@@ -364,7 +364,7 @@ def wash_urlargd(form, content):
 
     result = {}
 
-    content['ln'] = (str, CFG_SITE_LANG)
+    content['ln'] = (str, '')
 
     for k, (dst_type, default) in content.items():
         try:
