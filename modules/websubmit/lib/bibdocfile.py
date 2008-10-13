@@ -30,6 +30,7 @@ import urllib2
 import urllib
 import tempfile
 import cPickle
+import cgi
 from datetime import datetime
 from xml.sax.saxutils import quoteattr
 from mimetypes import MimeTypes
@@ -1695,6 +1696,8 @@ def bibdocfile_url_to_fullpath(url):
 def bibdocfile_url_p(url):
     """Return True when the url is a potential valid url pointing to a
     fulltext owned by a system."""
+    if url.startswith('%s/getfile.py' % CFG_SITE_URL) or url.startswith('%s/getfile.py' % CFG_SITE_SECURE_URL):
+        return True
     if not (url.startswith('%s/record/' % CFG_SITE_URL) or url.startswith('%s/record/' % CFG_SITE_SECURE_URL)):
         return False
     splitted_url = url.split('/files/')
@@ -1702,6 +1705,8 @@ def bibdocfile_url_p(url):
 
 def decompose_bibdocfile_url(url):
     """Given a bibdocfile_url return a triple (recid, docname, format)."""
+    if url.startswith('%s/getfile.py' % CFG_SITE_URL) or url.startswith('%s/getfile.py' % CFG_SITE_SECURE_URL):
+        return decompose_bibdocfile_very_old_url(url)
     if url.startswith('%s/record/' % CFG_SITE_URL):
         recid_file = url[len('%s/record/' % CFG_SITE_URL):]
     elif url.startswith('%s/record/' % CFG_SITE_SECURE_URL):
@@ -1720,6 +1725,34 @@ def decompose_bibdocfile_old_url(url):
     if g:
         return int(g.group(1))
     raise InvenioWebSubmitFileError('%s is not a valid old bibdocfile url' % url)
+
+def decompose_bibdocfile_very_old_url(url):
+    """Decompose an old /getfile.py? URL"""
+    if url.startswith('%s/getfile.py' % CFG_SITE_URL) or url.startswith('%s/getfile.py' % CFG_SITE_SECURE_URL):
+        params = urllib.splitquery(url)[1]
+        if params:
+            try:
+                params = cgi.parse_qs(params)
+                if 'docid' in params:
+                    docid = int(params['docid'][0])
+                    bibdoc = BibDoc(docid)
+                    recid = bibdoc.get_recid()
+                    docname = bibdoc.get_docname()
+                elif 'recid' in params and 'name' in params:
+                    docname = params['name'][0]
+                    recid = int(params['recid'][0])
+                else:
+                    raise InvenioWebSubmitFileError('%s has not enough params to correspond to a bibdocfile.' % url)
+                format = normalize_format(params.get('format', [''])[0])
+                return (recid, docname, format)
+            except Exception, e:
+                raise InvenioWebSubmitFileError('Problem with %s: %s' % (url, e))
+        else:
+            raise InvenioWebSubmitFileError('%s has no params to correspond to a bibdocfile.' % url)
+    else:
+        raise InvenioWebSubmitFileError('%s is not a valid very old bibdocfile url' % url)
+
+
 
 def nice_size(size):
     """Return a nicely printed size in kilo."""
