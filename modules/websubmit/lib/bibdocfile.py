@@ -1738,9 +1738,12 @@ def decompose_bibdocfile_very_old_url(url):
                     bibdoc = BibDoc(docid)
                     recid = bibdoc.get_recid()
                     docname = bibdoc.get_docname()
-                elif 'recid' in params and 'name' in params:
-                    docname = params['name'][0]
+                elif 'recid' in params:
                     recid = int(params['recid'][0])
+                    if 'name' in params:
+                        docname = params['name'][0]
+                    else:
+                        docname = ''
                 else:
                     raise InvenioWebSubmitFileError('%s has not enough params to correspond to a bibdocfile.' % url)
                 format = normalize_format(params.get('format', [''])[0])
