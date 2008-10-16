@@ -49,7 +49,7 @@ __revision__ = "$Id$"
 DEFAULT_SESSION_COOKIE_NAME = "CDSSESSION"
 DEFAULT_SESSION_COOKIE_DOMAIN = None
 DEFAULT_SESSION_COOKIE_PATH = "/"
-DEFAULT_CHECK_SESSION_ADDR = 1
+DEFAULT_CHECK_SESSION_ADDR = 0
 
 import re
 from time import time, gmtime, localtime, strftime, clock
