@@ -368,7 +368,7 @@ class SessionManager:
                 # responsible for revoking the session cookie.  Yuck.
                 raise SessionError(session_id=sessid)
             if (session.get_remote_address() >> DEFAULT_CHECK_SESSION_ADDR !=
-                _mkip(request.get_environ("REMOTE_ADDR")) >> DEFAULT_CHECK_SESSION_ADDR):
+                request.get_environ("REMOTE_ADDR") >> DEFAULT_CHECK_SESSION_ADDR):
                 raise SessionError("Remote IP address does not match the "
                                    "IP address that created the session",
                                    session_id=sessid)
@@ -521,7 +521,7 @@ class Session:
 
     def __init__ (self, request, id):
         self.id = id
-        self.__remote_address = _mkip(request.get_environ("REMOTE_ADDR"))
+        self.__remote_address = request.get_environ("REMOTE_ADDR")
         self.__creation_time = self.__access_time = time()
 
     def __repr__ (self):
