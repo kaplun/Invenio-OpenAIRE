@@ -43,7 +43,8 @@ pylib_DATA = __init__.py \
              intbitset_tests.py \
              inveniocfg.py \
              shellutils.py \
-             shellutils_tests.py
+             shellutils_tests.py \
+             spellutils.py
 
 noinst_DATA = testimport.py \
               kwalitee.py \

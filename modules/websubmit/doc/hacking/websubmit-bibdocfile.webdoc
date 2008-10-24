@@ -17,11 +17,10 @@
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
 
-<!-- WebDoc-Page-Title: BibDocFile API -->
-<!-- WebDoc-Page-Navtrail: <a class="navtrail" href="<CFG_SITE_URL>/help/hacking">Hacking CDS Invenio</a> -->
-<!-- WebDoc-Page-Navbar-Select: hacking-websubmit-bibdocfile -->
+<!-- WebDoc-Page-Title: Fulltext manipulation API -->
+<!-- WebDoc-Page-Navtrail: <a class="navtrail" href="<CFG_SITE_URL>/help/hacking">Hacking CDS Invenio</a> &gt; <a class="navtrail" href="websubmit-internals">WebSubmit Internals</a> -->
 
-<p>BibDocFile library handles every interaction relation between records and related fulltext document files.</p>
+<p>The BibDocFile library handles every interaction relation between records and related fulltext document files.</p>
 
 <h2>Nomenclature</h2>
 <p>
@@ -34,11 +33,109 @@
 </dl>
 </p>
 
-<h2>API</h2>
-<p>Given a <tt>record_id</tt>, BibRecDocs(record_id) will be an object useful to represent all the bibdocs connected to a record.</p>
+<h2>Python API</h2>
+<p>Given a <tt>record_id</tt>, <tt>BibRecDocs(record_id)</tt> will be an object useful to represent all the bibdocs connected to a record.</p>
 
-<p>Given a <tt>record_id</tt> and a <tt>docname</tt> or a <tt>document_id</tt>, BibDoc(recid=record_id, docname=docname) or BibDoc(docid=document_id) will be an object useful to represent all the possible version and formats of a document connected to a record.</p>
+<p>Given a <tt>record_id</tt> and a <tt>docname</tt> or a <tt>document_id</tt>, <tt>BibDoc(recid=record_id, docname=docname)</tt> or <tt>BibDoc(docid=document_id)</tt> will be an object useful to represent all the possible version and formats of a document connected to a record.</p>
 
-<p>By properly querying BibRecDocs and BibDoc you can obtain a BibDocFile. This is an object representing all the possible details related a single physical file, like a comment, a description, the path, the related URL, the size, the format, the version, the checksum, the protection...</p>
+<p>By properly querying <tt>BibRecDocs</tt> and <tt>BibDoc</tt> you can obtain a <tt>BibDocFile</tt>. This is an object representing all the possible details related a single physical file, like a comment, a description, the path, the related URL, the size, the format, the version, the checksum, the protection...</p>
 
-<p>Please refer to bibdocfile.py for a complete and up-to-date description of the API.</p>
+<p>Please refer to <tt>bibdocfile.py</tt> for a complete and up-to-date description of the API.</p>
+
+<h2>CLI API</h2>
+<protect><pre>
+Usage: bibdocfile <query> <action> [options]
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+  -v VERBOSE, --verbose=VERBOSE
+  --yes-i-know
+  -H, --human-readable  print sizes in human readable format (e.g., 1KB 234MB
+                        2GB)
+
+  Query parameters:
+    -a, --all           Select all the records
+    --show-deleted      Show deleted docname, too
+    -p PATTERN, --pattern=PATTERN
+                        select by specifying the search pattern
+    -c COLLECTION, --collection=COLLECTION
+                        select by collection
+    -r RECID, --recid=RECID
+                        select the recid (or the first recid in a range)
+    --recid2=RECID2     select the end of the range
+    -d DOCID, --docid=DOCID
+                        select by docid (or the first docid in a range)
+    --docid2=DOCID2     select the end of the range
+    --docname=DOCNAME   specify the docname to work on
+    --new-docname=NEWDOCNAME
+                        specify the desired new docname for revising
+    --doctype=DOCTYPE   specify the new doctype
+    --format=FORMAT     specify the format
+    --icon=ICON         specify the URL/path for an icon
+    --description=DESCRIPTION
+                        specify a description
+    --comment=COMMENT   specify a comment
+    --restriction=RESTRICTION
+                        specify a restriction tag
+    --force             force an action even when it's not necessary e.g.
+                        textify on an already textified bibdoc.
+
+  Actions:
+    --get-info          print all the informations about the
+                        record/bibdoc/file structure
+    --get-disk-usage    print statistics about usage disk usage
+    --get-docnames      print the document docnames
+    --get-history       print the document history
+    --delete            delete the specified docname
+    --undelete          undelete the specified docname
+    --list-available-flags
+                        list the available flags that can be used when
+                        revising/appending a file
+    --check-md5         check md5 checksum validity of files
+    --check-format      check if any format-related inconsistences exists
+    --check-duplicate-docnames
+                        check for duplicate docnames associated with the same
+                        record
+    --update-md5        update md5 checksum of files
+    --fix-all           fix inconsistences in filesystem vs database vs MARC
+    --fix-marc          synchronize MARC after filesystem/database
+    --fix-format        fix format related inconsistences
+    --fix-duplicate-docnames
+                        fix duplicate docnames associated with the same record
+    --textify           extract the text, to allow for indexing
+    --textify-with-ocr  extract the text to allow for indexing (and using OCR
+                        if possible)
+
+  Actions with parameter:
+    --merge-into=INTO_DOCNAME
+                        merge the docname speficied --docname into_docname
+    --revise=REVISE_PATH
+                        specify the URL/path of the file that will revise the
+                        bibdoc
+    --append=APPEND_PATH
+                        specify the URL/path of the file that will appended to
+                        the bibdoc
+    --revise_hide_previous=REVISE_HIDE_PATH
+                        specify the URL/path of the file that will revise the
+                        bibdoc, previous revisions will be hidden
+
+
+Examples:
+    $ bibdocfile --append foo.tar.gz --recid=1
+    $ bibdocfile --revise http://foo.com?search=123 --docname='sam'
+            --format=pdf --recid=3 --new-docname='pippo'
+    $ bibdocfile --delete *sam --all
+    $ bibdocfile --undelete -c "Test Collection"
+
+************************************************************************
+** WARNING                                                            **
+** ****************************************************************** **
+** The bibdocfile command line tool is in a state of high             **
+** developement. Please do not rely on the command line parameters to **
+** remain compatible for the next release. You should in particular   **
+** be aware that if you need to build scripts on top of the           **
+** bibdocfile command line interfaces, you will probably need to      **
+** revise them with the next release of CDS Invenio.                  **
+************************************************************************
+</pre></protect>

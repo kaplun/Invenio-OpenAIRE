@@ -40,12 +40,13 @@ class BibRecordSuccessTest(unittest.TestCase):
     def test_records_created(self):
         """ bibrecord - demo file how many records are created """
         self.assertEqual(101, len(self.recs))
+tools:modules/bibedit/lib/bibrecord_tests.py
 
     def test_tags_created(self):
         """ bibrecord - demo file which tags are created """
         ## check if the tags are correct
 
-        tags = [u'003', u'005', '020', '035', '037', '041', '080', '088',
+        tags = ['003', '005', '020', '024', '035', '037', '041', '080', '088',
             '100', '245', '246', '250', '260', '269', '270', '300', '340',
             '490', '500', '502', '520', '590', '595', '650', '653', '690',
             '695', '700', '710', '720', '773', '856', '859', '901', '909',
