@@ -315,13 +315,17 @@ def swap_temporary_reindex_tables(index_id, reindex_prefix="tmp_"):
         "%sidxWORD%02dR TO idxWORD%02dR," % (reindex_prefix, index_id, index_id) +
         "idxWORD%02dF TO old_idxWORD%02dF," % (index_id, index_id) +
         "%sidxWORD%02dF TO idxWORD%02dF," % (reindex_prefix, index_id, index_id) +
+        "idxPAIR%02dR TO old_idxPAIR%02dR," % (index_id, index_id) +
+        "%sidxPAIR%02dR TO idxPAIR%02dR," % (reindex_prefix, index_id, index_id) +
+        "idxPAIR%02dF TO old_idxPAIR%02dF," % (index_id, index_id) +
+        "%sidxPAIR%02dF TO idxPAIR%02dF," % (reindex_prefix, index_id, index_id) +
         "idxPHRASE%02dR TO old_idxPHRASE%02dR," % (index_id, index_id) +
         "%sidxPHRASE%02dR TO idxPHRASE%02dR," % (reindex_prefix, index_id, index_id) +
         "idxPHRASE%02dF TO old_idxPHRASE%02dF," % (index_id, index_id) +
         "%sidxPHRASE%02dF TO idxPHRASE%02dF;" % (reindex_prefix, index_id, index_id)
     )
     write_message("Dropping old re-indexed tables for id %s" % index_id, verbose=2)
-    run_sql("DROP TABLE old_idxWORD%02dR, old_idxWORD%02dF, old_idxPHRASE%02dR, old_idxPHRASE%02dF" % (index_id, index_id, index_id, index_id)
+    run_sql("DROP TABLE old_idxWORD%02dR, old_idxWORD%02dF, old_idxPAIR%02dR, old_idxPAIR%02dF, old_idxPHRASE%02dR, old_idxPHRASE%02dF" % (index_id, index_id, index_id, index_id, index_id, index_id)
     )
 
 def init_temporary_reindex_tables(index_id, reindex_prefix="tmp_"):
@@ -336,6 +340,21 @@ def init_temporary_reindex_tables(index_id, reindex_prefix="tmp_"):
                         ) ENGINE=MyISAM""" % (reindex_prefix, index_id))
 
     res = run_sql("""CREATE TABLE IF NOT EXISTS %sidxWORD%02dR (
+                        id_bibrec mediumint(9) unsigned NOT NULL,
+                        termlist longblob,
+                        type enum('CURRENT','FUTURE','TEMPORARY') NOT NULL default 'CURRENT',
+                        PRIMARY KEY (id_bibrec,type)
+                        ) ENGINE=MyISAM""" % (reindex_prefix, index_id))
+
+    res = run_sql("""CREATE TABLE IF NOT EXISTS %sidxPAIR%02dF (
+                        id mediumint(9) unsigned NOT NULL auto_increment,
+                        term varchar(100) default NULL,
+                        hitlist longblob,
+                        PRIMARY KEY  (id),
+                        UNIQUE KEY term (term)
+                        ) ENGINE=MyISAM""" % (reindex_prefix, index_id))
+
+    res = run_sql("""CREATE TABLE IF NOT EXISTS %sidxPAIR%02dR (
                         id_bibrec mediumint(9) unsigned NOT NULL,
                         termlist longblob,
                         type enum('CURRENT','FUTURE','TEMPORARY') NOT NULL default 'CURRENT',
@@ -404,6 +423,48 @@ def get_words_from_phrase(phrase, stemming_language=None, check_spelling=False):
                             words[alphanumeric_group] = 1
     for block in formulas:
         words[block] = 1
+    return words.keys()
+
+def get_pairs_from_phrase(phrase, stemming_language=None, check_spelling=False):
+    """Return list of words found in PHRASE.  Note that the phrase is
+       split into groups depending on the alphanumeric characters and
+       punctuation characters definition present in the config file.
+    """
+    if check_spelling and stemming_language:
+        phrase = spell_check(phrase, stemming_language)
+    words = {}
+    if CFG_BIBINDEX_REMOVE_HTML_MARKUP and phrase.find("</") > -1:
+        phrase = re_html.sub(' ', phrase)
+    if CFG_BIBINDEX_REMOVE_LATEX_MARKUP:
+        phrase = remove_latex_markup(phrase)
+        phrase = latex_formula_re.sub(' ', phrase)
+    try:
+        phrase = lower_index_term(phrase)
+    except UnicodeDecodeError:
+        # too bad the phrase is not UTF-8 friendly, continue...
+        phrase = phrase.lower()
+    # 1st split phrase into blocks according to whitespace
+    last_word = ''
+    for block in strip_accents(phrase).split():
+        # 2nd remove leading/trailing punctuation and add block:
+        block = re_block_punctuation_begin.sub("", block)
+        block = re_block_punctuation_end.sub("", block)
+        if block:
+            if stemming_language:
+                block = apply_stemming_and_stopwords_and_length_check(block, stemming_language)
+            # 3rd break each block into subblocks according to punctuation and add subblocks:
+            for subblock in re_punctuation.split(block):
+                if stemming_language:
+                    subblock = apply_stemming_and_stopwords_and_length_check(subblock, stemming_language)
+                if subblock:
+                    # 4th break each subblock into alphanumeric groups and add groups:
+                    for alphanumeric_group in re_separators.split(subblock):
+                        if stemming_language:
+                            alphanumeric_group = apply_stemming_and_stopwords_and_length_check(alphanumeric_group, stemming_language)
+                        if alphanumeric_group:
+                            if last_word:
+                                words['%s %s' % (last_word, alphanumeric_group)] = 1
+                            last_word = alphanumeric_group
     return words.keys()
 
 phrase_delimiter_re = re.compile(r'[\.:;\?\!]')
@@ -1322,12 +1383,12 @@ def task_run_core():
             _last_word_table = wordTable
             wordTable.report_on_table_consistency()
             task_sleep_now_if_required(can_stop_too=True)
-        _last_word_table = None
-        return True
 
-    if task_get_option("cmd") == "check":
-        wordTables = get_word_tables(task_get_option("windex"))
-        for index_id, index_tags in wordTables:
+            wordTable = WordTable(index_id, index_tags, 'idxPAIR%02dF', get_pairs_from_phrase, {'8564_u': get_nothing_from_phrase}, False)
+            _last_word_table = wordTable
+            wordTable.report_on_table_consistency()
+            task_sleep_now_if_required(can_stop_too=True)
+
             wordTable = WordTable(index_id, index_tags, 'idxPHRASE%02dF', get_phrases_from_phrase, {'8564_u': get_nothing_from_phrase}, False)
             _last_word_table = wordTable
             wordTable.report_on_table_consistency()
@@ -1390,6 +1451,61 @@ def task_run_core():
         except StandardError, e:
             write_message("Exception caught: %s" % e, sys.stderr)
             register_exception(alert_admin=True)
+            task_update_status("ERROR")
+            if _last_word_table:
+                _last_word_table.put_into_db()
+            sys.exit(1)
+
+        wordTable.report_on_table_consistency()
+        task_sleep_now_if_required(can_stop_too=True)
+
+        # Let's work on pairs now
+        wordTable = WordTable(index_id, index_tags, reindex_prefix + 'idxPAIR%02dF', get_pairs_from_phrase, {'8564_u': get_nothing_from_phrase}, False)
+        _last_word_table = wordTable
+        wordTable.report_on_table_consistency()
+        try:
+            if task_get_option("cmd") == "del":
+                if task_get_option("id"):
+                    wordTable.del_recIDs(task_get_option("id"))
+                    task_sleep_now_if_required(can_stop_too=True)
+                elif task_get_option("collection"):
+                    l_of_colls = task_get_option("collection").split(",")
+                    recIDs = perform_request_search(c=l_of_colls)
+                    recIDs_range = []
+                    for recID in recIDs:
+                        recIDs_range.append([recID,recID])
+                    wordTable.del_recIDs(recIDs_range)
+                    task_sleep_now_if_required(can_stop_too=True)
+                else:
+                    write_message("Missing IDs of records to delete from index %s." % wordTable.tablename,
+                                sys.stderr)
+                    raise StandardError
+            elif task_get_option("cmd") == "add":
+                if task_get_option("id"):
+                    wordTable.add_recIDs(task_get_option("id"), task_get_option("flush"))
+                    task_sleep_now_if_required(can_stop_too=True)
+                elif task_get_option("collection"):
+                    l_of_colls = task_get_option("collection").split(",")
+                    recIDs = perform_request_search(c=l_of_colls)
+                    recIDs_range = []
+                    for recID in recIDs:
+                        recIDs_range.append([recID,recID])
+                    wordTable.add_recIDs(recIDs_range, task_get_option("flush"))
+                    task_sleep_now_if_required(can_stop_too=True)
+                else:
+                    wordTable.add_recIDs_by_date(task_get_option("modified"), task_get_option("flush"))
+                    # let us update last_updated timestamp info, if run via automatic mode:
+                    task_sleep_now_if_required(can_stop_too=True)
+            elif task_get_option("cmd") == "repair":
+                wordTable.repair(task_get_option("flush"))
+                task_sleep_now_if_required(can_stop_too=True)
+            else:
+                write_message("Invalid command found processing %s" % \
+                    wordTable.tablename, sys.stderr)
+                raise StandardError
+        except StandardError, e:
+            write_message("Exception caught: %s" % e, sys.stderr)
+            register_exception()
             task_update_status("ERROR")
             if _last_word_table:
                 _last_word_table.put_into_db()
