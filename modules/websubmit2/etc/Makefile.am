@@ -15,6 +15,10 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = bibcatalog bibcheck bibcirculation bibclassify bibconvert bibedit bibexport bibharvest bibmatch bibmerge bibsched bibindex bibrank bibupload bibformat elmsubmit miscutil webstyle websession webhelp webbasket webalert websearch websubmit webaccess webmessage webstat webcomment webjournal websubmit2
+submission_submissions_dir = $(sysconfdir)/websubmit/submissions
 
-CLEANFILES = *~
+submission_submissions_DATA = DEMOTHE.sbm
+
+EXTRA_DIST = $(submission_submissions_DATA)
+
+CLEANFILES = *~ *.tmp

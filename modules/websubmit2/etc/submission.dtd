@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<!DOCTYPE submission [
+    <!ATTLIST submission id NMTOKEN #REQUIRED
+                         title CDATA #REQUIRED
+                         author CDATA #IMPLIED
+    >
+    <!ATTLIST element id ID #REQUIRED
+                      type CDATA #IMPLIED
+                      name NMTOKEN #IMPLIED
+                      source CDATA #IMPLIED
+                      label CDATA #IMPLIED
+                      prefix CDATA #IMPLIED
+                      suffix CDATA #IMPLIED
+                      default CDATA #IMPLIED
+    >
+    <!ATTLIST parameter key NMTOKEN #REQUIRED
+                        type (raw | python) #IMPLIED
+                        value CDATA #IMPLIED
+    >
+    <!ATTLIST translation lang NMTOKEN #REQUIRED
+                          label CDATA #IMPLIED
+                          prefix CDATA #IMPLIED
+                          suffix CDATA #IMPLIED
+    >
+    <!ATTLIST local_check name NMTOKEN #IMPLIED
+                          source NMTOKEN #IMPLIED
+    >
+    <!ATTLIST global_check name NMTOKEN #IMPLIED
+                           source NMTOKEN #IMPLIED
+    >
+    <!ATTLIST default type (raw | python) #IMPLIED>
+
+    <!ELEMENT submission (interface*, chains*)>
+    <!ELEMENT interface (element*, element-group*, global-check*)>
+    <!ELEMENT element (parameter*, default?, translation*, html-code?, local_check*)>
+    <!ELEMENT parameter (#PCDATA)>
+    <!ELEMENT default (#PCDATA)>
+    <!ELEMENT translation EMPTY>
+    <!ELEMENT html_code (#PCDATA)>
+    <!ELEMENT local_check (#PCDATA)>
+    <!ELEMENT chains (function*)>
+    <!ELEMENT function (parameter*)>
+    <!ELEMENT element-group (element*, element-group*)>
+    <!ELEMENT global-check (#PCDATA)>
+    <!ELEMENT default (#PCDATA)>
+]>

@@ -1,0 +1,71 @@
+author, email, (name *), title, (date *) # * based on the submission time
+different steps. they could be of two kinds:
+    interface to the user
+    chain of functions
+
+steps might have a position, and a name, and a title
+
+an interface might have a position and a name. it's made of two parts:
+    elements
+    global checks
+
+elements might have name, a default value, a compulsory attribute, a type,
+The type should correspond to an HTML template in /etc/websubmit/elements
+to an element might be associate a check.
+A local check is a Python function that takes the value, and some parameters, and returns
+True or raise Error-Message). A check must be a function that exists in /lib/python/invenio/websubmit-local-checks or might be embedded in the xml as an eval function.
+
+An element might be: a bool, an int, a float, a string, an enum, a multichoice, a string (with a suggest range), must have a title and an id (unique), and a position?, might have a prefix and a suffix, might have subelement for translation, might refer to HTML template
+
+e.g.:
+
+<element type="year" value-type="int" min="1970" max="2070" title="year of production" suffix="D.C." id="production-year">
+    <translation lang="it" title="anno di produzione" suffix="D.C." />
+    <default-value type="python">
+        <!-- this might go into /lib/python/invenio/websubmit-defaults/wsd-year.py
+        import datetime
+        return datetime.datetime.today().year
+    </default-value>
+    <html>
+        <!-- this might go into /etc/websubmit/elements/year.tpl -->
+        &lt;input type="text" id="%(element-id)s" value="%(value)s" size="4 maxlength="4" xml:lang="%(element-lang)s" tabindex="%(element-tabindex)s" title="%(element-title)s" accesskey="%(element-accesskey)s" onchange="check_%(element-id)s()"/>
+        &lt;script type="text/javascript">
+            function check_%(element-id)s() {
+                value = document.getElementById("%(element-id)s");
+                return value &lt;= %(element-max)s && value >= %(element-min)s;
+            }
+        &lt;/script>
+    <html>
+    <check>
+        <!-- this might go into /lib/python/invenio/websubmit-local-checks/wslc-year.py -->
+        if element_min &lt;= element_value %lt;= element_max:
+            return
+        raise _("Value of %(title)s not in the given range (%(min)s-%(max)s): %(value)s") % {
+                'title' : element_title,
+                'min' : element_min,
+                'max' : element_max,
+                'value' : element_value
+            }
+    </check>
+    <!-- <check script="year"/> -->
+
+</element>
+
+<step>
+    <element_group title="the title">
+        <translation lang="it" title="il titolo"/>
+        <element .../>
+        <element_group ...>
+            <element ...>
+            ...
+        </element_group>
+    </element_group>
+    <checks>
+        <!-- this might go into /lib/python/invenio/websubmit-global-check/wsgc-check.py -->
+        if everything's fine:
+            return
+        else:
+            raise "Berk!"
+    </checks>
+</step>
+
