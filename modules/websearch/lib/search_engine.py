@@ -34,6 +34,7 @@ import os
 import re
 import time
 import urllib
+import bisect
 import urlparse
 import zlib
 import sys
@@ -1772,13 +1773,14 @@ def browse_pattern(req, colls, p, f, rg, ln=CFG_SITE_LANG):
                     browsed_phrases_in_colls.append([phrase, len(phrase_hitset)])
 
         ## were there hits in collections?
-        if browsed_phrases_in_colls == []:
-            if browsed_phrases != []:
-                #print_warning(req, """<p>No match close to <em>%s</em> found in given collections.
-                #Please try different term.<p>Displaying matches in any collection...""" % p_orig)
+        if not browsed_phrases_in_colls:
+            if browsed_phrases:
+                print_warning(req, """<p>No match close to <em>%s</em> found in given collections.
+                Please try different term.</p>"""
+                #<p>Displaying matches in any collection...""" % p_orig)
                 ## try to get nbhits for these phrases in any collection:
-                for phrase in browsed_phrases:
-                    browsed_phrases_in_colls.append([phrase, get_nbhits_in_bibxxx(phrase, f)])
+                #for phrase in browsed_phrases:
+                    #browsed_phrases_in_colls.append([phrase, get_nbhits_in_bibxxx(phrase, f)])
 
     ## display results now:
     out = websearch_templates.tmpl_browse_pattern(
@@ -2739,22 +2741,50 @@ def get_nearest_terms_in_idxphrase(p, index_id, n_below, n_above):
 
     return res_above + res_below
 
+def get_nearest_terms_in_bibxxx_with_small_collection(p, f, n_below, n_above, collection):
+    """Browse (-n_above, +n_below) closest bibliographic phrases
+    for the given pattern p in the given field f, considering the
+    collection (hitSet).
+    return list of strings.
+    """
+    tags = get_field_tags(f)
+    values = dict()
+    for tag in tags:
+        values.update([(elem.lower(), 1) for elem in get_fieldvalues(collection, tag)])
+    values = values.keys()
+    values.sort()
+    pos = bisect.bisect(values, p.lower())
+    return values[pos - n_above:pos] + values[pos:n_below + pos]
+
+def get_term_from_id(id_term, index_id):
+    """Return the required term in the corresponding idxPHRASE."""
+    idxphraseX = "idxPHRASE%02dF" % index_id
+    res = run_sql("SELECT term FROM %s WHERE id=%%s" % idxphraseX, (id_term, ))
+    if res:
+        return ret[0][0]
+    else:
+        return ''
+
 def get_nearest_terms_in_idxphrase_with_collection(p, index_id, n_below, n_above, collection):
     """Browse (-n_above, +n_below) closest bibliographic phrases
        for the given pattern p in the given field idxPHRASE table,
        considering the collection (HitSet).
-       Return list of [(phrase1, hitset), (phrase2, hitset), ... , (phrase_n, hitset)]."""
+       Return list of [(id, phrase1, hitset), (id, phrase2, hitset), ... , (id, phrase_n, hitset)]."""
     idxphraseX = "idxPHRASE%02dF" % index_id
-    res_above = run_sql("SELECT term,hitlist FROM %s WHERE term<%%s ORDER BY term DESC LIMIT %%s" % idxphraseX, (p, n_above * 3))
-    res_above = [(term, HitSet(hitlist) & collection) for term, hitlist in res_above]
-    res_above = [(term, len(hitlist)) for term, hitlist in res_above if hitlist]
+    res_above = run_sql("SELECT id,term,hitlist FROM %s WHERE term<%%s ORDER BY term DESC LIMIT %%s" % idxphraseX, (p, n_above * 3), n_above * 3)
+    res2_above = [(id, term, HitSet(hitlist) & collection) for id, term, hitlist in res_above]
+    res3_above = [(id, term, len(hitlist)) for id, term, hitlist in res2_above if hitlist]
+    if len(res3_above) < n_above <= len(res_above):
+        res3_above.append((res_above[-1][0], res_above[-1][1], 0))
 
-    res_below = run_sql("SELECT term,hitlist FROM %s WHERE term>=%%s ORDER BY term ASC LIMIT %%s" % idxphraseX, (p, n_below * 3))
-    res_below = [(term, HitSet(hitlist) & collection) for term, hitlist in res_below]
-    res_below = [(term, len(hitlist)) for term, hitlist in res_below if hitlist]
+    res_below = run_sql("SELECT id,term,hitlist FROM %s WHERE term>=%%s ORDER BY term ASC LIMIT %%s" % idxphraseX, (p, n_below * 3), n_below * 3)
+    res2_below = [(id, term, HitSet(hitlist) & collection) for id, term, hitlist in res_below]
+    res3_below = [(id, term, len(hitlist)) for id, term, hitlist in res2_below if hitlist]
+    if len(res3_below) < n_below <= len(res_below):
+        res3_below.append((res_below[-1][0], res_below[-1][1], 0))
 
-    res_above.reverse()
-    return res_above[-n_above:] + res_below[:n_below]
+    res3_above.reverse()
+    return (res3_above[-n_above:] + res3_below[:n_below])
 
 
 def get_nearest_terms_in_bibxxx(p, f, n_below, n_above):
