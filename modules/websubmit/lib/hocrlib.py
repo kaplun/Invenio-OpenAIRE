@@ -46,16 +46,11 @@ def extract_hocr(hocr_text):
         def store_current_page(self):
             if self.image:
                 self.store_current_line()
-<<<<<<< HEAD:modules/websubmit/lib/hocrlib.py
-                self.sort_current_lines()
-=======
->>>>>>> New file conversion tools library.:modules/websubmit/lib/hocrlib.py
                 self.pages.append((self.page_bbox, self.image, self.lines))
                 self.page_bbox = None
                 self.image = ''
                 self.lines = []
 
-<<<<<<< HEAD:modules/websubmit/lib/hocrlib.py
         def sort_current_lines(self):
             def line_cmp(a, b):
                 y0_a = a[0][1]
@@ -64,8 +59,6 @@ def extract_hocr(hocr_text):
 
             self.lines.sort(line_cmp)
 
-=======
->>>>>>> New file conversion tools library.:modules/websubmit/lib/hocrlib.py
         def store_current_line(self):
             if self.bbox:
                 self.lines.append((self.bbox, _RE_CLEAN_SPACES.sub(' ', self.text).strip()))
@@ -176,7 +169,6 @@ def create_pdf(hocr, filename, font="Courier", author=None, keywords=None, subje
             width = (x1 - x0) / ratio
             height = ((y1 - y0) / ratio)
             x0 = x0 / ratio
-<<<<<<< HEAD:modules/websubmit/lib/hocrlib.py
             #for ch in 'gjpqy,(){}[];$@':
                 #if ch in line:
                     #y0 = A4[1] - (y0 / ratio) - height
@@ -194,20 +186,6 @@ def create_pdf(hocr, filename, font="Courier", author=None, keywords=None, subje
                 canvas.drawText(text_object)
             else:
                 info('%s, %s has width 0' % (bbox, line))
-=======
-            for ch in 'gjpqy,(){}[];$@':
-                if ch in line:
-                    y0 = A4[1] - (y0 / ratio) - height
-                    break
-            else:
-                y0 = A4[1] - (y0 / ratio) - height
-            canvas.setFontSize(height * 1.5)
-            text_width = canvas.stringWidth(line)
-            text_object = canvas.beginText(x0, y0)
-            text_object.setHorizScale(width / text_width * 100)
-            text_object.textOut(line)
-            canvas.drawText(text_object)
->>>>>>> New file conversion tools library.:modules/websubmit/lib/hocrlib.py
             if draft:
                 canvas.setStrokeColor(green)
                 canvas.rect(x0, y0, width, height)
