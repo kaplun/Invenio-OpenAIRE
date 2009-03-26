@@ -1631,7 +1631,7 @@ def search_pattern(req=None, p=None, f=None, m=None, ap=0, of="id", verbose=0, l
                     if of.startswith('h'):
                         if req:
                             if bsu_f == "recid":
-                                print_warning(req, "Requested record does not seem to exist.")
+                                print_warning(req, _("Requested record does not seem to exist."))
                             else:
                                 print_warning(req, create_nearest_terms_box(req.argd, bsu_p, bsu_f, bsu_m, ln=ln))
                     return hitset_empty
@@ -1640,7 +1640,7 @@ def search_pattern(req=None, p=None, f=None, m=None, ap=0, of="id", verbose=0, l
                 if of.startswith('h'):
                     if req:
                         if bsu_f == "recid":
-                            print_warning(req, "Requested record does not seem to exist.")
+                            print_warning(req, _("Requested record does not seem to exist."))
                         else:
                             print_warning(req, create_nearest_terms_box(req.argd, bsu_p, bsu_f, bsu_m, ln=ln))
                 return hitset_empty
@@ -3935,7 +3935,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 if req.header_only:
                     raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
                 else:
-                    print_warning(req, "Requested record does not seem to exist.")
+                    print_warning(req, _("Requested record does not seem to exist."))
             if of == "id":
                 return []
             elif of.startswith("x"):
@@ -3986,7 +3986,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
         if record_exists(recID) != 1:
             # record does not exist
             if of.startswith("h"):
-                print_warning(req, "Requested record does not seem to exist.")
+                print_warning(req, _("Requested record does not seem to exist."))
             if of == "id":
                 return []
             elif of.startswith("x"):

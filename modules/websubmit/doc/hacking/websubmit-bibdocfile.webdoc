@@ -44,54 +44,119 @@
 
 <h2>CLI API</h2>
 <protect><pre>
-Usage: bibdocfile <query> <action> [options]
+Usage: bibdocfile [options]
 
 Options:
   --version             show program's version number and exit
   -h, --help            show this help message and exit
-  -v VERBOSE, --verbose=VERBOSE
-  --yes-i-know
+  -D, --debug
   -H, --human-readable  print sizes in human readable format (e.g., 1KB 234MB
                         2GB)
 
-  Query parameters:
+  Query options:
+    -r RECIDS, --recids=RECIDS
+                        matches records by recids, e.g.: --recids=1-3,5-7
+    -d DOCIDS, --docids=DOCIDS
+                        matches documents by docids, e.g.: --docids=1-3,5-7
     -a, --all           Select all the records
-    --show-deleted      Show deleted docname, too
+    --with-deleted-recs=yes/no/only
+                        'Yes' to also match deleted records, 'no' to exclude
+                        them, 'only' to match only deleted ones
+    --with-deleted-docs=yes/no/only
+                        'Yes' to also match deleted documents, 'no' to exclude
+                        them, 'only' to match only deleted ones (e.g. for
+                        undeletion)
+    --with-empty-recs=yes/no/only
+                        'Yes' to also match records without attached
+                        documents, 'no' to exclude them, 'only' to consider
+                        only such records (e.g. for statistics)
+    --with-empty-docs=yes/no/only
+                        'Yes' to also match documents without attached files,
+                        'no' to exclude them, 'only' to consider only such
+                        documents (e.g. for sanity checking)
+    --with-record-modification-date=date1,date2
+                        matches records modified date1 and date2; dates can be
+                        expressed relatively, e.g.:"-5m,2030-2-23 04:40" #
+                        matches records modified since 5 minutes ago until the
+                        2030...
+    --with-record-creation-date=date1,date2
+                        matches records created between date1 and date2; dates
+                        can be expressed relatively
+    --with-document-modification-date=date1,date2
+                        matches documents modified between date1 and date2;
+                        dates can be expressed relatively
+    --with-document-creation-date=date1,date2
+                        matches documents created between date1 and date2;
+                        dates can be expressed relatively
+    --url=URL           matches the document referred by the URL, e.g. "http:/
+                        /pcsk.cern.ch/record/1/files/foobar.pdf?version=2"
+    --path=PATH         matches the document referred by the internal
+                        filesystem path, e.g. /opt/cds-
+                        dev/var/data/files/g0/1/foobar.pdf\;1
+    --with-docname=DOCNAME
+                        matches documents with the given docname (accept
+                        wildcards)
+    --with-doctype=DOCTYPE
+                        matches documents with the given doctype
     -p PATTERN, --pattern=PATTERN
-                        select by specifying the search pattern
+                        matches records by pattern
     -c COLLECTION, --collection=COLLECTION
-                        select by collection
-    -r RECID, --recid=RECID
-                        select the recid (or the first recid in a range)
-    --recid2=RECID2     select the end of the range
-    -d DOCID, --docid=DOCID
-                        select by docid (or the first docid in a range)
-    --docid2=DOCID2     select the end of the range
-    --docname=DOCNAME   specify the docname to work on
-    --new-docname=NEWDOCNAME
-                        specify the desired new docname for revising
-    --doctype=DOCTYPE   specify the new doctype
-    --format=FORMAT     specify the format
-    --icon=ICON         specify the URL/path for an icon
-    --description=DESCRIPTION
-                        specify a description
-    --comment=COMMENT   specify a comment
-    --restriction=RESTRICTION
-                        specify a restriction tag
+                        matches records by collection
     --force             force an action even when it's not necessary e.g.
                         textify on an already textified bibdoc.
 
-  Actions:
-    --get-info          print all the informations about the
-                        record/bibdoc/file structure
-    --get-disk-usage    print statistics about usage disk usage
-    --get-docnames      print the document docnames
-    --get-history       print the document history
-    --delete            delete the specified docname
-    --undelete          undelete the specified docname
-    --list-available-flags
-                        list the available flags that can be used when
-                        revising/appending a file
+  Actions for getting information:
+    --get-info          print all the informations about the matched
+                        record/documents
+    --get-disk-usage    print disk usage statistics of the matched documents
+    --get-history       print the matched documents history
+
+  Actions for setting information:
+    --set-doctype=doctype
+                        specify the new doctype
+    --set-description=description
+                        specify a description
+    --set-comment=comment
+                        specify a comment
+    --set-restriction=restriction
+                        specify a restriction tag
+    --set-docname=docname
+                        specifies a new docname for renaming
+    --unset-comment     remove any comment
+    --unset-descriptions
+                        remove any description
+    --unset-restrictions
+                        remove any restriction
+    --hide              hides matched documents and revisions
+    --unhide            hides matched documents and revisions
+
+  Action for revising content:
+    --append=PATH/URL   specify the URL/path of the file that will appended to
+                        the bibdoc
+    --revise=PATH/URL   specify the URL/path of the file that will revise the
+                        bibdoc
+    --revert            reverts a document to the specified version
+    --delete            soft-delete the matched documents (applies to all
+                        revisions and formats)
+    --hard-delete       hard-delete the matched documents (applies to matched
+                        revisions and formats)
+    --undelete          undelete previosuly soft-deleted documents (applies to
+                        all revisions and formats)
+    --purge             purge (i.e. hard-delete previous versions) the matched
+                        documents
+    --expunge           expunge (i.e. hard-delete any version and formats) the
+                        matched documents
+    --with-versions=VERSION
+                        specifies the version(s) to be used with hard-delete,
+                        hide, revert, e.g.: 1-2,3 or all
+    --with-format=FORMAT
+                        to specify a format when
+                        appending/revising/deleting/reverting a document, e.g.
+                        "pdf"
+    --with-hide-previous
+                        when revising, hides previous versions
+
+  Actions for housekeeping:
     --check-md5         check md5 checksum validity of files
     --check-format      check if any format-related inconsistences exists
     --check-duplicate-docnames
@@ -103,39 +168,28 @@ Options:
     --fix-format        fix format related inconsistences
     --fix-duplicate-docnames
                         fix duplicate docnames associated with the same record
-    --textify           extract the text, to allow for indexing
-    --textify-with-ocr  extract the text to allow for indexing (and using OCR
-                        if possible)
 
-  Actions with parameter:
-    --merge-into=INTO_DOCNAME
-                        merge the docname speficied --docname into_docname
-    --revise=REVISE_PATH
-                        specify the URL/path of the file that will revise the
-                        bibdoc
-    --append=APPEND_PATH
-                        specify the URL/path of the file that will appended to
-                        the bibdoc
-    --revise_hide_previous=REVISE_HIDE_PATH
-                        specify the URL/path of the file that will revise the
-                        bibdoc, previous revisions will be hidden
+  Experimental options (do not expect to find them in the next release):
+    --set-icon=URL/PATH
+                        attache the specified icon to the matched documents
+    --unset-icon        remove any icon on the matched documents
+    --textify           extract text from matched documents and store it for
+                        later indexing
+    --with-ocr=yes/no/always
+                        when used with --textify, wether to perform OCR (yes
+                        will perform it only if necessary, based on an
+                        heuristic)
 
 
 Examples:
     $ bibdocfile --append foo.tar.gz --recid=1
-    $ bibdocfile --revise http://foo.com?search=123 --docname='sam'
-            --format=pdf --recid=3 --new-docname='pippo'
-    $ bibdocfile --delete *sam --all
-    $ bibdocfile --undelete -c "Test Collection"
-
-************************************************************************
-** WARNING                                                            **
-** ****************************************************************** **
-** The bibdocfile command line tool is in a state of high             **
-** developement. Please do not rely on the command line parameters to **
-** remain compatible for the next release. You should in particular   **
-** be aware that if you need to build scripts on top of the           **
-** bibdocfile command line interfaces, you will probably need to      **
-** revise them with the next release of CDS Invenio.                  **
-************************************************************************
+    $ bibdocfile --revise http://foo.com?search=123 --with-docname='sam'
+            --format=pdf --recid=3 --set-docname='pippo' # revise for record 3
+                    # the document sam, renaming it to pippo.
+    $ bibdocfile --delete *sam --all # delete all documents starting ending
+                                     # with "sam"
+    $ bibdocfile --undelete -c "Test Collection" # undelete documents for
+                                                 # the collection
+    $ bibdocfile --get-info --recids=1-4,6-8 # obtain informations
+    $ bibdocfile -r 1 --with-docname=foo --set-docname=bar # Rename a document
 </pre></protect>
