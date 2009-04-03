@@ -51,7 +51,8 @@ from invenio.config import CFG_TMPDIR, CFG_ETCDIR, CFG_PYLIBDIR, \
     CFG_OPENOFFICE_SERVER_HOST, \
     CFG_OPENOFFICE_SERVER_PORT, \
     CFG_OPENOFFICE_USER, \
-    CFG_PATH_CONVERT
+    CFG_PATH_CONVERT, \
+    CFG_PATH_PAMFILE
 
 from invenio.websubmit_config import \
     CFG_WEBSUBMIT_BEST_FORMATS_TO_EXTRACT_TEXT_FROM, \
@@ -139,7 +140,7 @@ def get_conversion_map():
             ret['.pdf']['.ps.gz'] = (pdf2ps, {'compress' : True})
     if CFG_PATH_PDFTOTEXT:
         ret['.pdf']['.txt'] = (pdf2text, {})
-    if CFG_PATH_PDFTOPPM and CFG_PATH_OCROSCRIPT:
+    if CFG_PATH_PDFTOPPM and CFG_PATH_OCROSCRIPT and CFG_PATH_PAMFILE:
         ret['.pdf']['.hocr'] = (pdf2hocr, {})
     if CFG_PATH_PDFTOPS and CFG_PATH_GS and CFG_PATH_PDFOPT and CFG_PATH_PDFINFO:
         ret['.pdf']['.pdf'] = (pdf2pdfa, {})
@@ -627,10 +628,25 @@ def pdf2hocr(input_file, output_file=None, ln='en', return_working_dir=False, ex
         if extract_only_text:
             out = ''
         else:
-            out = """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml"><head><meta content="ocr_line ocr_page" name="ocr-capabilities"/><meta content="en" name="ocr-langs"/><meta content="Latn" name="ocr-scripts"/><meta content="" name="ocr-microformats"/><title>OCR Output</title></head>
-<body><div class="ocr_page" title="bbox 0 0 3508 2481; image %s">
-</div></body></html>""" % os.path.join(working_dir, imagefile)
+            try:
+                ## Since pdftoppm is returning a netpbm image, we use
+                ## pamfile to retrieve the size of the image, in order to
+                ## create an empty .hocr file containing just the
+                ## desired file and a reference to its size.
+                dummy, stdout, stderr = run_shell_command('%s %s' % (escape_shell_arg(CFG_PATH_PAMFILE), escape_shell_arg(os.path.join(working_dir, imagefile))))
+                g = re.search(r'(?P<width>\d+) by (?P<height>\d+)', stdout)
+                if g:
+                    width = int(g.group('width'))
+                    height = int(g.group('height'))
+
+                    out = """<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+    <html xmlns="http://www.w3.org/1999/xhtml"><head><meta content="ocr_line ocr_page" name="ocr-capabilities"/><meta content="en" name="ocr-langs"/><meta content="Latn" name="ocr-scripts"/><meta content="" name="ocr-microformats"/><title>OCR Output</title></head>
+    <body><div class="ocr_page" title="bbox 0 0 %s %s; image %s">
+    </div></body></html>""" % (width, height, os.path.join(working_dir, imagefile))
+                else:
+                    raise InvenioWebSubmitFileConverterError
+            except Exception, err:
+                raise InvenioWebSubmitFileConverterError, 'It\'s impossible to retrieve the size of %s needed to perform a dummy OCR. The stdout of pamfile was: %s, the stderr was: %s. (%s)' % (imagefile, stdout, stderr, err)
         open(os.path.join(working_dir, 'recognize.out'), 'w').write(out)
 
     if CFG_PATH_OCROSCRIPT:

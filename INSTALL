@@ -36,7 +36,7 @@ Contents
               python2.3-mysqldb python2.3-4suite python-simplejson \
               python2.3-xml python2.3-libxml2 python2.3-libxslt1 \
               rxp gnuplot xpdf-utils gs-common antiword catdoc \
-              wv html2text ppthtml xlhtml clisp gettext
+              wv html2text ppthtml xlhtml clisp gettext netpbm
 
         You can also install the following packages:
 
@@ -143,6 +143,8 @@ Contents
               <http://pyenchant.sourceforge.net/>
           - to generate PDF after OCR: ReportLab
               <http://www.reportlab.org/rl_toolkit.html>
+          - to analyze images to generate PDF after OCR: netpbm
+              <http://netpbm.sourceforge.net/>
 
      h) If you have chosen to install fast XML MARC Python processors
         in the step d) above, then you have to install the parsers

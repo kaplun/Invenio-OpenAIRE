@@ -279,6 +279,20 @@ if test -z "$PDFTOPPM"; then
    <http://poppler.freedesktop.org/>.])
 fi
 
+## Check for pdfimages:
+AC_PATH_PROG(PAMFILE, pdftoppm)
+if test -z "$PAMFILE"; then
+   AC_MSG_WARN([
+   pamfile was not found in your PATH.  It is used in
+   the WebSubmit module to retrieve the size of images extracted from PDFs
+   for OCR.
+   You can continue without it but you will miss some CDS Invenio
+   functionality.  We recommend you to install it first and to rerun
+   the configure script.  pamfile is available as part of the netpbm utilities
+   from:
+   <http://netpbm.sourceforge.net/>.])
+fi
+
 ## Check for ocroscript:
 AC_PATH_PROG(OCROSCRIPT, ocroscript)
 if test -z "$OCROSCRIPT"; then
