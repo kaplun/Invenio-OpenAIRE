@@ -1,5 +1,7 @@
+## $Id: websubmit_templates.py,v 1.14 2007/08/17 13:10:13 nich Exp $
+
 ## This file is part of CDS Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
+## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007 CERN.
 ##
 ## CDS Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -15,7 +17,7 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-__revision__ = "$Id$"
+__revision__ = "$Id: websubmit_templates.py,v 1.14 2007/08/17 13:10:13 nich Exp $"
 
 import urllib
 import time
@@ -28,25 +30,19 @@ import operator
 import os
 
 from invenio.config import \
-     CFG_SITE_URL, \
-     CFG_VERSION, \
-     CFG_SITE_URL, \
-     CFG_SITE_LANG
+     accessurl, \
+     images, \
+     version, \
+     weburl
 from invenio.messages import gettext_set_language
-from invenio.dateutils import convert_datetext_to_dategui
-from invenio.urlutils import create_html_link
-from invenio.webmessage_mailutils import email_quoted_txt2html
-from invenio.htmlutils import escape_html
-import invenio.template
-
+##----NEW STUFF--------------------
+from invenio.config import cdslang
+##----END OF NEW STUFF-------------
 class Template:
 
     # Parameters allowed in the web interface for fetching files
     files_default_urlargd = {
-        'version': (str, ""), # version "" means "latest"
-        'docname': (str, ""), # the docname (optional)
-        'format' : (str, ""), # the format
-        'verbose' : (int, 0) # the verbosity
+        'version': (str, "") # version "" means "latest"
         }
 
 
@@ -80,7 +76,10 @@ class Template:
                     <table width="100%%">
                     <tr>
                         <td width="50%%" class="narrowsearchboxbody">
-                            %(catalogues)s
+                          <form method="get" action="/submit">
+                            <input type="hidden" name="doctype" />
+                              %(catalogues)s
+                          </form>
                         </td>
                     </tr>
                     </table>
@@ -88,9 +87,8 @@ class Template:
               </tr>
             </table>""" % {
               'document_types' : _("Document types available for submission"),
-              'please_select' : _("Please select the type of document you want to submit"),
+              'please_select' : _("Please select the type of document you want to submit."),
               'catalogues' : catalogues,
-              'ln' : ln,
             }
 
     def tmpl_submit_home_catalog_no_content(self, ln):
@@ -139,27 +137,6 @@ class Template:
 
         return out
 
-    def tmpl_print_warning(self, msg, type, prologue, epilogue):
-        """Prints warning message and flushes output.
-
-        Parameters:
-
-          - 'msg' *string* - The message string
-
-          - 'type' *string* - the warning type
-
-          - 'prologue' *string* - HTML code to display before the warning
-
-          - 'epilogue' *string* - HTML code to display after the warning
-        """
-
-        out = '\n%s<span class="quicknote">' % (prologue)
-        if type:
-            out += '%s: ' % type
-        out += '%s</span>%s' % (msg, epilogue)
-        return out
-
-
     def tmpl_submit_home_catalogs_sub(self, ln, catalog):
         """
         Recursive function that produces a catalog's HTML display
@@ -184,10 +161,10 @@ class Template:
             out = "<li><font size=\"+1\"><strong>%s</strong></font>\n" % catalog['name']
         else:
             if catalog['level'] == 2:
-                out = "<li>%s\n" % cgi.escape(catalog['name'])
+                out = "<li>%s\n" % catalog['name']
             else:
                 if catalog['level'] > 2:
-                    out = "<li>%s\n" % cgi.escape(catalog['name'])
+                    out = "<li>%s\n" % catalog['name']
 
         if len(catalog['docs']) or len(catalog['sons']):
             out += "<ul>\n"
@@ -204,7 +181,7 @@ class Template:
             out += "</ul></li>"
         else:
             out += "</li>"
-
+            
         return out
 
     def tmpl_submit_home_catalogs_doctype(self, ln, doc):
@@ -223,7 +200,7 @@ class Template:
         # load the right message language
         _ = gettext_set_language(ln)
 
-        return """<li>%s</li>""" % create_html_link('%s/submit' % CFG_SITE_URL, {'doctype' : doc['id'], 'ln' : ln}, doc['name'])
+        return """<li><a href="" onclick="document.forms[0].doctype.value='%(id)s';document.forms[0].submit();return false;">%(name)s</a></li>""" % doc
 
     def tmpl_action_page(self, ln, uid, guest, pid, now, doctype,
                          description, docfulldesc, snameCateg,
@@ -298,9 +275,8 @@ class Template:
 
                 <input type="hidden" name="act" />
                 <input type="hidden" name="startPg" value="1" />
-                <input type="hidden" name="mainmenu" value="/submit?doctype=%(doctype)s&amp;ln=%(ln)s" />
+                <input type="hidden" name="mainmenu" value="/submit?doctype=%(doctype)s" />
 
-                <input type="hidden" name="ln" value="%(ln)s" />
                 <table class="searchbox" width="100%%" summary="">
                   <tr>
                     <th class="portalboxheader">%(docfulldesc)s</th>
@@ -321,7 +297,6 @@ class Template:
                       'pid' : pid,
                       'docfulldesc' : docfulldesc,
                       'description' : description,
-                      'ln' : ln,
                     }
 
         if len(snameCateg) :
@@ -340,7 +315,7 @@ class Template:
                     <table><tr><td>
                """
         #display list of actions
-        for i in range(0, len(actionShortDesc)):
+        for i in range(0,len(actionShortDesc)):
             out += """<input type="submit" class="adminbutton" value="%(status)s" onclick="if (tester()) { document.forms[0].indir.value='%(indir)s';document.forms[0].act.value='%(act)s';document.forms[0].submit();}; return false;" /><br />""" % {
                      'status' : statustext[i],
                      'indir' : indir[i],
@@ -359,7 +334,7 @@ class Template:
                     }
         out += """
                 <br /><br />
-
+            
                 </td>
                 </tr>
                 </table>
@@ -370,7 +345,6 @@ class Template:
                     <td width="100%%">
                     <small>Access Number: <input size="15" name="AN" />
                       <input type="hidden" name="doctype" value="%(doctype)s" />
-                      <input type="hidden" name="ln" value="%(ln)s" />
                       <input class="adminbutton" type="submit" value=" %(go)s " />
                     </small>
                     </td></tr>
@@ -381,7 +355,6 @@ class Template:
                 'continue_explain' : _("To continue with a previously interrupted submission, enter an access number into the box below:"),
                   'doctype' : doctype,
                   'go' : _("GO"),
-                  'ln' : ln,
                 }
 
         return out
@@ -402,7 +375,7 @@ class Template:
 
         return """<center><font color="red">%s</font></center>""" % msg
 
-    def tmpl_page_interface(self, ln, docname, actname, curpage, nbpages, nextPg, access, nbPg, doctype, act, fields, javascript, mainmenu):
+    def tmpl_page_interface(self, ln, docname, actname, curpage, nbpages, file, nextPg, access, nbPg, doctype, act, indir, fields, javascript, images, mainmenu):
         """
         Produces a page with the specified fields (in the submit chain)
 
@@ -427,6 +400,8 @@ class Template:
           - 'access' *string* - The submission number
 
           - 'nbPg' *string* - ??
+
+          - 'indir' *string* - the directory of submitting
 
           - 'fields' *array* - the fields to display in the page, with each record having the structure:
 
@@ -456,6 +431,8 @@ class Template:
 
           - 'javascript' *string* - the javascript code to insert in the page
 
+          - 'images' *string* - the path to the images
+
           - 'mainmenu' *string* - the url of the main menu
 
         """
@@ -465,7 +442,7 @@ class Template:
 
         # top menu
         out = """
-                <form method="post" action="/submit" enctype="multipart/form-data" onsubmit="return tester();">
+                <form method="post" action="/submit" onsubmit="return tester();">
                 <center><table cellspacing="0" cellpadding="0" border="0">
                   <tr>
                     <td class="submitHeader"><b>%(docname)s&nbsp;</b></td>
@@ -482,33 +459,35 @@ class Template:
             if i == int(curpage):
                 out += """<td class="submitCurrentPage"><small>&nbsp;page: %s&nbsp;</small></td>""" % curpage
             else:
-                out += """<td class="submitPage"><small>&nbsp;<a href='' onclick="if (tester2() == 1){document.forms[0].curpage.value=%s;document.forms[0].submit();return false;} else { return false; }">%s</a>&nbsp;</small></td>""" % (i, i)
+                out += """<td class="submitPage"><small>&nbsp;<a href='' onclick="if (tester2() == 1){document.forms[0].curpage.value=%s;document.forms[0].submit();return false;} else { return false; }">%s</a>&nbsp;</small></td>""" % (i,i)
         out += """        <td class="submitEmptyPage">&nbsp;&nbsp;
                         </td></tr></table>
                     </td>
-                    <td class="submitHeader" align="right">&nbsp;<a href="" onclick="window.open('/submit/summary?doctype=%(doctype)s&amp;act=%(act)s&amp;access=%(access)s&amp;ln=%(ln)s','summary','scrollbars=yes,menubar=no,width=500,height=250');return false;"><font color="white"><small>%(summary)s(2)</small></font></a>&nbsp;</td>
+                    <td class="submitHeader" align="right">&nbsp;<a href='' onclick="window.open('/submit/summary?doctype=%(doctype)s&amp;act=%(act)s&amp;access=%(access)s&amp;indir=%(indir)s','summary','scrollbars=yes,menubar=no,width=500,height=250');return false;"><font color="white"><small>%(summary)s(2)</small></font></a>&nbsp;</td>
                   </tr>
                   <tr><td colspan="5" class="submitHeader">
                     <table border="0" cellspacing="0" cellpadding="15" width="100%%" class="submitBody"><tr><td>
                      <br />
+                     <input type="hidden" name="file" value="%(file)s" />
                      <input type="hidden" name="nextPg" value="%(nextPg)s" />
                      <input type="hidden" name="access" value="%(access)s" />
                      <input type="hidden" name="curpage" value="%(curpage)s" />
                      <input type="hidden" name="nbPg" value="%(nbPg)s" />
                      <input type="hidden" name="doctype" value="%(doctype)s" />
                      <input type="hidden" name="act" value="%(act)s" />
+                     <input type="hidden" name="indir" value="%(indir)s" />
                      <input type="hidden" name="mode" value="U" />
                      <input type="hidden" name="step" value="0" />
-                     <input type="hidden" name="ln" value="%(ln)s" />
                 """ % {
                  'summary' : _("SUMMARY"),
-                 'doctype' : cgi.escape(doctype),
-                 'act' : cgi.escape(act),
-                 'access' : cgi.escape(access),
-                 'nextPg' : cgi.escape(nextPg),
-                 'curpage' : cgi.escape(curpage),
-                 'nbPg' : cgi.escape(nbPg),
-                 'ln' : cgi.escape(ln),
+                 'doctype' : doctype,
+                 'act' : act,
+                 'access' : access,
+                 'indir' : indir,
+                 'file' : file,
+                 'nextPg' : nextPg,
+                 'curpage' : curpage,
+                 'nbPg' : nbPg,
                }
 
         for field in fields:
@@ -516,7 +495,7 @@ class Template:
                 out += """<script language="JavaScript1.1"  type="text/javascript">
                           %s
                           </script>
-                       """ % field['javascript']
+                       """ % field['javascript'];
 
             # now displays the html form field(s)
             out += "%s\n%s\n" % (field['fullDesc'], field['text'])
@@ -536,7 +515,7 @@ class Template:
                        </td>
             """ % {
               'prpage' : int(curpage) - 1,
-              'images' : CFG_SITE_URL + '/img',
+              'images' : images,
               'prevpage' : _("Previous page"),
             }
         else:
@@ -544,7 +523,7 @@ class Template:
         # Display the submission number
         out += """ <td class="submitHeader" align="center"><small>%(submission)s: %(access)s</small></td>\n""" % {
                 'submission' : _("Submission number") + '(1)',
-                'access' : cgi.escape(access),
+                'access' : access,
               }
         # Display the "next page" navigation arrow
         if int(curpage) != int(nbpages):
@@ -556,7 +535,7 @@ class Template:
                        </td>
             """ % {
               'nxpage' : int(curpage) + 1,
-              'images' : CFG_SITE_URL + '/img',
+              'images' : images,
               'nextpage' : _("Next page"),
             }
         else:
@@ -574,8 +553,8 @@ class Template:
                """ % {
                  'surequit' : _("Are you sure you want to quit this submission?"),
                  'back' : _("Back to main menu"),
-                 'mainmenu' : cgi.escape(mainmenu),
-                 'images' : CFG_SITE_URL + '/img',
+                 'mainmenu' : mainmenu,
+                 'images' : images,
                  'take_note' : '(1) ' + _("This is your submission access number. It can be used to continue with an interrupted submission in case of problems."),
                  'explain_summary' : '(2) ' + _("Mandatory fields appear in red in the SUMMARY window."),
                }
@@ -619,7 +598,7 @@ class Template:
         # If the field is a textarea
         if field['type'] == 'T':
             ## Field is a textarea:
-            text = "<textarea name=\"%s\" rows=\"%s\" cols=\"%s\">%s</textarea>" \
+            text="<textarea name=\"%s\" rows=\"%s\" cols=\"%s\">%s</textarea>" \
                   % (field['name'], field['rows'], field['cols'], cgi.escape(str(field['val']), 1))
         # If the field is a file upload
         elif field['type'] == 'F':
@@ -635,20 +614,20 @@ class Template:
                       % ((field['maxlength'] in (0, None) and " ") or (""" maxlength="%s\"""" % field['maxlength'])) )
         # If the field is a hidden input
         elif field['type'] == 'H':
-            text = "<input type=\"hidden\" name=\"%s\" value=\"%s\" />" % (field['name'], field['val'])
+            text="<input type=\"hidden\" name=\"%s\" value=\"%s\" />" % (field['name'], field['val'])
         # If the field is user-defined
         elif field['type'] == 'D':
-            text = field['htmlcode']
+            text=field['htmlcode']
         # If the field is a select box
         elif field['type'] == 'S':
-            text = field['htmlcode']
+            text=field['htmlcode']
         # If the field type is not recognized
         else:
-            text = "%s: unknown field type" % field['typename']
+            text="%s: unknown field type" % field['typename']
 
         return text
 
-    def tmpl_page_interface_js(self, ln, upload, field, fieldhtml, txt, check, level, curdir, values, select, radio, curpage, nbpages, returnto):
+    def tmpl_page_interface_js(self, ln, upload, field, fieldhtml, txt, check, level, curdir, values, select, radio, curpage, nbpages, images, returnto):
         """
         Produces the javascript for validation and value filling for a submit interface page
 
@@ -679,6 +658,8 @@ class Template:
           - 'curpage' *int* - the current page
 
           - 'nbpages' *int* - the total number of pages
+
+          - 'images' *int* - the path to the images
 
           - 'returnto' *array* - a structure with 'field' and 'page', if a mandatory field on antoher page was not completed
         """
@@ -821,9 +802,7 @@ class Template:
                           document.forms[0].submit();
                          }
                        """ % {
-                         'msg' : _("The field %(field)s is mandatory.") + '\n' \
-                                 + _("Going back to page") \
-                                 + str(returnto['page']),
+                         'msg' : _("The field %(field)s is mandatory.") + '\n' + _("Going back to page") + returnto['page'],
                          'page' : returnto['page']
                        }
             else:
@@ -838,13 +817,15 @@ class Template:
         out += """</script>"""
         return out
 
-    def tmpl_page_endaction(self, ln, nextPg, startPg, access, curpage, nbPg, nbpages, doctype, act, docname, actname, mainmenu, finished, function_content, next_action):
+    def tmpl_page_endaction(self, ln, weburl, file, nextPg, startPg, access, curpage, nbPg, nbpages, doctype, act, docname, actname, indir, mainmenu, finished, function_content, next_action, images):
         """
         Produces the pages after all the fields have been submitted.
 
         Parameters:
 
           - 'ln' *string* - The language to display the interface in
+
+          - 'weburl' *string* - The url of CDS Invenio
 
           - 'doctype' *string* - The document type
 
@@ -866,10 +847,15 @@ class Template:
 
           - 'nbpages' *string* - number of pages (?)
 
+          - 'indir' *string* - the directory of submitting
+
+          - 'file' *string* - ??
 
           - 'mainmenu' *string* - the url of the main menu
 
           - 'finished' *bool* - if the submission is finished
+
+          - 'images' *string* - the path to the images
 
           - 'function_content' *string* - HTML code produced by some function executed
 
@@ -881,6 +867,7 @@ class Template:
 
         out = """
           <form ENCTYPE="multipart/form-data" action="/submit" method="post">
+          <input type="hidden" name="file" value="%(file)s" />
           <input type="hidden" name="nextPg" value="%(nextPg)s" />
           <input type="hidden" name="startPg" value="%(startPg)s" />
           <input type="hidden" name="access" value="%(access)s" />
@@ -888,6 +875,7 @@ class Template:
           <input type="hidden" name="nbPg" value="%(nbPg)s" />
           <input type="hidden" name="doctype" value="%(doctype)s" />
           <input type="hidden" name="act" value="%(act)s" />
+          <input type="hidden" name="indir" value="%(indir)s" />
           <input type="hidden" name="fromdir" value="" />
           <input type="hidden" name="mainmenu" value="%(mainmenu)s" />
 
@@ -897,7 +885,6 @@ class Template:
           <input type="hidden" name="file_path" value="" />
           <input type="hidden" name="userfile_name" value="" />
 
-          <input type="hidden" name="ln" value="%(ln)s" />
           <center><table cellspacing="0" cellpadding="0" border="0"><tr>
              <td class="submitHeader"><b>%(docname)s&nbsp;</b></td>
              <td class="submitHeader"><small>&nbsp;%(actname)s&nbsp;</small></td>
@@ -905,17 +892,18 @@ class Template:
                  <table cellspacing="0" cellpadding="0" border="0" width="100%%">
                  <tr><td class="submitEmptyPage">&nbsp;&nbsp;</td>
               """ % {
-                'nextPg' : cgi.escape(nextPg),
-                'startPg' : cgi.escape(startPg),
-                'access' : cgi.escape(access),
-                'curpage' : cgi.escape(curpage),
-                'nbPg' : cgi.escape(nbPg),
-                'doctype' : cgi.escape(doctype),
-                'act' : cgi.escape(act),
+                'file' : file,
+                'nextPg' : nextPg,
+                'startPg' : startPg,
+                'access' : access,
+                'curpage' : curpage,
+                'nbPg' : nbPg,
+                'doctype' : doctype,
+                'act' : act,
                 'docname' : docname,
                 'actname' : actname,
-                'mainmenu' : cgi.escape(mainmenu),
-                'ln' : cgi.escape(ln),
+                'indir' : indir,
+                'mainmenu' : mainmenu,
               }
 
         if finished == 1:
@@ -932,13 +920,13 @@ class Template:
                 out += """<td class="submitPage"><small>&nbsp;
                             <a href='' onclick="document.forms[0].curpage.value=%s;document.forms[0].action='/submit';document.forms[0].step.value=0;document.forms[0].submit();return false;">%s</a>&nbsp;</small></td>""" % (i,i)
             out += """<td class="submitCurrentPage">%(end_action)s</td><td class="submitEmptyPage">&nbsp;&nbsp;</td></tr></table></td>
-                      <td class="submitHeader" align="right">&nbsp;<a href='' onclick="window.open('/submit/summary?doctype=%(doctype)s&amp;act=%(act)s&amp;access=%(access)s&amp;ln=%(ln)s','summary','scrollbars=yes,menubar=no,width=500,height=250');return false;"><font color="white"><small>%(summary)s(2)</small></font></a>&nbsp;</td>""" % {
+                      <td class="submitHeader" align="right">&nbsp;<a href='' onclick="window.open('/submit/summary?doctype=%(doctype)s&amp;act=%(act)s&amp;access=%(access)s&amp;indir=%(indir)s','summary','scrollbars=yes,menubar=no,width=500,height=250');return false;"><font color="white"><small>%(summary)s(2)</small></font></a>&nbsp;</td>""" % {
                         'end_action' : _("end of action"),
                         'summary' : _("SUMMARY"),
-                        'doctype' : cgi.escape(doctype),
-                        'act' : cgi.escape(act),
-                        'access' : cgi.escape(access),
-                        'ln' : cgi.escape(ln),
+                        'doctype' : doctype,
+                        'act' : act,
+                        'access' : access,
+                        'indir' : indir,
                       }
         out += """</tr>
                   <tr>
@@ -958,7 +946,7 @@ class Template:
             out += """<small>%(submission)s</small>&sup2;:
                       <small>%(access)s</small>""" % {
                         'submission' : _("Submission no"),
-                        'access' : cgi.escape(access),
+                        'access' : access,
                       }
         else:
             out += "&nbsp;\n"
@@ -977,16 +965,16 @@ class Template:
                        <br /><br />""" % {
                            'surequit' : _("Are you sure you want to quit this submission?"),
                            'back' : _("Back to main menu"),
-                           'images' : CFG_SITE_URL + '/img',
-                           'mainmenu' : cgi.escape(mainmenu)
+                           'images' : images,
+                           'mainmenu' : mainmenu
                            }
         else:
             out += """ <a href="%(mainmenu)s">
                        <img src="%(images)s/mainmenu.gif" border="0" alt="%(back)s" align="right" /></a>
                        <br /><br />""" % {
                      'back' : _("Back to main menu"),
-                     'images' : CFG_SITE_URL + '/img',
-                     'mainmenu' : cgi.escape(mainmenu),
+                     'images' : images,
+                     'mainmenu' : mainmenu,
                    }
 
         return out
@@ -1091,7 +1079,7 @@ class Template:
         out += "</ul>"
         return out
 
-    def tmpl_filelist(self, ln, filelist='', recid='', docname='', version=''):
+    def tmpl_filelist(self, ln, filelist, recid, docid, version):
         """
         Displays the file list for a record.
 
@@ -1099,11 +1087,11 @@ class Template:
 
           - 'ln' *string* - The language to display the interface in
 
-          - 'recid' *int* - The record id
+          - 'recid' *string* - The record id
 
-          - 'docname' *string* - The document name
+          - 'docid' *string* - The document id
 
-          - 'version' *int* - The version of the document
+          - 'version' *string* - The version of the document
 
           - 'filelist' *string* - The HTML string of the filelist (produced by the BibDoc classes)
         """
@@ -1111,13 +1099,13 @@ class Template:
         # load the right message language
         _ = gettext_set_language(ln)
 
-        title = _("record") + ' #' + '<a href="%s/record/%s">%s</a>' % (CFG_SITE_URL, recid, recid)
-        if docname != "":
-            title += ' ' + _("document") + ' #' + str(docname)
+        title = _("record") + ' #' + '<a href="%s/record/%s">%s</a>' % (weburl, recid, recid)
+        if docid != "":
+            title += ' ' + _("document") + ' #' + str(docid)
         if version != "":
             title += ' ' + _("version") + ' #' + str(version)
 
-        out = """<div style="width:90%%;margin:auto;min-height:100px;margin-top:10px">
+        out = """<div style="width:90%%;margin:auto;min-height:100px;">
                 <!--start file list-->
                   %s
                 <!--end file list--></div>
@@ -1125,7 +1113,7 @@ class Template:
 
         return out
 
-    def tmpl_bibrecdoc_filelist(self, ln, types, verbose_files=''):
+    def tmpl_bibrecdoc_filelist(self, ln, types):
         """
         Displays the file list for a record.
 
@@ -1138,9 +1126,6 @@ class Template:
                - 'name' *string* - The name of the format
 
                - 'content' *array of string* - The HTML code produced by tmpl_bibdoc_filelist, for the right files
-
-          - 'verbose_files' - A string representing in a verbose way the
-          file information.
         """
 
         # load the right message language
@@ -1153,17 +1138,17 @@ class Template:
             for content in mytype['content']:
                 out += content
             out += "</ul>"
-            if verbose_files:
-                out += "<pre>%s</pre>" % verbose_files
         return out
 
-    def tmpl_bibdoc_filelist(self, ln, versions=[], imageurl='', recid='', docname=''):
+    def tmpl_bibdoc_filelist(self, ln, weburl, versions, imagepath, docname, id, recid):
         """
         Displays the file list for a record.
 
         Parameters:
 
           - 'ln' *string* - The language to display the interface in
+
+          - 'weburl' *string* - The url of CDS Invenio
 
           - 'versions' *array* - The different versions to display, each record in the format:
 
@@ -1173,11 +1158,14 @@ class Template:
 
                - 'previous' *bool* - If the file has previous versions
 
-          - 'imageurl' *string* - The URL to the file image
+          - 'imagepath' *string* - The path to the image of the file
+
+          - 'docname' *string* - The name of the document
+
+         - 'id' *int* - The id of the document
 
          - 'recid' *int* - The record id
 
-         - 'docname' *string* - The name of the document
         """
 
         # load the right message language
@@ -1186,21 +1174,20 @@ class Template:
         out = """<table border="0" cellspacing="1" class="searchbox">
                    <tr>
                      <td align="left" colspan="2" class="portalboxheader">
-                       <img src='%(imageurl)s' border="0" />&nbsp;&nbsp;%(docname)s
+                       <img src='%(imagepath)s' border="0" />&nbsp;&nbsp;%(docname)s
                      </td>
                    </tr>""" % {
-                     'imageurl' : imageurl,
+                     'imagepath' : imagepath,
                      'docname' : docname
                    }
         for version in versions:
             if version['previous']:
-                versiontext =  """<br />(%(see)s <a href="%(siteurl)s/record/%(recID)s/files/?docname=%(docname)s&amp;version=all%(ln_link)s">%(previous)s</a>)""" % {
+                versiontext =  """<br />(%(see)s <a href="%(weburl)s/record/%(recID)s/files/getfile.py?docid=%(id)s&amp;version=all">%(previous)s</a>)""" % {
                                  'see' : _("see"),
-                                 'siteurl' : CFG_SITE_URL,
-                                 'docname' : urllib.quote(docname),
+                                 'weburl' : weburl,
+                                 'id' : id,
                                  'recID': recid,
                                  'previous': _("previous"),
-                                 'ln_link': (ln != CFG_SITE_LANG and '&amp;ln=' + ln) or '',
                                }
             else:
                 versiontext = ""
@@ -1221,7 +1208,7 @@ class Template:
         out += "</table>"
         return out
 
-    def tmpl_bibdocfile_filelist(self, ln, recid, name, version, format, size, description):
+    def tmpl_bibdocfile_filelist(self, ln, weburl, id, name, selfformat, version, format, size):
         """
         Displays a file in the file list.
 
@@ -1229,18 +1216,19 @@ class Template:
 
           - 'ln' *string* - The language to display the interface in
 
-          - 'recid' *int* - The id of the record
+          - 'weburl' *string* - The url of CDS Invenio
+
+          - 'id' *int* - The id of the document
 
           - 'name' *string* - The name of the file
+
+          - 'selfformat' *string* - The format to pass in parameter
 
           - 'version' *string* - The version
 
           - 'format' *string* - The display format
 
           - 'size' *string* - The size of the file
-
-          - 'description' *string* - The description that might have been associated
-          to the particular file
         """
 
         # load the right message language
@@ -1248,28 +1236,24 @@ class Template:
 
         return """<tr>
                     <td valign="top">
-                      <small><a href="%(siteurl)s/record/%(recid)s/files/%(quoted_name)s%(quoted_format)s?version=%(version)s">
+                      <small><a href="%(weburl)s/getfile.py?docid=%(docid)s&amp;name=%(quotedname)s&amp;format=%(selfformat)s&amp;version=%(version)s">
                         %(name)s%(format)s
                       </a></small>
                     </td>
                     <td valign="top">
                       <font size="-2" color="green">[%(size)s&nbsp;B]</font>
-                    </td>
-                    <td valign="top"><em>%(description)s</em></td>
-                    </tr>""" % {
-                      'siteurl' : CFG_SITE_URL,
-                      'recid' : recid,
-                      'quoted_name' : urllib.quote(name),
-                      'name' : cgi.escape(name),
+                    </td></tr>""" % {
+                      'weburl' : weburl,
+                      'docid' : id,
+                      'quotedname' : urllib.quote(name),
+                      'selfformat' : urllib.quote(selfformat),
                       'version' : version,
-                      'name' : cgi.escape(name),
-                      'quoted_format' : urllib.quote(format),
-                      'format' : cgi.escape(format),
-                      'size' : size,
-                      'description' : cgi.escape(description),
+                      'name' : name,
+                      'format' : format,
+                      'size' : size
                     }
 
-    def tmpl_submit_summary (self, ln, values):
+    def tmpl_submit_summary (self, ln, values, images):
         """
         Displays the summary for the submit procedure.
 
@@ -1286,14 +1270,16 @@ class Template:
                 - 'value' *string* - The inserted value
 
                 - 'page' *int* - The submit page on which the field is entered
+
+          - 'images' *string* - the path to the images
         """
 
         # load the right message language
         _ = gettext_set_language(ln)
 
         out = """<body style="background-image: url(%(images)s/header_background.gif);"><table border="0">""" % \
-              { 'images' : CFG_SITE_URL + '/img' }
-
+              { 'images' : images }
+        
         for value in values:
             if value['mandatory']:
                 color = "red"
@@ -1302,7 +1288,7 @@ class Template:
             out += """<tr>
                         <td align="right">
                           <small>
-                            <a href='' onclick="window.opener.document.forms[0].curpage.value='%(page)s';window.opener.document.forms[0].action='/submit?ln=%(ln)s';window.opener.document.forms[0].submit();return false;">
+                            <a href='' onclick="window.opener.document.forms[0].curpage.value='%(page)s';window.opener.document.forms[0].action='/submit';window.opener.document.forms[0].submit();return false;">
                               <font color="%(color)s">%(name)s</font>
                             </a>
                           </small>
@@ -1314,19 +1300,22 @@ class Template:
                         'color' : color,
                         'name' : value['name'],
                         'value' : value['value'],
-                        'page' : value['page'],
-                        'ln' : ln
+                        'page' : value['page']
                       }
         out += "</table>"
         return out
 
-    def tmpl_yoursubmissions(self, ln, order, doctypes, submissions):
+    def tmpl_yoursubmissions(self, ln, images, weburl, order, doctypes, submissions):
         """
         Displays the list of the user's submissions.
 
         Parameters:
 
           - 'ln' *string* - The language to display the interface in
+
+          - 'images' *string* - the path to the images
+
+          - 'weburl' *string* - The url of CDS Invenio
 
           - 'order' *string* - The ordering parameter
 
@@ -1373,7 +1362,6 @@ class Template:
                   <input type="hidden" name="deletedId" />
                   <input type="hidden" name="deletedDoctype" />
                   <input type="hidden" name="deletedAction" />
-                  <input type="hidden" name="ln" value="%(ln)s"/>
                   <table class="searchbox" width="100%%" summary="" >
                     <tr>
                       <th class="portalboxheader"><small>%(for)s</small>&nbsp;
@@ -1383,7 +1371,6 @@ class Template:
                     'order' : order,
                     'for' : _("For"),
                     'alltype' : _("all types of document"),
-                    'ln' : ln,
                   }
         for doctype in doctypes:
             out += """<option value="%(id)s" %(sel)s>%(name)s</option>""" % {
@@ -1439,15 +1426,15 @@ class Template:
                          'status' : _("Status"),
                          'id' : _("Id"),
                          'reference' : _("Reference"),
-                         'images' : CFG_SITE_URL + '/img',
+                         'images' : images,
                          'first' : _("First access"),
                          'last' : _("Last access"),
                        }
             if submission['pending']:
-                idtext = """<a href="submit/direct?access=%(id)s&sub=%(action)s%(doctype)s%(ln_link)s">%(id)s</a>
+                idtext = """<a href="submit/sub?access=%(id)s@%(action)s%(doctype)s">%(id)s</a>
                             &nbsp;<a onclick='if (confirm("%(sure)s")){document.forms[0].deletedId.value="%(id)s";document.forms[0].deletedDoctype.value="%(doctype)s";document.forms[0].deletedAction.value="%(action)s";document.forms[0].submit();return true;}else{return false;}' href=''><img src="%(images)s/smallbin.gif" border="0" alt='%(delete)s' /></a>
                          """ % {
-                           'images' : CFG_SITE_URL + '/img',
+                           'images' : images,
                            'id' : submission['id'],
                            'action' : submission['act'],
                            'doctype' : submission['doctype'],
@@ -1455,8 +1442,7 @@ class Template:
                            'delete' : _("Delete submission %(x_id)s in %(x_docname)s") % {
                                         'x_id' : str(submission['id']),
                                         'x_docname' : str(submission['docname'])
-                                      },
-                           'ln_link': (ln != CFG_SITE_LANG and '&amp;ln=' + ln) or ''
+                                      }
                          }
             else:
                 idtext = submission['id']
@@ -1469,14 +1455,7 @@ class Template:
             if submission['reference']:
                 reference = submission['reference']
             else:
-                if submission['pending']:
-                    reference = submission['reference']
-                else:
-                    reference = create_html_link('%s/search' % CFG_SITE_URL, {
-                        'ln' : ln,
-                        'p' : submission['reference'],
-                        'f' : 'reportnumber'
-                    }, submission['reference'])
+                reference = """<font color="red">%s</font>""" % _("Reference not yet given")
 
             cdate = str(submission['cdate']).replace(" ","&nbsp;")
             mdate= str(submission['mdate']).replace(" ","&nbsp;")
@@ -1553,25 +1532,22 @@ class Template:
         for doctype in referees:
             out += """<ul><li><b>%(docname)s</b><ul>""" % doctype
 
-            if doctype ['categories'] is None:
-                out += '''<li><a href="publiline.py?doctype=%(doctype)s%(ln_link)s">%(generalref)s</a></li>''' % {
+            if doctype ['categories'] is None:            
+                out += '''<li><a href="publiline.py?doctype=%(doctype)s">%(generalref)s</a></li>''' % {
                     'docname' : doctype['docname'],
                     'doctype' : doctype['doctype'],
-                    'generalref' : _("You are a general referee"),
-                    'ln_link': '&amp;ln=' + ln}
+                    'generalref' : _("You are a general referee")}
 
             else:
                 for category in doctype['categories']:
-                    out += """<li><a href="publiline.py?doctype=%(doctype)s&amp;categ=%(categ)s%(ln_link)s">%(referee)s</a></li>""" % {
+                    out += """<li><a href="publiline.py?doctype=%(doctype)s&amp;categ=%(categ)s">%(referee)s</a></li>""" % {
                         'referee' : _("You are a referee for category:") + ' ' + str(category['name']) + ' (' + str(category['id']) + ')',
-                        'doctype' : doctype['doctype'],
-                        'categ' : category['id'],
-                        'ln_link': '&amp;ln=' + ln}
-
+			'doctype' : doctype['doctype'],
+                        'categ' : category['id']}
+                    
             out += "</ul><br /></li></ul>"
 
         out += "</td></tr></table>"
-        out += '''<p>To see the status of documents for which approval has been requested, click <a href=\"%(url)s/publiline.py?flow=cplx\">here</a></p>''' % {'url' : CFG_SITE_URL}
         return out
 
     def tmpl_publiline_selectdoctype(self, ln, docs):
@@ -1603,63 +1579,19 @@ class Template:
             </small>
             <blockquote>""" % {
               'list' : _("List of refereed types of documents"),
-              'select' : _("Select one of the following types of documents to check the documents status"),
+              'select' : _("Select one of the following types of documents to check the documents status."),
             }
 
         for doc in docs:
-            params = {'ln' : ln}
-            params.update(doc)
-            out += '<li><a href="publiline.py?doctype=%(doctype)s&amp;ln=%(ln)s">%(docname)s</a></li><br />' % params
+            out += "<li><a href='publiline.py?doctype=%(doctype)s'>%(docname)s</a></li><br />" % doc
 
         out += """</blockquote>
                 </td>
             </tr>
-        </table>
-
-        <a href="publiline.py?flow=cplx&amp;ln=%s">%s</a>""" % (ln, _("Go to specific approval workflow"))
+        </table>"""
         return out
 
-    def tmpl_publiline_selectcplxdoctype(self, ln, docs):
-        """
-        Displays the doctypes that the user can select in a complex workflow
-
-        Parameters:
-
-          - 'ln' *string* - The language to display the interface in
-
-          - 'docs' *array* - All the doctypes that the user can select:
-
-              - 'doctype' *string* - The doctype
-
-              - 'docname' *string* - The display name of the doctype
-        """
-
-        # load the right message language
-        _ = gettext_set_language(ln)
-
-        out = """
-               <table class="searchbox" width="100%%" summary="">
-                  <tr>
-                      <th class="portalboxheader">%(list)s</th>
-                  </tr>
-                  <tr>
-                      <td class="portalboxbody">
-              %(select)s:
-            </small>
-            <blockquote>""" % {
-              'list' : _("List of refereed types of documents"),
-              'select' : _("Select one of the following types of documents to check the documents status"),
-            }
-
-        for doc in docs:
-            params = {'ln' : ln}
-            params.update(doc)
-            out += '<li><a href="publiline.py?flow=cplx&doctype=%(doctype)s&amp;ln=%(ln)s">%(docname)s</a></li><br />' % params
-
-        out += """</blockquote> </td> </tr> </table> </li><br/>"""
-        return out
-
-    def tmpl_publiline_selectcateg(self, ln, doctype, title, categories):
+    def tmpl_publiline_selectcateg(self, ln, doctype, title, categories, images):
         """
         Displays the categories from a doctype that the user can select
 
@@ -1670,6 +1602,8 @@ class Template:
           - 'doctype' *string* - The doctype
 
           - 'title' *string* - The doctype name
+
+          - 'images' *string* - the path to the images
 
           - 'categories' *array* - All the categories that the user can select:
 
@@ -1697,7 +1631,6 @@ class Template:
                       <form action="publiline.py" method="get">
                           <input type="hidden" name="doctype" value="%(doctype)s" />
                           <input type="hidden" name="categ" value="" />
-                          <input type="hidden" name="ln" value="%(ln)s" />
                           </form>
                <table>
                  <tr>
@@ -1706,7 +1639,6 @@ class Template:
                  'doctype' : doctype,
                  'list_categ' : _("List of refereed categories"),
                  'choose_categ' : _("Please choose a category"),
-                 'ln' : ln,
                }
 
         for categ in categories:
@@ -1726,19 +1658,19 @@ class Template:
                 out += """| %(waiting)s <img alt="%(pending)s" src="%(images)s/waiting_or.gif" border="0" />""" % {
                           'waiting' : categ['waiting'],
                           'pending' : _("Pending"),
-                          'images' : CFG_SITE_URL + '/img',
+                          'images' : images,
                         }
             if categ['approved'] != 0:
                 out += """| %(approved)s<img alt="%(approved_text)s" src="%(images)s/smchk_gr.gif" border="0" />""" % {
                           'approved' : categ['approved'],
                           'approved_text' : _("Approved"),
-                          'images' : CFG_SITE_URL + '/img',
+                          'images' : images,
                         }
             if categ['rejected'] != 0:
                 out += """| %(rejected)s<img alt="%(rejected_text)s" src="%(images)s/cross_red.gif" border="0" />""" % {
                           'rejected' : categ['rejected'],
                           'rejected_text' : _("Rejected"),
-                          'images' : CFG_SITE_URL + '/img',
+                          'images' : images,
                         }
             out += ")</small><br />"
 
@@ -1767,7 +1699,7 @@ class Template:
             </table>""" % {
               'key' : _("Key"),
               'pending' : _("Pending"),
-              'images' : CFG_SITE_URL + '/img',
+              'images' : images,
               'waiting' : _("Waiting for approval"),
               'approved' : _("Approved"),
               'already_approved' : _("Already approved"),
@@ -1777,178 +1709,7 @@ class Template:
             }
         return out
 
-    def tmpl_publiline_selectcplxcateg(self, ln, doctype, title, types):
-        """
-        Displays the categories from a doctype that the user can select
-
-        Parameters:
-
-          - 'ln' *string* - The language to display the interface in
-
-          - 'doctype' *string* - The doctype
-
-          - 'title' *string* - The doctype name
-
-          - 'categories' *array* - All the categories that the user can select:
-
-              - 'id' *string* - The id of the category
-
-              - 'waiting' *int* - The number of documents waiting
-
-              - 'approved' *int* - The number of approved documents
-
-              - 'rejected' *int* - The number of rejected documents
-        """
-
-        # load the right message language
-        _ = gettext_set_language(ln)
-
-        out = ""
-        #out = """
-        #       <table class="searchbox" width="100%%" summary="">
-        #          <tr>
-        #            <th class="portalboxheader">%(title)s: %(list_type)s</th>
-        #          </tr>
-        #       </table><br />
-        #       <table class="searchbox" width="100%%" summary="">
-        #          <tr>""" % {
-        #          'title' : title,
-        #          'list_type' : _("List of specific approvals"),
-        #      }
-
-        columns = []
-        columns.append ({'apptype' : 'RRP',
-                         'list_categ' : _("List of refereing categories"),
-                         'id_form' : 0,
-                       })
-        #columns.append ({'apptype' : 'RPB',
-        #                 'list_categ' : _("List of publication categories"),
-        #                 'id_form' : 1,
-        #               })
-        #columns.append ({'apptype' : 'RDA',
-        #                 'list_categ' : _("List of direct approval categories"),
-        #                 'id_form' : 2,
-        #               })
-
-        for column in columns:
-            out += """
-                      <td>
-                           <table class="searchbox" width="100%%" summary="">
-                              <tr>
-                                <th class="portalboxheader">%(list_categ)s</th>
-                              </tr>
-                              <tr>
-                                  <td class="portalboxbody">
-                                  %(choose_categ)s
-                                  <blockquote>
-                                  <form action="publiline.py" method="get">
-                                      <input type="hidden" name="flow" value="cplx" />
-                                      <input type="hidden" name="doctype" value="%(doctype)s" />
-                                      <input type="hidden" name="categ" value="" />
-                                      <input type="hidden" name="apptype" value="%(apptype)s" />
-                                      <input type="hidden" name="ln" value="%(ln)s" />
-                                      </form>
-                           <table>
-                             <tr>
-                             <td align="left">""" % {
-                             'doctype' : doctype,
-                             'apptype' : column['apptype'],
-                             'list_categ' : column['list_categ'],
-                             'choose_categ' : _("Please choose a category"),
-                             'ln' : ln,
-                   }
-
-            for categ in types[column['apptype']]:
-                num = categ['waiting'] + categ['approved'] + categ['rejected'] + categ['cancelled']
-
-                if categ['waiting'] != 0:
-                    classtext = "class=\"blocknote\""
-                else:
-                    classtext = ""
-
-                out += """<table><tr><td width="200px">*&nbsp<a href="" onclick="document.forms[%(id_form)s].categ.value='%(id)s';document.forms[%(id_form)s].submit();return false;"><small %(classtext)s>%(desc)s</small></td><td width="150px"></a><small> Total document(s) : %(num)s """ % {
-                         'id' : categ['id'],
-                         'id_form' : column['id_form'],
-                         'classtext' : classtext,
-                         'num' : num,
-                         'desc' : categ['desc'],
-                       }
-                out += """<td width="100px">"""
-                #if categ['waiting'] != 0:
-                out += """ %(waiting)s &nbsp&nbsp<img alt="%(pending)s" src="%(images)s/waiting_or.gif" border="0" /></td>""" % {
-                              'waiting' : categ['waiting'],
-                              'pending' : _("Pending"),
-                              'images' : CFG_SITE_URL + '/img',
-                            }
-                out += """<td width="100px">"""
-                #if categ['approved'] != 0:
-                out += """ %(approved)s &nbsp&nbsp<img alt="%(approved_text)s" src="%(images)s/smchk_gr.gif" border="0" /></td>""" % {
-                              'approved' : categ['approved'],
-                              'approved_text' : _("Approved"),
-                              'images' : CFG_SITE_URL + '/img',
-                            }
-                out += """<td width="100px">"""
-                #if categ['rejected'] != 0:
-                out += """ %(rejected)s&nbsp&nbsp<img alt="%(rejected_text)s" src="%(images)s/cross_red.gif" border="0" /></td>""" % {
-                              'rejected' : categ['rejected'],
-                              'rejected_text' : _("Rejected"),
-                              'images' : CFG_SITE_URL + '/img',
-                            }
-                out += """<td width="100px">"""
-                #if categ['cancelled'] != 0:
-                out += """ %(cancelled)s&nbsp&nbsp<img alt="%(cancelled_text)s" src="%(images)s/smchk_rd.gif" border="0" /></td>""" % {
-                              'cancelled' : categ['cancelled'],
-                              'cancelled_text' : _("Cancelled"),
-                              'images' : CFG_SITE_URL + '/img',
-                            }
-                out += "</small></td></tr>"
-
-            out += """
-                                </table>
-                                </td>
-                            </tr>
-                            </table>
-                          </blockquote>
-                          </td>
-                         </tr>
-                        </table>
-                      </td>"""
-
-        # Key
-        out += """
-               <table class="searchbox" width="100%%" summary="">
-                        <tr>
-                            <th class="portalboxheader">%(key)s:</th>
-                        </tr>
-                        <tr>
-                            <td>
-                              <img alt="%(pending)s" src="%(images)s/waiting_or.gif" border="0" /> %(waiting)s<br />
-                              <img alt="%(approved)s" src="%(images)s/smchk_gr.gif" border="0" /> %(already_approved)s<br />
-                              <img alt="%(rejected)s" src="%(images)s/cross_red.gif" border="0" /> %(rejected_text)s<br />
-                              <img alt="%(cancelled)s" src="%(images)s/smchk_rd.gif" border="0" /> %(cancelled_text)s<br /><br />
-                              <small class="blocknote">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</small> %(somepending)s<br />
-                            </td>
-                        </tr>
-                </table>
-              </blockquote>
-              </td>
-             </tr>
-            </table>""" % {
-              'key' : _("Key"),
-              'pending' : _("Pending"),
-              'images' : CFG_SITE_URL + '/img',
-              'waiting' : _("Waiting for approval"),
-              'approved' : _("Approved"),
-              'already_approved' : _("Already approved"),
-              'rejected' : _("Rejected"),
-              'rejected_text' : _("Rejected"),
-              'cancelled' : _("Cancelled"),
-              'cancelled_text' : _("Cancelled"),
-              'somepending' : _("Some documents are pending."),
-            }
-        return out
-
-    def tmpl_publiline_selectdocument(self, ln, doctype, title, categ, docs):
+    def tmpl_publiline_selectdocument(self, ln, doctype, title, categ, images, docs):
         """
         Displays the documents that the user can select in the specified category
 
@@ -1959,6 +1720,8 @@ class Template:
           - 'doctype' *string* - The doctype
 
           - 'title' *string* - The doctype name
+
+          - 'images' *string* - the path to the images
 
           - 'categ' *string* - the category
 
@@ -1985,7 +1748,6 @@ class Template:
                         <input type="hidden" name="doctype" value="%(doctype)s" />
                         <input type="hidden" name="categ" value="%(categ)s" />
                         <input type="hidden" name="RN" value="" />
-                        <input type="hidden" name="ln" value="%(ln)s">
                         </form>
                   <table class="searchbox">
                     <tr>
@@ -2004,12 +1766,11 @@ class Template:
                 'pending' : _("Pending"),
                 'approved' : _("Approved"),
                 'rejected' : _("Rejected"),
-                'ln': ln,
               }
 
         for doc in docs:
             status = doc ['status']
-
+            
             if status == "waiting":
                 out += """<tr>
                             <td align="center">
@@ -2023,7 +1784,7 @@ class Template:
                           </tr>
                        """ % {
                          'rn' : doc['RN'],
-                         'images' : CFG_SITE_URL + '/img',
+                         'images' : images,
                        }
             elif status == "rejected":
                 out += """<tr>
@@ -2036,7 +1797,7 @@ class Template:
                           </tr>
                        """ % {
                          'rn' : doc['RN'],
-                         'images' : CFG_SITE_URL + '/img',
+                         'images' : images,
                        }
             elif status == "approved":
                 out += """<tr>
@@ -2049,7 +1810,7 @@ class Template:
                           </tr>
                        """ % {
                          'rn' : doc['RN'],
-                         'images' : CFG_SITE_URL + '/img',
+                         'images' : images,
                        }
         out += """  </table>
                     </blockquote>
@@ -2058,148 +1819,7 @@ class Template:
                  </table>"""
         return out
 
-    def tmpl_publiline_selectcplxdocument(self, ln, doctype, title, categ, categname, docs, apptype):
-        """
-        Displays the documents that the user can select in the specified category
-
-        Parameters:
-
-          - 'ln' *string* - The language to display the interface in
-
-          - 'doctype' *string* - The doctype
-
-          - 'title' *string* - The doctype name
-
-          - 'categ' *string* - the category
-
-          - 'docs' *array* - All the categories that the user can select:
-
-              - 'RN' *string* - The id of the document
-
-              - 'status' *string* - The status of the document
-
-          - 'apptype' *string* - the approval type
-        """
-
-        # load the right message language
-        _ = gettext_set_language(ln)
-
-        listtype = ""
-        if apptype == "RRP":
-            listtype = _("List of refereed documents")
-        elif apptype == "RPB":
-            listtype = _("List of publication documents")
-        elif apptype == "RDA":
-            listtype = _("List of direct approval documents")
-
-        out = """
-               <table class="searchbox" width="100%%" summary="">
-                  <tr>
-                    <th class="portalboxheader">%(title)s - %(categname)s: %(list)s</th>
-                  </tr>
-                  <tr>
-                    <td class="portalboxbody">
-                    %(choose_report)s
-                    <blockquote>
-                      <form action="publiline.py" method="get">
-                        <input type="hidden" name="flow" value="cplx" />
-                        <input type="hidden" name="doctype" value="%(doctype)s" />
-                        <input type="hidden" name="categ" value="%(categ)s" />
-                        <input type="hidden" name="RN" value="" />
-                        <input type="hidden" name="apptype" value="%(apptype)s" />
-                        <input type="hidden" name="ln" value="%(ln)s" />
-                        </form>
-                  <table class="searchbox">
-                    <tr>
-                      <th class="portalboxheader">%(report_no)s</th>
-                      <th class="portalboxheader">%(pending)s</th>
-                      <th class="portalboxheader">%(approved)s</th>
-                      <th class="portalboxheader">%(rejected)s</th>
-                      <th class="portalboxheader">%(cancelled)s</th>
-                    </tr>
-              """ % {
-                'doctype' : doctype,
-                'title' : title,
-                'categname' : categname,
-                'categ' : categ,
-                'list' : listtype,
-                'choose_report' : _("Click on a report number for more information."),
-                'apptype' : apptype,
-                'report_no' : _("Report Number"),
-                'pending' : _("Pending"),
-                'approved' : _("Approved"),
-                'rejected' : _("Rejected"),
-                'cancelled' : _("Cancelled"),
-                'ln': ln,
-              }
-
-        for doc in docs:
-            status = doc ['status']
-
-            if status == "waiting":
-                out += """<tr>
-                            <td align="center">
-                              <a href="" onclick="document.forms[0].RN.value='%(rn)s';document.forms[0].submit();return false;">%(rn)s</a>
-                            </td>
-                            <td align="center"><img alt="check" src="%(images)s/waiting_or.gif" /></td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center">&nbsp;</td>
-                          </tr>
-                       """ % {
-                         'rn' : doc['RN'],
-                         'images' : CFG_SITE_URL + '/img',
-                       }
-            elif status == "rejected":
-                out += """<tr>
-                            <td align="center">
-                              <a href="" onclick="document.forms[0].RN.value='%(rn)s';document.forms[0].submit();return false;">%(rn)s</a>
-                            </td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center"><img alt="check" src="%(images)s/cross_red.gif" /></td>
-                            <td align="center">&nbsp;</td>
-                          </tr>
-                       """ % {
-                         'rn' : doc['RN'],
-                         'images' : CFG_SITE_URL + '/img',
-                       }
-            elif status == "approved":
-                out += """<tr>
-                            <td align="center">
-                              <a href="" onclick="document.forms[0].RN.value='%(rn)s';document.forms[0].submit();return false;">%(rn)s</a>
-                            </td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center"><img alt="check" src="%(images)s/smchk_gr.gif" /></td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center">&nbsp;</td>
-                          </tr>
-                       """ % {
-                         'rn' : doc['RN'],
-                         'images' : CFG_SITE_URL + '/img',
-                       }
-            elif status == "cancelled":
-                out += """<tr>
-                            <td align="center">
-                              <a href="" onclick="document.forms[0].RN.value='%(rn)s';document.forms[0].submit();return false;">%(rn)s</a>
-                            </td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center">&nbsp;</td>
-                            <td align="center"><img alt="check" src="%(images)s/smchk_rd.gif" /></td>
-                          </tr>
-                       """ % {
-                         'rn' : doc['RN'],
-                         'images' : CFG_SITE_URL + '/img',
-                       }
-        out += """  </table>
-                    </blockquote>
-                   </td>
-                  </tr>
-                 </table>"""
-        return out
-
-    def tmpl_publiline_displaydoc(self, ln, doctype, docname, categ, rn, status, dFirstReq, dLastReq, dAction, access, confirm_send, auth_code, auth_message, authors, title, sysno, newrn, note):
+    def tmpl_publiline_displaydoc(self, ln, doctype, docname, categ, rn, status, dFirstReq, dLastReq, dAction, access, images, accessurl, confirm_send, auth_code, auth_message, authors, title, sysno, newrn):
         """
         Displays the categories from a doctype that the user can select
 
@@ -2223,6 +1843,10 @@ class Template:
 
           - 'dAction' *string* - The date of the last action (approval or rejection)
 
+          - 'images' *string* - the path to the images
+
+          - 'accessurl' *string* - the URL of the publications
+
           - 'confirm_send' *bool* - must display a confirmation message about sending approval email
 
           - 'auth_code' *bool* - authorised to referee this document
@@ -2236,19 +1860,17 @@ class Template:
           - 'sysno' *string* - the unique database id for the record
 
           - 'newrn' *string* - the record number assigned to the submission
-
-          - 'note' *string* - Note about the approval request.
         """
 
         # load the right message language
         _ = gettext_set_language(ln)
 
         if status == "waiting":
-            image = """<img src="%s/waiting_or.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
+            image = """<img src="%s/waiting_or.gif" alt="" align="right" />""" % images
         elif status == "approved":
-            image = """<img src="%s/smchk_gr.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
+            image = """<img src="%s/smchk_gr.gif" alt="" align="right" />""" % images
         elif status == "rejected":
-            image = """<img src="%s/iconcross.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
+            image = """<img src="%s/iconcross.gif" alt="" align="right" />""" % images
         else:
             image = ""
         out = """
@@ -2270,12 +1892,10 @@ class Template:
                     <input type="hidden" name="RN" value="%(rn)s" />
                     <input type="hidden" name="categ" value="%(categ)s" />
                     <input type="hidden" name="doctype" value="%(doctype)s" />
-                    <input type="hidden" name="ln" value="%(ln)s" />
                   <small>""" % {
                  'rn' : rn,
                  'categ' : categ,
                  'doctype' : doctype,
-                 'ln' : ln,
                }
         if title != "unknown":
             out += """<strong class="headline">%(title_text)s</strong>%(title)s<br /><br />""" % {
@@ -2290,27 +1910,20 @@ class Template:
                    }
         if sysno != "":
             out += """<strong class="headline">%(more)s</strong>
-                        <a href="%(siteurl)s/record/%(sysno)s?ln=%(ln)s">%(click)s</a>
+                        <a href="%(weburl)s/record/%(sysno)s">%(click)s</a>
                         <br /><br />
                    """ % {
                      'more' : _("More information:"),
                      'click' : _("Click here"),
-                     'siteurl' : CFG_SITE_URL,
+                     'weburl' : weburl,
                      'sysno' : sysno,
-                     'ln' : ln,
-                   }
-
-        if note and auth_code == 0:
-            out += """<table><tr><td valign="top"><strong class="headline">%(note_text)s</strong></td><td><em>%(note)s</em></td></tr></table>""" % {
-                     'note_text' : _("Approval note:"),
-                     'note' : cgi.escape(note).replace('\n', '<br />'),
                    }
 
         if status == "waiting":
-            out += _("This document is still %(x_fmt_open)swaiting for approval%(x_fmt_close)s.") % {'x_fmt_open': '<strong class="headline">',
+            out += _("This document is still %(x_fmt_open)swaiting for approval%(x_fmt_close)s.") % {'x_fmt_open': '<strong class="headline">', 
                                                                                                      'x_fmt_close': '</strong>'}
-            out += "<br /><br />"
-            out += _("It was first sent for approval on:") + ' <strong class="headline">' + str(dFirstReq) + '</strong><br />'
+	    out += "<br /><br />"
+	    out += _("It was first sent for approval on:") + ' <strong class="headline">' + str(dFirstReq) + '</strong><br />'
             if dLastReq == "0000-00-00 00:00:00":
                 out += _("Last approval email was sent on:") + ' <strong class="headline">' + str(dFirstReq) + '</strong><br />'
             else:
@@ -2321,14 +1934,14 @@ class Template:
                      'warning' : _("WARNING! Upon confirmation, an email will be sent to the referee.")
                    }
             if auth_code == 0:
-                out += "<br />" + _("As a referee for this document, you may click this button to approve or reject it") + ":<br />" +\
-                       """<input class="adminbutton" type="submit" name="approval" value="%(approve)s" onclick="window.location='approve.py?%(access)s&amp;ln=%(ln)s';return false;" />""" % {
+                out += "<br />" + _("As a referee for this document, you may click this button to approve or reject it.") + ":<br />" +\
+                       """<input class="adminbutton" type="submit" name="approval" value="%(approve)s" onclick="window.location='approve.py?%(access)s';return false;" />""" % {
                          'approve' : _("Approve/Reject"),
-                         'access' : access,
-                         'ln' : ln
+                         'access' : access
                        }
         if status == "approved":
-            out += _("This document has been %(x_fmt_open)sapproved%(x_fmt_close)s.") % {'x_fmt_open': '<strong class="headline">', 'x_fmt_close': '</strong>'}
+            out += _("This document has been %(x_fmt_open)sapproved%(x_fmt_close)s.") % {'x_fmt_open': '<strong class="headline">', 
+                                                                                         'x_fmt_close': '</strong>'}
             out += '<br />' + _("Its approved reference is:") + ' <strong class="headline">' + str(newrn) + '</strong><br /><br />'
             out += _("It was first sent for approval on:") + ' <strong class="headline">' + str(dFirstReq) + '</strong><br />'
             if dLastReq == "0000-00-00 00:00:00":
@@ -2337,7 +1950,8 @@ class Template:
                 out += _("Last approval email was sent on:") + ' <strong class="headline">' + str(dLastReq) + '</strong><br />' +\
                        _("It was approved on:") + ' <strong class="headline">' + str(dAction) + '</strong><br />'
         if status == "rejected":
-            out += _("This document has been %(x_fmt_open)srejected%(x_fmt_close)s.") % {'x_fmt_open': '<strong class="headline">', 'x_fmt_close': '</strong>'}
+            out += _("This document has been %(x_fmt_open)srejected%(x_fmt_close)s.") % {'x_fmt_open': '<strong class="headline">',
+                                                                                         'x_fmt_close': '</strong>'} 
             out += "<br /><br />"
             out += _("It was first sent for approval on:") + ' <strong class="headline">' + str(dFirstReq) +'</strong><br />'
             if dLastReq == "0000-00-00 00:00:00":
@@ -2352,693 +1966,802 @@ class Template:
                    </tr>
                   </table>"""
         return out
-
-    def tmpl_publiline_displaycplxdoc(self, ln, doctype, docname, categ, rn, apptype, status, dates, isPubCom, isEdBoard, isReferee, isProjectLeader, isAuthor, authors, title, sysno, newrn):
-
-        # load the right message language
+    
+#----------NEW STUFF-----------------
+    def tmpl_wse_group_container(self, container_label, ln=cdslang):
+        """
+        Create html for a container with the label according to the language
+        @param container_label: (dict) labels for the current container, the keys
+        are the language 
+        @param ln: language of the page.
+        @return the HTML for this container, MUST be completed with a string value for element
+        """
         _ = gettext_set_language(ln)
-
-        if status == "waiting":
-            image = """<img src="%s/waiting_or.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        elif status == "approved":
-            image = """<img src="%s/smchk_gr.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        elif status == "rejected":
-            image = """<img src="%s/iconcross.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        elif status == "cancelled":
-            image = """<img src="%s/smchk_rd.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        else:
-            image = ""
+        
         out = """
-                <table class="searchbox" summary="">
-                 <tr>
-                  <th class="portalboxheader">%(image)s %(rn)s</th>
-                 </tr>
-                 <tr>
-                   <td class="portalboxbody">""" % {
-                   'image' : image,
-                   'rn' : rn,
-                 }
-
-        out += """<form action="publiline.py">
-                    <input type="hidden" name="flow" value="cplx" />
-                    <input type="hidden" name="doctype" value="%(doctype)s" />
-                    <input type="hidden" name="categ" value="%(categ)s" />
-                    <input type="hidden" name="RN" value="%(rn)s" />
-                    <input type="hidden" name="apptype" value="%(apptype)s" />
-                    <input type="hidden" name="action" value="" />
-                    <input type="hidden" name="ln" value="%(ln)s" />
-                  <small>""" % {
-                 'rn' : rn,
-                 'categ' : categ,
-                 'doctype' : doctype,
-                 'apptype' : apptype,
-                 'ln': ln,
-               }
-
-        out += "<table><tr height='30px'><td width='120px'>"
-
-        if title != "unknown":
-            out += """<strong class="headline">%(title_text)s</strong></td><td>%(title)s</td></tr>""" % {
-                     'title_text' : _("Title:"),
-                     'title' : title,
-                   }
-
-        out += "<tr height='30px'><td width='120px'>"
-        if authors != "":
-            out += """<strong class="headline">%(author_text)s</strong></td><td>%(authors)s</td></tr>""" % {
-                     'author_text' : _("Author:"),
-                     'authors' : authors,
-                   }
-        out += "<tr height='30px'><td width='120px'>"
-        if sysno != "":
-            out += """<strong class="headline">%(more)s</strong>
-                        </td><td><a href="%(siteurl)s/record/%(sysno)s?ln=%(ln)s">%(click)s</a>
-                        </td></tr>
-                   """ % {
-                     'more' : _("More information:"),
-                     'click' : _("Click here"),
-                     'siteurl' : CFG_SITE_URL,
-                     'sysno' : sysno,
-                     'ln' : ln,
-                   }
-
-        out += "</table>"
-        out += "<br /><br />"
-
-        if apptype == "RRP":
-            out += "<table><tr><td width='400px'>"
-            out += _("It has first been asked for refereing process on the ") + "</td><td>" + ' <strong class="headline">' + str(dates['dFirstReq']) + '</strong><br /></td></tr>'
-
-            out += "<tr><td width='400px'>"
-            out += _("Last request e-mail was sent to the publication committee chair on the ") + "</td><td>" + ' <strong class="headline">' + str(dates['dLastReq']) + '</strong><br /></td></tr>'
-
-            if dates['dRefereeSel'] != None:
-                out += "<tr><td width='400px'>"
-                out += _("A referee has been selected by the publication committee on the ") + "</td><td>" +  ' <strong class="headline">' + str(dates['dRefereeSel']) + '</strong><br /></td></tr>'
-            else:
-                out += "<tr><td width='400px'>"
-                out += _("No referee has been selected yet.") + "</td><td>"
-                if (status != "cancelled") and (isPubCom == 0):
-                    out += displaycplxdoc_displayauthaction (action="RefereeSel", linkText=_("Select a referee"))
-                out += '<br /></td></tr>'
-
-            if dates['dRefereeRecom'] != None:
-                out += "<tr><td width='400px'>"
-                out += _("The referee has sent his final recommendations to the publication committee on the ") + "</td><td>" +  ' <strong class="headline">' + str(dates['dRefereeRecom']) + '</strong><br /></td></tr>'
-            else:
-                out += "<tr><td width='400px'>"
-                out += _("No recommendation from the referee yet.") + "</td><td>"
-                if (status != "cancelled") and (dates['dRefereeSel'] != None) and (isReferee == 0):
-                    out += displaycplxdoc_displayauthaction (action="RefereeRecom", linkText=_("Send a recommendation"))
-                out += '<br /></td></tr>'
-
-            if dates['dPubComRecom'] != None:
-                out += "<tr><td width='400px'>"
-                out += _("The publication committee has sent his final recommendations to the project leader on the ") + "</td><td>" +  ' <strong class="headline">' + str(dates['dPubComRecom']) + '</strong><br /></td></tr>'
-            else:
-                out += "<tr><td width='400px'>"
-                out += _("No recommendation from the publication committee yet.") + "</td><td>"
-                if (status != "cancelled") and (dates['dRefereeRecom'] != None) and (isPubCom == 0):
-                    out += displaycplxdoc_displayauthaction (action="PubComRecom", linkText=_("Send a recommendation"))
-                out += '<br /></td></tr>'
-
-            if status == "cancelled":
-                out += "<tr><td width='400px'>"
-                out += _("It has been cancelled by the author on the ") + "</td><td>" +  ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br /></td></tr>'
-            elif dates['dProjectLeaderAction'] != None:
-                if status == "approved":
-                    out += "<tr><td width='400px'>"
-                    out += _("It has been approved by the project leader on the ") + "</td><td>" +  ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br /></td></tr>'
-                elif status == "rejected":
-                    out += "<tr><td width='400px'>"
-                    out += _("It has been rejected by the project leader on the ") + "</td><td>" +  ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br /></td></tr>'
-            else:
-                out += "<tr><td width='400px'>"
-                out += _("No final decision taken yet.") + "</td><td>"
-                if (dates['dPubComRecom'] != None) and (isProjectLeader == 0):
-                    out += displaycplxdoc_displayauthaction (action="ProjectLeaderDecision", linkText=_("Take a decision"))
-                if isAuthor == 0:
-                    out += displaycplxdoc_displayauthaction (action="AuthorCancel", linkText=_("Cancel"))
-                out += '<br /></table>'
-
-        elif apptype == "RPB":
-            out += _("It has first been asked for refereing process on the ") + ' <strong class="headline">' + str(dates['dFirstReq']) + '</strong><br />'
-
-            out += _("Last request e-mail was sent to the publication committee chair on the ") + ' <strong class="headline">' + str(dates['dLastReq']) + '</strong><br />'
-
-            if dates['dEdBoardSel'] != None:
-                out += _("An editorial board has been selected by the publication committee on the ") + ' <strong class="headline">' + str(dates['dEdBoardSel']) + '</strong>'
-                if (status != "cancelled") and (isEdBoard == 0):
-                    out += displaycplxdoc_displayauthaction (action="AddAuthorList", linkText=_("Add an author list"))
-                out += '<br />'
-            else:
-                out += _("No editorial board has been selected yet.")
-                if (status != "cancelled") and (isPubCom == 0):
-                    out += displaycplxdoc_displayauthaction (action="EdBoardSel", linkText=_("Select an editorial board"))
-                out += '<br />'
-
-            if dates['dRefereeSel'] != None:
-                out += _("A referee has been selected by the editorial board on the ") + ' <strong class="headline">' + str(dates['dRefereeSel']) + '</strong><br />'
-            else:
-                out += _("No referee has been selected yet.")
-                if (status != "cancelled") and (dates['dEdBoardSel'] != None) and (isEdBoard == 0):
-                    out += displaycplxdoc_displayauthaction (action="RefereeSel", linkText=_("Select a referee"))
-                out += '<br />'
-
-            if dates['dRefereeRecom'] != None:
-                out += _("The referee has sent his final recommendations to the editorial board on the ") + ' <strong class="headline">' + str(dates['dRefereeRecom']) + '</strong><br />'
-            else:
-                out += _("No recommendation from the referee yet.")
-                if (status != "cancelled") and (dates['dRefereeSel'] != None) and (isReferee == 0):
-                    out += displaycplxdoc_displayauthaction (action="RefereeRecom", linkText=_("Send a recommendation"))
-                out += '<br />'
-
-            if dates['dEdBoardRecom'] != None:
-                out += _("The editorial board has sent his final recommendations to the publication committee on the ") + ' <strong class="headline">' + str(dates['dRefereeRecom']) + '</strong><br />'
-            else:
-                out += _("No recommendation from the editorial board yet.")
-                if (status != "cancelled") and (dates['dRefereeRecom'] != None) and (isEdBoard == 0):
-                    out += displaycplxdoc_displayauthaction (action="EdBoardRecom", linkText=_("Send a recommendation"))
-                out += '<br />'
-
-            if dates['dPubComRecom'] != None:
-                out += _("The publication committee has sent his final recommendations to the project leader on the ") + ' <strong class="headline">' + str(dates['dPubComRecom']) + '</strong><br />'
-            else:
-                out += _("No recommendation from the publication committee yet.")
-                if (status != "cancelled") and (dates['dEdBoardRecom'] != None) and (isPubCom == 0):
-                    out += displaycplxdoc_displayauthaction (action="PubComRecom", linkText=_("Send a recommendation"))
-                out += '<br />'
-
-            if status == "cancelled":
-                out += _("It has been cancelled by the author on the ") + ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br />'
-            elif dates['dProjectLeaderAction'] != None:
-                if status == "approved":
-                    out += _("It has been approved by the project leader on the ") + ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br />'
-                elif status == "rejected":
-                    out += _("It has been rejected by the project leader on the ") + ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br />'
-            else:
-                out += _("No final decision taken yet.")
-                if (dates['dPubComRecom'] != None) and (isProjectLeader == 0):
-                    out += displaycplxdoc_displayauthaction (action="ProjectLeaderDecision", linkText=_("Take a decision"))
-                if isAuthor == 0:
-                    out += displaycplxdoc_displayauthaction (action="AuthorCancel", linkText=_("Cancel"))
-                out += '<br />'
-
-        elif apptype == "RDA":
-            out += _("It has first been asked for refereing process on the ") + ' <strong class="headline">' + str(dates['dFirstReq']) + '</strong><br />'
-
-            out += _("Last request e-mail was sent to the project leader on the ") + ' <strong class="headline">' + str(dates['dLastReq']) + '</strong><br />'
-
-            if status == "cancelled":
-                out += _("It has been cancelled by the author on the ") + ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br />'
-            elif dates['dProjectLeaderAction'] != None:
-                if status == "approved":
-                    out += _("It has been approved by the project leader on the ") + ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br />'
-                elif status == "rejected":
-                    out += _("It has been rejected by the project leader on the ") + ' <strong class="headline">' + str(dates['dProjectLeaderAction']) + '</strong><br />'
-            else:
-                out += _("No final decision taken yet.")
-                if isProjectLeader == 0:
-                    out += displaycplxdoc_displayauthaction (action="ProjectLeaderDecision", linkText=_("Take a decision"))
-                if isAuthor == 0:
-                    out += displaycplxdoc_displayauthaction (action="AuthorCancel", linkText=_("Cancel"))
-                out += '<br />'
-
-        out += """    </small></form>
-                      <br />
-                    </td>
-                   </tr>
-                  </table>"""
+        <!-- Open the "submission page" -->
+        <div class="websubmit_form_page">
+        """
+        out +=  """
+        <!-- WSE-Container -->
+        <!-- WSE-Container-Leader -->
+        <div class="wse_element_container6">
+        <div class="wse_element_container_header6">%(title)s</div>
+        <div class="wse_spacer">
+        &nbsp;
+        </div>
+        <!-- /WSE-Container-Leder -->"""
+        if container_label.has_key(ln):
+            out %=  {"title": container_label[ln]}
+        elif container_label.has_key(cdslang):
+            out %=  {"title": container_label[cdslang]}
+        elif container_label.values():
+            out %=  {"title": container_label.values()[0]}
+        else:
+            out %=  {"title": ""}
+        out += "%(elements)s"
+        out += """
+        <!-- WSE-Container-Footer -->
+        <div class="wse_spacer">
+        &nbsp;
+        </div>
+        </div>
+        <!-- /WSE-Container-Footer -->
+        <!-- /WSE-Container -->
+        <div class="wse_spacer">
+        &nbsp;
+        </div>"""
+        out += """</div>"""
         return out
 
-    def tmpl_publiline_displaycplxdocitem(self,
-                                          doctype, categ, rn, apptype, action,
-                                          comments,
-                                          (user_can_view_comments, user_can_add_comment, user_can_delete_comment),
-                                          selected_category,
-                                          selected_topic, selected_group_id, comment_subject, comment_body, ln):
-        _ = gettext_set_language(ln)
-
-        if comments and user_can_view_comments:
-
-            comments_text = ''
-            comments_overview = '<ul>'
-            for comment in comments:
-                (cmt_uid, cmt_nickname, cmt_title, cmt_body, cmt_date, cmt_priority, cmtid) = comment
-
-                comments_overview += '<li><a href="#%s">%s - %s</a> (%s)</li>' % (cmtid, cmt_nickname, cmt_title, convert_datetext_to_dategui (cmt_date))
-
-                comments_text += """
-<table class="bskbasket">
-  <thead class="bskbasketheader">
-    <tr><td class="bsktitle"><a name="%s"></a>%s - %s (%s)</td><td><a href=%s/publiline.py?flow=cplx&doctype=%s&apptype=%s&categ=%s&RN=%s&reply=true&commentId=%s&ln=%s#add_comment>Reply</a></td><td><a href="#top">Top</a></td></tr>
-  </thead>
-  <tbody>
-    <tr><td colspan="2">%s</td></tr>
-  </tbody>
-</table>""" % (cmtid, cmt_nickname, cmt_title, convert_datetext_to_dategui (cmt_date), CFG_SITE_URL, doctype, apptype, categ, rn, cmt_uid, ln, email_quoted_txt2html(cmt_body))
-
-            comments_overview += '</ul>'
-        else:
-            comments_text = ''
-            comments_overview = 'None.'
-
-        body = ''
-        if user_can_view_comments:
-            body += """<h4>%(comments_label)s</h4>"""
-        if user_can_view_comments:
-            body += """%(comments)s"""
-        if user_can_add_comment:
-            validation = """
-    <input type="hidden" name="validate" value="go" />
-    <input type="submit" class="formbutton" value="%(button_label)s" />""" % {'button_label': _("Add Comment")}
-            body += self.tmpl_publiline_displaywritecomment (doctype, categ, rn, apptype, action, _("Add Comment"), comment_subject, validation, comment_body, ln)
-
-        body %= {
-                'comments_label': _("Comments"),
-                'action': action,
-                'button_label': _("Write a comment"),
-                'comments': comments_text}
-        content = '<br />'
-
-        out = """
-<table class="bskbasket">
-  <thead class="bskbasketheader">
-    <tr>
-      <td class="bsktitle">
-        <a name="top"></a>
-        <h4>%(comments_overview_label)s</h4>
-        %(comments_overview)s
-      </td>
-      <td class="bskcmtcol"></td>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td colspan="2" style="padding: 5px;">
-%(body)s
-      </td>
-    </tr>
-  </tbody>
-</table>""" % {
-               'comments_overview_label' : _('Comments overview'),
-               'comments_overview' : comments_overview,
-               'body' : body,}
-
+    def tmpl_wse_html_instance(self, wse_element_html):
+        """
+        Put the html value of a wse_element in a div
+        @param wse_element_html: (string) html value of the current wse element
+        @param ln: language of the page.
+        @return the HTML for this element
+        """
+        out = """     
+        <!-- WSE-Element-Body -->
+        <div class="wse_field_row">
+        %(content)s
+        </div>
+        <!-- /WSE-Element-Body -->""" % { "content" : wse_element_html }
         return out
 
-    def tmpl_publiline_displaywritecomment(self, doctype, categ, rn, apptype, action, write_label, title, validation, reply_message, ln):
+    def tmpl_warning_guest_user_must_login(self, ln=cdslang):
+        """A message to be displayed when a guest user tries to perform some
+           kind of submission-related action requiring login.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the warning message.
+        """
+        ## Setup gettext for the interface language:
         _ = gettext_set_language(ln)
-        return """
-<div style="width:100%%%%">
-  <hr />
-  <h2>%(write_label)s</h2>
-  <form action="publiline.py">
-    <input type="hidden" name="flow" value="cplx" />
-    <input type="hidden" name="doctype" value="%(doctype)s" />
-    <input type="hidden" name="categ" value="%(categ)s" />
-    <input type="hidden" name="RN" value="%(rn)s" />
-    <input type="hidden" name="apptype" value="%(apptype)s" />
-    <input type="hidden" name="action" value="%(action)s" />
-    <input type="hidden" name="ln" value="%(ln)s" />
-    <p class="bsklabel">%(title_label)s:</p>
-    <a name="add_comment"></a>
-    <input type="text" name="msg_subject" size="80" value="%(title)s"/>
-    <p class="bsklabel">%(comment_label)s:</p>
-    <textarea name="msg_body" rows="20" cols="80">%(reply_message)s</textarea><br />
-    %(validation)s
-  </form>
-</div>""" % {'write_label': write_label,
-             'title_label': _("Title"),
-             'title': title,
-             'comment_label': _("Comment"),
-             'rn' : rn,
-             'categ' : categ,
-             'doctype' : doctype,
-             'apptype' : apptype,
-             'action' : action,
-             'validation' : validation,
-             'reply_message' : reply_message,
-             'ln' : ln,
+        ## Return the message:
+        return _("""You seem to be a guest user. You have to
+%(x_url_open)slogin%(x_url_close)s first.""") % \
+             { 'x_url_open'  : '<a href="../youraccount/login?ln=' + ln + '">',
+               'x_url_close' : '<a/>'}
+
+    def tmpl_error_permission_denied_for_user_access_to_submission(self,
+                                                                  user_nickname,
+                                                                  submission_id,
+                                                                  ln=cdslang):
+        """A message to be displayed when a user attempts to manipulate a
+           submission that is registered to another user in the submission log.
+           @param user_nickname: (string) - the user's nickname.
+           @param submission_id: (integer) - the submission ID.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""User %(x_user_nickname)s is not allowed to access 
+submission %(x_submission_id)s.""") \
+                % { 'x_user_nickname' : user_nickname,
+                    'x_submission_id' : submission_id,
+                  }
+
+    def tmpl_error_unresolvable_doctype(self, ln=cdslang):
+        """A message to be displayed when an attempt is made to create a
+           submission form, but the document type is either missing or unknown.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""There was an error while trying to process your submission
+(the document type could not be resolved).""")
+
+    def tmpl_error_unresolvable_action(self, ln=cdslang):
+        """A message to be displayed when an attempt is made to create a
+           submission form, but the action is either missing or unknown.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""There was an error while trying to process your submission
+(the action could not be resolved).""")
+
+    def tmpl_error_submission_directory_not_found(self,
+                                                  submission_id,
+                                                  ln=cdslang):
+        """A message to be displayed when, upon re-visiting a submission page,
+           WebSubmit is unable to find the "submission directory" in the
+           storage archive. (The submission directory should already exist
+           when a visit to a submission page is not the first visit.)
+           @param submission_id: (integer) - the submission ID.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (WebSubmit 
+could not find the working directory for submission %(x_submission_id)s).""") \
+                % { 'x_submission_id' : submission_id, }
+
+    def tmpl_error_submission_directory_already_existed(self,
+                                                        submission_id,
+                                                        ln=cdslang):
+        """A message to be displayed when WebSubmit tried to create the
+           working directory for a new submission, but was unable to because
+           it already existed.
+           @param submission_id: (integer) - the submission ID.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (WebSubmit tried 
+to create the working directory for submission %(x_submission_id)s, but it 
+already existed).""") \
+                % { 'x_submission_id' : submission_id, }
+
+    def tmpl_error_couldnt_create_submission_directory(self,
+                                                       submission_id,
+                                                       error_message,
+                                                       ln=cdslang):
+        """A message to be displayed when WebSubmit tried to create the
+           working directory for a new submission, but was unable to for an
+           unknown reason (the error message received from the OS will be
+           included into the message string that is returned).
+           @param submission_id: (integer) - the submission ID.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (WebSubmit tried 
+to create the working directory for submission %(x_submission_id)s, but it 
+was not possible [%(x_error_message)s]).""") \
+                    % { 'x_submission_id' : submission_id,
+                        'x_error_message' : error_message,
+                      }
+
+    def tmpl_error_unresolvable_submission_config_template(self, ln=cdslang):
+        """A message to be displayed when an attempt is made to process a
+           submission, but the name of the submission configuration template
+           is either missing or unknown.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""There was an error while trying to process your submission
+(the submission configuration template's name could not be resolved).""")
+
+    def tmpl_error_couldnt_access_submission_config_template(self,
+                                                             templatename,
+                                                             ln=cdslang):
+        """A message to be displayed when an attempt is made to process a
+           submission, but the submission configuration template is not
+           readable.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (WebSubmit could 
+not open submission configuration template file %(x_config_filename)s. Either 
+it didn't exist as a normal file, or WebSubmit didn't have the required 
+privileges to read it.""") \
+                    % { 'x_config_filename' : templatename, }
+
+    def tmpl_error_couldnt_read_submission_config_template(self,
+                                                           templatename,
+                                                           error_message,
+                                                           ln=cdslang):
+        """A message to be displayed when an attempt is made to process a
+           submission, but there is a problem opening the submission
+           configuration template.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (WebSubmit could 
+not read submission configuration template file %(x_config_filename)s. 
+[%(x_error_message)s]).""") \
+                    % { 'x_config_filename' : templatename,
+                        'x_error_message'   : error_message,
+                      }
+
+    def tmpl_error_xml_submission_template_unparsable(self,
+                                                      templatename,
+                                                      error_message,
+                                                      ln=cdslang):
+        """A message to be displayed when one of the XML configuration
+           templates that describe a given submission couldnt be parsed
+           due to some kind of XML error.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (WebSubmit could 
+not parse the XML config file %(x_config_filename)s. [%(x_error_message)s])
+.""") \
+                    % { 'x_config_filename' : templatename,
+                        'x_error_message'   : error_message,
+                      }
+
+    def tmpl_error_xml_submission_template_container_label_invalid(self,
+                                                                   templatename,
+                                                                   ln=cdslang):
+        """A message to be displayed when during the parsing of one of the
+           XML configuration templates that describe a given submission, a
+           container label that is invalid was found.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, an invalid container-label was 
+encountered. Container labels must have a language attribute and a message 
+value).""") \
+                    % { 'x_config_filename' : templatename, }
+
+
+    def tmpl_error_xml_submission_template_element_name_missing(self,
+                                                                templatename,
+                                                                ln=cdslang):
+        """A message to be displayed when during the parsing of one of the
+           XML configuration templates that describe a given submission, an
+           element node with no name is encountered.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, an element node without a name 
+attribute was encountered. An element's name is mandatory).""") \
+                    % { 'x_config_filename' : templatename, }
+
+    def tmpl_error_xml_submission_template_element_type_missing(self,
+                                                                templatename,
+                                                                elementname,
+                                                                ln=cdslang):
+        """A message to be displayed when during the parsing of one of the
+           XML configuration templates that describe a given submission, an
+           element node with no type is encountered and there is no
+           definition of this element in the WebSubmit common elements
+           library config file.
+           If an element is not declared in the library file, its type
+           is mandatory.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param elementname: (string) - the name of the problem element.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, an element node [%(x_elementname)s] 
+without a type attribute was encountered. If an element must be declared 
+with a type either in the config file itself, or in the the common elements 
+library. To repeat: element type is mandatory).""") \
+                    % { 'x_config_filename' : templatename,
+                        'x_elementname'     : elementname,
+                      }
+
+    def tmpl_error_xml_submission_template_node_value_missing(self,
+                                                              templatename,
+                                                              nodename,
+                                                              ln=cdslang):
+        """A message to be displayed when during the parsing of a submission
+           config file, a node is encountered for which a value is
+           mandatory, but is actually missing. For example, it could be
+           said that if there is a "default-value" node, then there must
+           actually be a value supplied for the default value.
+           I.e. this could be classed as illegal:
+
+                 <default-value />
+
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param nodename: (string) - the name of the problem node.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, a node (%(x_nodename)s) without a 
+value was encountered. A value for this node is mandatory.""") \
+                    % { 'x_config_filename' : templatename,
+                        'x_nodename' : nodename,
+                      }
+
+    def tmpl_error_xml_submission_template_invalid_element_label(self,
+                                                                 templatename,
+                                                                 elementname,
+                                                                 ln=cdslang):
+        """A message to be displayed when during the parsing of a submission
+           config file, an element-label node with a missing "ln" attribute
+           or with no value is encountered. An element label must have both a
+           language and a node value.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param elementname: (string) - the name of the element to which
+            the problem element-label node belongs.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+           
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, an invalid element-label node belonging 
+to the element %(x_elementname)s was encountered. An element-label must have 
+both a "ln" attribute and a value).""") \
+                    % { 'x_config_filename' : templatename,
+                        'x_elementname'     : elementname,
+                      }
+
+    def tmpl_error_xml_submission_template_invalid_element_option(self,
+                                                                 templatename,
+                                                                 elementname,
+                                                                 ln=cdslang):
+        """A message to be displayed when during the parsing of a submission
+           config file, an invalid option for an element is encountered.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param elementname: (string) - the name of the element to which
+            the problem option node belongs.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+           
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, an invalid "option" node belonging to 
+the element %(x_elementname)s was encountered. An option must have a "value" 
+attribute and if it contains option-labels, they must have "ln" 
+attributes).""") \
+                    % { 'x_config_filename' : templatename,
+                        'x_elementname'     : elementname,
+                      }
+
+    def tmpl_error_unable_to_retrieve_WSET_class_reference(self,
+                                                           wset_name,
+                                                           ln=cdslang):
+        """A message to be displayed when it isn't possible to obtain a
+           reference to the class of a given WSET.
+           @param wset_name: (string) - the WSET for which a class reference
+            couldn't be retrieved/
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to retrieve a class reference for the %(x_WSET_name)s WSET.""") \
+                    % { 'x_WSET_name'     : wset_name, }
+
+    def tmpl_error_unable_to_instantiate_WSET_object(self,
+                                                     wset_name,
+                                                     error_message,
+                                                     ln=cdslang):
+        """A message to be displayed when it isn't possible to instantiate
+           a WSET object from its class reference.
+           @param wset_name: (string) - the WSET class name.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to instantiate an object of class %(x_WSET_name)s [%(x_error_message)s]).""") \
+                    % { 'x_WSET_name'     : wset_name,
+                        'x_error_message' : error_message,
+                      }
+
+    def tmpl_error_xml_submission_template_invalid_check_node(self,
+                                                              templatename,
+                                                              ln=cdslang):
+        """A message to be displayed when during the parsing of one of the
+           XML configuration templates that describe a given submission, an
+           invalid "check" node is encountered.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, an invalid "check" node was 
+encountered. A check node must have a "test" attribute and any of its error-
+labels must have "ln" attributes and values).""") \
+                    % { 'x_config_filename' : templatename, }
+
+    def tmpl_error_xml_submission_template_invalid_check_string(self,
+                                                                templatename,
+                                                                ln=cdslang):
+        """A message to be displayed when during the parsing of one of the
+           XML configuration templates that describe a given submission, a
+           "check" node with an invalid "test" value is encountered.
+           @param templatename: (string) - the name of the configuration
+            template file.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (when parsing the 
+XML config file %(x_config_filename)s, a "check" node with an invalid 
+"test" attribute was encountered).""") \
+                    % { 'x_config_filename' : templatename, }
+
+
+    def tmpl_error_unable_to_retrieve_WSC_function_reference(self,
+                                                             wsc_name,
+                                                             ln=cdslang):
+        """A message to be displayed when it isn't possible to obtain a
+           reference to a given WSC function from its name.
+           @param wsc_name: (string) - the WSC for which a function reference
+            couldn't be retrieved.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to retrieve a class reference for the %(x_WSET_name)s WSET).""") \
+                    % { 'x_WSET_name'     : cgi.escape(wsc_name, 1), }
+
+    def tmpl_error_unable_to_create_simple_WSE_XML_record(self,
+                                                          error_message,
+                                                          ln=cdslang):
+        """A message to be displayed when it isn't possible to create the simple
+           WSE XML record for a given submission.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to create the simple XML record [%(error)s]).""") \
+                    % { 'error'       : cgi.escape(error_message, 1), }
+
+    def tmpl_error_unable_to_create_MARCXML_record(self,
+                                                   error_message,
+                                                   ln=cdslang):
+        """A message to be displayed when it isn't possible to create the
+           MARCXML record for a given submission.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to create the MARCXML record [%(error)s]).""") \
+                    % { 'error'       : cgi.escape(error_message, 1), }
+
+    def tmpl_error_unable_to_read_MARCXML_record(self,
+                                                   error_message,
+                                                   ln=cdslang):
+        """A message to be displayed when it isn't possible to read the
+           MARCXML record that has been created in a given submission's
+           working directory.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to read the MARCXML record [%(error)s]).""") \
+                    % { 'error'       : cgi.escape(error_message, 1), }
+
+    def tmpl_error_unable_to_create_record_preview_lockfile(self,
+                                                            error_message,
+                                                            ln=cdslang):
+        """A message to be displayed when it isn't possible to create the
+           lock-file that is used to signify that a preview of the submitted
+           data has been shown to the user.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to create the "submitted data previewed" lockfile: [%(error)s]).""") \
+                    % { 'error'       : cgi.escape(error_message, 1), }
+
+    def tmpl_error_unable_to_delete_record_preview_lockfile(self,
+                                                            error_message,
+                                                            ln=cdslang):
+        """A message to be displayed when it isn't possible to delete the
+           lock-file that is used to signify that a preview of the submitted
+           data has been shown to the user.
+           @param error_message: (string) - the error message received from the
+            system.
+           @param ln: (string) - the language that the message is to be
+            displayed in.
+           @return: (string) - the error message.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+        ## Return the message:
+        return _("""An unexpected internal error occurred (it was not possible 
+to remove the "submitted data previewed" lockfile: [%(error)s]).""") \
+                    % { 'error'       : cgi.escape(error_message, 1), }
+
+    def tmpl_new_record_preview_page(self,
+                                     doctype,
+                                     action,
+                                     config,
+                                     submissionid,
+                                     categories,
+                                     record_preview,
+                                     ln=cdslang):
+        """Create a page that allows the user to see a preview of the record
+           that they are about to submit and asks for confirmation that it's
+           OK to proceed with the submission.
+           @param doctype: (string) - the document type of the submission.
+           @param action: (string) - the action.
+           @param config: (string) - the config name.
+           @param submissionid: (string) - the identifier of the submission.
+           @param categories: (list) - the categories into which the
+            submission is being made.
+           @param record_preview: (string) - a preview of the record.
+           @param ln: (string) - the interface language. It defaults to
+            cdslang if not supplied.
+        """
+        ## Setup gettext for the interface language:
+        _ = gettext_set_language(ln)
+
+        ## Wash categories (it needs to be a list or tuple):
+        if type(categories) is str:
+            ## Since categories is a string, it needs to be put into a list:
+            categories = [categories]
+        elif type(categories) not in (list, tuple):
+            ## Invalid format for categories - suppress it:
+            categories = []
+
+        ## A buffer in which to put the form's HTML:
+        out = ""
+
+        ## Open the form:
+        out += """
+<form action="/submit" method="post" enctype="multipart/form-data">
+"""
+
+        ## Add some constant (hidden) system fields into the form:
+        out += """
+  <input type="hidden" name="ln" value="%(language)s" />
+  <input type="hidden" name="WebSubmit_document_type" value="%(doctype)s" />
+  <input type="hidden" name="WebSubmit_action" value="%(action)s" />
+  <input type="hidden" name="WebSubmit_Submission_Config" value="%(config)s" />
+  <input type="hidden" name="WebSubmit_submissionid" value="%(submissionid)s" />
+"""     % { 'language'     : cgi.escape(ln, 1),
+            'doctype'      : cgi.escape(doctype, 1),
+            'action'       : cgi.escape(action, 1),
+            'config'       : cgi.escape(config, 1),
+            'submissionid' : cgi.escape(str(submissionid), 1),
+          }
+
+        ## Add the "categories" into the form. We should have a list of them
+        ## and just add each member into a hidden "WebSubmit_category" field:
+        for category in categories:
+            out += """
+  <input type="hidden" name="WebSubmit_category" value="%(category)s" />""" \
+            % { 'category' : cgi.escape(category, 1), }
+
+        ## Add a message about the preview, followed by confirm submission and
+        ## edit data buttons:
+        out += """
+<div style="color: green;">
+%(x_preview_descr)s
+</div>
+<br />
+<div style="text-align: center;">
+<input type="submit" name="WebSubmitEditForm" value="%(x_edit_data)s" 
+class="formbutton" />
+&nbsp;&nbsp;
+<input type="submit" name="WebSubmitFormSubmit" 
+value="%(x_confirm_submission)s" class="formbutton" />
+</div>
+<br />
+<br />
+</form>""" % { 'x_preview_descr'      : _("""
+The information that you're about to submit can be seen in the record preview 
+below - please check it. Note that it's only a rough preview and there may be 
+minor differences in the final presentation. Nevertheless, you should check 
+that the data itself is correct.  If everything looks OK, you must confirm 
+the submission. If there is a problem however, you can edit the data again. 
+Do you want to confirm this submission?"""),
+               'x_edit_data'          : \
+                 _("""No! I need to change something!"""),
+               'x_confirm_submission' : \
+                 _("""Yes! Go ahead and submit the data!"""),
             }
 
-    def tmpl_publiline_displaydocplxaction(self, ln, doctype, categ, rn, apptype, action, status, authors, title, sysno, subtitle1, email_user_pattern, stopon1, users, extrausers, stopon2, subtitle2, usersremove, stopon3, validate_btn):
+        ## Now add the record preview into the output buffer:
+        out += """\n%s\n""" % record_preview
 
-        # load the right message language
-        _ = gettext_set_language(ln)
-
-        if status == "waiting":
-            image = """<img src="%s/waiting_or.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        elif status == "approved":
-            image = """<img src="%s/smchk_gr.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        elif status == "rejected":
-            image = """<img src="%s/iconcross.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        else:
-            image = ""
-        out = """
-                <table class="searchbox" summary="">
-                 <tr>
-                  <th class="portalboxheader">%(image)s %(rn)s</th>
-                 </tr>
-                 <tr>
-                   <td class="portalboxbody">
-                     <small>""" % {
-                   'image' : image,
-                   'rn' : rn,
-                 }
-
-        if title != "unknown":
-            out += """<strong class="headline">%(title_text)s</strong>%(title)s<br /><br />""" % {
-                     'title_text' : _("Title:"),
-                     'title' : title,
-                   }
-
-        if authors != "":
-            out += """<strong class="headline">%(author_text)s</strong>%(authors)s<br /><br />""" % {
-                     'author_text' : _("Author:"),
-                     'authors' : authors,
-                   }
-        if sysno != "":
-            out += """<strong class="headline">%(more)s</strong>
-                        <a href="%(siteurl)s/record/%(sysno)s?ln=%(ln)s">%(click)s</a>
-                        <br /><br />
-                   """ % {
-                     'more' : _("More information:"),
-                     'click' : _("Click here"),
-                     'siteurl' : CFG_SITE_URL,
-                     'sysno' : sysno,
-                     'ln' : ln,
-                   }
-
-        out += """      </small>
-                      <br />
-                    </td>
-                   </tr>
-                 </table>"""
-
-        if ((apptype == "RRP") or (apptype == "RPB")) and ((action == "EdBoardSel") or (action == "RefereeSel")):
-            out += """
-                    <table class="searchbox" summary="">
-                     <tr>
-                      <th class="portalboxheader">%(subtitle)s</th>
-                     </tr>
-                     <tr>
-                       <td class="portalboxbody">""" % {
-                       'subtitle' : subtitle1,
-                     }
-
-            out += """<form action="publiline.py">
-                        <input type="hidden" name="flow" value="cplx" />
-                        <input type="hidden" name="doctype" value="%(doctype)s" />
-                        <input type="hidden" name="categ" value="%(categ)s" />
-                        <input type="hidden" name="RN" value="%(rn)s" />
-                        <input type="hidden" name="apptype" value="%(apptype)s" />
-                        <input type="hidden" name="action" value="%(action)s" />
-                        <input type="hidden" name="ln" value="%(ln)s" />""" % {
-                     'rn' : rn,
-                     'categ' : categ,
-                     'doctype' : doctype,
-                     'apptype' : apptype,
-                     'action' : action,
-                     'ln': ln,
-                   }
-
-            out += ' <span class="adminlabel">1. %s </span>\n' % _("search for user")
-            out += ' <input class="admin_wvar" type="text" name="email_user_pattern" value="%s" />\n' % (email_user_pattern, )
-            out += ' <input class="adminbutton" type="submit" value="%s"/>\n' % (_("search for users"), )
-
-            if (stopon1 == "") and (email_user_pattern != ""):
-                out += ' <br /><span class="adminlabel">2. %s </span>\n' % _("select user")
-                out += ' <select name="id_user" class="admin_w200">\n'
-                out += '  <option value="0">*** %s ***</option>\n' % _("select user")
-                for elem in users:
-                    elem_id = elem[0]
-                    email = elem[1]
-                    out += '  <option value="%s">%s</option>\n' % (elem_id, email)
-
-                for elem in extrausers:
-                    elem_id = elem[0]
-                    email = elem[1]
-                    out += '  <option value="%s">%s %s</option>\n' % (elem_id, email, _("connected"))
-
-                out += ' </select>\n'
-                out += ' <input class="adminbutton" type="submit" value="%s" />\n' % (_("add this user"), )
-
-                out += stopon2
-
-            elif stopon1 != "":
-                out += stopon1
-
-            out += """
-                            </form>
-                          <br />
-                        </td>
-                       </tr>
-                     </table>"""
-
-            if action == "EdBoardSel":
-                out += """
-                        <table class="searchbox" summary="">
-                         <tr>
-                          <th class="portalboxheader">%(subtitle)s</th>
-                         </tr>
-                         <tr>
-                           <td class="portalboxbody">""" % {
-                           'subtitle' : subtitle2,
-                         }
-
-                out += """<form action="publiline.py">
-                            <input type="hidden" name="flow" value="cplx" />
-                            <input type="hidden" name="doctype" value="%(doctype)s" />
-                            <input type="hidden" name="categ" value="%(categ)s" />
-                            <input type="hidden" name="RN" value="%(rn)s" />
-                            <input type="hidden" name="apptype" value="%(apptype)s" />
-                            <input type="hidden" name="action" value="%(action)s" />
-                            <input type="hidden" name="ln" value="%(ln)s" />""" % {
-                         'rn' : rn,
-                         'categ' : categ,
-                         'doctype' : doctype,
-                         'apptype' : apptype,
-                         'action' : action,
-                         'ln': ln,
-                       }
-
-                out += ' <span class="adminlabel">1. %s </span>\n' % _("select user")
-                out += ' <select name="id_user_remove" class="admin_w200">\n'
-                out += '  <option value="0">*** %s ***</option>\n' % _("select user")
-                for elem in usersremove:
-                    elem_id = elem[0]
-                    email = elem[1]
-                    out += '  <option value="%s">%s</option>\n' % (elem_id, email)
-
-                out += ' </select>\n'
-                out += ' <input class="adminbutton" type="submit" value="%s" />\n' % (_("remove this user"), )
-
-                out += stopon3
-
-                out += """
-                                </form>
-                              <br />
-                            </td>
-                           </tr>
-                         </table>"""
-
-            if validate_btn != "":
-                out += """<form action="publiline.py">
-                            <input type="hidden" name="flow" value="cplx" />
-                            <input type="hidden" name="doctype" value="%(doctype)s" />
-                            <input type="hidden" name="categ" value="%(categ)s" />
-                            <input type="hidden" name="RN" value="%(rn)s" />
-                            <input type="hidden" name="apptype" value="%(apptype)s" />
-                            <input type="hidden" name="action" value="%(action)s" />
-                            <input type="hidden" name="validate" value="go" />
-                            <input type="hidden" name="ln" value="%(ln)s" />
-                            <input class="adminbutton" type="submit" value="%(validate_btn)s" />
-                          </form>""" % {
-                         'rn' : rn,
-                         'categ' : categ,
-                         'doctype' : doctype,
-                         'apptype' : apptype,
-                         'action' : action,
-                         'validate_btn' : validate_btn,
-                         'ln': ln,
-                       }
-
+        ## return the newly created form to the caller:
         return out
 
-    def tmpl_publiline_displaycplxrecom(self, ln, doctype, categ, rn, apptype, action, status, authors, title, sysno,  msg_to, msg_to_group, msg_subject):
 
-        # load the right message language
+    def tmpl_submission_form_body(self,
+                                  doctype,
+                                  action,
+                                  config,
+                                  submissionid,
+                                  categories,
+                                  main_form_content,
+                                  error_messages=None,
+                                  ln=cdslang):
+        ## Setup gettext for the interface language:
         _ = gettext_set_language(ln)
 
-        if status == "waiting":
-            image = """<img src="%s/waiting_or.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        elif status == "approved":
-            image = """<img src="%s/smchk_gr.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        elif status == "rejected":
-            image = """<img src="%s/iconcross.gif" alt="" align="right" />""" % (CFG_SITE_URL + '/img')
-        else:
-            image = ""
-        out = """
-                <table class="searchbox" summary="">
-                 <tr>
-                  <th class="portalboxheader">%(image)s %(rn)s</th>
-                 </tr>
-                 <tr>
-                   <td class="portalboxbody">
-                     <small>""" % {
-                   'image' : image,
-                   'rn' : rn,
-                 }
+        ## Wash error_messages (it needs to be a list or tuple):
+        if type(error_messages) is str:
+            ## Since error messages is a string, it needs to be put into a list:
+            error_messages = [error_messages]
+        elif type(error_messages) not in (list, tuple):
+            ## Invalid format for error messages - suppress it:
+            error_messages = []
 
-        if title != "unknown":
-            out += """<strong class="headline">%(title_text)s</strong>%(title)s<br /><br />""" % {
-                     'title_text' : _("Title:"),
-                     'title' : title,
-                   }
+        ## Wash categories (it needs to be a list or tuple):
+        if type(categories) is str:
+            ## Since categories is a string, it needs to be put into a list:
+            categories = [categories]
+        elif type(categories) not in (list, tuple):
+            ## Invalid format for categories - suppress it:
+            categories = []
 
-        if authors != "":
-            out += """<strong class="headline">%(author_text)s</strong>%(authors)s<br /><br />""" % {
-                     'author_text' : _("Author:"),
-                     'authors' : authors,
-                   }
-        if sysno != "":
-            out += """<strong class="headline">%(more)s</strong>
-                        <a href="%(siteurl)s/record/%(sysno)s?ln=%(ln)s">%(click)s</a>
-                        <br /><br />
-                   """ % {
-                     'more' : _("More information:"),
-                     'click' : _("Click here"),
-                     'siteurl' : CFG_SITE_URL,
-                     'sysno' : sysno,
-                     'ln' : ln,
-                   }
+        ## A buffer in which to put the form's HTML:
+        out = ""
 
-        out += """      </small>
-                      <br />
-                    </td>
-                   </tr>
-                 </table>"""
+        ## Add the error messages if there are any:
+        for error_message in error_messages:
+            out += "%s<br />\n" % error_message
 
-        # escape forbidden character
-        msg_to = escape_html(msg_to)
-        msg_to_group = escape_html(msg_to_group)
-        msg_subject = escape_html(msg_subject)
-
-        write_box = """
-<form action="publiline.py" method="post">
-  <input type="hidden" name="flow" value="cplx" />
-  <input type="hidden" name="doctype" value="%(doctype)s" />
-  <input type="hidden" name="categ" value="%(categ)s" />
-  <input type="hidden" name="RN" value="%(rn)s" />
-  <input type="hidden" name="apptype" value="%(apptype)s" />
-  <input type="hidden" name="action" value="%(action)s" />
-  <input type="hidden" name="ln" value="%(ln)s" />
-  <div style="float: left; vertical-align:text-top; margin-right: 10px;">
-    <table class="mailbox">
-      <thead class="mailboxheader">
-        <tr>
-          <td class="inboxheader" colspan="2">
-            <table class="messageheader">
-              <tr>
-                <td class="mailboxlabel">%(to_label)s</td>"""
-
-        if msg_to != "":
-            addr_box = """
-                <td class="mailboxlabel">%(users_label)s</td>
-                <td style="width:100%%%%;" class="mailboxlabel">%(to_users)s</td>""" % {'users_label': _("User"),
-                                                                                        'to_users' : msg_to,
-                                                                                       }
-            if msg_to_group != "":
-                addr_box += """
-              </tr>
-              <tr>
-                <td class="mailboxlabel">&nbsp;</td>
-                <td class="mailboxlabel">%(groups_label)s</td>
-                <td style="width:100%%%%;" class="mailboxlabel">%(to_groups)s</td>""" % {'groups_label': _("Group"),
-                                                                                         'to_groups': msg_to_group,
-                                                                                        }
-        elif msg_to_group != "":
-            addr_box = """
-                <td class="mailboxlabel">%(groups_label)s</td>
-                <td style="width:100%%%%;" class="mailboxlabel">%(to_groups)s</td>""" % {'groups_label': _("Group"),
-                                                                                         'to_groups': msg_to_group,
-                                                                                        }
-        else:
-            addr_box = """
-                <td class="mailboxlabel">&nbsp;</td>
-                <td class="mailboxlabel">&nbsp;</td>"""
-
-        write_box += addr_box
-        write_box += """
-              </tr>
-              <tr>
-                <td class="mailboxlabel">&nbsp;</td>
-                <td>&nbsp;</td>
-                <td>&nbsp;</td>
-              </tr>
-              <tr>
-                <td class="mailboxlabel">%(subject_label)s</td>
-                <td colspan="2">
-                  <input class="mailboxinput" type="text" name="msg_subject" value="%(subject)s" />
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </thead>
-      <tfoot>
-        <tr>
-          <td style="height:0px" colspan="2"></td>
-        </tr>
-      </tfoot>
-      <tbody class="mailboxbody">
-        <tr>
-          <td class="mailboxlabel">%(message_label)s</td>
-          <td>
-            <textarea name="msg_body" rows="10" cols="50"></textarea>
-          </td>
-        </tr>
-        <tr class="mailboxfooter">
-         <td>
-             <select name="validate">
-                 <option> %(select)s</option>
-                 <option value="approve">%(approve)s</option>
-                 <option value="reject">%(reject)s</option>
-             </select>
-          </td>
-
-          <td colspan="2" class="mailboxfoot">
-            <input type="submit" name="send_button" value="%(send_label)s" class="formbutton"/>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</form>
+        ## Open the form:
+        out += """
+<form action="/submit" method="post" enctype="multipart/form-data">
 """
-        write_box = write_box % {'rn' : rn,
-                                 'categ' : categ,
-                                 'doctype' : doctype,
-                                 'apptype' : apptype,
-                                 'action' : action,
-                                 'subject' : msg_subject,
-                                 'to_label': _("To:"),
-                                 'subject_label': _("Subject:"),
-                                 'message_label': _("Message:"),
-                                 'send_label': _("SEND"),
-                                 'select' : _("Select:"),
-                                 'approve' : _("approve"),
-                                 'reject' : _("reject"),
-                                 'ln': ln,
-                                }
 
-        out += write_box
+        ## Add some constant (hidden) system fields into the form:
+        out += """
+  <input type="hidden" name="ln" value="%(language)s" />
+  <input type="hidden" name="WebSubmit_document_type" value="%(doctype)s" />
+  <input type="hidden" name="WebSubmit_action" value="%(action)s" />
+  <input type="hidden" name="WebSubmit_Submission_Config" value="%(config)s" />
+  <input type="hidden" name="WebSubmit_submissionid" value="%(submissionid)s" />
+"""     % { 'language'     : cgi.escape(ln, 1),
+            'doctype'      : cgi.escape(doctype, 1),
+            'action'       : cgi.escape(action, 1),
+            'config'       : cgi.escape(config, 1),
+            'submissionid' : cgi.escape(str(submissionid), 1),
+          }
 
+        ## Add the "categories" into the form. We should have a list of them
+        ## and just add each member into a hidden "WebSubmit_category" field:
+        for category in categories:
+            out += """
+  <input type="hidden" name="WebSubmit_category" value="%(category)s" />""" \
+            % { 'category' : cgi.escape(category, 1), }
+
+        ## Now add the WSE & container content into the output buffer:
+        out += """
+%s
+""" \
+        % main_form_content
+
+        ## Add a "finish submission" button and close the form:
+        out += """
+  <input type="submit" name="WebSubmitFormSubmit" value="%(x_finish_submission)s" />
+</form>""" % { 'x_finish_submission' : cgi.escape(_("Finish Submission"), 1), }
+
+        ## return the newly created form to the caller:
         return out
 
-def displaycplxdoc_displayauthaction(action, linkText):
-    return """ <strong class="headline">(<a href="" onclick="document.forms[0].action.value='%(action)s';document.forms[0].submit();return false;">%(linkText)s</a>)</strong>""" % {
-        "action" : action,
-        "linkText" : linkText
-        }
+
+
+
+#------END OF NEW STUFF-------------------------

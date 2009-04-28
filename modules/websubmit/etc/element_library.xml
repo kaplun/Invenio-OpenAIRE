@@ -1,0 +1,187 @@
+<elements>
+   <element name="WSE_PublicationJournal" type="WSET_Select" multiple="0">
+    <!-- A select list of Journal names used when referring to a publication  -->
+    <option value="SPRINGER - The European Physics Journal: EPJ Direct">
+     <option-label ln="en">SPRINGER - The European Physics Journal: EPJ Direct</option-label>
+    </option>
+    <option value="SPRINGER - European physical journal A">
+     <option-label ln="en">SPRINGER - European physical journal A</option-label>
+    </option>
+    <option value="SPRINGER - European physical journal C">
+     <option-label ln="en">SPRINGER - European physical journal C</option-label>
+    </option>
+    <option value="IOP - The Journal of Physics">
+     <option-label ln="en">IOP - The Journal of Physics</option-label>
+     </option>
+    <option value="J. Instrum.">
+     <option-label ln="en">J. Instrum.</option-label>
+    </option>
+    <option value="ELSEVIER - Astroparticle Physics">
+     <option-label ln="en">ELSEVIER - Astroparticle Physics</option-label>
+    </option>
+    <option value="ELSEVIER - Computer Physics Communications">
+     <option-label ln="en">ELSEVIER - Computer Physics Communications</option-label>
+    </option>
+    <option value="ELSEVIER - Nuclear Instruments and Methods in Physics Research Section A">
+     <option-label ln="en">ELSEVIER - Nuclear Instruments and Methods in Physics Research Section A</option-label>
+    </option>
+    <option value="ELSEVIER - Nuclear Physics A">
+     <option-label ln="en">ELSEVIER - Nuclear Physics A</option-label>
+    </option>
+    <option value="ELSEVIER - Nuclear Physics B">
+     <option-label ln="en">ELSEVIER - Nuclear Physics B</option-label>
+    </option>
+    <option value="ELSEVIER - Nuclear Physics B - Proceedings Supplements">
+     <option-label ln="en">ELSEVIER - Nuclear Physics B - Proceedings Supplements</option-label>
+    </option>
+    <option value="ELSEVIER - Physics Letters B">
+     <option-label ln="en">ELSEVIER - Physics Letters B</option-label>
+    </option>
+    <option value="ELSEVIER - Physics Reports: review section of physics letters">
+     <option-label ln="en">ELSEVIER - Physics Reports: review section of physics letters</option-label>
+    </option>
+    <option value="ELSEVIER - Plasmas and Ions">
+     <option-label ln="en">ELSEVIER - Plasmas and Ions</option-label>
+    </option>
+    <option value="ELSEVIER - Progress in Particle and Nuclear Physics">
+     <option-label ln="en">ELSEVIER - Progress in Particle and Nuclear Physics</option-label>
+    </option>
+    <option value="ELSEVIER - Radiation Physics and Chemistry">
+     <option-label ln="en">ELSEVIER - Radiation Physics and Chemistry</option-label>
+    </option>
+    <option value="Jagellonian University - Acta Physica Polonica B">
+     <option-label ln="en">Jagellonian University - Acta Physica Polonica B</option-label>
+    </option>
+  </element>
+  <element name="WSE_Subject" type="WSET_Select" multiple="0">
+    <option value="Particle Physics - Experimental Results">
+     <option-label ln="en">Particle Physics - Experimental Results</option-label>
+    </option>
+    <option value="Particle Physics - Phenomenology">
+     <option-label ln="en">Particle Physics - Phenomenology</option-label>
+     </option>
+    <option value="Particle Physics - Theory">
+     <option-label ln="en">Particle Physics - Theory</option-label>
+    </option>
+    <option value="Particle Physics - Lattice">
+     <option-label ln="en">Particle Physics - Lattice</option-label>
+    </option>
+    <option value="Nuclear Physics">
+     <option-label ln="en">Nuclear Physics</option-label>
+    </option>
+    <option value="General Relativity and Cosmology">
+     <option-label ln="en">General Relativity and Cosmology</option-label>
+    </option>
+    <option value="General Theoretical Physics">
+     <option-label ln="en">General Theoretical Physics</option-label>
+    </option>
+    <option value="Detectors and Experimental Techniques">
+     <option-label ln="en">Detectors and Experimental Techniques</option-label>
+    </option>
+    <option value="Accelerators and Storage Rings">
+     <option-label ln="en">Accelerators and Storage Rings</option-label>
+    </option> 
+    <option value="Health Physics and Radiation Effects">
+     <option-label ln="en">Health Physics and Radiation Effects</option-label>
+    </option>
+    <option value="Computing and Computers">
+     <option-label ln="en">Computing and Computers</option-label>
+    </option>
+    <option value="Mathematical Physics and Mathematics">
+     <option-label ln="en">Mathematical Physics and Mathematics</option-label>
+    </option>
+    <option value="Astrophysics and Astronomy">
+     <option-label ln="en">Astrophysics and Astronomy</option-label>
+    </option>
+    <option value="Nonlinear Systems">
+     <option-label ln="en">Nonlinear Systems</option-label>
+    </option>
+    <option value="Condensed Matter">
+     <option-label ln="en">Condensed Matter</option-label>
+    </option>
+    <option value="Other Fields of Physics">
+     <option-label ln="en">Other Fields of Physics</option-label>
+    </option>
+    <option value="Chemical Physics and Chemistry">
+     <option-label ln="en">Chemical Physics and Chemistry</option-label>
+    </option>
+    <option value="Engineering">
+     <option-label ln="en">Engineering</option-label>
+    </option>
+    <option value="Electrical Engineering">
+     <option-label ln="en">Electrical Engineering</option-label>
+    </option>
+    <option value="Other Fields of Engineering">
+     <option-label ln="en">Other Fields of Engineering</option-label>
+    </option>
+    <option value="Information Transfer and Management">
+     <option-label ln="en">Information Transfer and Management</option-label>
+    </option>
+    <option value="Other">
+     <option-label ln="en">Other</option-label>
+    </option>
+  </element>
+  <element name="WSE_CernDepartements" type="WSET_Select" multiple="0">
+   <element-label ln="en">CERN Departement</element-label>
+   <option value="AB">
+     <option-label ln="en">AB</option-label>
+    </option>
+   <option value="AC">
+     <option-label ln="en">AC</option-label>
+    </option>
+   <option value="AS">
+     <option-label ln="en">AS</option-label>
+    </option>
+   <option value="AT">
+     <option-label ln="en">AT</option-label>
+    </option>
+   <option value="DG">
+     <option-label ln="en">DG</option-label>
+    </option>
+   <option value="DSU">
+     <option-label ln="en">DSU</option-label>
+    </option>
+   <option value="ECP">
+     <option-label ln="en">ECP</option-label>
+    </option>
+   <option value="EP">
+     <option-label ln="en">EP</option-label>
+    </option>
+   <option value="ETT">
+     <option-label ln="en">ETT</option-label>
+    </option>
+   <option value="FI">
+     <option-label ln="en">FI</option-label>
+    </option>
+   <option value="HR">
+     <option-label ln="en">HR</option-label>
+    </option>
+   <option value="IT">
+     <option-label ln="en">IT</option-label>
+    </option>
+   <option value="PH">
+     <option-label ln="en">PH</option-label>
+    </option>
+   <option value="PS">
+     <option-label ln="en">PS</option-label>
+    </option>
+   <option value="SC">
+     <option-label ln="en">SC</option-label>
+    </option>
+   <option value="SG">
+     <option-label ln="en">SG</option-label>
+    </option>
+   <option value="SL">
+     <option-label ln="en">SL</option-label>
+    </option>
+   <option value="ST">
+     <option-label ln="en">ST</option-label>
+    </option>
+   <option value="TH">
+     <option-label ln="en">TH</option-label>
+    </option>
+   <option value="TS">
+     <option-label ln="en">TS</option-label>
+    </option>
+ </element>
+</elements>

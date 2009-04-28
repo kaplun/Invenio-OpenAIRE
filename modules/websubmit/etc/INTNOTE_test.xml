@@ -1,0 +1,118 @@
+<submission>
+<interface>
+  <container>
+  <!--container-label ln="en"></container-label-->
+  <container-label ln="fr">Zone de texte</container-label>
+  <element type="WSET_TextArea" name="WSE_abstract" marc_code="6531a" rows="10" cols="50">
+   <element-label ln="en">Abstract</element-label>
+   <element-label ln="fr">Resume</element-label>
+   <default-value>This is a default value for abstract</default-value>
+  </element>
+  <element type="WSET_TextArea" name="WSE_title" marc_code="6531a" rows="10" cols="50">
+   <element-label ln="en">Title</element-label>
+   <element-label ln="fr">Titres</element-label>
+  </element>
+ </container>
+  <container>
+  <container-label ln="en">RadioButton</container-label>
+  <container-label ln="fr">Bouton Radio</container-label>
+  <element type="WSET_RadioButton" name="WSE_keyword" marc_code="6531a">
+   <element-label ln="en">Keywords of experiment</element-label>
+   <element-label ln="fr">Mots-clef concernant l'experience</element-label>
+   <option value="muon">
+    <option-label ln="en">Muon</option-label>
+    <option-label ln="fr">Muon(fr)</option-label>
+   </option>   
+   <option value="beam">
+    <option-label ln="en">Beam</option-label>
+    <option-label ln="fr">Rayon</option-label>
+   </option>
+  </element>
+ </container>
+
+ <container>
+  <container-label ln="en">Checkbox</container-label>
+  <container-label ln="fr">Case a cocher</container-label>
+  <element type="WSET_CheckBox" name="WSE_departement" marc_code="6531a">
+   <element-label ln="en">Departement</element-label>
+   <element-label ln="fr">Departement (fr)</element-label>
+   <option value="IT" selected="yes"> 
+    <option-label ln="en">Information Technology</option-label>
+    <option-label ln="fr">Technologie de l'information</option-label>
+   </option>   
+   <option value="PH">
+    <option-label ln="en">Physic</option-label>
+    <option-label ln="fr">Physique</option-label>
+   </option>
+  </element>
+ </container>
+ <container>
+  <container-label ln="en">Single select</container-label>
+  <container-label ln="fr">Selection simple(fr)</container-label>
+  <element type="WSET_Select" name="WSE_select_single">
+   <element-label ln="en">Fruit</element-label>
+   <element-label ln="fr">Fruit(fr)</element-label>
+   <option value="apple">
+    <option-label ln="en">Apple</option-label>
+    <option-label ln="fr">Pomme</option-label>
+   </option>   
+   <option value="banana">
+    <option-label ln="en">Banana</option-label>
+    <option-label ln="fr">Banane</option-label>
+   </option>
+  </element>
+ </container>
+ <container>
+  <container-label ln="en">Multiple select</container-label>
+  <container-label ln="fr">Selection multiple(fr)</container-label>
+  <element type="WSET_Select" name="WSE_select_multiple" multiple="1" listsize="2">
+   <element-label ln="en">Vegetable</element-label>
+   <element-label ln="fr">Legume</element-label>
+   <option value="tomato">
+    <option-label ln="en">Tomato</option-label>
+    <option-label ln="fr">Tomate</option-label>
+   </option>   
+   <option value="lettuce">
+    <option-label ln="en">Lettuce</option-label>
+    <option-label ln="fr">Salade</option-label>
+   </option>
+   <option value="cabbage">
+    <option-label ln="en">Cabbage</option-label>
+    <option-label ln="fr">Chou</option-label>
+   </option>   
+  </element>
+ </container>
+ <container>
+   <container-label ln="en">External Element</container-label>
+  <element name="WSE_PublicationJournal"/>
+ </container>
+ <container>
+   <container-label ln="en">Authors</container-label>
+   <container-label ln="fr">Auteurs</container-label>
+  <element type="WSET_Author" name="WSE_authors">
+   <element-label ln="en">Author(s)</element-label>
+   <element-label ln="fr">Auteur(s)</element-label>
+  </element>
+ </container>
+ <container>
+   <container-label ln="en">Publisher</container-label>
+   <container-label ln="fr">Editeur</container-label>
+  <element type="WSET_Text" name="WSE_publisher">
+   <element-label ln="en">Publisher</element-label>
+   <element-label ln="fr">Editeur</element-label>
+  </element>
+ </container>
+</interface>
+
+<!-- Checks -->
+<checker>
+ <check test="wsc_string_length(WSE_publisher, &quot;30&quot;, &quot;10&quot;)">
+   <error-label ln="en">The length of publisher name must be between 10 and 30 characters</error-label>
+   <error-label ln="fr">Le longueur du nom d'editeur doit etre entre 10 et 30 characteres</error-label>
+ </check>
+ <check test="wsc_author_details(WSE_authors, &quot;1&quot;,&quot;1&quot;)">
+   <error-label ln="en">Authors must be entered with surname and forename. Affiliation is optional.</error-label>
+   <error-label ln="fr">Le nom de famille et le prenom d'un auteur est obligatoire. Affiliation est optionnel.</error-label>
+ </check>
+</checker>
+</submission>

@@ -1,5 +1,7 @@
+## $Id: websubmit_engine.py,v 1.9 2007/07/30 14:00:58 diane Exp $
+
 ## This file is part of CDS Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
+## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007 CERN.
 ##
 ## CDS Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -19,7 +21,7 @@
    via a Web interface.
 """
 
-__revision__ = "$Id$"
+__revision__ = "$Id: websubmit_engine.py,v 1.9 2007/07/30 14:00:58 diane Exp $"
 
 ## import interesting modules:
 import string
@@ -28,31 +30,27 @@ import sys
 import time
 import types
 import re
-from urllib import quote_plus
-from cgi import escape
-
-try:
-    from mod_python import apache
-except ImportError:
-    pass
+import shutil
+from mod_python import apache
 
 from invenio.config import \
-     CFG_BINDIR, \
-     CFG_SITE_LANG, \
-     CFG_SITE_NAME, \
-     CFG_SITE_URL, \
-     CFG_PYLIBDIR, \
-     CFG_WEBSUBMIT_STORAGEDIR, \
-     CFG_VERSION
+     bibconvert, \
+     cdslang, \
+     cdsname, \
+     images, \
+     pylibdir, \
+     storage, \
+     urlpath, \
+     version, \
+     weburl
 from invenio.dbquery import run_sql, Error
 from invenio.access_control_engine import acc_authorize_action
 from invenio.access_control_admin import acc_is_role
 from invenio.webpage import page, create_error_box
 from invenio.webuser import getUid, get_email, collect_user_info
 from invenio.websubmit_config import *
+from invenio.file import *
 from invenio.messages import gettext_set_language, wash_language
-from invenio.errorlib import register_exception
-
 
 from websubmit_dblayer import \
      get_storage_directory_of_action, \
@@ -86,16 +84,934 @@ from websubmit_dblayer import \
 
 import invenio.template
 websubmit_templates = invenio.template.load('websubmit')
+## -------- NEW STUFF FOLLOWS ---- NEW STUFF FOLLOWS --------------
+import invenio.miniparser
+from websubmit_elements.WSET_RadioButton import WSET_RadioButton
+import cgi
+from xml.dom.minidom import parseString
+#from xml.sax import parseString, ContentHandler, SAXParseException
+from invenio.config import etcdir
+CFG_WEBSUBMIT_ELEMENTS_IMPORT_PATH = "invenio.websubmit_elements"
+CFG_WEBSUBMIT_ELEMENTS_LIBRARY = etcdir + "/websubmit/element_library.xml"
+CFG_WEBSUBMIT_CHECKS_IMPORT_PATH = "invenio.websubmit_checks"
+CFG_WEBSUBMIT_SUBMISSION_TEMPLATES = etcdir + "/websubmit"
+CFG_WEBSUBMIT_COLLECTION_NUMBER_OF_LEVEL = 5
+CFG_WEBSUBMIT_CATEGORY_NUMBER_OF_LEVEL = 5
+from invenio.websubmit_templates import *
+#put CFG_BIBRECORD_PARSERS_AVAILABLE in config.py ??? 
+from invenio.bibrecord_config import *
+import pyRXP
+# find out about the best usable parser:
+def warnCB(s):
+    print s
 
+## WSC calls:
+def perform_form_input_checking(wsc_requests, wse_objects, interface_language):
+    """Given a set of WSET elements, and a list of checks that are to be
+       performed upon various elements, perform the checks upon the relevant
+       elements, recording whether or not any checks are failed, and in the
+       event of any failures, building up a list of error-messages to be
+       returned to WebSubmit core for display.
+
+       @param wsc_requests: (list) - each index in the list is actually
+        another list in the following structure:
+            [ <reference to wsc function>,
+              "param1, param2, param3, ...",
+              { "en" : "Failure message in English",
+                "fr" : "Failure message in French",
+                "de" : "Failure messahe in German",
+                "ru" : "Failure message in Russian",
+                ...,
+              }
+            ]
+        Basically, the first cell contains a reference to the executable
+        function; the second cell is a string that represents the parameters
+        that are to be passed to the function; and the third cell is a
+        dictionary containing the error message to be displayed upon the
+        check's failure in the various supported languages.
+        So, for example, the wsc_requests parameter list may look something
+        like this:
+
+            [ [ <reference to wsc_string_length>,
+                "wse_buildingname, 4, 30,",
+                { "en" : "Building name must be between 4 and 30 characters in
+                          length.",
+                }
+              ]
+              [ <reference to wsc_string_length>,
+                "wse_surname, 0, 100",
+                { "en" : "The maximum length of surname is 110 characters.",
+                }
+              ]
+            ]
+        NOTE: When treating the "parameters" string for a WSC, any items
+        beginning with the prefix "wse_" (e.g. "wse_startdate") will be treated
+        as WSET objects. This means WSET fields MUST be named with a "wse_"
+        prefix.
+       @param wse_objects: (dictionary) - contains the WSE objects that
+        appear on the interface, keyed by their names. For example:
+           { "author"   : <WSET_Author instance>,
+             "title"    : <WSET_TextArea instance>,
+             "keywords" : <WSET_TextArea instance>,
+             "subject"  : <WSET_Select instance>,
+           }
+       @param interface_language: (string) -  the code for the language of the
+        interface. This is used to choose the correct language for any error-
+        messages that are generated.
+       @return: (list) - containing 2 cells: (boolean, list).
+        The first cell of the tuple, the boolean value, is a flag indicating
+        whether or not any checks failed. A boolean True value indicates that at
+        least one check failed, and WebSubmit should act appropriately; A
+        boolean False indicates that no checks failed.
+        The second cell of the tuple contains a list of strings, with each
+        string being an error message created by a failed check.
+    """
+    ## Flag to indicate whether or not one of the checks failed:
+    check_failure = False
+
+    ## A list in which to keep any error-messages that are to be displayed as a
+    ## result of the failure of wsc checks:
+    encountered_error_messages = []
+
+    ## Loop through all WSC requests, get the function, treat the parameters
+    for checking_request in wsc_requests:
+        ## get a reference to the WSC:
+        wsc_function = checking_request[0]
+        ## Get the arguments to be passed to the function in their raw
+        ## "string" form:
+        wsc_args_string = checking_request[1]
+        ## Get the error-messages dictionary:
+        error_messages = checking_request[2]
+        
+        ## Now parse the arguments string into a tuple:
+        argstring_parser = invenio.miniparser.Parser(wsc_args_string, wse_objects)
+        args_tuple = argstring_parser.parse()
+
+        ## Call the wsc, passing it the arguments tuple:
+        check_status = wsc_function(*args_tuple)
+
+        ## Did the check fail?
+        if check_status != 0:
+            ## Yes - a non-zero status code was returned by this check.
+            ## Set the check-failure flag:
+            check_failure = True
+
+            ## Now add the error-message for this check-failure in the
+            ## language appropriate to the interface:
+            if interface_language in error_messages:
+                ## This check has an error message in the interface
+                ## language: use it:
+                error_string = error_messages[interface_language]
+            elif cdslang in error_messages:
+                ## This check didn't have an error message in the interface
+                ## language. Did it have an error message written in the
+                ## default language "cdslang"? If so, use it:
+                error_string = error_messages[cdslang]
+            elif len(error_messages.keys()) > 0:
+                ## Although this check didn't have an error message in either
+                ## the interface language or the default "cdslang" language,
+                ## it did have an error message in at least one language.
+                ## Therefore, we simply take the first error message that we
+                ## find in the dictionary and use that:
+                error_string = error_messages.values()[0]
+            else:
+                ## The Admin hasn't provided an error message. Make a default
+                ## Unknown error message:
+                error_string = "An unidentified problem was encountered with" \
+                               " the data enterted into one of the form " \
+                               "fields. Please check and try again."
+
+            ## Now append the error string into the list of error messages:
+            encountered_error_messages.append(error_string)
+
+    ## return the check-failed flag, and the error-messages:
+    return (check_failure, encountered_error_messages)
+
+
+
+
+#replace get_WSET_class_reference to be able to retrieve either a class or a function
+#from a given module
+def get_reference_from_name(name,
+                            import_path=CFG_WEBSUBMIT_ELEMENTS_IMPORT_PATH):
+    """Given parameter name, get and return a reference to a class or function.
+       Note. It is assumed that each name will exist as a class or function in
+       the module having the same name
+       E.g. the element 'WSET_Text', should exist as a class in the file
+       'WSET_Text.py', in the directory designated by import_path 'CFG_WEBSUBMIT_ELEMENTS_IMPORT_PATH'.
+
+       @param name: (string) - the name of the function or class which should be retrieved
+       @param import_path: (string) - the base of the path to the module assigned by param name 
+       @return: (class-type/function) - the reference to the class/function named by the name parameter.
+    """
+    try:
+        ## Build the path to the module:
+        module_path = import_path + "." + name
+        ## Import that module:
+        module = __import__(module_path)
+        ## Loop through all of the components in the path to the imported
+        ## module and obtain a reference to that component's module:
+        components = module_path.split(".")
+        for comp in components[1:]:
+            module = getattr(module, comp)
+    except Exception, err:
+        ## If there was an exception while doing this, propagate it upwards:
+        ## FIXME
+        raise err
+    else:
+        ## From the reference to the module designated by name, get a reference to the
+        ## class/function itself:
+        try:
+            ## Store the reference to the class in a local variable:
+            built_in_object = module.__dict__['%s' % name]
+        except KeyError, err:
+            ## The class/function did not exist in its module!
+            raise err
+        else:
+            ## Return the reference to the class/function itself:
+            return built_in_object
+        
+
+## HERE IS A TEMPORARY FAKE WSO CLASS DEFINITION:
+class InvenioWebSubmitSubmissionObject(object):
+    def __init__(self, req, lang):
+        """Initialise a wso.
+           @param req: (mod_python.Request object) - the Apache request object.
+            This req object also contains a member "form", which is a
+            mod_python.util.FieldStorage object and contains all of the data
+            submitted to the server on the last visit to the page.
+        """
+        ## Keep a local reference to the request object:
+        self.req = req
+        ## Store the language:
+        self.lang = lang
+        ## Extract the WSET fields from the request object's form object:
+        self.submitted_form_fields = get_wset_fields_from_form(req.form)
+
+
+def get_wset_fields_from_form(form):
+    """From a submitted FORM, capture all of the fields whose names begin with
+       "WSET".  Return a dictionary containing these WSET* fields.
+
+       Note:
+        A WSET element object re-creates itself with the values that the user
+        entered into its fields on the last visit to the page, and to do this
+        it must have access to the form so that it can retrieve its own values.
+        Since it needs access to all of the form values in order to retrieve its
+        own values, it's nicer if it only has access to the WSET fields. That
+        way, it can't do anything with system-specific fields.
+        This function is used to produce the dictionary of WSET fields before
+        WSET-object creation, then.
+       @param form: (mod_python.util.FieldStorage) - the CGI "form".
+        It is treated as though it were a dictionary.
+       @return: (dictionary) - of mod_python.util.Field items keyed by their
+        (WSET) field names.
+    """
+    ## A dictionary to store all of the WSET* fields in:
+    wset_fields = {}
+    ## A list of all of the variables passed into the "form" (i.e. all of
+    ## the fieldnames):
+    form_fieldnames = form.keys()
+
+    ## Loop through all of the form fields. If a field whose name starts with
+    ## "WSET" is found, add it into dictionary of "WSET" fields.
+    for field_name in form_fieldnames:
+        if field_name.startswith("WSE_"):
+            ## This is a WSET field. Take a reference to it:
+            wset_fields[field_name] = form[field_name]
+
+    ## Return the dictionary of WSET fields
+    return wset_fields
+
+
+def read_library(xmltext=""):
+    """
+    @param xmltext: xml based text containing the library of the elements
+    This function builds a dictionnary where the key are the name of the
+    elements and the values are the element node
+    @return the dictionnary
+    """
+    dom = parseString(xmltext)
+    elements_by_name = {}
+    for element in dom.getElementsByTagName("element"):
+        try:
+            elements_by_name[element.getAttribute("name").encode("utf-8")] = element
+        except AttributeError, err:
+            #FIXME
+            #Attribute name is mandatory
+            raise err
+    return elements_by_name
+
+#parse the library - FIXME need to user data cacher
+library = read_library(open(CFG_WEBSUBMIT_ELEMENTS_LIBRARY, "r").read())
+
+def create_submission(wso,
+                      parser = "dom", 
+                      templates=[CFG_WEBSUBMIT_SUBMISSION_TEMPLATES + "/CTH.xml"]):
+    submission = []
+    for template in templates:
+        if os.access(template, os.F_OK|os.R_OK):
+            ## Parse Template:
+            try:
+                if parser == "dom":
+                    submission.append(create_interface_minidom(open(template).read(), wso))
+                #FIXME rxp parser is not up to date
+                #else:
+                    #wse_elements.append(create_interface_RXP(open(template).read(), wso))
+            except Exception, err:
+                ## Problem parsing the XML - FIXME
+                raise err
+        else:
+            ## Fatal error - can't read template - FIXME
+            raise Exception()
+    ## Do something with our objects
+    #return websubmit_templates.tmpl_create_page(wse_elements)
+    #return create_interface_html(wse_elements)
+    #FIXME: at the time beeing we consider only the submission for the first template
+    return submission[0]
+
+def preform_request_end_submission(req, lang=cdslang):
+    body = ""
+    ## create a WebSubmitSubmissionObject:
+    wso = InvenioWebSubmitSubmissionObject(req, lang)
+    ## on this submission page:
+    interface, checker, wse_objects = create_submission(wso)
+
+    (check_failure, error_messages) = \
+                   perform_form_input_checking(checker, wse_objects, lang)
+
+    if check_failure:
+        ## Something went wrong - redraw interface
+        body += create_submission_form(lang, interface, wse_objects, error_messages)
+    else:
+        body += "Now I would do the functions here"
+
+    return body
+        
+
+def perform_request_create_submission_interface(req, lang=cdslang):
+    """This function creates the submission-form that the user sees and uses
+       to submit new records into CDS Invenio via WebSubmit.
+       @param req: (mod_python.Request object) - the Apache request object.
+        This req object also contains a member "form", which is a
+        mod_python.util.FieldStorage object and contains all of the data
+        submitted to the server on the last visit to the page.
+       @param lang: (string) - the language of the interface. Defaults to
+        cdslang if not provided.
+       @return: (string) - the HTML page-body.
+    """
+    ## A string to hold the page-body:
+    body = ""
+
+    ## create a WebSubmitSubmissionObject:
+    wso = InvenioWebSubmitSubmissionObject(req, lang)
+
+    ## on this submission page:
+    interface, checker, wse_objects = create_submission(wso)
+    body += create_submission_form(lang, interface, wse_objects)
+
+##    body += "There is a form here. Click the button to submit it."
+##     body += """<br /><br />
+
+##     <form action="/submit" method="post">"""
+    
+##     #create html for containers and corresponding elements
+##     for items in interface:
+##         container = items["container_label"]
+##         elements = items["elements"]
+##         element_html = ""
+##         for element_name in elements:
+##             element_html += Template().tmpl_element(wse_objects[element_name].get_html(), cgi.escape(lang, 1))
+##         body +=  Template().tmpl_comtainer(container, elements, cgi.escape(lang, 1)) % {'elements' : element_html}
+
+##     body += """
+##     <input type="hidden" name="ln" value="%s" />
+##     <input type="submit" name="WebSubmitFormSubmit" value="Finish Submission" />
+##     </form>""" % cgi.escape(lang, 1)
+
+    return body
+
+def create_submission_form(lang,
+                           interface,
+                           wse_objects,
+                           error_messages=None):
+    ## Sanity check for errors:
+    if error_messages is None:
+        error_messages = []
+    
+    body = ""
+    body += "There is a form here. Click the button to submit it."
+    body += """<br /><br />"""
+
+    for error_message in error_messages:
+        body += "%s<br />" % error_message
+
+    body += """
+    <form action="/submit" method="post">"""
+    
+    #create html for containers and corresponding elements
+    for items in interface:
+        container = items["container_label"]
+        elements = items["elements"]
+        element_html = ""
+        for element_name in elements:
+            element_html += Template().tmpl_element(wse_objects[element_name].get_html(), cgi.escape(lang, 1))
+        body +=  Template().tmpl_comtainer(container, elements, cgi.escape(lang, 1)) % {'elements' : element_html}
+
+    body += """
+    <input type="hidden" name="ln" value="%s" />
+    <input type="submit" name="WebSubmitFormSubmit" value="Finish Submission" />
+    </form>""" % cgi.escape(lang, 1)
+
+    return body
+
+
+def get_wset_objects_for_submission(wso):
+    """FIXME: THIS METHOD IS A TEST DRIVER MAKING A DUMMY LIST OF
+              WSET_* OBJECTS.
+    """
+    wset_list = []
+
+    el1_lab = { "fr" : "Animaux",
+                "en" : "Animals",
+                "de" : "Tiele",
+              }
+
+    el1_opt = [
+                { "value"    : "BIRD",
+                  "label"    : { "fr" : "un oiseau",
+                                 "en" : "a bird",
+                                 "de" : "ein Vogel",
+                               },
+                  "selected" : "NO",
+                },
+                { "value"    : "HORSE",
+                  "label"    : { "fr" : "un cheval",
+                                 "en" : "a horse",
+                                 "de" : "ein Pferd",
+                               },
+                  "selected" : "YES",
+                },
+                { "value"    : "CAT",
+                  "label"    : { "fr" : "un chat",
+                                 "en" : "a cat",
+                                 "de" : "eine Katze",
+                               },
+                  "selected" : "NO",
+                }
+              ]
+
+    obj1 = WSET_RadioButton(wso,
+                            "animals",
+                            el1_lab,
+                            el1_opt)
+
+    el2_lab = { "fr" : "La nourriture",
+                "en" : "Food",
+                "de" : "Nahrungsmitteln",
+              }
+
+    el2_opt = [
+                { "value"    : "FRUIT",
+                  "label"    : { "fr" : "Le fruit",
+                                 "en" : "Fruit",
+                                 "de" : "Fruchte",
+                               },
+                  "selected" : "NO",
+                },
+                { "value"    : "MEAT",
+                  "label"    : { "fr" : "La viande",
+                                 "en" : "Meat",
+                                 "de" : "Fleisch",
+                               },
+                  "selected" : "NO",
+                },
+                { "value"    : "BREAD",
+                  "label"    : { "fr" : "Le pain",
+                                 "en" : "Bread",
+                                 "de" : "Brot",
+                               },
+                  "selected" : "NO",
+                }
+              ]
+
+    obj2 = WSET_RadioButton(wso=wso,
+                            elementname="food",
+                            elementlabel=el2_lab,
+                            optionvalues=el2_opt,
+                            buttonlayout="H",
+                            numbuttonsperline=2,
+                            mandatory=1)
+
+    wset_list.append(obj1)
+    wset_list.append(obj2)
+
+    return wset_list
+
+def create_interface_minidom(xmltext,
+                             wso,
+                             verbose=CFG_BIBRECORD_DEFAULT_VERBOSE_LEVEL,
+                             correct=CFG_BIBRECORD_DEFAULT_CORRECT):
+    
+    """
+    Uses xml.dom.minidom parser to creates a tuple (interface, checker, dictionnary of objects)
+    +interface:
+        List of dictionnaries with 2 keys:
+         "container-label" : dictionnary of pairs of language/value
+         "elements" : list of names of websubmit element
+         example:
+         [{'container_label': {'fr': 'Zone de texte'},
+           'elements': ['abstract', 'Title']},
+          {'container_label': {'fr': 'Bouton Radio', 'en': 'RadioButton'},
+           'elements': ['keyword']}
+    +checker:
+        List of tuples of 3 elements:
+        -reference to a wsc_function
+        -string containing the parameters for this function
+        -dictionnary where items are pairs of language/value
+        example:
+         [(<function wsc_string_length at 0x42b28d4c>,
+           '(abstract, 20)',
+           {'en': 'The size of the abstract must be more than 20 characters'}),
+          (<function wsc_string_length at 0x42b28d4c>,
+           '(title, 30)',
+           {'en': 'The size of the title must be more than 30 characters'
+            'fr:  'La taille du titre doit etre superieure a 30 caracteres'}),
+         ]
+    +elements:
+        Dictionnary of websubmit elements objects used for the current submission
+        -keys: name of the element
+        -values: instance of WSET class
+        example:
+        {'PublicationJournal': <invenio.websubmit_elements.WSET_Select.WSET_Select object at 0x42b24cec>,
+         'Title': <invenio.websubmit_elements.WSET_TextArea.WSET_TextArea object at 0x427e18cc>,
+         'abstract': <invenio.websubmit_elements.WSET_TextArea.WSET_TextArea object at 0x427e1aac>,
+        }
+    @param xmltext: (string) xml template for a the interface of a given submission
+    @param wso: () current websubmit object
+    @param verbose & correct : #FIXME put config variable in a unique place for websubmit and bibrecord
+
+    @return a tuple (interface, checker, elements) see description above.
+    """
+    
+    interface = []
+    elements = {}
+    checker = []
+    dom = parseString(xmltext)
+    root = dom.childNodes[0]
+    
+    #build interface & elements dictionnary
+    for cont in root.getElementsByTagName("container"):
+        container = {"container_label":{}, "elements" :[]}
+        list_of_elements = []
+        container_label = {}
+        for c_label in cont.getElementsByTagName("container-label"):
+            if c_label.hasAttribute("ln") and c_label.hasChildNodes():
+                container_label[c_label.getAttribute("ln").encode("utf-8")] = c_label.firstChild.nodeValue.encode("utf-8")
+            else:
+                raise Exception
+                    #FIXME xml template not correct
+                    #If container-label exists,it must have an attribute "ln" and a node Value
+        for element in cont.getElementsByTagName("element"):
+            element_label = {}
+            option_values = []
+            default_value = ""
+            attrs = {}
+            element_name = element.getAttribute("name").encode("utf-8")
+            if element_name == "":
+              raise Exception
+              #FIXME
+            if not element.hasAttribute("type"):
+                #Pick up the element node from the library
+                if library.has_key(element_name):
+                    current_element = library[element_name]
+                else:
+                    #FIXME: xml template not correct
+                    #Element must have an attribute type
+                    # of must be defined in the library
+                    raise Exception
+            else:
+                current_element = element
+            #Encode key value
+            for (key, value) in current_element.attributes.items():
+                attrs[key.encode("utf-8")] = value.encode("utf-8")
+            #Get element type
+            try:
+                element_type = attrs["type"]
+            except KeyError, err:
+                 #FIXME: xml template not correct
+                 #Element must have an attribute type
+                 raise Exception
+            del attrs["type"]
+            if current_element.getElementsByTagName("default-value"):
+                try:
+                    default_value = current_element.getElementsByTagName("default-value")[0].firstChild.nodeValue.encode("utf-8")
+                except AttributeError, err:
+                    #FIXME
+                    #If default_value exists it must have a node value
+                    raise err
+            for el_label in current_element.getElementsByTagName("element-label"):
+                if el_label.hasAttribute("ln") and el_label.hasChildNodes():
+                    element_label[el_label.getAttribute("ln")] = el_label.firstChild.nodeValue.encode("utf-8")
+                else:
+                    raise Exception
+                    #FIXME xml template not correct
+                    #If element-label exists,it must have an attribute "ln" and a node Value
+            for opt in current_element.getElementsByTagName("option"):
+                #Get the value. Value is mandatory for a option tag
+                if opt.hasAttribute("value"):
+                    option = {"value":opt.getAttribute("value").encode("utf-8"), "label":{}}
+                else:
+                    raise Exception 
+                    #FIXME xml template not correct
+                    #If option exists it must have and attribut 'value'
+                #Set the selected attribute yes/no
+                if opt.hasAttribute("selected"):
+                    option["selected"] = opt.getAttribute("selected").encode("utf-8")
+                    #FIXME need to check if selected is something else than yes/no???
+                else:
+                    option["selected"] ="no"
+                for opt_label in opt.getElementsByTagName("option-label"):
+                    if opt_label.hasAttribute("ln") and opt_label.hasChildNodes():
+                        option["label"][opt_label.getAttribute("ln")] = opt_label.firstChild.nodeValue.encode("utf-8")
+                    else:
+                        raise Exception
+                        #FIXME xml template not correct
+                        #If option-label exists,it must have an attribute "ln" and a node Value
+                option_values.append(option)
+
+            element_class = get_reference_from_name(element_type)
+            attrs["elementname"] = element_name
+            attrs["optionvalues"] = option_values
+            attrs["wso"] = wso
+            attrs["elementlabel"] = element_label
+            attrs["defaultvalue"] = default_value
+            try:
+                element_object = element_class(**attrs)
+            except TypeError, err:
+                ##FIXME
+                raise err
+            list_of_elements.append(element_name)
+            elements[element_name] = element_object
+            current_element = None
+        container["elements"] = list_of_elements
+        container["container_label"] = container_label
+        interface.append(container)
+        
+    #Build Checker
+    for check in root.getElementsByTagName("check"):
+        error_label = {}
+        if check.hasAttribute("test"):
+            test = check.getAttribute("test").encode("utf-8")
+        else:
+            #FIXME check must have an attribute test
+            raise Exception
+        try:
+            wsc_function_ref, params = test.split("(", 1)
+            params = "(" + params
+        except ValueError, err:
+            #FIXME attribute test must be of the form "function(param1, param2....)"
+            raise err
+        wsc_function_ref = get_reference_from_name(wsc_function_ref, CFG_WEBSUBMIT_CHECKS_IMPORT_PATH)
+        for err_label in check.getElementsByTagName("error-label"):
+            if err_label.hasAttribute("ln") and err_label.hasChildNodes():
+                error_label[err_label.getAttribute("ln").encode("utf-8")] = err_label.firstChild.nodeValue.encode("utf-8")
+            else:
+                raise Exception
+                #FIXME xml template not correct
+                #If error-label exists,it must have an attribute "ln" and a node Value
+        checker.append((wsc_function_ref, params, error_label))
+        
+    return (interface, checker, elements)
+
+
+def create_submission_collection_page_minidom(xmltext,
+                                              verbose=CFG_BIBRECORD_DEFAULT_VERBOSE_LEVEL,
+                                              correct=CFG_BIBRECORD_DEFAULT_CORRECT):
+    
+    """
+    Parse the main submission config file containing the submission tree
+    @param xmltext: (string) xml template for creating the submission collection page
+    @return a list of collections
+    +collection: dictionnaries of the following form
+                 {"label":{},
+                  "doctypes" :[],
+                  "collections"=[collection]
+                 }
+        +doctypes: list of dictionnaries of the following form:
+                   {"id":"",
+                    "label":{},
+                    "template": None,
+                    "categories":[],
+                    "access_rules":""
+                   }
+            +categories: list of dictionnaries of the following form:
+                   {"id":"",
+                    "label":{},
+                    "template": None,
+                    "categories":[],
+                    "access_rules":""
+                   }
+    """
+    dom = parseString(xmltext)
+    root = dom.childNodes[0]
+    collection_level = 0
+    collections = recursive_collection_node(root, collection_level, [])
+    #take the first element of the root collection
+    #return collections[0]["collections"]
+    return collections
+
+def recursive_collection_node(node, collection_level, collections):
+    """
+    Create the collection and sub-collections recursively
+    @param node: instance of DOM Element of type collection 
+    @collection_level: (int) level in the tree of the collections limit
+                       by CFG_WEBSUBMIT_COLLECTION_NUMBER_OF_LEVEL variable
+    @collections: current list of collection
+    @return the list of collections extended with the current collection
+    """
+    collection = {"label":{},
+                  "collections":[],
+                  "doctypes" :[]}
+    for coll_child in node.childNodes:
+        ## collection label
+        if coll_child.nodeName.encode("utf-8") == "collection-label":
+            if coll_child.hasAttribute("ln") and coll_child.hasChildNodes():
+                collection["label"][coll_child.getAttribute("ln").encode("utf-8")] = coll_child.firstChild.nodeValue.encode("utf-8")
+            else:
+                raise Exception
+                #FIXME xml template not correct
+                #If collection-label exists,it must have an attribute "ln" and a node Value                
+        ## doctype
+        if coll_child.nodeName.encode("utf-8") == "doctype":
+            doctype = {"id":"",
+                       "label":{},
+                       "template":None,
+                       "categories":[],
+                       "access_rules":""
+                       }
+            for child in coll_child.childNodes:
+                ## doctype label
+                if child.nodeName.encode("utf-8") == "doctype-label":
+                        if child.hasAttribute("ln") and child.hasChildNodes():
+                            doctype["label"][child.getAttribute("ln")] = child.firstChild.nodeValue.encode("utf-8")
+                        else:
+                            raise Exception
+                            #FIXME xml template not correct
+                            #If doctype-label exists,it must have an attribute "ln" and a node Value
+                elif child.nodeName.encode("utf-8") == "category":
+                    category_level = 0
+                    doctype["categories"] = recursive_category_node(child, category_level, [])
+                elif child.nodeName.encode("utf-8") == "access-restriction":
+                    for rule in child.getElementsByTagName("rule"):
+                        doctype["access_rules"] += "%s\n" % rule.firstChild.nodeValue.encode("utf-8")
+            if coll_child.hasAttribute("template"):
+                doctype["template"] = coll_child.getAttribute("template").encode("utf-8")
+            if coll_child.hasAttribute("id"):
+                doctype["id"] = coll_child.getAttribute("id").encode("utf-8")
+            else:
+                raise Exception
+            collection["doctypes"].append(doctype)
+        #####sub-collections#####
+        if coll_child.nodeName.encode("utf-8") == "collection":
+            collection_level += 1
+            if collection_level < CFG_WEBSUBMIT_COLLECTION_NUMBER_OF_LEVEL:
+                recursive_collection_node(coll_child, collection_level, collection["collections"])
+    collections.append(collection)
+    return collections
+    
+def recursive_category_node(node, category_level, categories):
+    category = {"id":"",
+                "label":{},
+                "template":None,
+                "categories":[],
+                "access_rules":""
+                }
+    if node.hasAttribute("id"):
+        category["id"] = node.getAttribute("id").encode("utf-8")
+    else:
+        raise Exception
+    if node.hasAttribute("template"):
+        category["template"] = node.getAttribute("template").encode("utf-8")
+    for categ_child in node.childNodes:
+        ######categ label########
+        if categ_child.nodeName.encode("utf-8") == "category-label":
+            if categ_child.hasAttribute("ln") and categ_child.hasChildNodes():
+                category["label"][categ_child.getAttribute("ln").encode("utf-8")] = categ_child.firstChild.nodeValue.encode("utf-8")
+            else:
+                raise Exception
+                #FIXME xml template not correct
+                #If category-label exists,it must have an attribute "ln" and a node Value                
+            
+        elif categ_child.nodeName.encode("utf-8") == "category":
+            category_level += 1
+            if category_level < CFG_WEBSUBMIT_CATEGORY_NUMBER_OF_LEVEL:
+                recursive_category_node(categ_child, category_level, category["categories"])
+        elif categ_child.nodeName.encode("utf-8") == "access-restriction":
+            for rule in categ_child.getElementsByTagName("rule"):
+                category["access_rules"] += "%s\n" % rule.firstChild.nodeValue.encode("utf-8")
+            if categ_child.hasAttribute("template"):
+                category["template"] = categ_child.getAttribute("template").encode("utf-8")
+    categories.append(category)
+    return categories
+
+    
+##FIXME: need to be updated as for minidom parser, don't want to keep the two parsers
+##up to date during development
+##def create_interface_RXP(xmltext,
+##                          wso,
+##                          verbose=CFG_BIBRECORD_DEFAULT_VERBOSE_LEVEL,
+##                          correct=CFG_BIBRECORD_DEFAULT_CORRECT):
+##     #FIXME put config variable in a unique place for websubmit and bibrecord
+##     """
+##     Creates a list of websubmit container object and returns it
+##     Uses the RXP parser
+    
+##     If verbose>3 then the parser will be strict and will stop in case of well-formedness errors
+##     or DTD errors
+##     If verbose=0, the parser will not give warnings
+##     If 0<verbose<=3, the parser will not give errors, but will warn the user about possible mistakes
+
+##     correct != 0 -> We will try to correct errors such as missing attributtes
+##     correct = 0 -> there will not be any attempt to correct errors
+    
+##     """
+    
+##     TAG, ATTRS, CHILD_LIST = range(3)
+    
+##     if verbose > 3:
+##         p = pyRXP.Parser(ErrorOnValidityErrors=1,
+##                          ProcessDTD=1,
+##                          ErrorOnUnquotedAttributeValues=1,
+##                          warnCB = warnCB,
+##                          srcName='string input')
+##     else:
+##         p = pyRXP.Parser(ErrorOnValidityErrors=0,
+##                          ProcessDTD=1,
+##                          ErrorOnUnquotedAttributeValues=0,
+##                          warnCB = warnCB,
+##                          srcName='string input')
+
+##     #FIXME
+##     ## if correct:
+## ##         (rec, e) = wash(xmltext)
+## ##         err.extend(e)
+## ##         return (rec, e)
+
+    
+##     root1 = p(xmltext) #root = (tagname, attr_dict, child_list, reserved)
+
+##     interface = []
+##     for tc in root1[CHILD_LIST]:
+##         #tc --> container
+##         if type(tc).__name__ == 'tuple' and tc[TAG] == "container":
+##             container = {"container_label":{}, "elements" :[]}
+##             list_of_elements = []
+##             #te --> element or container-label
+##             for te in tc[CHILD_LIST]:
+##                 if type(te).__name__ == 'tuple' and te[TAG] == "container-label":
+##                     try:
+##                         label = {te[ATTRS].values()[0].encode("utf-8"): te[CHILD_LIST][0].encode("utf-8")}
+##                         container["container_label"].update(label)
+##                     except IndexError, err:
+##                         #FIXME xml template not correct
+##                         #If container-label exists,it must have an attribute "ln" and a node Value
+##                         raise err
+##                 if type(te).__name__ == 'tuple' and te[TAG] == "element":
+##                     element_label = {}
+##                     option_values = []
+##                     default_value = ""
+##                     for tel in te[CHILD_LIST]:
+##                         if type(tel).__name__ == 'tuple' and tel[TAG] == "default-value":
+##                             try:
+##                                 default_value = tel[CHILD_LIST][0].encode("utf-8")
+##                             except KeyError, err:
+##                                 #FIXME
+##                                 #If default_value exists it must have a node value
+##                                 raise err
+##                         if type(tel).__name__ == 'tuple' and tel[TAG] == "element-label":
+##                             try:
+##                                 label = {tel[ATTRS].values()[0].encode("utf-8"): tel[CHILD_LIST][0].encode("utf-8")}
+##                                 element_label.update(label)
+##                             except IndexError, err:
+##                                 #FIXME xml template not correct
+##                                 #If element-label exists,it must have an attribute "ln" and a node Value
+##                                 raise err
+##                         if type(tel).__name__ == 'tuple' and tel[TAG] == "option":
+##                             try:
+##                                 option = {"value":tel[ATTRS]["value"].encode("utf-8"),
+##                                           "label":{}}
+##                             except KeyError, err:
+##                                 #FIXME xml template not correct
+##                                 #If option exists it must have and attribut 'value'
+##                                 raise err
+##                             #Set the selected attribute yes/no
+##                             #FIXME need to check if selected is something else than yes/no???
+##                             if tel[ATTRS].has_key("selected"):
+##                                 option["selected"] = tel[ATTRS]["selected"].encode("utf-8")
+##                             else:
+##                                 option["selected"] ="no"
+##                             for teo in tel[CHILD_LIST]:
+##                                 #option-label
+##                                 if type(teo).__name__ == 'tuple' and teo[TAG] == "option-label":
+##                                     try:
+##                                         label = {teo[ATTRS].values()[0].encode("utf-8"): teo[CHILD_LIST][0].encode("utf-8")}
+##                                         option["label"].update(label)
+##                                     except IndexError, err:
+##                                         #FIXME xml template not correct
+##                                         #If option-label exists,it must have an attribute "ln" and a node Value
+##                                         raise err
+##                             option_values.append(option)
+                    
+##                     try:
+##                         attrs = te[ATTRS]
+##                         element_type = attrs["type"]
+##                         del attrs["type"]
+##                         element_name = attrs["name"]
+##                         del attrs["name"]
+##                         element_name = element_name.encode("utf-8")
+##                     except KeyError, err:
+##                         ##FIXME mandatory attributes are missing
+##                         raise err
+##                     for (key, value) in attrs.items():
+##                         attrs[key.encode("utf-8")] = value.encode("utf-8")
+##                     element_class = get_WSET_class_reference(element_type)
+##                     attrs["optionvalues"] = option_values
+##                     attrs["wso"] = wso
+##                     attrs["elementname"] = element_name
+##                     attrs["elementlabel"] = element_label
+##                     attrs["defaultvalue"] = default_value
+##                     try:
+##                         element_object = element_class(**attrs)
+##                     except TypeError, err:
+##                         ##FIXME
+##                         raise err
+##                     list_of_elements.append(element_object)
+##             container["elements"] = list_of_elements
+##             interface.append(container)          
+##     return interface
+
+
+
+
+
+
+
+
+
+
+## -------- OLD STUFF FOLLOWS ---- OLD STUFF FOLLOWS --------------
 def interface(req,
-              c=CFG_SITE_NAME,
-              ln=CFG_SITE_LANG,
+              c=cdsname,
+              ln=cdslang,
               doctype="",
               act="",
               startPg=1,
+              indir="",
               access="",
               mainmenu="",
               fromdir="",
+              file="",
               nextPg="",
               nbPg="",
               curpage=1):
@@ -123,9 +1039,9 @@ def interface(req,
         the index function of websubmit_webinterface. It contains a
         "mod_python.util.FieldStorage" instance, that contains the form-fields
         found on the previous submission page.
-       @param c: (string), defaulted to CFG_SITE_NAME. The name of the CDS Invenio
+       @param c: (string), defaulted to cdsname. The name of the CDS Invenio
         installation.
-       @param ln: (string), defaulted to CFG_SITE_LANG. The language in which to
+       @param ln: (string), defaulted to cdslang. The language in which to
         display the pages.
        @param doctype: (string) - the doctype ID of the doctype for which the
         submission is being made.
@@ -145,6 +1061,7 @@ def interface(req,
         home stem) for the submission's home-page. (E.g. If this submission
         is "PICT", the "mainmenu" file would contain "/submit?doctype=PICT".
        @param fromdir: (integer)
+       @param file: (string)
        @param nextPg: (string)
        @param nbPg: (string)
        @param curpage: (integer) - the current submission page number. Defaults
@@ -158,8 +1075,11 @@ def interface(req,
 
     sys.stdout = req
     # get user ID:
-    uid = getUid(req)
-    uid_email = get_email(uid)
+    try:
+        uid = getUid(req)
+        uid_email = get_email(uid)
+    except Error, e:
+        return errorMsg(e, req, c, ln)
     # variable initialisation
     t = ""
     field = []
@@ -175,31 +1095,18 @@ def interface(req,
     noPage = []
     # Preliminary tasks
     # check that the user is logged in
-    if not uid_email or uid_email == "guest":
+    if uid_email == "" or uid_email == "guest":
         return warningMsg(websubmit_templates.tmpl_warning_message(
                            ln = ln,
                            msg = _("Sorry, you must log in to perform this action.")
                          ), req, ln)
         # warningMsg("""<center><font color="red"></font></center>""",req, ln)
     # check we have minimum fields
-    if not doctype or not act or not access:
+    if "" in (doctype, act, access):
         ## We don't have all the necessary information to go ahead
         ## with this submission:
-        return warningMsg(_("Not enough information to go ahead with the submission."), req, c, ln)
+        return errorMsg(_("Invalid parameter"), req, c, ln)
 
-    try:
-        assert(not access or re.match('\d+_\d+', access))
-    except AssertionError:
-        register_exception(req=req, prefix='doctype="%s", access="%s"' % (doctype, access))
-        return warningMsg(_("Invalid parameters"), req, c, ln)
-
-    if doctype and act:
-        ## Let's clean the input
-        details = get_details_of_submission(doctype, act)
-        if not details:
-            return warningMsg(_("Invalid doctype and act parameters"), req, c, ln)
-        doctype = details[0]
-        act = details[1]
 
     ## Before continuing to display the submission form interface,
     ## verify that this submission has not already been completed:
@@ -213,7 +1120,7 @@ def interface(req,
         wrnmsg = """<b>This submission has been completed. Please go to the""" \
                  """ <a href="/submit?doctype=%(doctype)s&amp;ln=%(ln)s">""" \
                  """main menu</a> to start a new submission.</b>""" \
-                 % { 'doctype' : quote_plus(doctype), 'ln' : ln }
+                 % { 'doctype' : doctype, 'ln' : ln }
         return warningMsg(wrnmsg, req)
 
 
@@ -222,13 +1129,14 @@ def interface(req,
     ## Concatenate action ID and doctype ID to make the submission ID:
     subname = "%s%s" % (act, doctype)
 
-    ## Get the submission storage directory from the DB:
-    submission_dir = get_storage_directory_of_action(act)
-    if submission_dir:
-        indir = submission_dir
-    else:
-        ## Unable to determine the submission-directory:
-        return warningMsg(_("Unable to find the submission directory for the action: %s") % escape(str(act)), req, c, ln)
+    if indir == "":
+        ## Get the submission storage directory from the DB:
+        submission_dir = get_storage_directory_of_action(act)
+        if submission_dir not in ("", None):
+            indir = submission_dir
+        else:
+            ## Unable to determine the submission-directory:
+            return errorMsg(_("Unable to find the submission directory."), req, c, ln)
 
     ## get the document type's long-name:
     doctype_lname = get_longname_of_doctype(doctype)
@@ -237,13 +1145,16 @@ def interface(req,
         docname = doctype_lname.replace(" ", "&nbsp;")
     else:
         ## Unknown document type:
-        return warningMsg(_("Unknown document type"), req, c, ln)
+        return errorMsg(_("Unknown document type"), req, c, ln)
 
     ## get the action's long-name:
-    actname = get_longname_of_action(act)
-    if actname is None:
+    action_lname = get_longname_of_action(act)
+    if action_lname is not None:
+        ## Got the action long-name: replace spaces with HTML chars:
+        actname = action_lname.replace(" ", "&nbsp;")
+    else:
         ## Unknown action:
-        return warningMsg(_("Unknown action"), req, c, ln)
+        return errorMsg(_("Unknown action"), req, c, ln)
 
     ## Get the number of pages for this submission:
     num_submission_pages = get_num_pages_of_submission(subname)
@@ -251,7 +1162,7 @@ def interface(req,
         nbpages = num_submission_pages
     else:
         ## Unable to determine the number of pages for this submission:
-        return warningMsg(_("Unable to determine the number of submission pages."), req, c, ln)
+        return errorMsg(_("Unable to determine the number of submission pages."), req, c, ln)
 
     ## If unknown, get the current page of submission:
     if startPg != "" and curpage in ("", 0):
@@ -267,49 +1178,37 @@ def interface(req,
         edsrn = ""
 
     ## This defines the path to the directory containing the action data
-    curdir = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, indir, doctype, access)
-    try:
-        assert(curdir == os.path.abspath(curdir))
-    except AssertionError:
-        register_exception(req=req, prefix='indir="%s", doctype="%s", access="%s"' % (indir, doctype, access))
-        return warningMsg(_("Invalid parameters"), req, c, ln)
+    curdir = "%s/%s/%s/%s" % (storage, indir, doctype, access)
 
     ## if this submission comes from another one (fromdir is then set)
     ## We retrieve the previous submission directory and put it in the proper one
     if fromdir != "":
-        olddir = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, fromdir, doctype, access)
-        try:
-            assert(olddir == os.path.abspath(olddir))
-        except AssertionError:
-            register_exception(req=req, prefix='fromdir="%s", doctype="%s", access="%s"' % (fromdir, doctype, access))
-            return warningMsg(_("Invalid parameters"), req, c, ln)
-
+        olddir = "%s/%s/%s/%s" % (storage, fromdir, doctype, access)
         if os.path.exists(olddir):
             os.rename(olddir, curdir)
     ## If the submission directory still does not exist, we create it
     if not os.path.exists(curdir):
         try:
             os.makedirs(curdir)
-        except Exception, e:
-            register_exception(req=req, alert_admin=True)
-            return warningMsg(_("Unable to create a directory for this submission. The administrator has been alerted."), req, c, ln)
+        except:
+            return errorMsg(_("Unable to create a directory for this submission."), req, c, ln)
     # retrieve the original main menu url and save it in the "mainmenu" file
     if mainmenu != "":
-        fp = open(os.path.join(curdir, "mainmenu"), "w")
+        fp = open("%s/mainmenu" % curdir, "w")
         fp.write(mainmenu)
         fp.close()
     # and if the file containing the URL to the main menu exists
     # we retrieve it and store it in the $mainmenu variable
-    if os.path.exists(os.path.join(curdir, "mainmenu")):
-        fp = open(os.path.join(curdir, "mainmenu"), "r");
+    if os.path.exists("%s/mainmenu" % curdir):
+        fp = open("%s/mainmenu" % curdir, "r");
         mainmenu = fp.read()
         fp.close()
     else:
-        mainmenu = "%s/submit" % (CFG_SITE_URL,)
+        mainmenu = "%s/submit" % (urlpath,)
     # various authentication related tasks...
     if uid_email != "guest" and uid_email != "":
         #First save the username (email address) in the SuE file. This way bibconvert will be able to use it if needed
-        fp = open(os.path.join(curdir, "SuE"), "w")
+        fp = open("%s/SuE" % curdir, "w")
         fp.write(uid_email)
         fp.close()
     # is user authorized to perform this action?
@@ -328,29 +1227,20 @@ def interface(req,
         ## Submission doesn't exist in log - create it:
         log_new_pending_submission(doctype, act, access, uid_email)
 
-    ## Let's write in curdir file under curdir the curdir value
-    ## in case e.g. it is needed in FFT.
-    fp = open(os.path.join(curdir, "curdir"), "w")
-    fp.write(curdir)
-    fp.close()
-
     # Save the form fields entered in the previous submission page
     # If the form was sent with the GET method
-    form = dict(req.form)
+    form = req.form
     value = ""
     # we parse all the form variables
-    for key, formfields in form.items():
-        filename = key.replace("[]", "")
-        file_to_open = os.path.join(curdir, filename)
-        try:
-            assert(file_to_open == os.path.abspath(file_to_open))
-        except AssertionError:
-            register_exception(req=req, prefix='curdir="%s", filename="%s"' % (curdir, filename))
-            return warningMsg(_("Invalid parameters"), req, c, ln)
-
+    for key in form.keys():
+        formfields = form[key]
+        if re.search("\[\]", key):
+            filename = key.replace("[]", "")
+        else:
+            filename = key
         # the field is an array
         if isinstance(formfields, types.ListType):
-            fp = open(file_to_open, "w")
+            fp = open("%s/%s" % (curdir, filename), "w")
             for formfield in formfields:
                 #stripslashes(value)
                 value = specialchars(formfield)
@@ -359,43 +1249,29 @@ def interface(req,
         # the field is a normal string
         elif isinstance(formfields, types.StringTypes) and formfields != "":
             value = formfields
-            fp = open(file_to_open, "w")
+            fp = open("%s/%s" % (curdir, filename), "w")
             fp.write(specialchars(value))
             fp.close()
         # the field is a file
-        elif hasattr(formfields,"filename") and formfields.filename:
-            dir_to_open = os.path.join(curdir, 'files', key)
-            try:
-                assert(dir_to_open == os.path.abspath(dir_to_open))
-                assert(dir_to_open.startswith(CFG_WEBSUBMIT_STORAGEDIR))
-            except AssertionError:
-                register_exception(req=req, prefix='curdir="%s", key="%s"' % (curdir, key))
-                return warningMsg(_("Invalid parameters"), req, c, ln)
-            if not os.path.exists(dir_to_open):
+        elif hasattr(formfields,"filename") and formfields.filename is not None:
+            if not os.path.exists("%s/files/%s" % (curdir, key)):
                 try:
-                    os.makedirs(dir_to_open)
+                    os.makedirs("%s/files/%s" % (curdir, key))
                 except:
-                    register_exception(req=req, alert_admin=True)
-                    return warningMsg(_("Cannot create submission directory. The administrator has been alerted."), req, c, ln)
+                    return errorMsg(_("Cannot create submission directory."), req, c, ln)
             filename = formfields.filename
-            ## Before saving the file to disc, wash the filename (in particular
-            ## washing away UNIX and Windows (e.g. DFS) paths):
-            filename = os.path.basename(filename.split('\\')[-1])
-            filename = filename.strip()
             if filename != "":
                 # This may be dangerous if the file size is bigger than the available memory
-                fp = open(os.path.join(dir_to_open, filename), "w")
-                while formfields.file:
-                    fp.write(formfields.file.read(10240))
+                data = formfields.file.read()
+                fp = open("%s/files/%s/%s" % (curdir, key, filename), "w")
+                fp.write(data)
                 fp.close()
-                fp = open(os.path.join(curdir, "lastuploadedfile"), "w")
+                fp = open("%s/lastuploadedfile" % curdir, "w")
                 fp.write(filename)
                 fp.close()
-                fp = open(file_to_open, "w")
+                fp = open("%s/%s" % (curdir, key), "w")
                 fp.write(filename)
                 fp.close()
-            else:
-                return warningMsg(_("No file uploaded?"), req, c, ln)
 
         ## if the found field is the reference of the document,
         ## save this value in the "journal of submissions":
@@ -416,13 +1292,11 @@ def interface(req,
         full_field = {}
         ## Retrieve the field's description:
         element_descr = get_element_description(field_instance[3])
-        try:
-            assert(element_descr is not None)
-        except AssertionError:
-            msg = _("Unknown form field found on submission page.")
-            register_exception(req=req, alert_admin=True, prefix=msg)
+        if element_descr is None:
             ## The form field doesn't seem to exist - return with error message:
-            return warningMsg(_("Unknown form field found on submission page."), req, c, ln)
+            return \
+             errorMsg(_("Unknown form field found on submission page."), \
+                      req, c, ln)
 
         if element_descr[8] is None:
             val = ""
@@ -515,8 +1389,8 @@ def interface(req,
 
         # If a file exists with the name of the field we extract the saved value
         text = ''
-        if os.path.exists(os.path.join(curdir, full_field['name'])):
-            file = open(os.path.join(curdir, full_field['name']), "r");
+        if os.path.exists("%s/%s" % (curdir, full_field['name'])):
+            file = open("%s/%s" % (curdir, full_field['name']), "r");
             text = file.read()
             text = re.compile("[\n\r]*$").sub("", text)
             text = re.compile("\n").sub("\\n", text)
@@ -546,13 +1420,11 @@ def interface(req,
             if field_instance[5] == "M":
                 ## If this field is mandatory, get its description:
                 element_descr = get_element_description(field_instance[3])
-                try:
-                    assert(element_descr is not None)
-                except AssertionError:
-                    msg = _("Unknown form field found on submission page.")
-                    register_exception(req=req, alert_admin=True, prefix=msg)
+                if element_descr is None:
                     ## The form field doesn't seem to exist - return with error message:
-                    return warningMsg(_("Unknown form field found on submission page."), req, c, ln)
+                    return \
+                     errorMsg(_("Unknown form field found on one of the submission pages."), \
+                              req, c, ln)
                 if element_descr[3] in ['D', 'R']:
                     if element_descr[3] == "D":
                         text = element_descr[9]
@@ -582,12 +1454,12 @@ def interface(req,
         # tests each mandatory field
         fld = 0
         res = 1
-        for i in xrange(nbFields):
+        for i in range (0, nbFields):
             res = 1
-            if not os.path.exists(os.path.join(curdir, fullcheck_field[i])):
+            if not os.path.exists("%s/%s" % (curdir, fullcheck_field[i])):
                 res=0
             else:
-                file = open(os.path.join(curdir, fullcheck_field[i]), "r")
+                file = open("%s/%s" % (curdir, fullcheck_field[i]), "r")
                 text = file.read()
                 if text == '':
                     res=0
@@ -609,11 +1481,13 @@ def interface(req,
           actname = actname,
           curpage = curpage,
           nbpages = nbpages,
+          file = file,
           nextPg = nextPg,
           access = access,
           nbPg = nbPg,
           doctype = doctype,
           act = act,
+          indir = indir,
           fields = full_fields,
           javascript = websubmit_templates.tmpl_page_interface_js(
                          ln = ln,
@@ -629,19 +1503,20 @@ def interface(req,
                          radio = radio,
                          curpage = curpage,
                          nbpages = nbpages,
+                         images = images,
                          returnto = returnto,
                        ),
+          images = images,
           mainmenu = mainmenu,
          )
 
     # start display:
     req.content_type = "text/html"
     req.send_http_header()
-    p_navtrail = """<a href="/submit?ln=%(ln)s" class="navtrail">%(submit)s</a>&nbsp;>&nbsp;<a href="/submit?doctype=%(doctype)s&amp;ln=%(ln)s" class="navtrail">%(docname)s</a>&nbsp;""" % {
+    p_navtrail = """<a href="/submit">%(submit)s</a>&nbsp;>&nbsp;<a href="/submit?doctype=%(doctype)s\">%(docname)s</a>&nbsp;""" % {
                    'submit'  : _("Submit"),
-                   'doctype' : quote_plus(doctype),
+                   'doctype' : doctype,
                    'docname' : docname,
-                   'ln' : ln
                  }
     return page(title= actname,
                 body = t,
@@ -655,14 +1530,16 @@ def interface(req,
 
 
 def endaction(req,
-              c=CFG_SITE_NAME,
-              ln=CFG_SITE_LANG,
+              c=cdsname,
+              ln=cdslang,
               doctype="",
               act="",
               startPg=1,
+              indir="",
               access="",
               mainmenu="",
               fromdir="",
+              file="",
               nextPg="",
               nbPg="",
               curpage=1,
@@ -691,9 +1568,9 @@ def endaction(req,
         the index function of websubmit_webinterface. It contains a
         "mod_python.util.FieldStorage" instance, that contains the form-fields
         found on the previous submission page.
-       @param c: (string), defaulted to CFG_SITE_NAME. The name of the CDS Invenio
+       @param c: (string), defaulted to cdsname. The name of the CDS Invenio
         installation.
-       @param ln: (string), defaulted to CFG_SITE_LANG. The language in which to
+       @param ln: (string), defaulted to cdslang. The language in which to
         display the pages.
        @param doctype: (string) - the doctype ID of the doctype for which the
         submission is being made.
@@ -713,6 +1590,7 @@ def endaction(req,
         home stem) for the submission's home-page. (E.g. If this submission
         is "PICT", the "mainmenu" file would contain "/submit?doctype=PICT".
        @param fromdir:
+       @param file:
        @param nextPg:
        @param nbPg:
        @param curpage: (integer) - the current submission page number. Defaults
@@ -736,8 +1614,11 @@ def endaction(req,
     sys.stdout = req
     t = ""
     # get user ID:
-    uid = getUid(req)
-    uid_email = get_email(uid)
+    try:
+        uid = getUid(req)
+        uid_email = get_email(uid)
+    except Error, e:
+        return errorMsg(e, req, c, ln)
     # Preliminary tasks
     # check that the user is logged in
     if uid_email == "" or uid_email == "guest":
@@ -747,24 +1628,11 @@ def endaction(req,
                          ), req, ln)
 
     ## check we have minimum fields
-    if not doctype or not act or not access:
+    if "" in (doctype, act, access):
         ## We don't have all the necessary information to go ahead
         ## with this submission:
-        return warningMsg(_("Not enough information to go ahead with the submission."), req, c, ln)
+        return errorMsg(_("Invalid parameter"), req, c, ln)
 
-    if doctype and act:
-        ## Let's clean the input
-        details = get_details_of_submission(doctype, act)
-        if not details:
-            return warningMsg(_("Invalid doctype and act parameters"), req, c, ln)
-        doctype = details[0]
-        act = details[1]
-
-    try:
-        assert(not access or re.match('\d+_\d+', access))
-    except AssertionError:
-        register_exception(req=req, prefix='doctype="%s", access="%s"' % (doctype, access))
-        return warningMsg(_("Invalid parameters"), req, c, ln)
 
     ## Before continuing to process the submitted data, verify that
     ## this submission has not already been completed:
@@ -778,50 +1646,44 @@ def endaction(req,
         wrnmsg = """<b>This submission has been completed. Please go to the""" \
                  """ <a href="/submit?doctype=%(doctype)s&amp;ln=%(ln)s">""" \
                  """main menu</a> to start a new submission.</b>""" \
-                 % { 'doctype' : quote_plus(doctype), 'ln' : ln }
+                 % { 'doctype' : doctype, 'ln' : ln }
         return warningMsg(wrnmsg, req)
 
     ## retrieve the action and doctype data
-    ## Get the submission storage directory from the DB:
-    submission_dir = get_storage_directory_of_action(act)
-    if submission_dir:
-        indir = submission_dir
-    else:
-        ## Unable to determine the submission-directory:
-        return warningMsg(_("Unable to find the submission directory for the action: %s") % escape(str(act)), req, c, ln)
+    if indir == "":
+        ## Get the submission storage directory from the DB:
+        submission_dir = get_storage_directory_of_action(act)
+        if submission_dir not in ("", None):
+            indir = submission_dir
+        else:
+            ## Unable to determine the submission-directory:
+            return errorMsg(_("Unable to find the submission directory."), \
+                            req, c, ln)
 
     # The following words are reserved and should not be used as field names
     reserved_words = ["stop", "file", "nextPg", "startPg", "access", "curpage", "nbPg", "act", \
                       "indir", "doctype", "mode", "step", "deleted", "file_path", "userfile_name"]
     # This defines the path to the directory containing the action data
-    curdir = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, indir, doctype, access)
-    try:
-        assert(curdir == os.path.abspath(curdir))
-    except AssertionError:
-        register_exception(req=req, prefix='indir="%s", doctype=%s, access=%s' % (indir, doctype, access))
-        return warningMsg(_("Invalid parameters"), req, c, ln)
-
-    ## If the submission directory still does not exist, we create it
+    curdir = "%s/%s/%s/%s" % (storage, indir, doctype, access)
+    # If the submission directory still does not exist, we create it
     if not os.path.exists(curdir):
         try:
             os.makedirs(curdir)
-        except Exception, e:
-            register_exception(req=req, alert_admin=True)
-            return warningMsg(_("Unable to create a directory for this submission. The administrator has been alerted."), req, c, ln)
-
+        except:
+            return errorMsg(_("Cannot create submission directory."), req, c, ln)
     # retrieve the original main menu url ans save it in the "mainmenu" file
     if mainmenu != "":
-        fp = open(os.path.join(curdir, "mainmenu"), "w")
+        fp = open("%s/mainmenu" % curdir, "w")
         fp.write(mainmenu)
         fp.close()
     # and if the file containing the URL to the main menu exists
     # we retrieve it and store it in the $mainmenu variable
-    if os.path.exists(os.path.join(curdir, "mainmenu")):
-        fp = open(os.path.join(curdir, "mainmenu"), "r");
+    if os.path.exists("%s/mainmenu" % curdir):
+        fp = open("%s/mainmenu" % curdir, "r");
         mainmenu = fp.read()
         fp.close()
     else:
-        mainmenu = "%s/submit" % (CFG_SITE_URL,)
+        mainmenu = "%s/submit" % (urlpath,)
 
     ## retrieve the name of the file in which the reference of
     ## the submitted document will be stored
@@ -836,12 +1698,6 @@ def endaction(req,
     ## (ie there are no other steps after the current one):
     finished = function_step_is_last(doctype, act, step)
 
-    ## Let's write in curdir file under curdir the curdir value
-    ## in case e.g. it is needed in FFT.
-    fp = open(os.path.join(curdir, "curdir"), "w")
-    fp.write(curdir)
-    fp.close()
-
     # Save the form fields entered in the previous submission page
     # If the form was sent with the GET method
     form = req.form
@@ -849,19 +1705,13 @@ def endaction(req,
     # we parse all the form variables
     for key in form.keys():
         formfields = form[key]
-        filename = key.replace("[]", "")
-
-        file_to_open = os.path.join(curdir, filename)
-        try:
-            assert(file_to_open == os.path.abspath(file_to_open))
-            assert(file_to_open.startswith(CFG_WEBSUBMIT_STORAGEDIR))
-        except AssertionError:
-            register_exception(req=req, prefix='curdir="%s", filename="%s"' % (curdir, filename))
-            return warningMsg(_("Invalid parameters"), req, c, ln)
-
+        if re.search("\[\]", key):
+            filename = key.replace("[]", "")
+        else:
+            filename = key
         # the field is an array
         if isinstance(formfields,types.ListType):
-            fp = open(file_to_open, "w")
+            fp = open("%s/%s" % (curdir, filename), "w")
             for formfield in formfields:
                 #stripslashes(value)
                 value = specialchars(formfield)
@@ -870,44 +1720,29 @@ def endaction(req,
         # the field is a normal string
         elif isinstance(formfields, types.StringTypes) and formfields != "":
             value = formfields
-            fp = open(file_to_open, "w")
+            fp = open("%s/%s" % (curdir, filename), "w")
             fp.write(specialchars(value))
             fp.close()
         # the field is a file
-        elif hasattr(formfields, "filename") and formfields.filename:
-            dir_to_open = os.path.join(curdir, 'files', key)
-            try:
-                assert(dir_to_open == os.path.abspath(dir_to_open))
-                assert(dir_to_open.startswith(CFG_WEBSUBMIT_STORAGEDIR))
-            except AssertionError:
-                register_exception(req=req, prefix='curdir="%s", key="%s"' % (curdir, key))
-                return warningMsg(_("Invalid parameters"), req, c, ln)
-
-            if not os.path.exists(dir_to_open):
+        elif hasattr(formfields, "filename") and formfields.filename is not None:
+            if not os.path.exists("%s/files/%s" % (curdir, key)):
                 try:
-                    os.makedirs(dir_to_open)
+                    os.makedirs("%s/files/%s" % (curdir, key))
                 except:
-                    register_exception(req=req, alert_admin=True)
-                    return warningMsg(_("Cannot create submission directory. The administrator has been alerted."), req, c, ln)
+                    return errorMsg("can't create submission directory", req, cdsname, ln)
             filename = formfields.filename
-            ## Before saving the file to disc, wash the filename (in particular
-            ## washing away UNIX and Windows (e.g. DFS) paths):
-            filename = os.path.basename(filename.split('\\')[-1])
-            filename = filename.strip()
             if filename != "":
                 # This may be dangerous if the file size is bigger than the available memory
                 data = formfields.file.read()
-                fp = open(os.path.join(dir_to_open, filename), "w")
+                fp = open("%s/files/%s/%s" % (curdir, key, filename), "w")
                 fp.write(data)
                 fp.close()
-                fp = open(os.path.join(curdir, "lastuploadedfile"), "w")
+                fp = open("%s/lastuploadedfile" % curdir, "w")
                 fp.write(filename)
                 fp.close()
-                fp = open(file_to_open, "w")
+                fp = open("%s/%s" % (curdir, key), "w")
                 fp.write(filename)
                 fp.close()
-            else:
-                return warningMsg(_("No file uploaded?"), req, c, ln)
         ## if the found field is the reference of the document
         ## we save this value in the "journal of submissions"
         if uid_email != "" and uid_email != "guest":
@@ -921,13 +1756,16 @@ def endaction(req,
         docname = doctype_lname.replace(" ", "&nbsp;")
     else:
         ## Unknown document type:
-        return warningMsg(_("Unknown document type"), req, c, ln)
+        return errorMsg(_("Unknown document type"), req, c, ln)
 
     ## get the action's long-name:
-    actname = get_longname_of_action(act)
-    if actname is None:
+    action_lname = get_longname_of_action(act)
+    if action_lname is not None:
+        ## Got the action long-name: replace spaces with HTML chars:
+        actname = action_lname.replace(" ", "&nbsp;")
+    else:
         ## Unknown action:
-        return warningMsg(_("Unknown action"), req, c, ln)
+        return errorMsg(_("Unknown action"), req, c, ln)
 
     ## Get the number of pages for this submission:
     subname = "%s%s" % (act, doctype)
@@ -936,8 +1774,8 @@ def endaction(req,
         nbpages = num_submission_pages
     else:
         ## Unable to determine the number of pages for this submission:
-        return warningMsg(_("Unable to determine the number of submission pages."), \
-                        req, CFG_SITE_NAME, ln)
+        return errorMsg(_("Unable to determine the number of submission pages."), \
+                        req, cdsname, ln)
 
     ## Determine whether the action is finished
     ## (ie there are no other steps after the current one):
@@ -962,9 +1800,8 @@ def endaction(req,
                                                 start_time=start_time,
                                                 ln=ln)
     except InvenioWebSubmitFunctionError, e:
-        register_exception(req=req, alert_admin=True, prefix='doctype="%s", action="%s", step="%s", form="%s", start_time="%s"' % (doctype, act, step, form, start_time))
         ## There was a serious function-error. Execution ends.
-        return warningMsg(_("A serious function-error has been encountered. Adminstrators have been alerted. <br /><em>Please not that this might be due to wrong characters inserted into the form</em> (e.g. by copy and pasting some text from a PDF file)."), req, c, ln)
+        return errorMsg(e.value, req, c, ln)
     except InvenioWebSubmitFunctionStop, e:
         ## For one reason or another, one of the functions has determined that
         ## the data-processing phase (i.e. the functions execution) should be
@@ -1021,7 +1858,9 @@ def endaction(req,
     ## to the user:
     t = websubmit_templates.tmpl_page_endaction(
           ln = ln,
+          weburl = weburl,
           # these fields are necessary for the navigation
+          file = file,
           nextPg = nextPg,
           startPg = startPg,
           access = access,
@@ -1032,8 +1871,10 @@ def endaction(req,
           act = act,
           docname = docname,
           actname = actname,
+          indir = indir,
           mainmenu = mainmenu,
           finished = finished,
+          images = images,
           function_content = function_content,
           next_action = next_action,
         )
@@ -1042,11 +1883,10 @@ def endaction(req,
     req.content_type = "text/html"
     req.send_http_header()
 
-    p_navtrail = '<a href="/submit?ln='+ln+'" class="navtrail">' + _("Submit") +\
-                 """</a>&nbsp;>&nbsp;<a href="/submit?doctype=%(doctype)s&amp;ln=%(ln)s" class="navtrail">%(docname)s</a>""" % {
-                   'doctype' : quote_plus(doctype),
+    p_navtrail = """<a href="/submit">""" + _("Submit") +\
+                 """</a>&nbsp;>&nbsp;<a href="/submit?doctype=%(doctype)s">%(docname)s</a>""" % {
+                   'doctype' : doctype,
                    'docname' : docname,
-                   'ln' : ln,
                  }
     return page(title= actname,
                 body = t,
@@ -1058,7 +1898,7 @@ def endaction(req,
                 req = req,
                 navmenuid='submit')
 
-def home(req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG):
+def home(req, c=cdsname, ln=cdslang):
     """This function generates the WebSubmit "home page".
        Basically, this page contains a list of submission-collections
        in WebSubmit, and gives links to the various document-type
@@ -1066,9 +1906,9 @@ def home(req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG):
        Document-types only appear on this page when they have been
        connected to a submission-collection in WebSubmit.
        @param req: (apache request object)
-       @param c: (string) - defaults to CFG_SITE_NAME
+       @param c: (string) - defaults to cdsname
        @param ln: (string) - The CDS Invenio interface language of choice.
-        Defaults to CFG_SITE_LANG (the default language of the installation).
+        Defaults to cdslang (the default language of the installation).
        @return: (string) - the Web page to be displayed.
     """
     ln = wash_language(ln)
@@ -1077,15 +1917,16 @@ def home(req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG):
         uid = getUid(req)
     except Error, e:
         return errorMsg(e, req, c, ln)
+    # start display:
+    req.content_type = "text/html"
+    req.send_http_header()
 
     # load the right message language
     _ = gettext_set_language(ln)
 
-    user_info = collect_user_info(req)
-
     finaltext = websubmit_templates.tmpl_submit_home_page(
                     ln = ln,
-                    catalogues = makeCataloguesTable(user_info, ln)
+                    catalogues = makeCataloguesTable(ln)
                 )
 
     return page(title=_("Submit"),
@@ -1099,14 +1940,12 @@ def home(req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG):
                navmenuid='submit'
                )
 
-def makeCataloguesTable(user_info, ln=CFG_SITE_LANG):
+def makeCataloguesTable(ln=cdslang):
     """Build the 'catalogues' (submission-collections) tree for
        the WebSubmit home-page. This tree contains the links to
        the various document types in WebSubmit.
-       @param user_info: (dict) - the user information in order to decide
-        whether to display a submission.
        @param ln: (string) - the language of the interface.
-        (defaults to 'CFG_SITE_LANG').
+        (defaults to 'cdslang').
        @return: (string) - the submission-collections tree.
     """
     text = ""
@@ -1119,7 +1958,7 @@ def makeCataloguesTable(user_info, ln=CFG_SITE_LANG):
         ## There are submission-collections attatched to the top level.
         ## retrieve their details for displaying:
         for child_collctn in top_level_collctns:
-            catalogues.append(getCatalogueBranch(child_collctn[0], 1, user_info))
+            catalogues.append(getCatalogueBranch(child_collctn[0], 1))
 
         text = websubmit_templates.tmpl_submit_home_catalogs(
                  ln=ln,
@@ -1129,7 +1968,7 @@ def makeCataloguesTable(user_info, ln=CFG_SITE_LANG):
         text = websubmit_templates.tmpl_submit_home_catalog_no_content(ln=ln)
     return text
 
-def getCatalogueBranch(id_father, level, user_info):
+def getCatalogueBranch(id_father, level):
     """Build up a given branch of the submission-collection
        tree. I.e. given a parent submission-collection ID,
        build up the tree below it. This tree will include
@@ -1140,8 +1979,6 @@ def getCatalogueBranch(id_father, level, user_info):
         from which to begin building the branch.
        @param level: (integer) - the level of the current submission-
         collection branch.
-       @param user_info: (dict) - the user information in order to decide
-        whether to display a submission.
        @return: (dictionary) - the branch and its sub-branches.
     """
     elem = {} ## The dictionary to contain this branch of the tree.
@@ -1164,15 +2001,14 @@ def getCatalogueBranch(id_father, level, user_info):
     doctype_children = \
        get_doctype_children_of_submission_collection(id_father)
     for child_doctype in doctype_children:
-        if acc_authorize_action(user_info, 'submit', authorized_if_no_roles=True, doctype=child_doctype[0])[0] == 0:
-            elem['docs'].append(getDoctypeBranch(child_doctype[0]))
+        elem['docs'].append(getDoctypeBranch(child_doctype[0]))
 
     ## Now, get the collection-children of this submission-collection:
     elem['sons'] = []
     collctn_children = \
          get_collection_children_of_submission_collection(id_father)
     for child_collctn in collctn_children:
-        elem['sons'].append(getCatalogueBranch(child_collctn[0], level + 1), user_info)
+        elem['sons'].append(getCatalogueBranch(child_collctn[0], level + 1))
 
     ## Now return this branch of the built-up 'collection-tree':
     return elem
@@ -1253,7 +2089,7 @@ def displayDoctypeBranch(doctype, catalogues):
     return text
 
 
-def action(req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG, doctype=""):
+def action(req, c=cdsname, ln=cdslang, doctype=""):
     # load the right message language
     _ = gettext_set_language(ln)
 
@@ -1284,7 +2120,7 @@ def action(req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG, doctype=""):
     doctype_details = get_doctype_details(doctype)
     if doctype_details is None:
         ## Doctype doesn't exist - raise error:
-        return warningMsg(_("Unable to find document type: %s") % escape(str(doctype)), req, c, ln)
+        return errorMsg (_("Unable to find document type.") + str(doctype), req)
     else:
         docFullDesc  = doctype_details[0]
         docShortDesc = doctype_details[1]
@@ -1319,8 +2155,7 @@ def action(req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG, doctype=""):
           statustext = statustext,
         )
 
-    p_navtrail = """<a href="/submit?ln=%(ln)s" class="navtrail">%(submit)s</a>""" % {'submit' : _("Submit"),
-                                                                                      'ln' : ln}
+    p_navtrail = """<a href="/submit">%(submit)s</a>""" % {'submit' : _("Submit")}
 
     return page(title = docFullDesc,
                 body=t,
@@ -1425,10 +2260,10 @@ def action_details (doctype, action):
     else:
         return -1
 
-def print_function_calls (req, doctype, action, step, form, start_time, ln=CFG_SITE_LANG):
+def print_function_calls (req, doctype, action, step, form, start_time, ln=cdslang):
     # Calls the functions required by an "action" action on a "doctype" document
     # In supervisor mode, a table of the function calls is produced
-    global htdocsdir,CFG_WEBSUBMIT_STORAGEDIR,access,CFG_PYLIBDIR,dismode
+    global htdocsdir,storage,access,pylibdir,dismode,user_info
     user_info = collect_user_info(req)
     # load the right message language
     _ = gettext_set_language(ln)
@@ -1453,10 +2288,10 @@ def print_function_calls (req, doctype, action, step, form, start_time, ln=CFG_S
               'error' : 0,
               'text' : '',
             }
-            if os.path.exists("%s/invenio/websubmit_functions/%s.py" % (CFG_PYLIBDIR, function_name)):
+            if os.path.exists("%s/invenio/websubmit_functions/%s.py" % (pylibdir, function_name)):
                 # import the function itself
                 #function = getattr(invenio.websubmit_functions, function_name)
-                execfile("%s/invenio/websubmit_functions/%s.py" % (CFG_PYLIBDIR, function_name), globals())
+                execfile("%s/invenio/websubmit_functions/%s.py" % (pylibdir, function_name), globals())
                 if not globals().has_key(function_name):
                     currfunction['error'] = 1
                 else:
@@ -1466,62 +2301,11 @@ def print_function_calls (req, doctype, action, step, form, start_time, ln=CFG_S
                     # Call function:
                     log_function(curdir, "Start %s" % function_name, start_time)
                     try:
-                        try:
-                            ## Attempt to call the function with 4 arguments:
-                            ## ("parameters", "curdir" and "form" as usual),
-                            ## and "user_info" - the dictionary of user
-                            ## information:
-                            ##
-                            ## Note: The function should always be called with
-                            ## these keyword arguments because the "TypeError"
-                            ## except clause checks for a specific mention of
-                            ## the 'user_info' keyword argument when a legacy
-                            ## function (one that accepts only 'parameters',
-                            ## 'curdir' and 'form') has been called and if
-                            ## the error string doesn't contain this,
-                            ## the TypeError will be considered as a something
-                            ## that was incorrectly handled in the function and
-                            ## will be propagated as an
-                            ## InvenioWebSubmitFunctionError instead of the
-                            ## function being called again with the legacy 3
-                            ## arguments.
-                            func_returnval = function(parameters=parameters, \
-                                                      curdir=curdir, \
-                                                      form=form, \
-                                                      user_info=user_info)
-                        except TypeError, err:
-                            ## If the error contains the string "got an
-                            ## unexpected keyword argument", it means that the
-                            ## function doesn't accept the "user_info"
-                            ## argument. Test for this:
-                            if "got an unexpected keyword argument 'user_info'" in \
-                               str(err).lower():
-                                ## As expected, the function doesn't accept
-                                ## the user_info keyword argument. Call it
-                                ## again with the legacy 3 arguments
-                                ## (parameters, curdir, form):
-                                func_returnval = \
-                                               function(parameters=parameters, \
-                                                        curdir=curdir, \
-                                                        form=form)
-                            else:
-                                ## An unexpected "TypeError" was caught.
-                                ## It looks as though the function itself didn't
-                                ## handle something correctly.
-                                ## Convert this error into an
-                                ## InvenioWebSubmitFunctionError and raise it:
-                                msg = "Unhandled TypeError caught when " \
-                                      "calling [%s] WebSubmit function: " \
-                                      "[%s]" % (function_name, str(err))
-                                raise InvenioWebSubmitFunctionError(msg)
+                        func_returnval = function(parameters, curdir, form)
                     except InvenioWebSubmitFunctionWarning, err:
-                        ## There was an unexpected behaviour during the
-                        ## execution. Log the message into function's log
-                        ## and go to next function
-                        log_function(curdir, "***Warning*** from %s: %s" \
-                                     % (function_name, str(err)), start_time)
-                        ## Reset "func_returnval" to None:
-                        func_returnval = None
+                        ## There was an unexpected behaviour during the execution.
+                        ## Log the message into function's log and go to next function
+                        log_function(curdir, "***Warning*** from %s: %s" % (function_name, str(err)), start_time)
                     log_function(curdir, "End %s" % function_name, start_time)
                     if func_returnval is not None:
                         ## Append the returned value as a string:
@@ -1549,8 +2333,8 @@ def print_function_calls (req, doctype, action, step, form, start_time, ln=CFG_S
     return t
 
 
-def Propose_Next_Action (doctype, action_score, access, currentlevel, indir, ln=CFG_SITE_LANG):
-    global machine, CFG_WEBSUBMIT_STORAGEDIR, act, rn
+def Propose_Next_Action (doctype, action_score, access, currentlevel, indir, ln=cdslang):
+    global machine, storage, act, rn
     t = ""
     next_submissions = \
          get_submissions_at_level_X_with_score_above_N(doctype, currentlevel, action_score)
@@ -1581,6 +2365,30 @@ def Propose_Next_Action (doctype, action_score, access, currentlevel, indir, ln=
             )
     return t
 
+def errorMsg(title, req, c=cdsname, ln=cdslang):
+    # load the right message language
+    _ = gettext_set_language(ln)
+
+    return page(title = _("Error"),
+                body = create_error_box(req, title=title, verbose=0, ln=ln),
+                description="%s - Internal Error" % c,
+                keywords="%s, Internal Error" % c,
+                language=ln,
+                req=req,
+                navmenuid='submit')
+
+def warningMsg(title, req, c=cdsname, ln=cdslang):
+    # load the right message language
+    _ = gettext_set_language(ln)
+
+    return page(title = _("Warning"),
+                body = title,
+                description="%s - Internal Error" % c,
+                keywords="%s, Internal Error" % c,
+                language=ln,
+                req=req,
+                navmenuid='submit')
+
 def specialchars(text):
     text = string.replace(text, "&#147;", "\042");
     text = string.replace(text, "&#148;", "\042");
@@ -1603,31 +2411,3 @@ def log_function(curdir, message, start_time, filename="function_log"):
         fd.write("""%s --- %s\n""" % (message, time_lap))
         fd.close()
 
-
-## FIXME: Duplicated
-
-def errorMsg(title, req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG):
-    # load the right message language
-    _ = gettext_set_language(ln)
-
-    return page(title = _("Error"),
-                body = create_error_box(req, title=title, verbose=0, ln=ln),
-                description="%s - Internal Error" % c,
-                keywords="%s, Internal Error" % c,
-                uid = getUid(req),
-                language=ln,
-                req=req,
-                navmenuid='submit')
-
-def warningMsg(title, req, c=CFG_SITE_NAME, ln=CFG_SITE_LANG):
-    # load the right message language
-    _ = gettext_set_language(ln)
-
-    return page(title = _("Warning"),
-                body = title,
-                description="%s - Warning" % c,
-                keywords="%s, Warning" % c,
-                uid = getUid(req),
-                language=ln,
-                req=req,
-                navmenuid='submit')

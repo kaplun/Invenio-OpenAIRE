@@ -1958,7 +1958,7 @@ text-decoration:underline;
 	clear:both;
 	width:100%;
 	border-bottom:2px solid #36c;
-	border-top:2px solid #36c;	
+	border-top:2px solid #36c;
 	height:auto;
 	padding:0;
 	position:relative;
@@ -1987,7 +1987,7 @@ text-decoration:underline;
 	padding-right:5px;
 	margin-right:10px;
 	background: transparent url(list_sep_blue.gif) no-repeat left center;
-	
+
 }
 #bibcircmenu li.hassubmenu{
 	position:relative;
@@ -2090,7 +2090,7 @@ text-decoration:underline;
         .bibcircwarning {
         color: #f11010;
         }
-  	
+
 	 .bibcircpending {
         color: #f16f10;
         }
@@ -2134,3 +2134,291 @@ text-decoration:underline;
 
 
 /* end of cds.css */
+
+
+/*start of websubmit style sheet*/
+div.wse_element_container {
+  float: left;
+  border: 1px dashed #f1f1f1;
+  background-color: #ffe;
+  width: 100%;
+}
+
+div.wse_spacer {
+  clear: both;
+}
+
+div.wse_field_row {
+  clear: both;
+  padding-top: 10px;
+  }
+
+div.wse_field_row span.wse_field_label {
+  float: left;
+  width: 30%;
+  text-align: right;
+  }
+
+div.wse_field_row span.wse_field_val {
+  float: right;
+  width: 70%;
+  text-align: left;
+  }
+
+
+
+.websubmitportalboxbody {
+   color: #000;
+   background: #fff;
+   padding: 2px;
+   font-size: x-small;
+}
+.websubmitportalboxheader {
+   color: #36c;
+   background: #f1f1f1;
+   padding: 2px;
+   border-spacing: 0px;
+   border-bottom: 1px solid #999;
+   text-align: left;
+   font-size: small;
+   font-weight: bold;
+}
+div.float p {
+   text-align: center;
+}
+div.websubmit_form_page {
+  width: 75%;
+  margin: 0px auto;
+  padding: 20px;
+  text-align: center;
+  background-color: #fffff3;
+}
+
+div.wse_element_container {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #ccffcc;
+  background-color: #fcf9e9;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+div.wse_element_container_header {
+   color: navy;
+//   background: #99ffcc;
+   background: #fffbe5;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #999;
+   text-align: left;
+}
+
+div.wse_element_container_header2 {
+   color: navy;
+//   background: #99ffcc;
+   background: #b4eeb4;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #8fbc8f;
+   text-align: left;
+}
+
+div.wse_element_container2 {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #e6e6fa;
+  background-color: #c1ffc1;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+div.wse_element_container_header3 {
+   color: navy;
+//   background: #99ffcc;
+//   background-color: #e6e6fa;
+   background-color: #eee0e5;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #cdc1c5;
+   text-align: left;
+}
+
+div.wse_element_container3 {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #e6e6fa;
+//   background-color: #f0f8ff;
+   background-color: #fff0f5;
+//  background-color: #e6e6fa;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+div.wse_element_container_header4 {
+   color: navy;
+//   background: #99ffcc;
+//   background-color: #e6e6fa;
+   background-color: #cdc5bf;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #8b8682;
+   text-align: left;
+}
+
+div.wse_element_container4 {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #e6e6fa;
+//   background-color: #f0f8ff;
+   background-color: #eee5de;
+//  background-color: #e6e6fa;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+
+div.wse_element_container_header5 {
+   color: navy;
+//   background: #99ffcc;
+//   background-color: #e6e6fa;
+   background-color: #eee5de;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #cdc5bf;
+   text-align: left;
+}
+
+div.wse_element_container5 {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #e6e6fa;
+//   background-color: #f0f8ff;
+   background-color: #fff5ee;
+//  background-color: #e6e6fa;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+div.wse_element_container_header6 {
+   color: navy;
+//   background: #99ffcc;
+//   background-color: #e6e6fa;
+   background-color: #ebece4;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #c1cdcd;
+   text-align: left;
+}
+
+div.wse_element_container6 {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #e6e6fa;
+//   background-color: #f0f8ff;
+   background-color: #ecf1ef;
+//  background-color: #e6e6fa;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+
+div.wse_element_container_header7 {
+   color: navy;
+//   background: #99ffcc;
+//   background-color: #e6e6fa;
+   background-color: #eef3e2;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #c1cdcd;
+   text-align: left;
+}
+
+div.wse_element_container7 {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #e6e6fa;
+//   background-color: #f0f8ff;
+   background-color: #ebece4;
+//  background-color: #e6e6fa;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+
+div.wse_element_container_header8 {
+   color: navy;
+//   background: #99ffcc;
+//   background-color: #e6e6fa;
+   background-color: #bcd2ee;
+   padding: 3px;
+   padding-left: 15px;
+   margin-left: 1px;
+   margin-bottom: 5px;
+   border-spacing: 0px;
+   border-bottom: 1px dashed #a2b5cd;
+   text-align: left;
+}
+
+div.wse_element_container8 {
+  border: 1px dashed #333;
+//  background-color: #ffe;
+//  background-color: #e6e6fa;
+//   background-color: #f0f8ff;
+   background-color: #cae1ff;
+//  background-color: #e6e6fa;
+  width: 100%;
+//  padding: 5px;
+  margin: 0px auto;
+}
+
+
+
+div.wse_spacer {
+  clear: both;
+}
+
+div.wse_field_row {
+  clear: both;
+  padding-top: 10px;
+  }
+
+div.wse_field_row span.wse_field_label {
+  float: left;
+  width: 20%;
+  text-align: right;
+//  margin: 5px 5px;
+  }
+
+div.wse_field_row span.wse_field_val {
+  float: right;
+  width: 80%;
+  text-align: left;
+}

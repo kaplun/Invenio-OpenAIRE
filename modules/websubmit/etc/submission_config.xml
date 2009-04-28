@@ -1,0 +1,72 @@
+<submission_collections>
+ <collection>
+  <collection-label ln="en">Library Catalogues</collection-label>
+  <collection-label ln="fr">Catalogue de la bibliotheque</collection-label>
+  <collection>
+   <collection-label ln="en">Articles and Preprints(CERN)</collection-label>
+   <collection-label ln="fr">Articles et Preprints(CERN) - fr</collection-label>
+   <doctype id="PREPRINTS">
+    <doctype-label ln="en">CERN Preprints</doctype-label>
+    <doctype-label ln="fr">CERN Preprints - fr</doctype-label>
+    <category id="CDD">
+     <category-label ln="en">User-defined Numbering</category-label>
+     <category-label ln="en">Attribution de reference manuelle</category-label>
+     <category id="ALI">
+       <category-label ln="en">Alice</category-label>
+     </category>
+     <category id="IT">
+      <category-label ln="en">IT division</category-label>
+      <category-label ln="en">Division IT</category-label>
+     </category>
+    </category>
+    <category id="ANP">
+     <category-label ln="en">Automatic Numbering</category-label>
+     <category-label ln="fr">Attribution de reference automatique</category-label>
+      <category id="AB">
+       <category-label ln="en">Accelerators and Beams</category-label>
+      </category>
+      <category id="LHC">
+       <category-label ln="en">LHC Project Report</category-label>
+       <category-label ln="en">Rapport de projet LHC</category-label>
+      </category>
+     </category>
+    <access-restriction>
+     <rule>allow email /.*@cern.ch/</rule>
+    </access-restriction>
+   </doctype>
+   <doctype id="CTH" template="CTH.xml">
+    <doctype-label ln="en">CERN Thesis</doctype-label>
+    <doctype-label ln="fr">Theses du CERN - fr</doctype-label>
+    <access-restriction>
+     <rule>allow email /.*@cern.ch/</rule>
+    </access-restriction>
+   </doctype>
+  </collection>
+ </collection>  
+ <collection>
+  <collection-label ln="en">Internal Notes</collection-label>
+  <collection-label ln="fr">Notes internes</collection-label>
+  <doctype id="ATL">
+   <doctype-label ln="en">ATLAS</doctype-label>
+   <doctype-label ln="fr">ATLAS - fr</doctype-label>
+   <category id="DAQ">
+    <category-label ln="en">DAQ and Trigger</category-label>
+    <category-label ln="en">Systemes d'acquisition des donnees et mecanismes</category-label>
+   </category>
+   <category id="PHYS">
+    <category-label ln="en">Physics</category-label>
+    <category-label ln="en">Physique</category-label>
+    <access-restriction>
+     <rule>allow group atlas-phys-menmbers</rule>
+    </access-restriction>
+   </category>
+   <access-restriction>
+    <rule>allow group atlas-members</rule>
+   </access-restriction>
+  </doctype>
+  <doctype id="LHC">
+   <doctype-label ln="en">LHC</doctype-label>
+   <doctype-label ln="fr">LHC - fr</doctype-label>
+  </doctype>
+ </collection>
+</submission_collections>

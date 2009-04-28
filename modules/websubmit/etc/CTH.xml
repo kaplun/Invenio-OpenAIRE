@@ -1,0 +1,128 @@
+<submission>
+ <interface>
+ <container>
+   <element type="WSET_TextArea" name="WSE_other_rep" marc_code="088__a" rows="4" cols="30" treatlinesasvalues="1">
+     <element-label ln="en">Other Report numbers(one per line)</element-label>
+     <element-label ln="fr">Autres numeros de rapport(un par ligne)</element-label>
+   </element>
+   <element type="WSET_RadioButton" name="WSE_language">
+    <element-label ln="en">Language</element-label>
+    <element-label ln="fr">Langue</element-label>
+    <option value="en">
+      <option-value ln="en">English</option-value>
+      <option-value ln="fr">Anglais</option-value>
+    </option>
+     <option value="fr">
+      <option-value ln="en">French</option-value>
+      <option-value ln="fr">Francais</option-value>
+    </option>
+  </element>
+ </container>
+ <container>
+  <element type="WSET_TextArea" name="WSE_title" marc_code="245__a" rows="5" cols="60">
+   <element-label ln="en">Thesis Title</element-label>
+   <element-label ln="fr">Titre de la these</element-label>
+  </element>
+  <element type="WSET_TextArea" name="WSE_subtitle" marc_code="245__b" rows="3" cols="60">
+   <element-label ln="en">Thesis Subtitle</element-label>
+   <element-label ln="fr">Sous-titre de la these</element-label>
+  </element>
+ </container>
+  <container>
+  <element type="WSET_Author" name="WSE_authors"> 
+   <element-label ln="en">Authors</element-label>
+   <element-label ln="fr">Auteurs</element-label>
+  </element>
+  <element type="WSET_Author" name="WSE_supervisors">
+   <element-label ln="en">Thesis Supervisor(s)</element-label>
+   <element-label ln="fr">Superviseur de la these</element-label>
+  </element>
+ </container>
+ <container>
+  <container-label ln="en">Abstract</container-label>
+  <container-label ln="fr">Resume</container-label>
+  <element type="WSET_TextArea" name="WSE_abstract" marc_code="520__a" rows="12" cols="80">
+   <element-label ln="en">Abstract</element-label>
+   <element-label ln="fr">Resume</element-label>
+  </element>
+  <element type="WSET_CheckBox" name="WSE_keyword">
+    <element-label ln="en">Keywords</element-label>
+    <element-label ln="fr">Mots clef</element-label>
+    <option value="muon">
+      <option-value ln="en">muon</option-value>
+      <option-value ln="fr">muon</option-value>
+    </option>
+     <option value="atlas">
+      <option-value ln="en">atlas</option-value>
+      <option-value ln="fr">atlas</option-value>
+    </option>
+  </element>
+ </container>
+ <container>
+  <container-label ln="en">Thesis subject</container-label>
+  <container-label ln="fr">Sujet de la these</container-label>
+  <element name="WSE_Subject"/>
+ </container>
+ <container>
+  <element name="WSE_CernDepartements"/>
+ <element type="WSET_Text" name="WSE_experiment" size="35" marc_code="693__e">
+   <element-label ln="en">Experiment</element-label>
+   <element-label ln="fr">Experience</element-label>
+ </element>
+ </container>
+ <container>
+  <element type="WSET_Text" name="WSE_pages" size="8" marc_code="300__a">
+   <element-label ln="en">Number of pages</element-label>
+   <element-label ln="fr">Nombre de pages</element-label>
+  </element>
+  <element type="WSET_Date" name="WSE_date" marc_code="269__c">
+   <element-label ln="en">Date of Thesis Defence </element-label>
+   <element-label ln="fr">Date de la defense de la these</element-label>
+  </element>
+  <element type="WSET_Text" name="WSE_place" size="10" marc_code="269__c">
+   <element-label ln="en">Place</element-label>
+   <element-label ln="fr">Lieu</element-label>
+  </element>
+  <element type="WSET_Text" name="WSE_publisher" size="10" marc_code="269__c">
+   <element-label ln="en">Thesis Publisher (or University)</element-label>
+   <element-label ln="fr">Editeur ou Universite</element-label>
+  </element>
+  <element type="WSET_TextArea" name="WSE_diploma" rows="3" cols="80" marc_code="000__c">
+   <element-label ln="en">Diploma Awarded</element-label>
+   <element-label ln="fr">Diplome</element-label>
+  </element>
+  <element type="WSET_TextArea" name="WSE_university" rows="12" cols="80" marc_code="502__b">
+   <element-label ln="en">Awarding University</element-label>
+   <element-label ln="fr">Universite</element-label>
+  </element>
+ </container>
+ <container>
+  <container-label ln="en">File</container-label>
+  <container-label ln="fr">Fichier</container-label>
+  <element type="WSET_File" name="WSE_main"/>
+ </container>
+ </interface>
+
+ <checker>
+ <check test="wsc_string_length(WSE_title, &quot;&quot;, &quot;10&quot;)">
+   <error-label ln="en">The length of title must be above 10 characters</error-label>
+   <error-label ln="fr">La longueur du titre doit etre superieure a 10 characteres</error-label>
+ </check>
+ <check test="wsc_author_details(WSE_authors, &quot;1&quot;,&quot;0&quot;)">
+   <error-label ln="en">Authors must be entered with surname and forename. Affiliation is optional.</error-label>
+   <error-label ln="fr">Le nom de famille et le prenom d'un auteur sont obligatoires. L'affiliation est optionnelle.</error-label>
+ </check>
+ <check test="wsc_mandatory(WSE_place)">
+   <error-label ln="en">The place is mandatory</error-label>
+   <error-label ln="fr">Le lieu est obligatoire</error-label>
+ </check>
+  <check test="wsc_mandatory(WSE_abstract)">
+   <error-label ln="en">The abstract is mandatory</error-label>
+   <error-label ln="fr">Le resume est obligatoire</error-label>
+ </check>
+  <check test="wsc_mandatory(WSE_date)">
+   <error-label ln="en">The date is mandatory</error-label>
+   <error-label ln="fr">Le date est obligatoire</error-label>
+ </check>
+ </checker>
+</submission>
