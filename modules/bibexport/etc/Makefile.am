@@ -19,6 +19,7 @@ etcdir = $(sysconfdir)/bibexport
 
 etc_DATA = sitemap.cfg \
            googlescholar.cfg \
+           googlescholar-openurl.cfg \
            marcxml.cfg
 
 EXTRA_DIST = $(etc_DATA)

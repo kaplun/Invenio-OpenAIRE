@@ -52,6 +52,7 @@ this:
 from invenio.config import CFG_WEBDIR, CFG_CERN_SITE
 from invenio.bibtask import write_message
 from invenio.search_engine import perform_request_search, print_record
+from invenio.errorlib import register_exception
 import os
 import gzip
 import datetime
@@ -66,6 +67,7 @@ def run_export_method(jobname):
         exporter = GoogleScholarExporter(output_directory)
         exporter.export()
     except GoogleScholarExportException, ex:
+        register_exception(alert_admin=True)
         write_message("%s Exception: %s" %(ex.get_error_message(), ex.get_inner_exception()))
 
     write_message("bibexport_sitemap: job %s finished." % jobname)
@@ -117,6 +119,7 @@ class GoogleScholarExporter:
             try:
                 os.makedirs(directory)
             except(IOError, OSError), exception:
+                register_exception(alert_admin=True)
                 self._report_error("Directory %s does not exist and cannot be ctreated." % (directory, ), exception)
 
         # if it is not path to a directory report an error
@@ -198,6 +201,7 @@ class GoogleScholarExporter:
 
             index_file.write("</body></html>\n")
         except (IOError, OSError), exception:
+            register_exception(alert_admin=True)
             self._report_error("Failed to create index file.", exception)
 
         if index_file is not None:
@@ -234,6 +238,7 @@ class GoogleScholarExporter:
             output_file = gzip.GzipFile(filename = path, mode = "w")
             return output_file
         except (IOError, OSError), exception:
+            register_exception(alert_admin=True)
             self._report_error("Failed to open file file %s." % (path, ), exception)
             return None
 
@@ -248,6 +253,7 @@ class GoogleScholarExporter:
         try:
             output_file.write(text_to_write)
         except (IOError, OSError), exception:
+            register_exception(alert_admin=True)
             self._report_error("Failed to write to file " + output_file.name, exception)
 
     def _get_record_NLM_XML(self, record):
