@@ -632,7 +632,7 @@ def create_basic_search_units(req, p, f, m=None, of='hb'):
     ## return search units:
     return opfts
 
-def page_start(req, of, cc, as, ln, uid, title_message=None,
+def page_start(req, of, cc, aas, ln, uid, title_message=None,
                description='', keywords='', recID=-1, tab=''):
     "Start page according to given output format."
     _ = gettext_set_language(ln)
@@ -677,7 +677,7 @@ def page_start(req, of, cc, as, ln, uid, title_message=None,
             argd = cgi.parse_qs(req.args)
         rssurl = websearch_templates.build_rss_url(argd)
 
-        navtrail = create_navtrail_links(cc, as, ln)
+        navtrail = create_navtrail_links(cc, aas, ln)
         navtrail_append_title_p = 1
 
         # FIXME: Find a good point to put this code.
@@ -694,6 +694,7 @@ def page_start(req, of, cc, as, ln, uid, title_message=None,
 """
         else:
             metaheaderadd = ''
+
         if (tab != '' or ((of != '' or of.lower() != 'hd') and of != 'hb')) and \
                recID != -1:
             # If we are not in information tab in HD format, customize
@@ -773,7 +774,7 @@ def create_inputdate_box(name="d1", selected_year=0, selected_month=0, selected_
     box += """</select>"""
     return box
 
-def create_search_box(cc, colls, p, f, rg, sf, so, sp, rm, of, ot, as,
+def create_search_box(cc, colls, p, f, rg, sf, so, sp, rm, of, ot, aas,
                       ln, p1, f1, m1, op1, p2, f2, m2, op2, p3, f3,
                       m3, sc, pl, d1y, d1m, d1d, d2y, d2m, d2d, dt, jrec, ec,
                       action=""):
@@ -855,13 +856,13 @@ def create_search_box(cc, colls, p, f, rg, sf, so, sp, rm, of, ot, as,
     # collection defined, and not if we are in super simple search)
     show_colls = True
     if len(collection_reclist_cache.keys()) == 1 or \
-           as == -1:
+           aas == -1:
         show_colls = False
 
 
     return websearch_templates.tmpl_search_box(
              ln = ln,
-             as = as,
+             aas = aas,
              cc_intl = cc_intl,
              cc = cc,
              ot = ot,
@@ -899,9 +900,9 @@ def create_search_box(cc, colls, p, f, rg, sf, so, sp, rm, of, ot, as,
              show_colls = show_colls,
            )
 
-def create_navtrail_links(cc=CFG_SITE_NAME, as=0, ln=CFG_SITE_LANG, self_p=1, tab=''):
+def create_navtrail_links(cc=CFG_SITE_NAME, aas=0, ln=CFG_SITE_LANG, self_p=1, tab=''):
     """Creates navigation trail links, i.e. links to collection
-    ancestors (except Home collection).  If as==1, then links to
+    ancestors (except Home collection).  If aas==1, then links to
     Advanced Search interfaces; otherwise Simple Search.
     """
 
@@ -914,7 +915,7 @@ def create_navtrail_links(cc=CFG_SITE_NAME, as=0, ln=CFG_SITE_LANG, self_p=1, ta
         dads.append((cc, get_coll_i18nname(cc, ln)))
 
     return websearch_templates.tmpl_navtrail_links(
-        as=as, ln=ln, dads=dads)
+        aas=aas, ln=ln, dads=dads)
 
 def get_searchwithin_fields(ln='en', colID=None):
     """Retrieves the fields name used in the 'search within' selection box for the collection ID colID."""
@@ -2587,7 +2588,7 @@ def print_warning(req, msg, type='', prologue='<br />', epilogue='<br />'):
         return
 
 def print_search_info(p, f, sf, so, sp, rm, of, ot, collection=CFG_SITE_NAME, nb_found=-1, jrec=1, rg=10,
-                      as=0, ln=CFG_SITE_LANG, p1="", p2="", p3="", f1="", f2="", f3="", m1="", m2="", m3="", op1="", op2="",
+                      aas=0, ln=CFG_SITE_LANG, p1="", p2="", p3="", f1="", f2="", f3="", m1="", m2="", m3="", op1="", op2="",
                       sc=1, pl_in_url="",
                       d1y=0, d1m=0, d1d=0, d2y=0, d2m=0, d2d=0, dt="",
                       cpu_time=-1, middle_only=0):
@@ -2607,7 +2608,7 @@ def print_search_info(p, f, sf, so, sp, rm, of, ot, collection=CFG_SITE_NAME, nb
     return websearch_templates.tmpl_print_search_info(
              ln = ln,
              collection = collection,
-             as = as,
+             aas = aas,
              collection_name = get_coll_i18nname(collection, ln),
              collection_id = get_colID(collection),
              middle_only = middle_only,
@@ -3470,7 +3471,7 @@ def wash_url_argument(var, new_type):
 
 ### CALLABLES
 
-def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10, sf="", so="d", sp="", rm="", of="id", ot="", as=0,
+def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10, sf="", so="d", sp="", rm="", of="id", ot="", aas=0,
                            p1="", f1="", m1="", op1="", p2="", f2="", m2="", op2="", p3="", f3="", m3="", sc=0, jrec=0,
                            recid=-1, recidb=-1, sysno="", id=-1, idb=-1, sysnb="", action="", d1="",
                            d1y=0, d1m=0, d1d=0, d2="", d2y=0, d2m=0, d2d=0, dt="", verbose=0, ap=0, ln=CFG_SITE_LANG, ec=None, tab=""):
@@ -3518,7 +3519,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                Useful if only some fields are to be shown in the
                output, e.g. for library to control some fields.
 
-          as - advanced search ("0" means no, "1" means yes).  Whether
+         aas - advanced search ("0" means no, "1" means yes).  Whether
                search was called from within the advanced search
                interface.
 
@@ -3654,7 +3655,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
     except InvenioWebSearchUnknownCollectionError, exc:
         colname = exc.colname
         if of.startswith("h"):
-            page_start(req, of, cc, as, ln, getUid(req),
+            page_start(req, of, cc, aas, ln, getUid(req),
                        websearch_templates.tmpl_collection_not_found_page_title(colname, ln))
             req.write(websearch_templates.tmpl_collection_not_found_page_body(colname, ln))
             return page_end(req, of, ln)
@@ -3714,7 +3715,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
         title, description, keywords = \
                websearch_templates.tmpl_record_page_header_content(req, recid, ln)
 
-        page_start(req, of, cc, as, ln, uid, title, description, keywords, recid, tab)
+        page_start(req, of, cc, aas, ln, uid, title, description, keywords, recid, tab)
         # Default format is hb but we are in detailed -> change 'of'
         if of == "hb":
             of = "hd"
@@ -3740,12 +3741,12 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
 
     elif action == "browse":
         ## 2 - browse needed
-        page_start(req, of, cc, as, ln, uid, _("Browse"))
+        page_start(req, of, cc, aas, ln, uid, _("Browse"))
         if of.startswith("h"):
-            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, as, ln, p1, f1, m1, op1,
+            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, aas, ln, p1, f1, m1, op1,
                                         p2, f2, m2, op2, p3, f3, m3, sc, pl, d1y, d1m, d1d, d2y, d2m, d2d, dt, jrec, ec, action))
         try:
-            if as == 1 or (p1 or p2 or p3):
+            if aas == 1 or (p1 or p2 or p3):
                 browse_pattern(req, colls_to_search, p1, f1, rg, ln)
                 browse_pattern(req, colls_to_search, p2, f2, rg, ln)
                 browse_pattern(req, colls_to_search, p3, f3, rg, ln)
@@ -3762,9 +3763,9 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
 
     elif rm and p.startswith("recid:"):
         ## 3-ter - similarity search needed
-        page_start(req, of, cc, as, ln, uid, _("Search Results"))
+        page_start(req, of, cc, aas, ln, uid, _("Search Results"))
         if of.startswith("h"):
-            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, as, ln, p1, f1, m1, op1,
+            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, aas, ln, p1, f1, m1, op1,
                                         p2, f2, m2, op2, p3, f3, m3, sc, pl, d1y, d1m, d1d, d2y, d2m, d2d, dt, jrec, ec, action))
         if record_exists(p[6:]) != 1:
             # record does not exist
@@ -3786,7 +3787,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 cpu_time = t2 - t1
                 if of.startswith("h"):
                     req.write(print_search_info(p, f, sf, so, sp, rm, of, ot, cc, len(results_similar_recIDs),
-                                                jrec, rg, as, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
+                                                jrec, rg, aas, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
                                                 sc, pl_in_url,
                                                 d1y, d1m, d1d, d2y, d2m, d2d, dt, cpu_time))
                     print_warning(req, results_similar_comments)
@@ -3812,9 +3813,9 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
 
     elif p.startswith("cocitedwith:"):  #WAS EXPERIMENTAL
         ## 3-terter - cited by search needed
-        page_start(req, of, cc, as, ln, uid, _("Search Results"))
+        page_start(req, of, cc, aas, ln, uid, _("Search Results"))
         if of.startswith("h"):
-            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, as, ln, p1, f1, m1, op1,
+            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, aas, ln, p1, f1, m1, op1,
                                         p2, f2, m2, op2, p3, f3, m3, sc, pl, d1y, d1m, d1d, d2y, d2m, d2d, dt, jrec, ec, action))
         recID = p[12:]
         if record_exists(recID) != 1:
@@ -3836,7 +3837,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 cpu_time = t2 - t1
                 if of.startswith("h"):
                     req.write(print_search_info(p, f, sf, so, sp, rm, of, ot, CFG_SITE_NAME, len(results_cocited_recIDs),
-                                                jrec, rg, as, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
+                                                jrec, rg, aas, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
                                                 sc, pl_in_url,
                                                 d1y, d1m, d1d, d2y, d2m, d2d, dt, cpu_time))
                     print_records(req, results_cocited_recIDs, jrec, rg, of, ot, ln, search_pattern=p, verbose=verbose)
@@ -3857,13 +3858,13 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                     print_records_epilogue(req, of)
     else:
         ## 3 - common search needed
-        page_start(req, of, cc, as, ln, uid, _("Search Results"))
+        page_start(req, of, cc, aas, ln, uid, _("Search Results"))
         if of.startswith("h"):
-            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, as, ln, p1, f1, m1, op1,
+            req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, aas, ln, p1, f1, m1, op1,
                                         p2, f2, m2, op2, p3, f3, m3, sc, pl, d1y, d1m, d1d, d2y, d2m, d2d, dt, jrec, ec, action))
         t1 = os.times()[4]
         results_in_any_collection = HitSet()
-        if as == 1 or (p1 or p2 or p3):
+        if aas == 1 or (p1 or p2 or p3):
             ## 3A - advanced search
             try:
                 results_in_any_collection = search_pattern_parenthesised(req, p1, f1, m1, ap=ap, of=of, verbose=verbose, ln=ln)
@@ -4084,7 +4085,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                     if results_final.has_key(coll) and len(results_final[coll]):
                         if of.startswith("h"):
                             req.write(print_search_info(p, f, sf, so, sp, rm, of, ot, coll, results_final_nb[coll],
-                                                        jrec, rg, as, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
+                                                        jrec, rg, aas, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
                                                         sc, pl_in_url,
                                                         d1y, d1m, d1d, d2y, d2m, d2d, dt, cpu_time))
                         results_final_recIDs = list(results_final[coll])
@@ -4116,7 +4117,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                                       verbose=verbose)
                         if of.startswith("h"):
                             req.write(print_search_info(p, f, sf, so, sp, rm, of, ot, coll, results_final_nb[coll],
-                                                        jrec, rg, as, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
+                                                        jrec, rg, aas, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
                                                         sc, pl_in_url,
                                                         d1y, d1m, d1d, d2y, d2m, d2d, dt, cpu_time, 1))
                 print_records_epilogue(req, of)
@@ -4231,7 +4232,7 @@ def perform_request_log(req, date=""):
         i = 0
         for line in lines:
             try:
-                datetime, as, p, f, c, nbhits = string.split(line,"#")
+                datetime, aas, p, f, c, nbhits = string.split(line,"#")
                 i += 1
                 req.write("<tr><td align=\"right\">#%d</td><td>%s:%s:%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>" \
                           % (i, datetime[8:10], datetime[10:12], datetime[12:], p, f, c, nbhits))

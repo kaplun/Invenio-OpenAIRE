@@ -99,6 +99,9 @@ def wash_search_urlargd(form):
     """
 
     argd = wash_urlargd(form, search_results_default_urlargd)
+    if argd.has_key('as'):
+        argd['aas'] = argd['as']
+        del argd['as']
 
     # Sometimes, users pass ot=245,700 instead of
     # ot=245&ot=700. Normalize that.
@@ -539,6 +542,7 @@ class WebInterfaceSearchResultsPages(WebInterfaceDirectory):
 # Parameters for the legacy URLs, of the form /?c=ALEPH
 legacy_collection_default_urlargd = {
     'as': (int, CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE),
+    'aas': (int, CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE),
     'verbose': (int, 0),
     'c': (str, CFG_SITE_NAME)}
 
@@ -602,6 +606,12 @@ class WebInterfaceSearchInterfacePages(WebInterfaceDirectory):
                     # collection argument not present; display
                     # home collection by default
                     argd['c'] = CFG_SITE_NAME
+
+                # Treat `as' argument specially:
+                if argd.has_key('as'):
+                    argd['aas'] = argd['as']
+                    del argd['as']
+
                 return display_collection(req, **argd)
 
             return answer, []
@@ -678,6 +688,11 @@ class WebInterfaceSearchInterfacePages(WebInterfaceDirectory):
         del argd['referer']
         del argd['realm']
 
+        # Treat `as' argument specially:
+        if argd.has_key('as'):
+            argd['aas'] = argd['as']
+            del argd['as']
+
         # If we specify no collection, then we don't need to redirect
         # the user, so that accessing <http://yoursite/> returns the
         # default collection.
@@ -695,9 +710,14 @@ class WebInterfaceSearchInterfacePages(WebInterfaceDirectory):
         else:
             target = '/collection/' + quote(c)
 
+        # Treat `as' argument specially:
+        # We are going to redirect, so replace `aas' by `as' visible argument:
+        if argd.has_key('aas'):
+            argd['as'] = argd['aas']
+            del argd['aas']
+
         target += make_canonical_urlargd(argd, legacy_collection_default_urlargd)
         return redirect_to_url(req, target)
-
 
     def legacy_search(self, req, form):
         """Search URL backward compatibility handling."""
@@ -716,12 +736,12 @@ class WebInterfaceSearchInterfacePages(WebInterfaceDirectory):
         return redirect_to_url(req, target)
 
 
-def display_collection(req, c, as, verbose, ln):
+def display_collection(req, c, aas, verbose, ln):
     """Display search interface page for collection c by looking
     in the collection cache."""
     _ = gettext_set_language(ln)
 
-    req.argd = drop_default_urlargd({'as': as, 'verbose': verbose, 'ln': ln},
+    req.argd = drop_default_urlargd({'aas': aas, 'verbose': verbose, 'ln': ln},
                                     search_interface_default_urlargd)
 
     # get user ID:
@@ -760,10 +780,10 @@ def display_collection(req, c, as, verbose, ln):
                     navmenuid='search')
     # display collection interface page:
     try:
-        filedesc = open("%s/collections/%d/navtrail-as=%d-ln=%s.html" % (CFG_CACHEDIR, colID, as, ln), "r")
+        filedesc = open("%s/collections/%d/navtrail-as=%d-ln=%s.html" % (CFG_CACHEDIR, colID, aas, ln), "r")
         c_navtrail = filedesc.read()
         filedesc.close()
-        filedesc = open("%s/collections/%d/body-as=%d-ln=%s.html" % (CFG_CACHEDIR, colID, as, ln), "r")
+        filedesc = open("%s/collections/%d/body-as=%d-ln=%s.html" % (CFG_CACHEDIR, colID, aas, ln), "r")
         c_body = filedesc.read()
         filedesc.close()
         filedesc = open("%s/collections/%d/portalbox-tp-ln=%s.html" % (CFG_CACHEDIR, colID, ln), "r")
