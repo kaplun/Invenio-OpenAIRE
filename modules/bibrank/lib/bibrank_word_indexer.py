@@ -38,6 +38,7 @@ from invenio.bibtask import write_message, task_get_option, task_update_progress
     task_update_status, task_sleep_now_if_required
 from invenio.intbitset import intbitset
 from invenio.errorlib import register_exception
+from invenio.bibrank_word_indexer_c import update_rnkWORD
 
 options = {} # global variable to hold task options
 
@@ -746,7 +747,6 @@ def word_index(run):
         import psyco
         psyco.bind(get_words_from_phrase)
         psyco.bind(WordTable.merge_with_old_recIDs)
-        psyco.bind(update_rnkWORD)
         psyco.bind(check_rnkWORD)
     except StandardError,e:
         print "Warning: Psyco", e
@@ -837,7 +837,7 @@ def word_index(run):
                 write_message("Invalid command found processing %s" % \
                      wordTable.tablename, sys.stderr)
                 raise StandardError
-            update_rnkWORD(options["table"], options["modified_words"])
+            update_rnkWORD(options["table"], options["modified_words"].keys())
             task_sleep_now_if_required(can_stop_too=True)
         except StandardError, e:
             register_exception(alert_admin=True)
@@ -985,197 +985,6 @@ def rank_method_code_statistics(table):
     for i in range(0, 20):
         write_message("%s/%s---%s---%s" % (terms[i][0],terms[i][1], Gi[i][0],Gi[len(Gi) - i - 1][0]))
 
-def update_rnkWORD(table, terms):
-    """Updates rnkWORDF and rnkWORDR with Gi and Nj values. For each term in rnkWORDF, a Gi value for the term is added. And for each term in each document, the Nj value for that document is added. In rnkWORDR, the Gi value for each term in each document is added. For description on how things are computed, look in the hacking docs.
-    table - name of forward index to update
-    terms - modified terms"""
-
-    stime = time.time()
-    Gi = {}
-    Nj = {}
-    N = run_sql("select count(id_bibrec) from %sR" % table[:-1])[0][0]
-
-    if len(terms) == 0 and task_get_option("quick") == "yes":
-        write_message("No terms to process, ending...")
-        return ""
-    elif task_get_option("quick") == "yes": #not used -R option, fast calculation (not accurate)
-        write_message("Beginning post-processing of %s terms" % len(terms))
-
-        #Locating all documents related to the modified/new/deleted terms, if fast update,
-        #only take into account new/modified occurences
-        write_message("Phase 1: Finding records containing modified terms")
-        terms = terms.keys()
-        i = 0
-
-        while i < len(terms):
-            terms_docs = get_from_forward_index(terms, i, (i+5000), table)
-            for (t, hitlist) in terms_docs:
-                term_docs = deserialize_via_marshal(hitlist)
-                if term_docs.has_key("Gi"):
-                    del term_docs["Gi"]
-                for (j, tf) in term_docs.iteritems():
-                    if (task_get_option("quick") == "yes" and tf[1] == 0) or task_get_option("quick") == "no":
-                        Nj[j] = 0
-            write_message("Phase 1: ......processed %s/%s terms" % ((i+5000>len(terms) and len(terms) or (i+5000)), len(terms)))
-            i += 5000
-        write_message("Phase 1: Finished finding records containing modified terms")
-
-        #Find all terms in the records found in last phase
-        write_message("Phase 2: Finding all terms in affected records")
-        records = Nj.keys()
-        i = 0
-        while i < len(records):
-            docs_terms = get_from_reverse_index(records, i, (i + 5000), table)
-            for (j, termlist) in docs_terms:
-                doc_terms = deserialize_via_marshal(termlist)
-                for (t, tf) in doc_terms.iteritems():
-                    Gi[t] = 0
-            write_message("Phase 2: ......processed %s/%s records " % ((i+5000>len(records) and len(records) or (i+5000)), len(records)))
-            i += 5000
-        write_message("Phase 2: Finished finding all terms in affected records")
-
-    else: #recalculate
-        max_id = run_sql("SELECT MAX(id) FROM %s" % table)
-        max_id = max_id[0][0]
-        write_message("Beginning recalculation of %s terms" % max_id)
-
-        terms = []
-        i = 0
-        while i < max_id:
-            terms_docs = get_from_forward_index_with_id(i, (i+5000), table)
-            for (t, hitlist) in terms_docs:
-                Gi[t] = 0
-                term_docs = deserialize_via_marshal(hitlist)
-                if term_docs.has_key("Gi"):
-                    del term_docs["Gi"]
-                for (j, tf) in term_docs.iteritems():
-                    Nj[j] = 0
-            write_message("Phase 1: ......processed %s/%s terms" % ((i+5000)>max_id and max_id or (i+5000), max_id))
-            i += 5000
-
-        write_message("Phase 1: Finished finding which records contains which terms")
-        write_message("Phase 2: Jumping over..already done in phase 1 because of -R option")
-
-    terms = Gi.keys()
-    Gi = {}
-    i = 0
-    if task_get_option("quick") == "no":
-        #Calculating Fi and Gi value for each term
-        write_message("Phase 3: Calculating importance of all affected terms")
-        while i < len(terms):
-            terms_docs = get_from_forward_index(terms, i, (i+5000), table)
-            for (t, hitlist) in terms_docs:
-                term_docs = deserialize_via_marshal(hitlist)
-                if term_docs.has_key("Gi"):
-                    del term_docs["Gi"]
-                Fi = 0
-                Gi[t] = 1
-                for (j, tf) in term_docs.iteritems():
-                    Fi += tf[0]
-                for (j, tf) in term_docs.iteritems():
-                    if tf[0] != Fi:
-                        Gi[t] = Gi[t] + ((float(tf[0]) / Fi) * math.log(float(tf[0]) / Fi) / math.log(2)) / math.log(N)
-            write_message("Phase 3: ......processed %s/%s terms" % ((i+5000>len(terms) and len(terms) or (i+5000)), len(terms)))
-            i += 5000
-        write_message("Phase 3: Finished calculating importance of all affected terms")
-    else:
-        #Using existing Gi value instead of calculating a new one. Missing some accurancy.
-        write_message("Phase 3: Getting approximate importance of all affected terms")
-        while i < len(terms):
-            terms_docs = get_from_forward_index(terms, i, (i+5000), table)
-            for (t, hitlist) in terms_docs:
-                term_docs = deserialize_via_marshal(hitlist)
-                if term_docs.has_key("Gi"):
-                    Gi[t] = term_docs["Gi"][1]
-                elif len(term_docs) == 1:
-                    Gi[t] = 1
-                else:
-                    Fi = 0
-                    Gi[t] = 1
-                    for (j, tf) in term_docs.iteritems():
-                        Fi += tf[0]
-                    for (j, tf) in term_docs.iteritems():
-                        if tf[0] != Fi:
-                            Gi[t] = Gi[t] + ((float(tf[0]) / Fi) * math.log(float(tf[0]) / Fi) / math.log(2)) / math.log(N)
-            write_message("Phase 3: ......processed %s/%s terms" % ((i+5000>len(terms) and len(terms) or (i+5000)), len(terms)))
-            i += 5000
-        write_message("Phase 3: Finished getting approximate importance of all affected terms")
-
-    write_message("Phase 4: Calculating normalization value for all affected records and updating %sR" % table[:-1])
-    records = Nj.keys()
-    i = 0
-    while i < len(records):
-        #Calculating the normalization value for each document, and adding the Gi value to each term in each document.
-        docs_terms = get_from_reverse_index(records, i, (i + 5000), table)
-        for (j, termlist) in docs_terms:
-            doc_terms = deserialize_via_marshal(termlist)
-            try:
-                for (t, tf) in doc_terms.iteritems():
-                    if Gi.has_key(t):
-                        Nj[j] = Nj.get(j, 0) + math.pow(Gi[t] * (1 + math.log(tf[0])), 2)
-                        Git = int(math.floor(Gi[t]*100))
-                        if Git >= 0:
-                            Git += 1
-                        doc_terms[t] = (tf[0], Git)
-                    else:
-                        Nj[j] = Nj.get(j, 0) + math.pow(tf[1] * (1 + math.log(tf[0])), 2)
-                Nj[j] = 1.0 / math.sqrt(Nj[j])
-                Nj[j] = int(Nj[j] * 100)
-                if Nj[j] >= 0:
-                    Nj[j] += 1
-                run_sql("UPDATE %sR SET termlist=%%s WHERE id_bibrec=%%s" % table[:-1],
-                        (serialize_via_marshal(doc_terms), j))
-            except (ZeroDivisionError, OverflowError), e:
-                ## This is to try to isolate division by zero errors.
-                register_exception(prefix="Error when analysing the record %s (%s): %s\n" % (j, repr(docs_terms), e), alert_admin=True)
-        write_message("Phase 4: ......processed %s/%s records" % ((i+5000>len(records) and len(records) or (i+5000)), len(records)))
-        i += 5000
-    write_message("Phase 4: Finished calculating normalization value for all affected records and updating %sR" % table[:-1])
-    write_message("Phase 5: Updating %s with new normalization values" % table)
-    i = 0
-    terms = Gi.keys()
-    while i < len(terms):
-        #Adding the Gi value to each term, and adding the normalization value to each term in each document.
-        terms_docs = get_from_forward_index(terms, i, (i+5000), table)
-        for (t, hitlist) in terms_docs:
-            try:
-                term_docs = deserialize_via_marshal(hitlist)
-                if term_docs.has_key("Gi"):
-                    del term_docs["Gi"]
-                for (j, tf) in term_docs.iteritems():
-                    if Nj.has_key(j):
-                        term_docs[j] = (tf[0], Nj[j])
-                Git = int(math.floor(Gi[t]*100))
-                if Git >= 0:
-                    Git += 1
-                term_docs["Gi"] = (0, Git)
-                run_sql("UPDATE %s SET hitlist=%%s WHERE term=%%s" % table,
-                        (serialize_via_marshal(term_docs), t))
-            except (ZeroDivisionError, OverflowError), e:
-                register_exception(prefix="Error when analysing the term %s (%s): %s\n" % (t, repr(terms_docs), e), alert_admin=True)
-        write_message("Phase 5: ......processed %s/%s terms" % ((i+5000>len(terms) and len(terms) or (i+5000)), len(terms)))
-        i += 5000
-    write_message("Phase 5:  Finished updating %s with new normalization values" % table)
-    write_message("Time used for post-processing: %.1fmin" % ((time.time() - stime) / 60))
-    write_message("Finished post-processing")
-
-
-def get_from_forward_index(terms, start, stop, table):
-    terms_docs = ()
-    for j in range(start, (stop < len(terms) and stop or len(terms))):
-        terms_docs += run_sql("SELECT term, hitlist FROM %s WHERE term=%%s" % table,
-                              (terms[j],))
-    return terms_docs
-
-def get_from_forward_index_with_id(start, stop, table):
-    terms_docs = run_sql("SELECT term, hitlist FROM %s WHERE id BETWEEN %s AND %s" % (table, start, stop))
-    return terms_docs
-
-def get_from_reverse_index(records, start, stop, table):
-    current_recs = "%s" % records[start:stop]
-    current_recs = current_recs[1:-1]
-    docs_terms = run_sql("SELECT id_bibrec, termlist FROM %sR WHERE id_bibrec IN (%s)" % (table[:-1], current_recs))
-    return docs_terms
 
 #def test_word_separators(phrase="hep-th/0101001"):
     #"""Tests word separating policy on various input."""

@@ -9,7 +9,7 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
@@ -18,19 +18,25 @@
 pylibdir = $(libdir)/python/invenio
 
 pylib_DATA = bibrankadminlib.py \
-             bibrank_tag_based_indexer.py bibrank_tag_based_indexer_tests.py \
-	     bibrank_word_indexer.py \
-             bibrank_record_sorter.py bibrank_record_sorter_tests.py \
-             bibrank_downloads_indexer.py bibrank_downloads_indexer_tests.py \
-	     bibrank_downloads_similarity.py \
-	     bibrank_grapher.py bibrank_downloads_grapher.py bibrank_citation_grapher.py \
-	     bibrank_citation_indexer.py bibrank_citation_indexer_tests.py \
-	     bibrank_citation_searcher.py bibrank_citation_searcher_tests.py \
-             bibrank_regression_tests.py bibrank.py \
-             bibrankadmin_regression_tests.py \
-             bibrankgkb.py \
-             bibrank_citerank_indexer.py bibrank_citerank_indexer_tests.py
+	bibrank_tag_based_indexer.py bibrank_tag_based_indexer_tests.py \
+	bibrank_word_indexer.py \
+	bibrank_record_sorter.py bibrank_record_sorter_tests.py \
+	bibrank_downloads_indexer.py bibrank_downloads_indexer_tests.py \
+	bibrank_downloads_similarity.py \
+	bibrank_grapher.py bibrank_downloads_grapher.py bibrank_citation_grapher.py \
+	bibrank_citation_indexer.py bibrank_citation_indexer_tests.py \
+	bibrank_citation_searcher.py bibrank_citation_searcher_tests.py \
+	bibrank_regression_tests.py bibrank.py \
+	bibrankadmin_regression_tests.py \
+	bibrankgkb.py \
+	bibrank_citerank_indexer.py bibrank_citerank_indexer_tests.py
 
 EXTRA_DIST = $(pylib_DATA)
+
+all:
+	$(PYTHON) $(srcdir)/bibrank_word_indexer_setup.py build_ext
+
+install-data-hook:
+	@find ${srcdir} -name bibrank_word_indexer_c.so -exec cp {} ${pylibdir} \;
 
 CLEANFILES = *~ *.tmp *.pyc
