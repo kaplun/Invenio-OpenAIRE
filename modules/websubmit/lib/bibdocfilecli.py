@@ -129,17 +129,17 @@ def _parse_date_range(var):
 
 def cli_quick_match_all_recids(options):
     """Return an quickly an approximate but (by excess) list of good recids."""
-    url = getattr(options, 'url')
+    url = getattr(options, 'url', None)
     if url:
         return intbitset([decompose_bibdocfile_url(url)[0]])
-    path = getattr(options, 'path')
+    path = getattr(options, 'path', None)
     if path:
         return intbitset([decompose_bibdocfile_fullpath(path)[0]])
-    collection = getattr(options, 'collection')
-    pattern = getattr(options, 'pattern')
-    recids = getattr(options, 'recids')
-    md_rec = getattr(options, 'md_rec')
-    cd_rec = getattr(options, 'cd_rec')
+    collection = getattr(options, 'collection', None)
+    pattern = getattr(options, 'pattern', None)
+    recids = getattr(options, 'recids', None)
+    md_rec = getattr(options, 'md_rec', None)
+    cd_rec = getattr(options, 'cd_rec', None)
     tmp_date_query = []
     tmp_date_params = []
     if recids is None:
@@ -176,18 +176,18 @@ def cli_quick_match_all_recids(options):
 
 def cli_quick_match_all_docids(options, recids=None):
     """Return an quickly an approximate but (by excess) list of good docids."""
-    url = getattr(options, 'url')
+    url = getattr(options, 'url', None)
     if url:
         return intbitset([bibdocfile_url_to_bibdoc(url).get_id()])
-    path = getattr(options, 'path')
+    path = getattr(options, 'path', None)
     if path:
         return intbitset([decompose_bibdocfile_fullpath(path)[0]])
 
-    deleted_docs = getattr(options, 'deleted_docs')
-    action_undelete = getattr(options, 'action') == 'undelete'
-    docids = getattr(options, 'docids')
-    md_doc = getattr(options, 'md_doc')
-    cd_doc = getattr(options, 'cd_doc')
+    deleted_docs = getattr(options, 'deleted_docs', None)
+    action_undelete = getattr(options, 'action', None) == 'undelete'
+    docids = getattr(options, 'docids', None)
+    md_doc = getattr(options, 'md_doc', None)
+    cd_doc = getattr(options, 'cd_doc', None)
     if docids is None:
         debug('Initially considering all the docids')
         docids = intbitset(run_sql('SELECT id_bibdoc FROM bibrec_bibdoc'))
@@ -227,9 +227,9 @@ def cli_slow_match_single_recid(options, recid, recids=None, docids=None):
     match or not.
     if with_docids is True, the recid is matched if it has at least one docid that is matched"""
     debug('cli_slow_match_single_recid checking: %s' % recid)
-    deleted_docs = getattr(options, 'deleted_docs')
-    deleted_recs = getattr(options, 'deleted_recs')
-    empty_recs = getattr(options, 'empty_recs')
+    deleted_docs = getattr(options, 'deleted_docs', None)
+    deleted_recs = getattr(options, 'deleted_recs', None)
+    empty_recs = getattr(options, 'empty_recs', None)
     docname = cli2docname(options)
     bibrecdocs = BibRecDocs(recid, deleted_too=(deleted_docs != 'no'))
     if bibrecdocs.deleted_p() and (deleted_recs == 'no'):
@@ -251,8 +251,8 @@ def cli_slow_match_single_docid(options, docid, recids=None, docids=None):
     """Apply all the given queries in order to assert wethever a recid
     match or not."""
     debug('cli_slow_match_single_docid checking: %s' % docid)
-    empty_docs = getattr(options, 'empty_docs')
-    docname = getattr(options, 'docname')
+    empty_docs = getattr(options, 'empty_docs', None)
+    docname = getattr(options, 'docname', None)
     if recids is None:
         recids = cli_quick_match_all_recids(options)
     bibdoc = BibDoc(docid)
@@ -289,7 +289,7 @@ def cli2docid(options, recids=None, docids=None):
 
 def cli2icon(options):
     """Return a good value for the icon."""
-    icon = getattr(options, 'set_icon')
+    icon = getattr(options, 'set_icon', None)
     if icon is None:
         icon = KEEP_OLD_VALUE
     elif icon:
@@ -299,28 +299,28 @@ def cli2icon(options):
 
 def cli2description(options):
     """Return a good value for the description."""
-    description = getattr(options, 'set_description')
+    description = getattr(options, 'set_description', None)
     if description is None:
         description = KEEP_OLD_VALUE
     return description
 
 def cli2restriction(options):
     """Return a good value for the restriction."""
-    restriction = getattr(options, 'set_restriction')
+    restriction = getattr(options, 'set_restriction', None)
     if restriction is None:
         restriction = KEEP_OLD_VALUE
     return restriction
 
 def cli2comment(options):
     """Return a good value for the comment."""
-    comment = getattr(options, 'set_comment')
+    comment = getattr(options, 'set_comment', None)
     if comment is None:
         comment = KEEP_OLD_VALUE
     return comment
 
 def cli2doctype(options):
     """Return a good value for the doctype."""
-    doctype = getattr(options, 'set_doctype')
+    doctype = getattr(options, 'set_doctype', None)
     if not doctype:
         return 'Main'
     return doctype
@@ -331,7 +331,7 @@ def cli2docname(options, docid=None, url=None):
     if docid:
         bibdoc = BibDoc(docid=docid)
         return bibdoc.get_docname()
-    docname = getattr(options, 'docname')
+    docname = getattr(options, 'docname', None)
     if docname is not None:
         return docname
     if url is not None:
@@ -341,7 +341,7 @@ def cli2docname(options, docid=None, url=None):
 
 def cli2format(options, url=None):
     """Given the command line options returns the corresponding format."""
-    format = getattr(options, 'format')
+    format = getattr(options, 'format', None)
     if format is not None:
         return format
     elif url is not None:
@@ -545,10 +545,10 @@ def ranges2ids(parse_string):
 def cli_append(options, append_path):
     """Create a bibupload FFT task submission for appending a format."""
     recid = cli2recid(options)
-    comment = getattr(options, 'comment')
-    description = getattr(options, 'comment')
-    restriction = getattr(options, 'restriction')
-    doctype = getattr(options, 'doctype') or 'Main'
+    comment = getattr(options, 'comment', None)
+    description = getattr(options, 'comment', None)
+    restriction = getattr(options, 'restriction', None)
+    doctype = getattr(options, 'doctype', None) or 'Main'
     icon = cli2icon(options)
     if icon == KEEP_OLD_VALUE:
         icon = None
@@ -577,14 +577,14 @@ def cli_revise(options, revise_path):
     description = cli2description(options)
     restriction = cli2restriction(options)
     docname = cli2docname(options, url=revise_path)
-    hide_previous = getattr(options, 'hide_previous')
+    hide_previous = getattr(options, 'hide_previous', None)
     if not docname:
         raise OptionValueError, 'Not enough information to retrieve a valid docname'
     format = cli2format(options, revise_path)
     doctype = cli2doctype(options)
     icon = cli2icon(options)
     url = clean_url(revise_path)
-    new_docname = getattr(options, 'new_docname')
+    new_docname = getattr(options, 'new_docname', None)
     check_valid_url(url)
     ffts = {recid : [{
         'docname' : docname,
@@ -603,11 +603,11 @@ def cli_revise(options, revise_path):
 def cli_set_batch(options):
     """Change in batch the doctype, description, comment and restriction."""
     ffts = {}
-    doctype = getattr(options, 'set_doctype')
-    description = getattr(options, 'set_description')
-    comment = getattr(options, 'set_comment')
-    restriction = getattr(options, 'set_restriction')
-    with_format = getattr(options, 'format')
+    doctype = getattr(options, 'set_doctype', None)
+    description = getattr(options, 'set_description', None)
+    comment = getattr(options, 'set_comment', None)
+    restriction = getattr(options, 'set_restriction', None)
+    with_format = getattr(options, 'format', None)
     for docid in cli_docids_iterator(options):
         bibdoc = BibDoc(docid)
         recid = bibdoc.get_recid()
@@ -629,8 +629,8 @@ def cli_set_batch(options):
 
 def cli_textify(options):
     """Extract text to let indexing on fulltext be possible."""
-    force = getattr(options, 'force')
-    perform_ocr = getattr(options, 'perform_ocr')
+    force = getattr(options, 'force', None)
+    perform_ocr = getattr(options, 'perform_ocr', None)
     if perform_ocr:
         if not can_perform_ocr():
             print >> sys.stderr, "WARNING: OCR requested but OCR is not possible"
@@ -654,7 +654,7 @@ def cli_textify(options):
 
 def cli_rename(options):
     """Rename a docname within a recid."""
-    new_docname = getattr(options, 'new_docname')
+    new_docname = getattr(options, 'new_docname', None)
     docid = cli2docid(options)
     bibdoc = BibDoc(docid)
     docname = bibdoc.get_docname()
@@ -800,7 +800,7 @@ def cli_delete_file(options):
     docid = cli2docid(options)
     format = cli2format(options)
     docname = BibDoc(docid).get_docname()
-    version = getattr(options, 'version')
+    version = getattr(options, 'version', None)
     ffts = {recid : [{'docname' : docname, 'version' : version, 'format' : format, 'doctype' : 'DELETE-FILE'}]}
     return bibupload_ffts(ffts)
 
@@ -809,7 +809,7 @@ def cli_revert(options):
     recid = cli2recid(options)
     docid = cli2docid(options)
     docname = BibDoc(docid).get_docname()
-    version = getattr(options, 'version')
+    version = getattr(options, 'version', None)
     try:
         version = int(version)
         if 0 >= version:
@@ -822,7 +822,7 @@ def cli_revert(options):
 def cli_undelete(options):
     """Delete the given docname"""
     docname = cli2docname(options)
-    restriction = getattr(options, 'restriction')
+    restriction = getattr(options, 'restriction', None)
     count = 0
     if not docname:
         docname = 'DELETED-*-*'
@@ -848,11 +848,11 @@ def cli_undelete(options):
 def cli_get_info(options):
     """Print all the info of the matched docids or recids."""
     debug('Getting info!')
-    human_readable = bool(getattr(options, 'human_readable'))
+    human_readable = bool(getattr(options, 'human_readable', None))
     debug('human_readable: %s' % human_readable)
-    deleted_docs = getattr(options, 'deleted_docs') in ('yes', 'only')
+    deleted_docs = getattr(options, 'deleted_docs', None) in ('yes', 'only')
     debug('deleted_docs: %s' % deleted_docs)
-    if getattr(options, 'docids'):
+    if getattr(options, 'docids', None):
         for docid in cli_docids_iterator(options):
             sys.stdout.write(str(BibDoc(docid, human_readable=human_readable)))
     else:
@@ -901,7 +901,7 @@ def cli_get_history(options):
 
 def cli_get_disk_usage(options):
     """Print the space usage of a docid_set."""
-    human_readable = getattr(options, 'human_readable')
+    human_readable = getattr(options, 'human_readable', None)
     total_size = 0
     total_latest_size = 0
     for docid in cli_docids_iterator(options):
@@ -1022,72 +1022,72 @@ def cli_unhide(options):
 def main():
     parser = prepare_option_parser()
     (options, args) = parser.parse_args()
-    if getattr(options, 'debug'):
+    if getattr(options, 'debug', None):
         getLogger().setLevel(DEBUG)
         debug('test')
     debug('options: %s, args: %s' % (options, args))
     try:
-        if not getattr(options, 'action') and \
-                not getattr(options, 'append_path') and \
-                not getattr(options, 'revise_path'):
-            if getattr(options, 'set_doctype') is not None or \
-                    getattr(options, 'set_comment') is not None or \
-                    getattr(options, 'set_description') is not None or \
-                    getattr(options, 'set_restriction') is not None:
+        if not getattr(options, 'action', None) and \
+                not getattr(options, 'append_path', None) and \
+                not getattr(options, 'revise_path', None):
+            if getattr(options, 'set_doctype', None) is not None or \
+                    getattr(options, 'set_comment', None) is not None or \
+                    getattr(options, 'set_description', None) is not None or \
+                    getattr(options, 'set_restriction', None) is not None:
                 cli_set_batch(options)
-            elif getattr(options, 'new_docname'):
+            elif getattr(options, 'new_docname', None):
                 cli_rename(options)
-            elif getattr(options, 'set_icon') is not None:
+            elif getattr(options, 'set_icon', None) is not None:
                 cli_set_icon(options)
             else:
                 print >> sys.stderr, "ERROR: no action specified"
                 sys.exit(1)
-        elif getattr(options, 'append_path'):
-            cli_append(options, getattr(options, 'append_path'))
-        elif getattr(options, 'revise_path'):
-            cli_revise(options, getattr(options, 'revise_path'))
+        elif getattr(options, 'append_path', None):
+            cli_append(options, getattr(options, 'append_path', None))
+        elif getattr(options, 'revise_path', None):
+            cli_revise(options, getattr(options, 'revise_path', None))
         elif options.action == 'textify':
             cli_textify(options)
-        elif getattr(options, 'action') == 'get-history':
+        elif getattr(options, 'action', None) == 'get-history':
             cli_get_history(options)
-        elif getattr(options, 'action') == 'get-info':
+        elif getattr(options, 'action', None) == 'get-info':
             cli_get_info(options)
-        elif getattr(options, 'action') == 'get-disk-usage':
+        elif getattr(options, 'action', None) == 'get-disk-usage':
             cli_get_disk_usage(options)
-        elif getattr(options, 'action') == 'check-md5':
+        elif getattr(options, 'action', None) == 'check-md5':
             cli_check_md5(options)
-        elif getattr(options, 'action') == 'update-md5':
+        elif getattr(options, 'action', None) == 'update-md5':
             cli_update_md5(options)
-        elif getattr(options, 'action') == 'fix-all':
+        elif getattr(options, 'action', None) == 'fix-all':
             cli_fix_all(options)
-        elif getattr(options, 'action') == 'fix-marc':
+        elif getattr(options, 'action', None) == 'fix-marc':
             cli_fix_marc(options)
-        elif getattr(options, 'action') == 'delete':
+        elif getattr(options, 'action', None) == 'delete':
             cli_delete(options)
-        elif getattr(options, 'action') == 'delete-file':
+        elif getattr(options, 'action', None) == 'delete-file':
             cli_delete_file(options)
-        elif getattr(options, 'action') == 'fix-duplicate-docnames':
+        elif getattr(options, 'action', None) == 'fix-duplicate-docnames':
             cli_fix_duplicate_docnames(options)
-        elif getattr(options, 'action') == 'fix-format':
+        elif getattr(options, 'action', None) == 'fix-format':
             cli_fix_format(options)
-        elif getattr(options, 'action') == 'check-duplicate-docnames':
+        elif getattr(options, 'action', None) == 'check-duplicate-docnames':
             cli_check_duplicate_docnames(options)
-        elif getattr(options, 'action') == 'check-format':
+        elif getattr(options, 'action', None) == 'check-format':
             cli_check_format(options)
-        elif getattr(options, 'action') == 'undelete':
+        elif getattr(options, 'action', None) == 'undelete':
             cli_undelete(options)
-        elif getattr(options, 'action') == 'purge':
+        elif getattr(options, 'action', None) == 'purge':
             cli_purge(options)
-        elif getattr(options, 'action') == 'expunge':
+        elif getattr(options, 'action', None) == 'expunge':
             cli_expunge(options)
-        elif getattr(options, 'action') == 'revert':
+        elif getattr(options, 'action', None) == 'revert':
             cli_revert(options)
-        elif getattr(options, 'action') == 'hide':
+        elif getattr(options, 'action', None) == 'hide':
             cli_hide(options)
-        elif getattr(options, 'action') == 'unhide':
+        elif getattr(options, 'action', None) == 'unhide':
             cli_unhide(options)
         else:
-            print >> sys.stderr, "ERROR: Action %s is not valid" % getattr(options, 'action')
+            print >> sys.stderr, "ERROR: Action %s is not valid" % getattr(options, 'action', None)
             sys.exit(1)
     except InvenioWebSubmitFileError, e:
         register_exception()
