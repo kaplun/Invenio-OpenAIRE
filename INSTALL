@@ -35,11 +35,12 @@ Contents
               mysql-client python-mysqldb python-4suite python-simplejson \
               python-xml python-libxml2 python-libxslt1 \
               rxp gnuplot xpdf-utils gs-common antiword catdoc \
-              wv html2text ppthtml xlhtml clisp gettext libapache2-mod-wsgi
+              wv html2text ppthtml xlhtml clisp gettext netpbm \
+              libapache2-mod-wsgi
 
         You can also install the following packages:
 
-          $ sudo apt-get install python-psyco sbcl cmucl
+          $ sudo apt-get install openoffice.org python-psyco sbcl cmucl
 
         The last three packages are not available on all Debian
         "Lenny" GNU/Linux architectures (e.g. not on AMD64); you can
@@ -130,6 +131,9 @@ Contents
         files (i.e. to have fulltext indexing) or to stamp submitted
         files, then you need as well to install some of the following
         tools:
+          - for Microsoft Office/OpenOffice.org document conversion:
+                OpenOffice.org
+              <http://www.openoffice.org/>
           - for PDF file stamping: pdftk, pdf2ps
               <http://www.accesspdf.com/pdftk/>
               <http://www.cs.wisc.edu/~ghost/doc/AFPL/>
@@ -138,16 +142,16 @@ Contents
               <http://www.cs.wisc.edu/~ghost/doc/AFPL/>
           - for PostScript files: pstotext or ps2ascii
               <http://www.cs.wisc.edu/~ghost/doc/AFPL/>
-          - for MS Word files: antiword, catdoc, or wvText
-              <http://www.winfield.demon.nl/index.html>
-              <http://www.ice.ru/~vitus/catdoc/index.html>
-              <http://sourceforge.net/projects/wvware>
-          - for MS PowerPoint files: pptHtml and html2text
-              <http://packages.debian.org/stable/utils/ppthtml>
-              <http://userpage.fu-berlin.de/~mbayer/tools/html2text.html>
-          - for MS Excel files: xlhtml and html2text
-              <http://chicago.sourceforge.net/xlhtml/>
-              <http://userpage.fu-berlin.de/~mbayer/tools/html2text.html>
+          - for DjVu creation, elaboration: DjVuLibre
+              <http://djvu.sourceforge.net>
+          - to perform OCR: OCRopus (tested only with release 0.3.1)
+              <http://code.google.com/p/ocropus/>
+          - to perform different image elaborations: ImageMagick
+              <http://www.imagemagick.org/>
+          - to generate PDF after OCR: ReportLab
+              <http://www.reportlab.org/rl_toolkit.html>
+          - to analyze images to generate PDF after OCR: netpbm
+              <http://netpbm.sourceforge.net/>
 
      h) If you have chosen to install fast XML MARC Python processors
         in the step d) above, then you have to install the parsers
@@ -343,6 +347,14 @@ Contents
                  installation on your system.  If you don't set this
                  option, then the first executable that will be found
                  in your PATH will be chosen for running CDS Invenio.
+
+              --with-openoffice-python
+
+                 Optionally, specify the path to the Python interpreter
+                 embedded with OpenOffice.org. This is normally not
+                 contained in the normal path. If you don't specify this
+                 it won't be possible to use OpenOffice.org to convert from and
+                 to Microsoft Office and OpenOffice.org documents.
 
           This configuration step is mandatory.  Usually, you do this
           step only once.
