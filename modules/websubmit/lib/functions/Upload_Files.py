@@ -21,7 +21,6 @@ __revision__ = "$Id$"
 from invenio.config import \
      CFG_PATH_ACROREAD, \
      CFG_PATH_CONVERT, \
-     CFG_PATH_DISTILLER, \
      CFG_PATH_GUNZIP, \
      CFG_PATH_GZIP, \
      CFG_SITE_URL
