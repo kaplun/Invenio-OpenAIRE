@@ -45,7 +45,8 @@ pylib_DATA = __init__.py \
              shellutils.py \
              shellutils_tests.py \
              pluginutils.py \
-             pluginutils_tests.py
+             pluginutils_tests.py \
+             asyncproc.py
 
 noinst_DATA = testimport.py \
               kwalitee.py \
