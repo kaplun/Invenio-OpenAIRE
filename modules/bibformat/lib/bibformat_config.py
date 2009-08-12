@@ -94,7 +94,8 @@ CFG_BIBFORMAT_ERROR_MESSAGES = \
     'ERR_BIBFORMAT_IN_FORMAT_ELEMENT'             :  'Error in format element %s. %s',
     'ERR_BIBFORMAT_NO_RECORD_FOUND_FOR_PATTERN'   :  'No Record Found for %s.',
     'ERR_BIBFORMAT_NBMAX_NOT_INT'                 :  '"nbMax" parameter for %s must be an "int".',
-    'ERR_BIBFORMAT_EVALUATING_ELEMENT_ESCAPE'     :  'Escape mode for format element %s could not be retrieved. Using default mode instead.'
+    'ERR_BIBFORMAT_EVALUATING_ELEMENT_ESCAPE'     :  'Escape mode for format element %s could not be retrieved. Using default mode instead.',
+    'ERR_BIBFORMAT_IN_FORMAT_ELEMENTS'             :  'Error in format elements. %s',
 }
 
 CFG_BIBFORMAT_WARNING_MESSAGES = \
