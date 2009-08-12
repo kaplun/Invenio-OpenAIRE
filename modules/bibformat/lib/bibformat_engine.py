@@ -69,6 +69,7 @@ from invenio.htmlutils import \
      cfg_html_buffer_allowed_attribute_whitelist
 from invenio.webuser import collect_user_info
 from HTMLParser import HTMLParseError
+from invenio.pluginutils import PluginContainer, create_enhanced_plugin_builder
 
 if CFG_PATH_PHP: #Remove when call_old_bibformat is removed
     from xml.dom import minidom
@@ -78,6 +79,7 @@ if CFG_PATH_PHP: #Remove when call_old_bibformat is removed
 format_templates_cache = {}
 format_elements_cache = {}
 format_outputs_cache = {}
+format_elements_container = None
 kb_mappings_cache = {}
 
 html_field = '<!--HTML-->' # String indicating that field should be
@@ -183,6 +185,25 @@ pattern_format_element_seealso = re.compile('''@see:\s*(?P<see>.*)''',
 ##      (?P<val2>.*)
 ##      (?P=sep2)
 ##      ''', re.VERBOSE | re.MULTILINE)
+
+def load_format_elements_container():
+    def format_signature(bfo, *args, **argd):
+        pass
+
+    def escape_values_signature(bfo):
+        pass
+
+    plugin_builder = create_enhanced_plugin_builder(
+        compulsory_objects={
+            'format' : format_signature,
+        },
+        optional_objects={
+            'escape_values' : escape_values_signature,
+        })
+    bibformat_elements = PluginContainer(os.path.join(CFG_BIBFORMAT_ELEMENTS_PATH, 'bfe_*.py'),
+        plugin_builder=plugin_builder)
+    return bibformat_elements
+
 
 def call_old_bibformat(recID, format="HD", on_the_fly=False, verbose=0):
     """
@@ -491,6 +512,7 @@ def eval_format_template_elements(format_template, bfo, verbose=0):
         try:
             format_element = get_format_element(function_name, verbose)
         except Exception, e:
+            format_element = None
             if verbose >= 5:
                 return '<b><span style="color: rgb(255, 0, 0);">' + \
                        cgi.escape(str(e)).replace('\n', '<br/>') + \
@@ -585,7 +607,7 @@ def eval_format_element(format_element, bfo, parameters={}, verbose=0):
         function = format_element['code']
 
         try:
-            output_text = apply(function, (), params)
+            output_text = function(**params)
         except Exception, e:
             name = format_element['attrs']['name']
             error = ("ERR_BIBFORMAT_EVALUATING_ELEMENT", name, str(params))
@@ -950,7 +972,11 @@ def get_format_element(element_name, verbose=0, with_built_in_params=False):
     @return: a dictionary with format element attributes
     """
     # Get from cache whenever possible
-    global format_elements_cache
+    global format_elements_cache, format_elements_container
+
+    if format_elements_container is None:
+        format_elements_container = load_format_elements_container()
+
 
     errors = []
 
@@ -998,45 +1024,17 @@ def get_format_element(element_name, verbose=0, with_built_in_params=False):
         if module_name.endswith(".py"):
             module_name = module_name[:-3]
 
-        # Load element
-        try:
-            module = __import__(CFG_BIBFORMAT_ELEMENTS_IMPORT_PATH + \
-                                "." + module_name)
-            # Load last module in import path
-            # For eg. load bfe_name in
-            # invenio.bibformat_elements.bfe_name
-            # Used to keep flexibility regarding where elements
-            # directory is (for eg. test cases)
-            components = CFG_BIBFORMAT_ELEMENTS_IMPORT_PATH.split(".")
-            for comp in components[1:]:
-                module = getattr(module, comp)
-
-        except Exception, e:
-            # We catch all exceptions here, as we just want to print
-            # traceback in all cases
-            tb = sys.exc_info()[2]
-            stack = traceback.format_exception(Exception, e, tb, limit=None)
-            errors = get_msgs_for_code_list([("ERR_BIBFORMAT_IN_FORMAT_ELEMENT",
-                                              element_name,"\n" + "\n".join(stack[-2:-1]))],
-                                            stream='error', ln=CFG_SITE_LANG)
-            if verbose == 0:
-                register_errors(errors, 'error')
-            elif verbose >= 5:
-                sys.stderr.write(errors[0][1])
-
-        if errors:
-            if verbose >= 7:
-                raise Exception, errors[0][1]
-            return None
-
-        # Load function 'format()' inside element
-        try:
-            function_format  = module.__dict__[module_name].format
+        if module_name in format_elements_container:
+            format_element_tmp = format_elements_container[module_name]
+            function_format = format_element_tmp['format']
             format_element['code'] = function_format
-        except AttributeError, e:
-            errors = get_msgs_for_code_list([("ERR_BIBFORMAT_FORMAT_ELEMENT_FORMAT_FUNCTION",
-                                              element_name)],
-                                            stream='error', ln=CFG_SITE_LANG)
+            function_escape = format_element_tmp.get('escape_values')
+            format_element['escape_function'] = function_escape
+        else:
+            errors = get_msgs_for_code_list([("ERR_BIBFORMAT_IN_FORMAT_ELEMENT",
+                element_name,"\n" +
+                format_elements_container.get_plugin(module_name)['error'])],
+                stream='error', ln=CFG_SITE_LANG)
             if verbose == 0:
                 register_errors(errors, 'error')
             elif verbose >= 5:
@@ -1046,12 +1044,6 @@ def get_format_element(element_name, verbose=0, with_built_in_params=False):
             if verbose >= 7:
                 raise Exception, errors[0][1]
             return None
-
-        # Load function 'escape_values()' inside element
-        function_escape  = getattr(module.__dict__[module_name],
-                                   'escape_values',
-                                   None)
-        format_element['escape_function'] = function_escape
 
         # Prepare, cache and return
         format_element['attrs'] = get_format_element_attrs_from_function( \
