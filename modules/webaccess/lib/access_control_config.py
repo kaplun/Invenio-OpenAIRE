@@ -192,7 +192,8 @@ DEF_ACTIONS = (
                ('viewstatistics', 'view statistics', 'collection', 'yes'),
                ('runbibcirculation', 'run BibCirculation', '', 'no'),
                ('moderatecomments', 'moderate comments', 'collection', 'no'),
-               ('runbatchuploader', 'run batchuploader', 'collection', 'yes')
+               ('runbatchuploader', 'run batchuploader', 'collection', 'yes'),
+               ('runbibtasklet', 'run BibTaskLet', '', 'no')
               )
 
 # Default authorizations
