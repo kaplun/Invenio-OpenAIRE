@@ -17,17 +17,16 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-"""CDS Invenio Bibliographic Task Example.
+"""CDS Invenio Bibliographic Tasklet Example.
 
-Demonstrates BibTask <-> BibSched connectivity, signal handling,
-error handling, etc.
+Demonstrates BibTaskLet <-> BibTask <-> BibSched connectivity
 """
 
 __revision__ = "$Id$"
 
 import sys
 import time
-from invenio.bibtask import task_init, write_message, task_set_option, \
+from invenio.bibtask import write_message, task_set_option, \
         task_get_option, task_update_progress, task_has_option, \
         task_get_task_param, task_sleep_now_if_required
 
@@ -38,29 +37,15 @@ def fib(n):
         out = fib(n-2) + fib(n-1)
     return out
 
-def task_submit_elaborate_specific_parameter(key, value, opts, args):
-    """ Given the string key it checks it's meaning, eventually using the
-    value. Usually it fills some key in the options dict.
-    It must return True if it has elaborated the key, False, if it doesn't
-    know that key.
-    eg:
-    if key in ('-n', '--number'):
-        task_set_option('number', value)
-        return True
-    return False
+def bst_fibonacci(n=30):
     """
-    if key in ('-n', '--number'):
-        task_set_option('number', value)
-        return True
-    return False
-
-def task_run_core():
-    """Runs the task by fetching arguments from the BibSched task queue.  This is
-    what BibSched will be invoking via daemon call.
-    The task prints Fibonacci numbers for up to NUM on the stdout, and some
-    messages on stderr.
-    Return 1 in case of success and 0 in case of failure."""
-    n = int(task_get_option('number'))
+    Small tasklets that prints the the Fibonacci sequence for n.
+    @param n: how many Fibonacci numbers to print.
+    @type n: int
+    """
+    ## Since it's tasklet, the parameter might be passed as a string.
+    ## it should then be converted to an int.
+    n = int(n)
     write_message("Printing %d Fibonacci numbers." % n, verbose=9)
     for i in range(0, n):
         if i > 0 and i % 4 == 0:
@@ -74,17 +59,3 @@ def task_run_core():
     task_update_progress("Done %d out of %d." % (n, n))
     return 1
 
-def main():
-    """Main that construct all the bibtask."""
-    task_init(authorization_action='runbibtaskex',
-            authorization_msg="BibTaskEx Task Submission",
-            help_specific_usage="""  -n,  --number         Print Fibonacci numbers for up to NUM. [default=30]\n""",
-            version=__revision__,
-            specific_params=("n:",
-                ["number="]),
-            task_submit_elaborate_specific_parameter_fnc=task_submit_elaborate_specific_parameter,
-            task_run_fnc=task_run_core)
-
-### okay, here we go:
-if __name__ == '__main__':
-    main()
