@@ -15,8 +15,10 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-bin_SCRIPTS = bibsched bibtaskex bibtasklet
+pylibdir=$(libdir)/python/invenio/bibsched_tasklets
 
-EXTRA_DIST = bibsched.in bibtaskex.in bibtasklet.in
+pylib_DATA = __init__.py bst_fibonacci.py bst_send_email.py
 
-CLEANFILES = *~ *.tmp
+EXTRA_DIST = $(pylib_DATA)
+
+CLEANFILES = *~ *.tmp *.pyc
