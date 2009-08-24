@@ -15,7 +15,7 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = functions
+SUBDIRS = functions file_converters
 
 pylibdir = $(libdir)/python/invenio
 
@@ -32,6 +32,7 @@ pylib_DATA = websubmit_config.py websubmit_engine.py file.py \
              websubmit_file_stamper.py \
              websubmit_icon_creator.py \
              websubmit_file_converter.py \
+             websubmit_file_converter_utils.py \
              unoconv.py \
              bibdocfile.py \
              bibdocfilecli.py \
