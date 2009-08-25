@@ -18,13 +18,18 @@
 pylibdir=$(libdir)/python/invenio/websubmit_file_converters
 
 pylib_DATA = __init__.py \
+             wfc_any2djv.py \
              wfc_djvu2ps.py \
              wfc_djvu2txt.py \
              wfc_gunzip.py \
              wfc_gzip.py \
              wfc_html2text.py \
              wfc_pdf2ocr.py \
+             wfc_pdf2pdfa.py \
+             wfc_pdf2ps.py \
+             wfc_pdf2text.py \
              wfc_pdfopt.py \
+             wfc_ps2pdfa.py \
              wfc_tiff2pdf.py \
              wfc_unoconv.py
 

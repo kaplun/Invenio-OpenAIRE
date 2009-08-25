@@ -3,6 +3,12 @@ from invenio.bibdocfile import normalize_format
 CFG_CONVERTER_DOESNT_NEED_WORKING_DIR="CFG_CONVERTER_DOESNT_NEED_WORKING_DIR"
 CFG_CONVERTER_NEEDS_WORKING_DIR="CFG_CONVERTER_NEEDS_WORKING_DIR"
 
+class InvenioWebSubmitFileConverterError(Exception):
+    """
+    This Exception is raised within the WebSubmit File Converter framework
+    to signal any error.
+    """
+    pass
 
 def create_temporary_file(output_ext):
     """
