@@ -35,7 +35,7 @@ if __name__ != "__main__":
 from invenio.webinterface_layout import invenio_handler
 from invenio.webinterface_handler_wsgi_utils import table, FieldStorage, \
     HTTP_STATUS_MAP, SERVER_RETURN, OK, DONE, \
-    HTTP_NOT_FOUND
+    HTTP_NOT_FOUND, HTTP_INTERNAL_SERVER_ERROR
 from invenio.config import CFG_WEBDIR, CFG_SITE_LANG
 from invenio.errorlib import register_exception
 
@@ -331,6 +331,7 @@ def application(environ, start_response):
         except Exception:
             register_exception(req=req, alert_admin=True)
             req.headers_out['content-type'] = 'text/html'
+            req.status = HTTP_INTERNAL_SERVER_ERROR
             start_response(req.get_wsgi_status(), req.get_low_level_headers(), sys.exc_info())
             return generate_error_page(req)
     finally:
