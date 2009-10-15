@@ -9,7 +9,7 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
@@ -19,7 +19,6 @@ pylibdir = $(libdir)/python/invenio
 
 pylib_DATA = webcomment_config.py \
              webcomment.py \
-             webcomment_tests.py \
              webcomment_templates.py \
              webcomment_webinterface.py \
              webcommentadminlib.py \

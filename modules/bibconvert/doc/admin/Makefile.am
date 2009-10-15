@@ -19,10 +19,10 @@ webdoclibdir = $(libdir)/webdoc/invenio/admin
 
 webdoclib_DATA = bibconvert-admin-guide.webdoc
 
-sampledir=$(localstatedir)/www/admin/bibconvert
-sample_DATA=sample.cfg sample.dat sample.kb bibtex.cfg dcq.cfg dcq.dat dcxml-to-marcxml.cfg \
+staticdir=$(localstatedir)/www/static
+static_DATA=sample.cfg sample.dat sample.kb bibtex.cfg dcq.cfg dcq.dat dcxml-to-marcxml.cfg \
 	    example_oaimarc2xm.xsl example_oaimarc2xm_collID.kb
 
-EXTRA_DIST = $(sample_DATA) $(webdoclib_DATA)
+EXTRA_DIST = $(static_DATA) $(webdoclib_DATA)
 
 CLEANFILES =  *~ *.tmp

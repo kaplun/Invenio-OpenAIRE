@@ -501,7 +501,7 @@ class Template:
                 }
             -->
         </style>
-        <script src="%(siteurl)s/admin/bibformat/js_quicktags.js" type="text/javascript"></script>
+        <script src="%(siteurl)s/static/js_quicktags.js" type="text/javascript"></script>
         <script type="text/javascript">
 
         /* Ask user confirmation before leaving page */
@@ -761,7 +761,7 @@ class Template:
         <head>
         <title>BibFormat Short Documentation of Format Elements</title>
         <link rel="stylesheet" href="%(siteurl)s/img/cds.css">
-        <script src="%(siteurl)s/admin/bibformat/js_quicktags.js" type="text/javascript"></script>
+        <script src="%(siteurl)s/static/js_quicktags.js" type="text/javascript"></script>
         <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
         </head>
         <body>

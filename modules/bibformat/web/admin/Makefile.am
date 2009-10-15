@@ -9,16 +9,18 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
 webappdir = $(localstatedir)/www/admin/bibformat
+webapp_DATA = bibformatadmin.py
 
-webapp_DATA = bibformatadmin.py js_quicktags.js
+staticdir = $(localstatedir)/www/static
+static_DATA = js_quicktags.js
 
-EXTRA_DIST =  $(webapp_DATA)
+EXTRA_DIST =  $(webapp_DATA) $(static_DATA)
 
 CLEANFILES = *~ *.tmp

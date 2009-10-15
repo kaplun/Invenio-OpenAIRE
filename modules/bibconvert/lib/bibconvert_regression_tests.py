@@ -40,15 +40,15 @@ class BibConvertWebPagesAvailabilityTest(unittest.TestCase):
 
     def test_availability_bibconvert_admin_guide_parts(self):
         """bibconvert - availability of BibConvert Admin Guide parts"""
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/bibtex.cfg')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/dcq.cfg')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/dcq.dat')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/dcxml-to-marcxml.cfg')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/example_oaimarc2xm.xsl')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/example_oaimarc2xm_collID.kb')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/sample.cfg')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/sample.dat')
-        test_web_page_existence(CFG_SITE_URL + '/admin/bibconvert/sample.kb')
+        test_web_page_existence(CFG_SITE_URL + '/static/bibtex.cfg')
+        test_web_page_existence(CFG_SITE_URL + '/static/dcq.cfg')
+        test_web_page_existence(CFG_SITE_URL + '/static/dcq.dat')
+        test_web_page_existence(CFG_SITE_URL + '/static/dcxml-to-marcxml.cfg')
+        test_web_page_existence(CFG_SITE_URL + '/static/example_oaimarc2xm.xsl')
+        test_web_page_existence(CFG_SITE_URL + '/static/example_oaimarc2xm_collID.kb')
+        test_web_page_existence(CFG_SITE_URL + '/static/sample.cfg')
+        test_web_page_existence(CFG_SITE_URL + '/static/sample.dat')
+        test_web_page_existence(CFG_SITE_URL + '/static/sample.kb')
 
     def test_availability_bibconvert_hacking_pages(self):
         """bibconvert - availability of BibConvert Hacking Guide pages"""
