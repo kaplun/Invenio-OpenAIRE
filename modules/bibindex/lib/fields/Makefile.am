@@ -9,19 +9,15 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = fields
+pylibdir=$(libdir)/python/invenio/bibindex_fields
 
-pylibdir = $(libdir)/python/invenio
-pylib_DATA = bibindex_engine.py bibindex_engine_config.py bibindex_engine_tests.py \
-             bibindexadminlib.py bibindex_engine_stemmer.py bibindex_engine_stopwords.py \
-             bibindex_engine_stemmer_tests.py \
-             bibindexadmin_regression_tests.py
+pylib_DATA = dlf_apply_format_string.py dlf_comment.py dlf_skip_for_sorting.py
 
 EXTRA_DIST = $(pylib_DATA)
 

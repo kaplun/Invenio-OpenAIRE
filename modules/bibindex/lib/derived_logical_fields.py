@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+## BibIndxes bibliographic data, reference and fulltext indexing utility.
+##
 ## This file is part of CDS Invenio.
 ## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
 ##
@@ -9,20 +12,13 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = fields
+"""
+Derived logical fields framework
+"""
 
-pylibdir = $(libdir)/python/invenio
-pylib_DATA = bibindex_engine.py bibindex_engine_config.py bibindex_engine_tests.py \
-             bibindexadminlib.py bibindex_engine_stemmer.py bibindex_engine_stopwords.py \
-             bibindex_engine_stemmer_tests.py \
-             bibindexadmin_regression_tests.py
-
-EXTRA_DIST = $(pylib_DATA)
-
-CLEANFILES = *~ *.tmp *.pyc

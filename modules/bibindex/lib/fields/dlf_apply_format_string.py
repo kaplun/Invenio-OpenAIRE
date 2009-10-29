@@ -1,3 +1,4 @@
+##
 ## This file is part of CDS Invenio.
 ## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
 ##
@@ -9,20 +10,30 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = fields
+"""
+Derived logical fields to put toghether some subfields into a given string
+using a format string.
+"""
 
-pylibdir = $(libdir)/python/invenio
-pylib_DATA = bibindex_engine.py bibindex_engine_config.py bibindex_engine_tests.py \
-             bibindexadminlib.py bibindex_engine_stemmer.py bibindex_engine_stopwords.py \
-             bibindex_engine_stemmer_tests.py \
-             bibindexadmin_regression_tests.py
+from invenio.bibrecord import record_get_field_instances, field_get_subfield_values
 
-EXTRA_DIST = $(pylib_DATA)
+def get_values(recid, record, format_string, tag, subfields):
+    instances = record_get_field_instances(record, tag[:4], tag[4:5] or ' ', tag[5:6] or ' ')
+    ret = []
+    for instance in instances:
+        mapping = {}
+        for code in subfields:
+            values = field_get_subfield_values(instance, code)
+            if values:
+                mapping[code] = values[0]
+            else:
+                mapping[code] = ''
+        ret.append(format_string % mapping)
+    return ret
 
-CLEANFILES = *~ *.tmp *.pyc
