@@ -67,21 +67,22 @@ def acc_save_xml_config(stream):
 def _acc_save_roles(rolesNode, document):
     roles = acc_get_all_roles()
     for (role_id, role_name, role_description,
-         firerole_def_ser, firerole_def_src) in roles:
-         role = document.createElement('role')
-         role.setAttribute('name', role_name)
-         if role_description:
+        firerole_def_ser, firerole_def_src) in roles:
+        role = document.createElement('role')
+        role.setAttribute('name', role_name)
+        if role_description:
             description = document.createElement('description')
             description_text = document.createTextNode(role_description)
             description.appendChild(description_text)
             role.appendChild(description)
-         definition = document.createElement('definition')
-         definition_text = document.createTextNode(firerole_def_src)
-         definition.appendChild(definition_text)
-         role.appendChild(definition)
-         query = "SELECT id_user FROM user_accROLE WHERE id_accROLE=%i"
-         uids = run_sql(query % role_id)
-         if len(uids):
+        if firerole_def_src:
+            definition = document.createElement('definition')
+            definition_text = document.createTextNode(firerole_def_src)
+            definition.appendChild(definition_text)
+            role.appendChild(definition)
+        query = "SELECT id_user FROM user_accROLE WHERE id_accROLE=%i"
+        uids = run_sql(query % role_id)
+        if len(uids):
             users = document.createElement('users')
             for uid in uids:
                 email = get_email(uid[0])
@@ -90,7 +91,7 @@ def _acc_save_roles(rolesNode, document):
                 user.setAttribute('email', email)
                 users.appendChild(user)
             role.appendChild(users)
-         role = rolesNode.appendChild(role)
+        role = rolesNode.appendChild(role)
 
 def _acc_save_actions(actionsNode, document):
      actions = acc_get_all_actions()
