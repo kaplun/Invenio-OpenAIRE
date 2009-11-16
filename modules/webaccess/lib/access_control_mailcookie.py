@@ -42,11 +42,11 @@ from cPickle import dumps, loads
 class InvenioWebAccessMailCookieError(Exception):
     pass
 
-class InvenioWebAccessMailCookieDeletedError(Exception):
+class InvenioWebAccessMailCookieDeletedError(InvenioWebAccessMailCookieError):
     pass
 
 
-_authorizations_kind = ('pw_reset', 'mail_activation', 'role', 'authorize_action')
+_authorizations_kind = ('pw_reset', 'mail_activation', 'role', 'authorize_action', 'generic')
 _datetime_format = "%Y-%m-%d %H:%M:%S"
 
 def mail_cookie_create_generic(kind, params, cookie_timeout=timedelta(days=1), onetime=False):
