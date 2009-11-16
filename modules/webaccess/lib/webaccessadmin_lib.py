@@ -3657,7 +3657,7 @@ def main():
                     the_file = sys.stdin
                 else:
                     the_file = open(options['load'])
-                acc_load_xml_config(the_file, verbose=True)
+                acc_load_xml_config(the_file, verbose=True, dump_old_config=False)
                 print >> sys.stderr, "WebAccess configuration loaded."
             if options['reset'] and options['demo']:
                 acca.acc_reset_default_settings([CFG_SITE_ADMIN_EMAIL], DEF_DEMO_USER_ROLES, DEF_DEMO_ROLES, DEF_DEMO_AUTHS)
