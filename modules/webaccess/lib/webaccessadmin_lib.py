@@ -2639,9 +2639,12 @@ def perform_addauthorization(req, id_role="0", id_action="0", optional=0, revers
                 output += '<span class="adminlabel" style="margin-left: 30px;">%s </span>\n <input class="admin_wvar" type="text" name="%s"' % (key, key)
                 try:
                     val = keywords[key] # = cleanstring_argumentvalue(keywords[key])
-                    if val: output += 'value="%s" ' % (escape(val, True), )
-                    else: allkeys = 0
-                except KeyError: allkeys = 0
+                    if val:
+                        output += 'value="%s" ' % (escape(val, True), )
+                    else:
+                        output += 'value="*" '
+                except KeyError:
+                    allkeys = 0
                 output += ' /> <br />\n'
             output = output[:-5] + ' <input class="adminbutton" type="submit" value="create authorization -->" />\n'
             output += '</form>\n'
