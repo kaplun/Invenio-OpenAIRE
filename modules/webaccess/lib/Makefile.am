@@ -30,7 +30,8 @@ pylib_DATA = access_control_engine.py \
              external_authentication_cern_wrapper.py \
              external_authentication_cern_tests.py \
              external_authentication_sso.py \
-             webaccess_regression_tests.py
+             webaccess_regression_tests.py \
+             webaccess_exporter.py
 
 noinst_DATA = collection_restrictions_migration_kit.py
 

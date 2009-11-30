@@ -28,6 +28,9 @@ import re
 import random
 import getopt
 import sys
+import time
+import tempfile
+import os
 
 from invenio.config import \
     CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS, \
@@ -43,7 +46,8 @@ from invenio.config import \
     CFG_SITE_SUPPORT_EMAIL, \
     CFG_SITE_ADMIN_EMAIL, \
     CFG_SITE_SECURE_URL, \
-    CFG_SITE_URL
+    CFG_SITE_URL, \
+    CFG_TMPDIR
 import invenio.access_control_engine as acce
 import invenio.access_control_admin as acca
 from invenio.mailutils import send_email
@@ -3578,7 +3582,9 @@ Option to administrate authorizations:
   -a, --add\t\tadd default authorization settings
   -c, --compile\t\tcompile firewall like role definitions (FireRole)
   -r, --reset\t\treset to default settings
-  -D, --demo\t\tto be used with -a or -r in order to consider demo site authorizationss
+  -D, --demo\t\tto be used with -a or -r in order to consider demo site authorizations
+  -l, --load\t\tto load the whole configuration from a file (- for standard input)
+  -s, --save\t\tto save the whole configuration to a file (- for standard output)
 """ % sys.argv[0]
     sys.exit(exitcode)
 
@@ -3589,11 +3595,12 @@ def main():
 
     ## parse command line:
     # set user-defined options:
-    options = {'user' : '', 'reset' : 0, 'compile' : 0, 'add' : 0, 'demo' : 0}
+    options = {'user' : '', 'reset' : 0, 'compile' : 0, 'add' : 0, 'demo' : 0, 'load': '', 'save' : ''}
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hVu:racD",
+        opts, args = getopt.getopt(sys.argv[1:], "hVu:racDl:s:",
                                     ["help", "version", "user=",
-                                    "reset", "add", "compile", "demo"])
+                                    "reset", "add", "compile", "demo",
+                                    "load=", "save="])
     except getopt.GetoptError, err:
         usage(1, err)
     try:
@@ -3613,14 +3620,45 @@ def main():
                 options["compile"] = 1
             elif opt[0] in ("-D", "--demo"):
                 options["demo"] = 1
+            elif opt[0] in ("-l", "--load"):
+                if opt[1]:
+                    options["load"] = opt[1]
+                else:
+                    options["load"] = '-'
+            elif opt[0] in ("-s", "--save"):
+                if opt[1]:
+                    options["save"] = opt[1]
+                else:
+                    options["save"] = '-'
             else:
                 usage(1)
-        if options['add'] or options['reset'] or options['compile']:
+        if options['add'] or options['reset'] or options['compile'] or options["save"] or options["load"]:
             if acca.acc_get_action_id('cfgwebaccess'):
                 # Action exists hence authentication works :-)
                 options['user'] = authenticate(options['user'],
                     authorization_msg="WebAccess Administration",
                     authorization_action="cfgwebaccess")
+            if options['save']:
+                from invenio.webaccess_exporter import acc_save_xml_config
+                if options['save'] == '-':
+                    the_file = sys.stdout
+                else:
+                    the_file = open(options['save'], 'w')
+                acc_save_xml_config(the_file)
+                print >> sys.stderr, "WebAccess configuration saved."
+            if options['load']:
+                from invenio.webaccess_exporter import acc_load_xml_config, acc_save_xml_config
+                if not options['save']:
+                    backup_fd, backup_name = tempfile.mkstemp(prefix="webaccess_backup_%s" % time.strftime("%Y%m%d_%H%M%S_"), suffix='.xml', dir=CFG_TMPDIR)
+                    backup = os.fdopen(backup_fd, 'w')
+                    acc_save_xml_config(backup)
+                    print >> sys.stderr, "A backup of the configuration can be found in: %s." % backup_name
+                if options['load'] == '-':
+                    the_file = sys.stdin
+                else:
+                    the_file = open(options['load'])
+                acc_load_xml_config(the_file, verbose=True, dump_old_config=False)
+                print >> sys.stderr, "WebAccess configuration loaded."
             if options['reset'] and options['demo']:
                 acca.acc_reset_default_settings([CFG_SITE_ADMIN_EMAIL], DEF_DEMO_USER_ROLES, DEF_DEMO_ROLES, DEF_DEMO_AUTHS)
                 print "Reset default demo site settings."
