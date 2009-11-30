@@ -434,7 +434,7 @@ AC_SUBST(GIFRSIZE)
 ## Define output files:
 AC_CONFIG_FILES([config.nice  \
 	  Makefile \
-          po/Makefile.in \
+	  po/Makefile.in \
 	  config/Makefile \
 	  config/invenio-autotools.conf \
 	  modules/Makefile \
@@ -567,10 +567,12 @@ AC_CONFIG_FILES([config.nice  \
 	  modules/bibsched/bin/Makefile \
 	  modules/bibsched/bin/bibsched \
 	  modules/bibsched/bin/bibtaskex \
+	  modules/bibsched/bin/bibtasklet \
 	  modules/bibsched/doc/Makefile \
 	  modules/bibsched/doc/admin/Makefile \
 	  modules/bibsched/doc/hacking/Makefile \
 	  modules/bibsched/lib/Makefile \
+	  modules/bibsched/lib/tasklets/Makefile \
 	  modules/bibupload/Makefile \
 	  modules/bibupload/bin/Makefile \
 	  modules/bibupload/bin/bibupload \

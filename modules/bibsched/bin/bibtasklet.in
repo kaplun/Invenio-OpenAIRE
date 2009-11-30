@@ -1,3 +1,6 @@
+#!@PYTHON@
+## -*- mode: python; coding: utf-8; -*-
+##
 ## This file is part of CDS Invenio.
 ## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
 ##
@@ -15,8 +18,19 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-bin_SCRIPTS = bibsched bibtaskex bibtasklet
+"""CDS Invenio Bibliographic Tasklet BibTask.
 
-EXTRA_DIST = bibsched.in bibtaskex.in bibtasklet.in
+This is a particular BibTask that execute tasklets, which can be any
+function dropped into /opt/cds-invenio/lib/python/invenio/bibsched_tasklets/.
+"""
 
-CLEANFILES = *~ *.tmp
+__revision__ = "$Id$"
+
+try:
+    from invenio.bibtasklet import main
+except ImportError, e:
+    print "Error: %s" % e
+    import sys
+    sys.exit(1)
+
+main()

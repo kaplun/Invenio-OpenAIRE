@@ -186,6 +186,7 @@ DEF_ACTIONS = (
                ('viewholdings', 'view holdings', 'collection', 'yes'),
                ('viewstatistics', 'view statistics', 'collection', 'yes'),
                ('runbibcirculation', 'run BibCirculation', '', 'no'),
+               ('runbibtasklet', 'run BibTaskLet', '', 'no')
               )
 
 # Default authorizations
