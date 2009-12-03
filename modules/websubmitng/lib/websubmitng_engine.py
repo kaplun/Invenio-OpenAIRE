@@ -20,9 +20,11 @@
 WebSubmit NG Engine module.
 """
 
-from invenio.textutils import encode_for_xml
+from cgi import escape
 import os
 
+from invenio.textutils import encode_for_xml
+from invenio.webpage import page
 from invenio.config import CFG_ETCDIR
 
 if sys.hexversion < 0x2060000:
@@ -105,3 +107,53 @@ class WebSubmitSession(dict):
         out = """<?xml version="1.0"?>
 <!DOCTYPE map SYSTEM "%s">
 """ % (os.path.join(CFG_ETCDIR, "websubmitng", "session.dtd"))
+
+class WebSubmitInterface(list):
+    def __init__(self, user_info, session, title=None, description=None):
+        self.user_info = user_info
+        self.session = session
+
+    def get_full_page(self, req):
+        return page(req=req, title=self.title, description=self.description)
+
+    def get_html(self):
+        out = '<table class="websubmitng_form"><tbody>\n'
+        for element in self:
+            out += '  <tr>\n'
+            if element.expects_default_label_usage():
+                out += '    <td class="websubmitng_label">\n'
+                element_name = element.get_name()
+                label = element.get_label()
+                out += '      <label for="%s">%s</label>\n' % (escape(element_name, True), label)
+                out += '    </td>\n'
+                out += '    <td class="websubmitng_element">\n'
+                out += element.get_html()
+                out += '    </td>\n'
+            else:
+                out += '    <td class="websubmitng_element" colspan="2">\n'
+                out += element.get_html()
+                out += '    </td>\n'
+            out += '  <tr>\n'
+        out += '</tbody></table>\n'
+        return out
+
+    def get_js(self):
+        out = ""
+        classes = []
+        for element in self:
+            element_class = type(element)
+            if element_class not in classes:
+                out += element.get_js()
+                classes.append(element_class)
+        return out
+
+    def get_css(self):
+        out = ""
+        classes = []
+        for element in self:
+            element_class = type(element)
+            if element_class not in classes:
+                out += element.get_css()
+                classes.append(element_class)
+        return out
+
