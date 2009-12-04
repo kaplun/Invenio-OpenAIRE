@@ -135,7 +135,7 @@ class SimulatedModPythonRequest(object):
             except IOError, err:
                 if "failed to write data" in str(err) or "client connection closed" in str(err):
                     ## Let's just log this expection without alerting the admin:
-                    register_exception(req=req)
+                    register_exception(req=self)
                 else:
                     raise
             self.__buffer = ''
