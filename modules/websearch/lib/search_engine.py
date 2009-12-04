@@ -2884,7 +2884,7 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
 
     # get user_info (for formatting based on user)
     if isinstance(req, cStringIO.OutputType):
-        user_info = {}
+        user_info = collect_user_info(None)
     else:
         user_info = collect_user_info(req)
 
@@ -3772,6 +3772,16 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                (e.g. "SPIRES HEP").
     """
 
+    if req is None:
+        req = cStringIO.StringIO()
+        uid = 0
+        user_info = collect_user_info(None)
+        have_req = False
+    else:
+        uid = getUid(req)
+        user_info = collect_user_info(req)
+        have_req = True
+
     selected_external_collections_infos = None
 
     # wash output format:
@@ -3791,19 +3801,30 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
     except InvenioWebSearchUnknownCollectionError, exc:
         colname = exc.colname
         if of.startswith("h"):
-            page_start(req, of, cc, aas, ln, getUid(req),
-                       websearch_templates.tmpl_collection_not_found_page_title(colname, ln))
-            req.write(websearch_templates.tmpl_collection_not_found_page_body(colname, ln))
-            return page_end(req, of, ln)
+                page_start(req, of, cc, aas, ln, uid,
+                        websearch_templates.tmpl_collection_not_found_page_title(colname, ln))
+                req.write(websearch_templates.tmpl_collection_not_found_page_body(colname, ln))
+                page_end(req, of, ln)
+                if have_req:
+                    return ''
+                else:
+                    req.getvalue()
         elif of == "id":
             return []
         elif of.startswith("x"):
             # Print empty, but valid XML
             print_records_prologue(req, of)
             print_records_epilogue(req, of)
-            return page_end(req, of, ln)
+            if have_req:
+                return ''
+            else:
+                req.getvalue()
         else:
-            return page_end(req, of, ln)
+            out = page_end(req, of, ln)
+            if isinstance(out, str) and not have_req:
+                return req.getvalue() + out
+            else:
+                return out
 
     p = wash_pattern(p)
     f = wash_field(f)
@@ -3830,8 +3851,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
         recidb = idb
     # TODO deduce passed search limiting criterias (if applicable)
     pl, pl_in_url = "", "" # no limits by default
-    if action != "browse" and req and not isinstance(req, cStringIO.OutputType) \
-           and req.args: # we do not want to add options while browsing or while calling via command-line
+    if action != "browse" and have_req and req.args:
         fieldargs = cgi.parse_qs(req.args)
         for fieldcode in get_fieldcodes():
             if fieldargs.has_key(fieldcode):
@@ -3846,21 +3866,16 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
     # deduce collection we are in (if applicable):
     if recid > 0:
         referer = None
-        if req:
+        if have_req:
             referer = req.headers_in.get('Referer')
         cc = guess_collection_of_a_record(recid, referer)
-    # deduce user id (if applicable):
-    try:
-        uid = getUid(req)
-    except:
-        uid = 0
     ## 0 - start output
     if recid >= 0: # recid can be 0 if deduced from sysno and if such sysno does not exist
         ## 1 - detailed record display
         title, description, keywords = \
                websearch_templates.tmpl_record_page_header_content(req, recid, ln)
 
-        if req is not None and not req.header_only:
+        if not (have_req and req.header_only):
             page_start(req, of, cc, aas, ln, uid, title, description, keywords, recid, tab)
         # Default format is hb but we are in detailed -> change 'of'
         if of == "hb":
@@ -3872,7 +3887,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 return [recidx for recidx in range(recid, recidb) if record_exists(recidx)]
             else:
                 print_records(req, range(recid, recidb), -1, -9999, of, ot, ln, search_pattern=p, verbose=verbose, tab=tab)
-            if req and of.startswith("h"): # register detailed record page view event
+            if have_req and of.startswith("h"): # register detailed record page view event
                 client_ip_address = str(req.remote_ip)
                 register_page_view_event(recid, uid, client_ip_address)
         else: # record does not exist
@@ -3883,10 +3898,12 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 print_records_prologue(req, of)
                 print_records_epilogue(req, of)
             elif of.startswith("h"):
-                if req.header_only:
+                if have_req and req.header_only:
                     raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
                 else:
                     print_warning(req, _("Requested record does not seem to exist."))
+                    if have_req:
+                        req.status = apache.HTTP_NOT_FOUND
 
     elif action == "browse":
         ## 2 - browse needed
@@ -3902,18 +3919,25 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
             else:
                 browse_pattern(req, colls_to_search, p, f, rg, ln)
         except:
-            register_exception(req=req, alert_admin=True)
+            if have_req:
+                register_exception(req=req, alert_admin=True)
+            else:
+                register_exception(alert_admin=True)
             if of.startswith("h"):
                 req.write(create_error_box(req, verbose=verbose, ln=ln))
             elif of.startswith("x"):
                 # Print empty, but valid XML
                 print_records_prologue(req, of)
                 print_records_epilogue(req, of)
-            return page_end(req, of, ln)
+            out = page_end(req, of, ln)
+            if isinstance(out, str) and not have_req:
+                return req.getvalue() + out
+            else:
+                return out
 
     elif rm and p.startswith("recid:"):
         ## 3-ter - similarity search or citation search needed
-        if not req.header_only:
+        if not (have_req and req.header_only):
             page_start(req, of, cc, aas, ln, uid, _("Search Results"), p=create_page_title_search_pattern_info(p, p1, p2, p3))
         if of.startswith("h"):
             req.write(create_search_box(cc, colls_to_display, p, f, rg, sf, so, sp, rm, of, ot, aas, ln, p1, f1, m1, op1,
@@ -3921,10 +3945,12 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
         if record_exists(p[6:]) != 1:
             # record does not exist
             if of.startswith("h"):
-                if req.header_only:
+                if have_req and req.header_only:
                     raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
                 else:
-                    print_warning(req, "Requested record does not seem to exist.")
+                    print_warning(req, _("Requested record does not seem to exist."))
+                    if have_req:
+                        req.status = apache.HTTP_NOT_FOUND
             if of == "id":
                 return []
             elif of.startswith("x"):
@@ -4031,7 +4057,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                         # Print empty, but valid XML
                         print_records_prologue(req, of)
                         print_records_epilogue(req, of)
-                    return page_end(req, of, ln)
+                    out = page_end(req, of, ln)
+                    if isinstance(out, str) and not have_req:
+                        return req.getvalue() + out
+                    else:
+                        return out
                 if p2:
                     results_tmp = search_pattern_parenthesised(req, p2, f2, m2, ap=ap, of=of, verbose=verbose, ln=ln)
                     if op1 == "a": # add
@@ -4050,7 +4080,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                             # Print empty, but valid XML
                             print_records_prologue(req, of)
                             print_records_epilogue(req, of)
-                        return page_end(req, of, ln)
+                        out = page_end(req, of, ln)
+                        if isinstance(out, str) and not have_req:
+                            return req.getvalue() + out
+                        else:
+                            return out
                 if p3:
                     results_tmp = search_pattern_parenthesised(req, p3, f3, m3, ap=ap, of=of, verbose=verbose, ln=ln)
                     if op2 == "a": # add
@@ -4063,7 +4097,10 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                         if of.startswith("h"):
                             print_warning(req, "Invalid set operation %s." % cgi.escape(op2), "Error")
             except:
-                register_exception(req=req, alert_admin=True)
+                if have_req:
+                    register_exception(req=req, alert_admin=True)
+                else:
+                    register_exception(alert_admin=True)
                 if of.startswith("h"):
                     req.write(create_error_box(req, verbose=verbose, ln=ln))
                     perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
@@ -4072,7 +4109,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                     print_records_prologue(req, of)
                     print_records_epilogue(req, of)
 
-                return page_end(req, of, ln)
+                out = page_end(req, of, ln)
+                if isinstance(out, str) and not have_req:
+                    return req.getvalue() + out
+                else:
+                    return out
         else:
             ## 3B - simple search
             if search_results_cache.cache.has_key(query_representation_in_cache):
@@ -4085,11 +4126,18 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 try:
                     results_in_any_collection = search_pattern_parenthesised(req, p, f, ap=ap, of=of, verbose=verbose, ln=ln)
                 except:
-                    register_exception(req=req, alert_admin=True)
+                    if have_req:
+                        register_exception(req=req, alert_admin=True)
+                    else:
+                        register_exception(alert_admin=True)
                     if of.startswith("h"):
                         req.write(create_error_box(req, verbose=verbose, ln=ln))
                         perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
-                    return page_end(req, of, ln)
+                    out = page_end(req, of, ln)
+                    if isinstance(out, str) and not have_req:
+                        return req.getvalue() + out
+                    else:
+                        return out
 
         if len(results_in_any_collection) == 0:
             if of.startswith("h"):
@@ -4098,7 +4146,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 # Print empty, but valid XML
                 print_records_prologue(req, of)
                 print_records_epilogue(req, of)
-            return page_end(req, of, ln)
+            out = page_end(req, of, ln)
+            if isinstance(out, str) and not have_req:
+                return req.getvalue() + out
+            else:
+                return out
 
         # store this search query results into search results cache if needed:
         if CFG_WEBSEARCH_SEARCH_CACHE_SIZE and not query_in_cache:
@@ -4112,11 +4164,18 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
         try:
             results_final = intersect_results_with_collrecs(req, results_in_any_collection, colls_to_search, ap, of, verbose, ln)
         except:
-            register_exception(req=req, alert_admin=True)
+            if have_req:
+                register_exception(req=req, alert_admin=True)
+            else:
+                register_exception(alert_admin=True)
             if of.startswith("h"):
                 req.write(create_error_box(req, verbose=verbose, ln=ln))
                 perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
-            return page_end(req, of, ln)
+            out = page_end(req, of, ln)
+            if isinstance(out, str) and not have_req:
+                return req.getvalue() + out
+            else:
+                return out
 
         if results_final == {}:
             if of.startswith("h"):
@@ -4125,7 +4184,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 # Print empty, but valid XML
                 print_records_prologue(req, of)
                 print_records_epilogue(req, of)
-            return page_end(req, of, ln)
+            out = page_end(req, of, ln)
+            if isinstance(out, str) and not have_req:
+                return req.getvalue() + out
+            else:
+                return out
 
         # search stage 5: apply search option limits and restrictions:
         if datetext1 != "":
@@ -4140,17 +4203,26 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                                                                         "discarding this condition..."),
                                                               of=of)
             except:
-                register_exception(req=req, alert_admin=True)
+                if have_req:
+                    register_exception(req=req, alert_admin=True)
+                else:
+                    register_exception(alert_admin=True)
                 if of.startswith("h"):
                     req.write(create_error_box(req, verbose=verbose, ln=ln))
                     perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
-                return page_end(req, of, ln)
+                out = page_end(req, of, ln)
+                if isinstance(out, str) and not have_req:
+                    return req.getvalue() + out
+                else:
+                    return out
             if results_final == {}:
                 if of.startswith("h"):
                     perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
-                return page_end(req, of, ln)
-
-
+                out = page_end(req, of, ln)
+                if isinstance(out, str) and not have_req:
+                    return req.getvalue() + out
+                else:
+                    return out
 
         if pl:
             pl = wash_pattern(pl)
@@ -4165,11 +4237,18 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                                                                        "discarding this condition..."),
                                                               of=of)
             except:
-                register_exception(req=req, alert_admin=True)
+                if have_req:
+                    register_exception(req=req, alert_admin=True)
+                else:
+                    register_exception(alert_admin=True)
                 if of.startswith("h"):
                     req.write(create_error_box(req, verbose=verbose, ln=ln))
                     perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
-                return page_end(req, of, ln)
+                out = page_end(req, of, ln)
+                if isinstance(out, str) and not have_req:
+                    return req.getvalue() + out
+                else:
+                    return out
             if results_final == {}:
                 if of.startswith("h"):
                     perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
@@ -4177,7 +4256,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                     # Print empty, but valid XML
                     print_records_prologue(req, of)
                     print_records_epilogue(req, of)
-                return page_end(req, of, ln)
+                out = page_end(req, of, ln)
+                if isinstance(out, str) and not have_req:
+                    return req.getvalue() + out
+                else:
+                    return out
 
         t2 = os.times()[4]
         cpu_time = t2 - t1
@@ -4292,15 +4375,13 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
                 if f == "author" and of.startswith("h"):
                     req.write(create_similarly_named_authors_link_box(p, ln))
             # log query:
-            try:
+            if have_req:
+                # do not log query if req is None (used by CLI interface)
                 id_query = log_query(req.remote_host, req.args, uid)
                 if of.startswith("h") and id_query:
                     if not of in ['hcs']:
                         # display alert/RSS teaser for non-summary formats:
                         req.write(websearch_templates.tmpl_alert_rss_teaser_box_for_query(id_query, ln=ln))
-            except:
-                # do not log query if req is None (used by CLI interface)
-                pass
             log_query_info("ss", p, f, colls_to_search, results_final_nb_total)
 
     # External searches
@@ -4308,7 +4389,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=10
         if not of in ['hcs']:
             perform_external_collection_search(req, cc, [p, p1, p2, p3], f, ec, verbose, ln, selected_external_collections_infos)
 
-    return page_end(req, of, ln)
+    out = page_end(req, of, ln)
+    if isinstance(out, str) and not have_req:
+        return req.getvalue() + out
+    else:
+        return out
 
 def perform_request_cache(req, action="show"):
     """Manipulates the search engine cache."""
