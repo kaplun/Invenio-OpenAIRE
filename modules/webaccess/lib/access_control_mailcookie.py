@@ -38,6 +38,7 @@ from datetime import datetime, timedelta
 from random import random
 from cPickle import dumps, loads
 
+_datetime_format = "%Y-%m-%d %H:%M:%S"
 
 class InvenioWebAccessMailCookieError(Exception):
     pass
@@ -45,26 +46,107 @@ class InvenioWebAccessMailCookieError(Exception):
 class InvenioWebAccessMailCookieDeletedError(InvenioWebAccessMailCookieError):
     pass
 
-
-_authorizations_kind = ('pw_reset', 'mail_activation', 'role', 'authorize_action', 'generic')
-_datetime_format = "%Y-%m-%d %H:%M:%S"
-
-def mail_cookie_create_generic(kind, params, cookie_timeout=timedelta(days=1), onetime=False):
-    """Create a unique url to be sent via email to access this authorization
-    @param kind: kind of authorization (e.g. 'pw_reset', 'mail_activation', 'role')
-    @param params: whatever parameters are needed
-    @param cookie_timeout: for how long the url will be valid
-    @param onetime: whetever to remove the cookie after it has used.
+class CookieHandler(object):
     """
-    assert(kind in _authorizations_kind)
-    expiration = datetime.today()+cookie_timeout
-    data = (kind, params, expiration, onetime)
-    password = md5(str(random())).hexdigest()
-    cookie_id = run_sql('INSERT INTO accMAILCOOKIE (data,expiration,kind,onetime) VALUES '
+    Cookie Handler.
+
+    This class implement a cookie handler. A cookie is a hexadecimal string
+    that will be mapped to some given data, and used later on to retrieve
+    that same data.
+
+    @param kind:
+    """
+    def __init__(self, kind, timeout=timedelta(days=1), onetime=False):
+        self.__kind = kind
+        self.__timeout = timeout
+        self.__onetime = onetime
+
+    def create_cookie(self, params):
+        """
+        Create a cookie which will store the C{params}.
+
+        @param params: some picklable data.
+        @return: a hexadecimal string useful to later retrieve the data.
+        @rtype: hexadecimal string.
+        """
+        expiration = datetime.today()+self.__timeout
+        data = (self.__kind, params, expiration, self.__onetime)
+        password = md5(str(random())).hexdigest()
+        cookie_id = run_sql('INSERT INTO accMAILCOOKIE (data,expiration,kind,onetime) VALUES '
         '(AES_ENCRYPT(%s, %s),%s,%s,%s)',
-        (dumps(data), password, expiration.strftime(_datetime_format), kind, onetime))
-    cookie = password[:16]+hex(cookie_id)[2:-1]+password[-16:]
-    return cookie
+        (dumps(data), password, expiration.strftime(_datetime_format), self.__kind, self.__onetime))
+        cookie = password[:16]+hex(cookie_id)[2:-1]+password[-16:]
+        return cookie
+
+    def retrieve_cookie(self, cookie, delete=False):
+        """
+        Checks for existense of the given cookie and returns its content.
+
+        @param cookie: hexadecimal string as returned by L{create_cookie}.
+        @type cookie: hexadecimal string
+        @param delete: if the cookie should be deleted once retrieven.
+        @type delete: boolean
+        @return: the C{params} data as provided to L{create_cookie}.
+        """
+        try:
+            password = cookie[:16]+cookie[-16:]
+            cookie_id = int(cookie[16:-16], 16)
+        except Exception, e:
+            raise InvenioWebAccessMailCookieError, "Cookie not valid: %s" % e
+        try:
+            res = run_sql("SELECT kind, AES_DECRYPT(data,%s), onetime, status FROM accMAILCOOKIE WHERE "
+                "id=%s AND expiration>=NOW()", (password, cookie_id))
+            if not res:
+                raise StandardError
+        except StandardError:
+            raise InvenioWebAccessMailCookieError, "Cookie %s doesn't exist or is expired" % cookie
+        (kind, data, onetime, status) = res[0]
+        (kind_check, params, expiration, onetime_check) = loads(data)
+        if not (kind == kind_check and onetime == onetime_check):
+            raise InvenioWebAccessMailCookieError, "Cookie %s is corrupted" % cookie
+        if kind != self.__kind:
+            raise InvenioWebAccessMailCookieError("Cookie %s is of the wrong kind: expected %s, found %s" % (cookie, repr(self.__kind), repr(kind)))
+        if status == 'D':
+            raise InvenioWebAccessMailCookieDeletedError, "Cookie has been deleted"
+        if onetime or delete:
+            run_sql("UPDATE accMAILCOOKIE SET status='D' WHERE id=%s", (cookie_id, ))
+        return params
+
+    def get_cookie_kind(self, cookie):
+        """
+        Return the kind of the given cookie.
+
+        @param cookie: hexadecimal string as returned by L{create_cookie}.
+        @type cookie: hexadecimal string
+        @returns: the kind.
+        @rtype: string
+
+        @note: this method is useful when you don't know in advance which
+               cookie is mapped by the cookie_id.
+        """
+        password = cookie[:16]+cookie[-16:]
+        cookie_id = int(cookie[16:-16], 16)
+        try:
+        res = run_sql("SELECT kind, AES_DECRYPT(data,%s) FROM accMAILCOOKIE WHERE id=%s AND expiration>=NOW() AND status != 'D'", (password, cookie_id, ))
+        if not res:
+            raise InvenioWebAccessMailCookieError("Cookie %s doesn't exist, is expired or has been deleted" % cookie)
+        else:
+            kind, data = res[0]
+            kind_check, params, expiration, onetime_check = loads(data)
+            if kind == kind_check:
+                return kind
+            else:
+                raise InvenioWebAccessMailCookieError("Cookie %s seems to be corrupted" % cookie)
+
+    def delete_cookie(self, cookie):
+        self.check_cookie(cookie, delete=True)
+
+    def mail_cookie_gc():
+        """
+        Clean the table for expired cookies (regardless of the type).
+        """
+        return run_sql("DELETE FROM accMAILCOOKIE WHERE expiration<NOW()")
+    mail_cookie_gc = staticmethod(mail_cookie_gc)
 
 def mail_cookie_create_role(role_name, role_timeout=timedelta(hours=3), cookie_timeout=timedelta(days=1), onetime=True):
     """Create a unique url to be sent via email to belong temporaly to a role."""
