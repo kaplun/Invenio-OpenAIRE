@@ -21,11 +21,20 @@ WebSubmit NG Engine module.
 """
 
 from cgi import escape
+from ConfigParser import SafeConfigParser
+from datetime import datetime
+from tempfile import mkdtemp
+from time import strftime
+from uuid import uuid4
+import tarfile
 import os
+import shutil
+import fcntl
 
 from invenio.textutils import encode_for_xml
 from invenio.webpage import page
 from invenio.config import CFG_ETCDIR
+from invenio.dbquery import run_sql
 
 if sys.hexversion < 0x2060000:
     try:
@@ -70,22 +79,16 @@ def python2xml(obj, indent=0):
         return out
     raise TypeError("%s is of type %s which can't be handled" % (repr(obj), type(obj)))
 
-class WebSubmitSubmission(object):
-    def __init__(self, session):
-        self.__session = session
-        pass
-
-    def get
-
 class WebSubmitSession(dict):
-    def __init__(self, path):
-        self.path = path
-        self.curdir = os.path.dirname(path)
-        self.session = os.path.basename(path)
-        os.makedirs(self.__curdir)
+    def __init__(self, doctype, session_id=None):
+        self.__session_id = session_id
+        self.__doctype = doctype
+        if self.__session is None:
+            self.create_session()
+        self.__curdir = os.path.join(CFG_WEBSUBMITNG_DIR, doctype, self.__session_id)
+        self.__session_path = os.path.join(self.__curdir, 'session.json')
+        self.__aliases = []
         self.load()
-        super.__setitem__(self, '__curdir__', self.curdir)
-        super.__setitem__(self, '__session__', self.session)
         self.dump()
 
     def __setitem__(self, key, value):
@@ -96,17 +99,65 @@ class WebSubmitSession(dict):
             super.__deitem__(self, key)
             raise
 
+    def __setattr__(self, name, value):
+        self.__dict__[name] = value
+        if name.startswith('__'):
+            self["%s__" % name] = value
+
     def dump(self):
-        json.dump(self, open(self.path, 'w'), indent=4)
+        if self.__status == 'PACKED':
+            raise InvenioWebSubmitNGSessionError("Session %s for doctype %s has already been packed" % (self.__session_id, self.__doctype))
+        else:
+            session_file = open(self.__session_path), 'w')
+            fcntl.lockf(session_file.fileno(), fcntl.LOCK_EX)
+            try:
+                json.dump(self, session_file, indent=4)
+            finally:
+                fcntl.lockf(session_file.fileno(), fcntl.LOCK_UN)
 
     def load(self):
-        if os.path.exists(self.path):
-            self.update(json.load(open(self.path)))
+        if os.path.exists(self.__session_path):
+            session_file = open(self.__session_path)
+            fcntl.lockf(session_file.fileno(), fcntl.LOCK_SH)
+            try:
+                self.update(json.load(session_file.read()))
+            finally:
+                fcntl.lockf(session_file.fileno(), fcntl.LOCK_UN)
+        elif os.path.exists('%s.tar.bz2' % self.__curdir):
+            raise InvenioWebSubmitNGSessionError("Session %s for doctype %s has already been closed" % (self.__session_id, self.__doctype))
 
-    def export_to_xml(self):
-        out = """<?xml version="1.0"?>
-<!DOCTYPE map SYSTEM "%s">
-""" % (os.path.join(CFG_ETCDIR, "websubmitng", "session.dtd"))
+    def create_session(self, doctype):
+        path = os.path.join(CFG_WEBSUBMIT_DIR, doctype)
+        self.__session_id = uuid.uuid4()
+        self.__curdir = os.path.join(path, self.__session_id)
+        os.makedirs(path)
+        self.__status = 'NEW'
+
+    def get_status(self):
+        return self.__status
+
+    def add_alias(self, alias):
+        if alias not in self.__aliases:
+            self.__aliases.append(alias)
+            alias_path = os.path.join(CFG_WEBSUBMITNG_DIR, self.doctype, '%s_%s' % (alias_path, self.__session_id))
+            os.symlink(self.__curdir, alias_path)
+
+    def close_session(self):
+        self.__status = 'CLOSED'
+        the_tar = tarfile.open("%s.tar.bz2" % self.__curdir, 'w:bz2', dereference=False)
+        the_tar.add(self.__curdir)
+        the_tar.close()
+        shutil.rmtree(self.__curdir, ignore_errors=True)
+        for alias in self.__aliases:
+            try:
+                os.remove(alias)
+            except:
+                register_exception(user_info=self['user_info'])
+            alias_path = os.path.join(CFG_WEBSUBMITNG_DIR, self.doctype, '%s_%s' % (alias_path, self.__session_id))
+            os.symlink('%s.tar.bz2' % self.__curdir, '%s.tar.bz2' % alias_path)
+        self.__status = 'PACKED'
+
+    status = property(get_status)
 
 class WebSubmitInterface(list):
     def __init__(self, user_info, session, title=None, description=None):
@@ -122,7 +173,7 @@ class WebSubmitInterface(list):
             out += '  <tr>\n'
             if element.expects_default_label_usage():
                 out += '    <td class="websubmitng_label">\n'
-                element_name = element.get_name()
+                element_name = element.name
                 label = element.get_label()
                 out += '      <label for="%s">%s</label>\n' % (escape(element_name, True), label)
                 out += '    </td>\n'
@@ -157,3 +208,44 @@ class WebSubmitInterface(list):
                 classes.append(element_class)
         return out
 
+class InvenioWebSubmitValueError(Exception):
+    pass
+
+class WebSubmitInterfaceElement(object):
+    def __init__(self, name, session):
+        self.__name = name,
+        self.__user_info = session['user_info']
+        self.__session = session
+        self.__value = None
+
+    def get_html(self):
+        raise NotImplemented()
+
+    def get_js():
+        raise NotImplemented()
+    get_js = staticmethod(get_js)
+
+    def get_css():
+        raise NotImplemented()
+    get_css = staticmethod(get_css)
+
+    def get_value(self):
+        return self.__value
+
+    def get_name(self):
+        return self.__name
+
+    def get_record_snippet(self):
+        return {}
+
+    def check_value(self):
+        pass
+
+    value = property(get_value)
+    name = property(get_name)
+
+
+class WebSubmitReportNumberTool(object):
+    def __init__(self, form)
+
+class WebSubmitConfigParser(SafeConfigParser):

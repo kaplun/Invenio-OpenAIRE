@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ## This file is part of CDS Invenio.
 ## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
 ##
@@ -15,19 +16,32 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-#SUBDIRS = functions
+"""
+WebSubmit NG Web Interface.
+"""
 
-pylibdir = $(libdir)/python/invenio
+from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 
-pylib_DATA = websubmitng_engine.py \
-             websubmitng_report_number_engine.py \
-             websubmitng_templates.py \
-             websubmitng_webinterface.py
+class WebInterfaceSubmitNGPages(WebInterfaceDirectory):
 
-#noinst_DATA = fulltext_files_migration_kit.py
+    _exports = ['', 'list', 'admin']
+    _force_https = True
 
-#EXTRA_DIST = $(pylib_DATA) $(noinst_DATA)
+    def __init__(self, session):
+        self.__session = session
 
-EXTRA_DIST = %(pylib_DATA)
+    def index(self, req, form):
+        redirect_to_url(req, '%s/submitng/list' % CFG_SITE_SECURE_URL)
 
-CLEANFILES = *~ *.tmp *.pyc
+    def _lookup(self, component, path):
+        """This handler parses dynamic URLs (/author/John+Doe)."""
+        return WebInterfaceSubmitNGPages(component), path
+
+
+    def list(self, req, form):
+        pass
+
+    def admin(self, req, form):
+
+
+class WebInterfaceSubmitNGAdminPages()

@@ -209,7 +209,6 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
         """This handler parses dynamic URLs (/author/John+Doe)."""
         return WebInterfaceAuthorPages(component), path
 
-
     def __call__(self, req, form):
         """Serve the page in the given language."""
         argd = wash_urlargd(form, {'ln': (str, CFG_SITE_LANG), 'verbose': (int, 0) })
