@@ -26,6 +26,7 @@ from datetime import datetime
 from tempfile import mkdtemp
 from time import strftime
 from uuid import uuid4
+from glob import glob
 import tarfile
 import os
 import shutil
@@ -45,6 +46,8 @@ if sys.hexversion < 0x2060000:
         pass
 else:
     import json
+
+CFG_WEBSUBMITNG_ETCDIR = os.path.join(CFG_ETCDIR, 'websubmitng')
 
 class WebSubmitStatus(object):
     INIT = 'INIT'
@@ -244,6 +247,67 @@ class WebSubmitInterfaceElement(object):
     value = property(get_value)
     name = property(get_name)
 
+class WebSubmitSubmission(object):
+    def __init__(self, doctype):
+        self.__doctype = doctype
+        self.__interfaces = {}
+        self.__worflows = {}
+        self.__parser = None
+        self._load()
+
+    def get_session(self, cookie):
+        return self.__session_loader(cookie)
+
+    def get_next_step(self, session):
+
+
+    def _load(self):
+        parser = SafeConfigParser()
+        parser.read(os.path.join(CFG_WEBSUBMITNG_ETCDIR, '%s.conf' % self.doctype))
+        if parser.has_section('include'):
+            self._load_includes(parser)
+        if 'session_type' in parser.defaults():
+            self._load_session_loader(parser)
+        for section in parser.sections():
+            if section.startswith('interface'):
+                self._load_interface(parser, section)
+            elif section.startswith('worflow'):
+                self._load_workflow(parser, section)
+
+    def _load_includes(self, parser):
+        for field, value in parser.items('include'):
+            if field == 'file':
+                path = os.path.join(CFG_WEBSUBMITNG_ETCDIR, '%s.conf' % value)
+                if path != os.path.abspath(path) or not os.path.exists(path):
+                    raise ConfigParser('value %s specified for field "file" in section "include" does not correspond to a valid name under %s' % (repr(value), CFG_WEBSUBMITNG_ETCDIR))
+                parser.read(path)
+
+    def _load_session_loader(self, parser):
+        session_type = parser.defaults().get('session_type', 'default')
+        if session_type == 'default':
+            self.__session_loader = WebSubmitSession
+        else:
+            raise NotImplemented
+
+    def _load_interface(self, parser, section):
+        try:
+            interface_type = parser.get(section, 'type')
+        except NoOptionError:
+            interface_type = 'default'
+        if interface_type == 'default':
+            self.__interfaces[section] = WebSubmitInterface(parser, section)
+        else:
+            raise NotImplemented
+
+    def _load_workflow(self, parser, section):
+        try:
+            worflow_type = parser.get(section, 'type')
+        except NoOptionError:
+            worflow_type = 'default'
+        if worflow_type == 'default':
+            self.__workflows[section] = WebSubmitWorkflow(parser, section)
+        else:
+            raise NotImplemented
 
 class WebSubmitReportNumberTool(object):
     def __init__(self, form)
