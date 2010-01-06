@@ -26,6 +26,7 @@ pylib_DATA = __init__.py \
              dbdump.py \
              dbquery.py \
              dbquery_tests.py \
+             dnetutils.py \
              mailutils.py \
              miscutil_config.py \
              messages.py \
