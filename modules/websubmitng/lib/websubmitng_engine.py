@@ -211,6 +211,35 @@ class WebSubmitInterface(list):
                 classes.append(element_class)
         return out
 
+    def check_values(self):
+        errors = []
+        for element in self:
+            try:
+                element.check_value()
+            except InvenioWebSubmitValueError, err:
+                errors.append(err)
+        if errors:
+            raise InvenioWebSubmitValuesError(errors)
+        return True
+
+    def get_recstruct(self):
+        recstruct = {}
+        for element in self:
+            recstruct.update(element.get_recstruct())
+        return recstruct
+
+    def get_simple_xml(self):
+        out = '<?xml version="1.0"?>\n'
+
+
+
+class InvenioWebSubmitValuesError(Exception):
+    def __init__(self, errors):
+        self.errors = errors
+
+    def __str__(self):
+        return 'ERRORS: %s.' % ', '.join(errors)
+
 class InvenioWebSubmitValueError(Exception):
     pass
 
@@ -220,6 +249,7 @@ class WebSubmitInterfaceElement(object):
         self.__user_info = session['user_info']
         self.__session = session
         self.__value = None
+        self.__marc_field = marc_field
 
     def get_html(self):
         raise NotImplemented()
@@ -238,11 +268,14 @@ class WebSubmitInterfaceElement(object):
     def get_name(self):
         return self.__name
 
-    def get_record_snippet(self):
+    def get_recstruct(self):
         return {}
 
     def check_value(self):
-        pass
+        return true
+
+    def get_value_as_xml_snippet(self):
+        return python2xml(self.__value, indent=8)
 
     value = property(get_value)
     name = property(get_name)
@@ -308,8 +341,5 @@ class WebSubmitSubmission(object):
             self.__workflows[section] = WebSubmitWorkflow(parser, section)
         else:
             raise NotImplemented
-
-class WebSubmitReportNumberTool(object):
-    def __init__(self, form)
 
 class WebSubmitConfigParser(SafeConfigParser):
