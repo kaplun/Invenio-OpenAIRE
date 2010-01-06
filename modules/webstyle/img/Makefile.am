@@ -60,6 +60,7 @@ img_DATA = add-small.png \
            drop_down_menu_arrow_down_w.gif \
            edit1.gif \
            external-icon-light-8x8.gif \
+           favicon.png \
            feed-icon-12x12.gif \
            file-icon-none-96x128.gif \
            file-icon-text-12x16.gif \
@@ -115,6 +116,7 @@ img_DATA = add-small.png \
            move_to.gif \
            noway.gif \
            okay.gif \
+           openaire_logo.jpeg \
            out.gif \
            paper-texture-128x128.gif \
            paper_clip-72x72.gif \
