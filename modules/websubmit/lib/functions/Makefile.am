@@ -58,6 +58,7 @@ pylib_DATA = __init__.py \
              Print_Success_DEL.py \
              Print_Success_MBI.py \
              Print_Success_SRV.py \
+             Process_Submitted_Values.py \
              Register_Approval_Request.py \
              Register_Referee_Decision.py \
              Withdraw_Approval_Request.py \
