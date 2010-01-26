@@ -34,6 +34,10 @@ from invenio.websubmit_config import InvenioWebSubmitFunctionError
 from invenio.dbquery import run_sql
 from invenio.bibsched import server_pid
 from invenio.messages import gettext_set_language
+from invenio.search_engine import get_record
+from invenio.bibrecord import record_get_field_values, record_get_field_value
+import re
+import os
 
 def createRelatedFormats(fullpath, overwrite=True):
     """Given a fullpath, this function extracts the file's extension and
@@ -176,9 +180,9 @@ def ParamFromFile(afile):
 
 def write_file(filename, filedata):
     """Open FILENAME and write FILEDATA to it."""
-    filename1 =filename.strip()
+    filename1 = filename.strip()
     try:
-        of=open(filename1,'w')
+        of = open(filename1,'w')
     except IOError:
         raise InvenioWebSubmitFunctionError('Cannot open ' + filename1 + ' to write')
     of.write(filedata)
@@ -215,3 +219,47 @@ def txt2html(msg):
     rows = [cgi.escape(row) for row in rows]
     rows = "<p>" + "</p><p>".join(rows) + "</p>"
     return rows
+
+def retrieve_field_values(curdir, field_name, separator=None, system_number_file='SN', tag=None):
+    """
+    This is a handy function to retrieve values either from the current
+    submission directory, when a form has been just submitted, or from
+    an existing record (e.g. during MBI action).
+
+    @param curdir: is the current submission directory.
+    @type curdir: string
+    @param field_name: is the form field name that might exists on disk.
+    @type field_name: string
+    @param separator: is an optional separator. If it exists, it will be used
+        to retrieve multiple values contained in the field.
+    @type separator: string
+    @param system_number_file: is the name of the file on disk in curdir, that
+        is supposed to contain the record id.
+    @type system_number_file: string
+    @param tag: is the full MARC tag (tag+ind1+ind2+code) that should
+        contain values. If not specified, only values in curdir will
+        be retrieved.
+    @type tag: 6-chars
+    @return: the field value(s).
+    @rtype: list of strings.
+
+    @note: if field_name exists in curdir it will take precedence over
+        retrieving the values from the record.
+    """
+    field_file = os.path.join(curdir, field_name)
+    if os.path.exists(field_name):
+        field_value = open(field_name).read()
+        if separator is not None:
+            return [value.strip() for value in field_value.split(separator) if value.strip()]
+        else:
+            return [field_value.strip()]
+    elif tag is not None:
+        system_number_file = os.path.join(curdir, system_number_file)
+        if os.path.exists(system_number_file):
+            recid = int(open(system_number_file).read().strip())
+            record = get_record(recid)
+            if separator:
+                return record_get_field_values(record, tag[:3], tag[3], tag[4], tag[5])
+            else:
+                return [record_get_field_value(record, tag[:3], tag[3], tag[4], tag[5])]
+    return []
