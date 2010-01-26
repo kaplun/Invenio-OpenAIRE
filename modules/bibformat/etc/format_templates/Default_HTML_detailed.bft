@@ -26,10 +26,15 @@ suffix_en="</small><br />"
 suffix_fr="</small><br />"
 />
 
+<BFE_SUBJECT prefix="<br /><small><strong>Subject(s): </strong></small><small>" separator="</small><small>"
+suffix="</small>" />
+
 <BFE_KEYWORDS
 prefix="<br /><small><strong>Keyword(s): </strong></small>"
 keyword_prefix="<small>"
 keyword_suffix="</small>" />
+
+
 
 <BFE_NOTES
 note_prefix="<br /><small><strong>Note: </strong>"
