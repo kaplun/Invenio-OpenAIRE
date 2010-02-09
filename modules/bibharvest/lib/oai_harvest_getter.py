@@ -33,16 +33,38 @@ try:
     import re
     import time
     import base64
+    import os
+    import urlparse
+    from cStringIO import StringIO
+    from xml.dom.minidom import parseString
 except ImportError, e:
     print "Error: %s" % e
     sys.exit(1)
 
-try:
-    from invenio.config import CFG_SITE_ADMIN_EMAIL, CFG_VERSION
-except ImportError, e:
-    print "Error: %s" % e
-    sys.exit(1)
+from invenio.bibconvert_xslt_engine import convert
+from invenio.config import CFG_SITE_ADMIN_EMAIL, CFG_VERSION, \
+    CFG_PYLIBDIR
 
+CFG_BIBHARVEST_REGISTRY_PATHNAME = os.path.join(CFG_PYLIBDIR, 'invenio', 'bibharvest_registries', 'bhr_*.py')
+
+RE_BIBHARVEST_VALID_OAIID = re.compile(r"oai:[a-zA-Z][a-zA-Z0-9\-]*(\.[a-zA-Z][a-zA-Z0-9\-]+)+:[a-zA-Z0-9\-_\.!~\*'\(\);/\?:@&=\+$,%]+")
+
+RE_BIBHARVEST_DSPACE_HANDLE = re.compile(r"(http://hdl\.handle\.net/|hdl:)(?P<handle>\d+(\.\d+)?/\d+)")
+
+from invenio.pluginutils import PluginContainer, create_enhanced_plugin_builder
+
+def _load_bibharvest_registries():
+    def get_full_registry_signature(): pass
+    def guess_oai_pmh_handler_signature(url): pass
+
+    plugin_builder = create_enhanced_plugin_builder(
+        compulsory_objects={
+            'get_full_registry': get_full_registry_signature,
+            'guess_oai_pmh_handler': guess_oai_pmh_handler_signature})
+
+    return PluginContainer([CFG_BIBHARVEST_REGISTRY_PATHNAME], plugin_builder=plugin_builder)
+
+BIBHARVEST_REGISTRIES = _load_bibharvest_registries()
 
 http_response_status_code = {
 
@@ -72,6 +94,8 @@ def http_request_parameters(http_param_dict, method="POST"):
 
     return urllib.urlencode(http_param_dict)
 
+class InvenioOAIHarvestGetterError(Exception): pass
+
 def OAI_Session(server, script, http_param_dict , method="POST", output="",
                 resume_request_nbr=0, secure=False, user=None, password=None,
                 cert_file=None, key_file=None):
@@ -85,10 +109,13 @@ def OAI_Session(server, script, http_param_dict , method="POST", output="",
     Returns an int corresponding to the last created 'resume_request_nbr'.
     """
 
-    sys.stderr.write("Starting the harvesting session at %s" %
-        time.strftime("%Y-%m-%d %H:%M:%S --> ", time.localtime()))
-    sys.stderr.write("%s - %s\n" % (server,
-        http_request_parameters(http_param_dict)))
+    write_to_open_file = hasattr(output, "write")
+
+    if not write_to_open_file:
+        sys.stderr.write("Starting the harvesting session at %s" %
+            time.strftime("%Y-%m-%d %H:%M:%S --> ", time.localtime()))
+        sys.stderr.write("%s - %s\n" % (server,
+            http_request_parameters(http_param_dict)))
 
     a = OAI_Request(server, script,
                     http_request_parameters(http_param_dict, method), method,
@@ -104,7 +131,10 @@ def OAI_Session(server, script, http_param_dict , method="POST", output="",
         if output:
             # Write results to a file named 'output'
             if a.lower().find('<'+http_param_dict['verb'].lower()) > -1:
-                write_file( "%s.%07d" % (output, i), a)
+                if write_to_open_file:
+                    output.write(a)
+                else:
+                    write_file( "%s.%07d" % (output, i), a)
             else:
                 # hmm, were there no records in output? Do not create
                 # a file and warn user
@@ -129,7 +159,10 @@ def OAI_Session(server, script, http_param_dict , method="POST", output="",
     if output:
         # Write results to a file named 'output'
         if a.lower().find('<'+http_param_dict['verb'].lower()) > -1:
-            write_file("%s.%07d" % (output, i), a)
+            if write_to_open_file:
+                output.write(a)
+            else:
+                write_file("%s.%07d" % (output, i), a)
         else:
             # hmm, were there no records in output? Do not create
             # a file and warn user
@@ -140,6 +173,94 @@ def OAI_Session(server, script, http_param_dict , method="POST", output="",
 
     return i
 
+def guess_oai_pmh_handler(url):
+    """
+    Given a URL guess the OAI-PMH base_url.
+    @param url: the URL for which a guess is needed.
+    @type url: string
+    @return: a set of OAI-PMH bases.
+    @rtpye: set([str, ...])
+    """
+    oai_pmh_bases = set()
+    for registry in BIBHARVEST_REGISTRIES.values():
+        oai_pmh_bases |= registry["guess_oai_pmh_handler"](url)
+    return oai_pmh_bases
+
+def guess_oai_pmh_id(url):
+    """
+    Given a URL guess the OAI-PMH id of the given document.
+    @param url: the URL for which a guess is needed.
+    @type url: string
+    @return: the guessed OAI-PMH Id
+    @rtpye: string
+    """
+    html = urllib.urlopen(url).read()
+    the_id = RE_BIBHARVEST_VALID_OAIID.search(html)
+    if the_id:
+        return the_id.group()
+    dspace_handle = RE_BIBHARVEST_DSPACE_HANDLE.search(html)
+    if dspace_handle:
+        hostname = urlparse.urlsplit(url)[1]
+        return "oai:%s:%s" % (hostname, dspace_handle.group("handle"))
+    return ""
+
+def get_supported_metadata_prefix(oai_pmh_base, oai_id=None):
+    protocol, server, script = urlparse.urlsplit(oai_pmh_base)[:3]
+    secure = protocol == 'https'
+    http_param_dict = {"verb": "ListMetadataFormats"}
+    if oai_id:
+        http_param_dict["identifier"] = oai_id
+    output = StringIO()
+    harvest(server, script, http_param_dict, secure=secure, output=output)
+    output = parseString(output.getvalue())
+    ret = []
+    for item in output.getElementsByTagName("metadataPrefix"):
+        ret.append(item.firstChild.nodeValue.encode("utf8"))
+    return ret
+
+def magic_harvest_a_record(url=None, oai_pmh_bases=None, oai_id=None):
+    def empty_record():
+        return """<?xml version="1.0" encoding="UTF-8"?>
+<record xmlns="http://www.loc.gov/MARC21/slim"></record>"""
+    def harvest_record(oai_pmh_base, oai_id, prefix):
+        protocol, server, script = urlparse.urlsplit(oai_pmh_base)[:3]
+        secure = protocol == 'https'
+        output = StringIO()
+        http_param_dict = {
+            "verb": "GetRecord",
+            "identifier": oai_id,
+            "metadataPrefix": prefix,
+        }
+        harvest(server, script, http_param_dict, output=output, secure=secure)
+        output = output.getvalue()
+        if 'marc' in prefix.lower():
+            output = convert(output, "oaimarc2marcxml.xsl")
+        elif 'dc' in prefix.lower():
+            output = convert(output, "oaidc2marcxml.xsl")
+        else:
+            output = empty_record()
+        return output
+
+    if not url and not oai_pmh_base and not oai_id:
+        return empty_record()
+    if not oai_pmh_bases:
+        oai_pmh_bases = guess_oai_pmh_handler(url)
+        if not oai_pmh_bases:
+            return empty_record()
+    if not oai_id:
+        oai_id = guess_oai_pmh_id(url)
+        if not oai_id:
+            return empty_record()
+    ret = empty_record()
+    for oai_pmh_base in oai_pmh_bases:
+        metadata_prefixes = get_supported_metadata_prefix(oai_pmh_base, oai_id)
+        for prefix in metadata_prefixes:
+            if 'marc' in prefix.lower() or 'dc' in prefix.lower():
+                new_ret = harvest_record(oai_pmh_base, oai_id, prefix)
+                if len(new_ret) > len(ret):
+                    ret = new_ret
+    return ret
+
 def harvest(server, script, http_param_dict , method="POST", output="",
             sets=None, secure=False, user=None, password=None,
             cert_file=None, key_file=None):
@@ -149,62 +270,73 @@ def harvest(server, script, http_param_dict , method="POST", output="",
 
     Needed for harvesting multiple sets in one row.
 
-    Returns the number of files created by the harvesting
+    @param server: the server URL to harvest eg: cdsweb.cern.ch
+    @type server: string
 
-        Parameters:
-
-         server - *str* the server URL to harvest
-                  eg: cdsweb.cern.ch
-
-         script - *str* path to the OAI script on the server to harvest
+    @param script: path to the OAI script on the server to harvest
                   eg: /oai2d
+    @type script: string
 
-http_param_dict - *dict* the URL parameters to send to the OAI script
+    @param http_param_dict: the URL parameters to send to the OAI script
                   eg: {'verb':'ListRecords', 'from'='2004-04-01'}
                   EXCLUDING the setSpec parameters. See 'sets'
                   parameter below.
+    @type http_param_dict: dict
 
-         method - *str* if we harvest using POST or GET
+    @param method: if we harvest using POST or GET
                   eg: POST
+    @type method: string
 
-         output - *str* the path (and base name) where results are
-                  saved. To handle multiple answers (for eg. triggered
-                  by multiple sets harvesting or OAI resumption
-                  tokens), this base name is suffixed with a sequence
-                  number. Eg output='/tmp/z.xml' ->
+    @param output: the path (and base name) or a file object where results
+                  are saved. In case of path, to handle multiple answers
+                  (for eg. triggered by multiple sets harvesting or OAI
+                  resumption tokens), this base name is suffixed with a
+                  sequence number. Eg output='/tmp/z.xml' ->
                   '/tmp/z.xml.0000000', '/tmp/z.xml.0000001', etc.
                   If file at given path already exists, it is
                   overwritten.
                   When this parameter is left empty, the results are
                   returned on the standard output.
+    @type output: string or open file object
 
-           sets - *list* the sets to harvest. Since this function
-                  offers multiple sets harvesting in one row, the OAI
-                  'setSpec' cannot be defined in the 'http_param_dict'
-                  dict where other OAI parameters are.
+    @param sets: the sets to harvest. Since this function
+                 offers multiple sets harvesting in one row, the OAI
+                 'setSpec' cannot be defined in the 'http_param_dict'
+                 dict where other OAI parameters are.
+    @type sets: list of string
 
-         secure - *bool* of we should use HTTPS (True) or HTTP (false)
+    @param secure: of we should use HTTPS (True) or HTTP (false)
+    @type secure: bool
 
-           user - *str* username to use to login to the server to
+    @param user: username to use to login to the server to
                   harvest in case it requires Basic authentication.
+    @type user: string
 
-       password - *str* a password (in clear) of the server to harvest
+    @param password: a password (in clear) of the server to harvest
                   in case it requires Basic authentication.
+    @type password: string
 
-       key_file - *str* a path to a PEM file that contain your private
+    @param key_file: a path to a PEM file that contain your private
                   key to connect to the server in case it requires
                   certificate-based authentication
                   (If provided, 'cert_file' must also be provided)
+    @type key_file: string
 
-       cert_file - *str* a path to a PEM file that contain your public
+    @param cert_file: path to a PEM file that contain your public
                   key in case the server to harvest requires
                   certificate-based authentication
                   (If provided, 'key_file' must also be provided)
+    @type cert_file: string
+    @return: the number of files created by the harvesting
+    @rtpe: integer
+
+    @note: if L{output} is an open file then the function will not
+        print any message to screen.
     """
     if sets:
         i = 0
-        for set in sets:
-            http_param_dict['set'] = set
+        for aset in sets:
+            http_param_dict['set'] = aset
             i = OAI_Session(server, script, http_param_dict, method,
                             output, i, secure, user, password,
                             cert_file, key_file)
@@ -226,7 +358,7 @@ def write_file(filename="harvest", a=""):
 
 def OAI_Request(server, script, params, method="POST", secure=False,
                 user=None, password=None,
-                key_file=None, cert_file=None):
+                key_file=None, cert_file=None, interactive=True):
     """Handle OAI request
 
     Parameters:
@@ -279,8 +411,11 @@ def OAI_Request(server, script, params, method="POST", secure=False,
             try:
                 conn = httplib.HTTPSConnection(server)
             except httplib.HTTPException, e:
-                sys.stderr.write("An error occured when trying to connect to %s: %s" % (server, e))
-                sys.exit(0)
+                if not interactive:
+                    raise e
+                else:
+                    sys.stderr.write("An error occured when trying to connect to %s: %s" % (server, e))
+                    sys.exit(0)
         elif secure and key_file and cert_file:
             # Certificate-based authentication
             try:
@@ -288,15 +423,21 @@ def OAI_Request(server, script, params, method="POST", secure=False,
                                                key_file=key_file,
                                                cert_file=cert_file)
             except httplib.HTTPException, e:
-                sys.stderr.write("An error occured when trying to connect to %s: %s" % (server, e))
-                sys.exit(0)
+                if not interactive:
+                    raise e
+                else:
+                    sys.stderr.write("An error occured when trying to connect to %s: %s" % (server, e))
+                    sys.exit(0)
         else:
             # Unsecured connection
             try:
                 conn = httplib.HTTPConnection(server)
             except httplib.HTTPException, e:
-                sys.stderr.write("An error occured when trying to connect to %s: %s\n" % (server, e))
-                sys.exit(0)
+                if not interactive:
+                    raise e
+                else:
+                    sys.stderr.write("An error occured when trying to connect to %s: %s\n" % (server, e))
+                    sys.exit(0)
 
         try:
             if method == "GET":
@@ -304,25 +445,32 @@ def OAI_Request(server, script, params, method="POST", secure=False,
             elif method == "POST":
                 conn.request("POST", script, params, headers)
         except socket.gaierror, (err, str_e):
-            sys.stderr.write("An error occured when trying to connect to %s: %s\n" % (server, str_e))
-            sys.exit(0)
+            if not interactive:
+                raise e
+            else:
+                sys.stderr.write("An error occured when trying to connect to %s: %s\n" % (server, str_e))
+                sys.exit(0)
         try:
             response = conn.getresponse()
         except httplib.HTTPException, e:
-            sys.stderr.write("An error occured when trying to read response from %s: %s\n" % (server, e))
-            sys.exit(0)
+            if not interactive:
+                raise e
+            else:
+                sys.stderr.write("An error occured when trying to read response from %s: %s\n" % (server, e))
+                sys.exit(0)
 
         status = "%d" % response.status
 
-        if http_response_status_code.has_key(status):
-            sys.stderr.write("%s(%s) : %s : %s\n" % (status,
-                http_response_status_code[status],
-                response.reason,
-                params))
-        else:
-            sys.stderr.write("%s(%s) : %s : %s\n" % (status,
-                http_response_status_code['000'],
-                response.reason, params))
+        if interactive:
+            if http_response_status_code.has_key(status):
+                sys.stderr.write("%s(%s) : %s : %s\n" % (status,
+                    http_response_status_code[status],
+                    response.reason,
+                    params))
+            else:
+                sys.stderr.write("%s(%s) : %s : %s\n" % (status,
+                    http_response_status_code['000'],
+                    response.reason, params))
 
         if response.status == 200:
             i = 10
@@ -336,38 +484,46 @@ def OAI_Request(server, script, params, method="POST", secure=False,
                     int(response.getheader("Retry-After", "%d" % (i*i)))
             except ValueError:
                 nb_seconds_to_wait = 10
-            sys.stderr.write("Retry in %d seconds...\n" % nb_seconds_to_wait)
+            if interactive:
+                sys.stderr.write("Retry in %d seconds...\n" % nb_seconds_to_wait)
             time.sleep(nb_seconds_to_wait)
 
         elif response.status == 302:
-            sys.stderr.write("Redirecting...\n")
+            if interactive:
+                sys.stderr.write("Redirecting...\n")
             server    = response.getheader("Location").split("/")[2]
             script    = "/" + \
                 "/".join(response.getheader("Location").split("/")[3:])
 
         elif response.status == 401:
-            if user is not None:
-                sys.stderr.write("Try again\n")
-            if not secure:
-                sys.stderr.write("*WARNING* Your password will be sent in clear!\n")
-            # getting input from user
-            sys.stderr.write('User:')
-            try:
-                user = raw_input()
-                password = getpass.getpass()
-            except EOFError, e:
-                sys.stderr.write("\n")
-                sys.exit(1)
-            except KeyboardInterrupt, e:
-                sys.stderr.write("\n")
-                sys.exit(1)
-            headers["Authorization"] = "Basic " + base64.encodestring(user + ":" + password).strip()
+            if interactive:
+                if user is not None:
+                    sys.stderr.write("Try again\n")
+                if not secure:
+                    sys.stderr.write("*WARNING* Your password will be sent in clear!\n")
+                # getting input from user
+                sys.stderr.write('User:')
+                try:
+                    user = raw_input()
+                    password = getpass.getpass()
+                except EOFError, e:
+                    sys.stderr.write("\n")
+                    sys.exit(1)
+                except KeyboardInterrupt, e:
+                    sys.stderr.write("\n")
+                    sys.exit(1)
+                headers["Authorization"] = "Basic " + base64.encodestring(user + ":" + password).strip()
+            else:
+                raise InvenioOAIHarvestGetterError("Wrong password supplied")
         else:
-            sys.stderr.write("Retry in 10 seconds...\n")
+            if interactive:
+                sys.stderr.write("Retry in 10 seconds...\n")
             time.sleep(10)
 
-
-    sys.stderr.write("Harvesting interrupted (after 10 attempts) at %s: %s\n"
+    if interactive:
+        sys.stderr.write("Harvesting interrupted (after 10 attempts) at %s: %s\n"
         % (time.strftime("%Y-%m-%d %H:%M:%S --> ", time.localtime()), params))
 
-    sys.exit(1)
+        sys.exit(1)
+    raise InvenioOAIHarvestGetterError("Harvesting interrupted (after 10 attempts) at %s: %s\n"
+        % (time.strftime("%Y-%m-%d %H:%M:%S --> ", time.localtime()), params))
