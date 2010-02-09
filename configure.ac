@@ -590,6 +590,7 @@ AC_CONFIG_FILES([config.nice  \
 	  modules/bibharvest/doc/admin/Makefile \
 	  modules/bibharvest/doc/hacking/Makefile \
 	  modules/bibharvest/lib/Makefile \
+          modules/bibharvest/lib/registries/Makefile \
 	  modules/bibharvest/web/Makefile \
 	  modules/bibharvest/web/admin/Makefile \
 	  modules/bibindex/Makefile \
