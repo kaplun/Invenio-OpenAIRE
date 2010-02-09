@@ -15,23 +15,12 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = registries
+pylibdir=$(libdir)/python/invenio/bibharvest_registries
 
-pylibdir = $(libdir)/python/invenio
-
-pylib_DATA = oai_repository_server.py \
-             oai_repository_tests.py \
-             oai_repository_webinterface.py \
-             oai_repository_regression_tests.py \
-             oai_harvest_getter.py \
-             oai_harvest_dblayer.py \
-             bibharvest_templates.py \
-             oai_harvest_admin.py \
-             oai_harvest_admin_regression_tests.py \
-             oai_repository_admin.py \
-             oai_repository_admin_regression_tests.py \
-             oai_harvest_daemon.py \
-             oai_repository_updater.py
+pylib_DATA = __init__.py \
+             bhr_roar.py \
+             bhr_opendoar.py \
+             bhr_famous_software.py
 
 EXTRA_DIST = $(pylib_DATA)
 
