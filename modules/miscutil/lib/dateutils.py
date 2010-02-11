@@ -46,6 +46,12 @@ from time import strptime, strftime, localtime
 from invenio.config import CFG_SITE_LANG
 from invenio.messages import gettext_set_language
 
+try:
+    from mx.DateTime import Parser
+    CFG_HAS_EGENIX_DATETIME = True
+except ImportError:
+    CFG_HAS_EGENIX_DATETIME = False
+
 datetext_default = '0000-00-00 00:00:00'
 datestruct_default = (0, 0, 0, 0, 0, 0, 0, 0, 0)
 datetext_format = "%Y-%m-%d %H:%M:%S"
@@ -291,3 +297,25 @@ def create_year_selectbox(name, from_year=-1, length=10, selected_year=0, ln=CFG
         out += ">%i</option>\n"% i
     out += "</select>\n"
     return out
+
+def guess_datetime(datetime_string):
+    """
+    Try to guess the datetime contained in a string of unknow format.
+    @param datetime_string: the datetime representation.
+    @type datetime_string: string
+    @return: the guessed time.
+    @rtype: L{time.struct_time}
+    @raises ValueError: in case it's not possible to guess the time.
+    """
+    if CFG_HAS_EGENIX_DATETIME:
+        try:
+            return Parser.DateTimeFromString(datetime_string).timetuple()
+        except ValueError:
+            pass
+    else:
+        for format in (None, '%x %X', '%X %x', '%Y-%M-%dT%h:%m:%sZ'):
+            try:
+                return strptime(datetime_string, format)
+            except ValueError:
+                pass
+    raise ValueError("It is not possible to guess the datetime format of %s" % datetime_string)
