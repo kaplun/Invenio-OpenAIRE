@@ -28,6 +28,8 @@ import re
 import random
 import getopt
 import sys
+from urllib import urllencode
+from cgi import escape
 
 from invenio.config import \
     CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS, \
@@ -64,7 +66,6 @@ from invenio.access_control_config import DEF_DEMO_USER_ROLES, \
     CFG_ACC_EMPTY_ROLE_DEFINITION_SRC, InvenioWebAccessFireroleError, \
     MAXSELECTUSERS
 from invenio.bibtask import authenticate
-from cgi import escape
 
 
 def index(req, title='', body='', subtitle='', adminarea=2, authorized=0, ln=CFG_SITE_LANG):
@@ -281,7 +282,7 @@ def perform_rolearea(req, grep=""):
     <input type="submit" class="adminbutton" value="Search">
     </form>
     </td></tr></table>
-    """ % escape(grep)
+    """ % escape(grep, True)
 
     output += tupletotable(header=header, tuple=roles2)
 
@@ -378,7 +379,7 @@ def perform_actionarea(req, grep=''):
     <input type="submit" class="adminbutton" value="Search">
     </form>
     </td></tr></table>
-    """ % escape(grep)
+    """ % escape(grep, True)
 
     output += tupletotable(header=header, tuple=actions2)
 
@@ -414,7 +415,7 @@ def perform_userarea(req, email_user_pattern=''):
 
     text  = ' <span class="adminlabel">1. search for user</span>\n'
     text += ' <input class="admin_wvar" type="text" name="email_user_pattern"'\
-        ' value="%s" />\n' % (email_user_pattern, )
+        ' value="%s" />\n' % (escape(email_user_pattern, True), )
 
     output += createhiddenform(action="userarea",
                             text=text,
@@ -442,9 +443,11 @@ def perform_userarea(req, email_user_pattern=''):
                         'id_user=%s">%s</a>' % (col[0][1],
                         email_user_pattern, id, col[0][0]))
                     for (str, function) in col[1:]:
-                        users[-1][-1] += ' / <a href="%s?email_user_pattern' \
-                            '=%s&amp;id_user=%s&amp;reverse=1">%s</a>' % \
-                            (function, email_user_pattern, id, str)
+                        users[-1][-1] += ' / <a href="%s?%s>%s</a>' % \
+                            (function, urlencode({
+                                "email_user_pattern": email_user_pattern
+                                "id_user": id,
+                                "reverse": 1}), str)
 
             output += '<p>found <strong>%s</strong> matching users:</p>' % \
                 (len(users1), )
@@ -516,7 +519,7 @@ def perform_resetdefaultsettings(req, superusers=[], confirm=0):
     <form action="resetdefaultsettings" method="POST">"""
 
     for email in superusers:
-        output += '      <input type="hidden" name="superusers" value="%s" />' % (email, )
+        output += '      <input type="hidden" name="superusers" value="%s" />' % (escape(email True), )
 
     output += """
     <span class="adminlabel">e-mail</span>
@@ -539,7 +542,7 @@ def perform_resetdefaultsettings(req, superusers=[], confirm=0):
 
         extra  = ' <input type="hidden" name="confirm" value="1" />'
         for email in superusers:
-            extra += '<input type="hidden" name="superusers" value="%s" />' % (email, )
+            extra += '<input type="hidden" name="superusers" value="%s" />' % (escape(email, True), )
         extra += ' <input class="adminbutton" type="submit" value="confirm to reset settings" />'
 
         end    = '</form>'
@@ -595,7 +598,7 @@ def perform_adddefaultsettings(req, superusers=[], confirm=0):
     <form action="adddefaultsettings" method="POST">"""
 
     for email in superusers:
-        output += '      <input type="hidden" name="superusers" value="%s" />' % (email, )
+        output += '      <input type="hidden" name="superusers" value="%s" />' % (escape(email, True) )
 
     output += """
     <span class="adminlabel">e-mail</span>
@@ -618,7 +621,7 @@ def perform_adddefaultsettings(req, superusers=[], confirm=0):
 
         extra  = ' <input type="hidden" name="confirm" value="1" />'
         for email in superusers:
-            extra += '<input type="hidden" name="superusers" value="%s" />' % (email, )
+            extra += '<input type="hidden" name="superusers" value="%s" />' % (escape(email, True), )
         extra += ' <input class="adminbutton" type="submit" value="confirm to add settings" />'
 
         end    = '</form>'
@@ -789,9 +792,9 @@ def perform_createaccount(req, email='', password='', callback='yes', confirm=0)
     output = ""
 
     text = ' <span class="adminlabel">Email:</span>\n'
-    text += ' <input class="admin_wvar" type="text" name="email" value="%s" /><br />' % (email, )
+    text += ' <input class="admin_wvar" type="text" name="email" value="%s" /><br />' % (escape(email, True), )
     text += ' <span class="adminlabel">Password:</span>\n'
-    text += ' <input class="admin_wvar" type="text" name="password" value="%s" /><br />' % (password, )
+    text += ' <input class="admin_wvar" type="text" name="password" value="%s" /><br />' % (escape(password, True), )
 
     output += createhiddenform(action="createaccount",
                                 text=text,
@@ -850,7 +853,7 @@ def perform_modifyaccountstatus(req, userID, email_user_pattern, limit_to, maxpa
 
         elif res[0][2] in [1, "1"]:
             res2 = run_sql("UPDATE user SET note=0 WHERE id=%s", (userID, ))
-            output += """<b><span class="info">The account '%s' has been set inactive.</span></b>""" % res[0][1]
+            output += """<b><span class="info">The account '%s' has been set inactive.</span></b>""" % escape(res[0][1])
     else:
         output += '<b><span class="info">The account id given does not exist.</span></b>'
 
@@ -919,7 +922,7 @@ def perform_editaccount(req, userID, mtype='', content='', callback='yes', confi
 
     return index(req=req,
                 title='Edit Account',
-                subtitle="Edit account '%s'" % res[0][1],
+                subtitle="Edit account '%s'" % escape(res[0][1]),
                 body=[fin_output],
                 adminarea=7,
                 authorized=1)
@@ -961,13 +964,13 @@ def perform_modifylogindata(req, userID, nickname='', email='', password='', cal
         if not email and not password:
             email = res[0][1]
             nickname = res[0][2]
-        text =  ' <span class="adminlabel">Account id:</span>%s<br />\n' % userID
+        text =  ' <span class="adminlabel">Account id:</span>%s<br />\n' % escape(userID)
         text =  ' <span class="adminlabel">Nickname:</span>\n'
-        text += ' <input class="admin_wvar" type="text" name="nickname" value="%s" /><br />' % (nickname, )
+        text += ' <input class="admin_wvar" type="text" name="nickname" value="%s" /><br />' % (escape(nickname, True), )
         text += ' <span class="adminlabel">Email:</span>\n'
-        text += ' <input class="admin_wvar" type="text" name="email" value="%s" /><br />' % (email, )
+        text += ' <input class="admin_wvar" type="text" name="email" value="%s" /><br />' % (escape(email, True), )
         text += ' <span class="adminlabel">Password:</span>\n'
-        text += ' <input class="admin_wvar" type="text" name="password" value="%s" /><br />' % (password, )
+        text += ' <input class="admin_wvar" type="text" name="password" value="%s" /><br />' % (escape(password, True), )
 
         output += createhiddenform(action="modifylogindata",
                                 text=text,
@@ -1020,7 +1023,7 @@ def perform_modifypreferences(req, userID, login_method='', callback='yes', conf
         methods = CFG_EXTERNAL_AUTHENTICATION.keys()
         methods.sort()
         for system in methods:
-            text += """<input type="radio" name="login_method" value="%s" %s>%s<br />""" % (system, (user_pref['login_method'] == system and "checked" or ""), system)
+            text += """<input type="radio" name="login_method" value="%s" %s>%s<br />""" % (escape(system, True), (user_pref['login_method'] == system and 'checked="checked"' or ""), escape(system))
 
 
         output += createhiddenform(action="modifypreferences",
@@ -1059,7 +1062,7 @@ def perform_deleteaccount(req, userID, callback='yes', confirm=0):
             text = '<b><span class="important">Are you sure you want to delete the account with email: "%s"?</span></b>' % res[0][1]
             output += createhiddenform(action="deleteaccount",
                                     text=text,
-                    userID=userID,
+                                    userID=userID,
                                     confirm=1,
                                     button="Delete")
 
@@ -1140,7 +1143,7 @@ def perform_modifyaccounts(req, email_user_pattern='', limit_to=-1, maxpage=MAXP
     <option value="all" %s>All accounts</option>
     <option value="enabled" %s>Active accounts</option>
     <option value="disabled" %s>Inactive accounts</option>
-    </select><br />""" % ((limit_to=="all" and "selected" or ""), (limit_to=="enabled" and "selected" or ""), (limit_to=="disabled" and "selected" or ""))
+    </select><br />""" % ((limit_to=="all" and 'selected="selected"' or ""), (limit_to=="enabled" and "selected" or ""), (limit_to=='disabled="disabled"' and 'selected="selected"' or ""))
 
     text += """<span class="adminlabel">Accounts per page:</span>
     <select name="maxpage" class="admin_wvar">
@@ -1150,7 +1153,7 @@ def perform_modifyaccounts(req, email_user_pattern='', limit_to=-1, maxpage=MAXP
     <option value="250" %s>250</option>
     <option value="500" %s>500</option>
     <option value="1000" %s>1000</option>
-    </select><br />""" % ((maxpage==25 and "selected" or ""), (maxpage==50 and "selected" or ""), (maxpage==100 and "selected" or ""), (maxpage==250 and "selected" or ""), (maxpage==500 and "selected" or ""), (maxpage==1000 and "selected" or ""))
+    </select><br />""" % ((maxpage==25 and 'selected="selected"' or ""), (maxpage==50 and 'selected="selected"' or ""), (maxpage==100 and 'selected="selected"' or ""), (maxpage==250 and 'selected="selected"' or ""), (maxpage==500 and 'selected="selected"' or ""), (maxpage==1000 and 'selected="selected"' or ""))
 
     output += createhiddenform(action="modifyaccounts",
                             text=text,
@@ -1186,10 +1189,34 @@ def perform_modifyaccounts(req, email_user_pattern='', limit_to=-1, maxpage=MAXP
                 users.append(['', id, email, (note=="1" and '<strong class="info">Active</strong>' or '<strong class="important">Inactive</strong>')])
                 for col in [(((note=="1" and 'Inactivate' or 'Activate'), 'modifyaccountstatus'), ((note == "0" and 'Reject' or 'Delete'), 'rejectaccount'), ),
                             (('Edit account', 'editaccount'), ),]:
-                    users[-1].append('<a href="%s?userID=%s&amp;email_user_pattern=%s&amp;limit_to=%s&amp;maxpage=%s&amp;page=%s&amp;rand=%s">%s</a>' % (col[0][1], id, email_user_pattern, limit_to, maxpage, page, random.randint(0, 1000), col[0][0]))
+                    users[-1].append('<a href="%s">%s</a>' % escape("%s?%s" %
+                        (col[0][1], urllencode({
+                            'userID': id,
+                            'email_user_pattern': email_user_pattern,
+                            'limit_to': limit_to,
+                            'maxpage': maxpage,
+                            'page': page,
+                            'rand': random.randint(0, 1000)})), True),
+                        escape(col[0][0]))
                     for (str, function) in col[1:]:
-                        users[-1][-1] += ' / <a href="%s?userID=%s&amp;email_user_pattern=%s&amp;limit_to=%s&amp;maxpage=%s&amp;page=%s&amp;rand=%s">%s</a>' % (function, id, email_user_pattern, limit_to, maxpage, page, random.randint(0, 1000), str)
-                users[-1].append('<a href=%s?userID=%s&amp;email_user_pattern=%s&amp;limit_to=%s&amp;maxpage=%s&amp;page=%s&amp;rand=%s">%s</a>' % ('becomeuser', id, email_user_pattern, limit_to, maxpage, page, random.randint(0, 1000), 'Become user'))
+                        users[-1][-1] += ' / <a href="%s">%s</a>' % (
+                            escape("%s?%s" % (function, urllencode({
+                                'userID': id,
+                                'email_user_pattern': email_user_pattern,
+                                'limit_to': limit_to,
+                                'maxpage': maxpage,
+                                'page': page,
+                                'rand': random.randint(0, 1000)
+                            })), True), escape(str))
+                users[-1].append('<a href="%s">%s</a>' % (
+                    escape("%s?%s" % ('becomeuser', urllencode({
+                        'userID': id
+                        'email_user_pattern': email_user_pattern,
+                        'limit_to': limit_to,
+                        'maxpage': maxpage,
+                        'page': page,
+                        'rand': random.randint(0, 1000),
+                    })), True), 'Become user'))
 
             last = ""
             next = ""
@@ -1734,7 +1761,7 @@ def perform_addrole(req, id_role=0, name_role='', description='put description h
     <input class="adminbutton" type="submit" value="add role" />
     </td></tr></tbody></table>
     </form>
-    """ % (escape(name_role, '"'), escape(description),  escape(firerole_def_src))
+    """ % (escape(name_role, True), escape(description),  escape(firerole_def_src))
 
     if name_role:
         # description must be changed before submitting
@@ -1756,9 +1783,9 @@ def perform_addrole(req, id_role=0, name_role='', description='put description h
 
             output += createhiddenform(action="addrole",
                                     text=text,
-                                    name_role=escape(name_role, '"'),
-                                    description=escape(description, '"'),
-                                    firerole_def_src=escape(firerole_def_src, '"'),
+                                    name_role=escape(name_role, True),
+                                    description=escape(description, True),
+                                    firerole_def_src=escape(firerole_def_src, True),
                                     confirm=1)
 
             if confirm not in ["0", 0]:
@@ -1848,7 +1875,7 @@ def perform_modifyrole(req, id_role='0', name_role='', description='put descript
     <input type="hidden" name="modified" value="1" />
     </td></tr></tbody></table>
     </form>
-    """ % (id_role, escape(name_role), escape(description), escape(firerole_def_src))
+    """ % (id_role, escape(name_role, True), escape(description), escape(firerole_def_src))
 
     if modified in [1, '1']:
         # description must be changed before submitting

@@ -206,8 +206,8 @@ def create_html_link(urlbase, urlargd, link_label, linkattrd=None,
                            attributes (e.g. < becomes &lt; or " becomes &quot;)
     """
     attributes_separator = ' '
-    output = '<a href="' + \
-             create_url(urlbase, urlargd, escape_urlargd) + '"'
+    output = '<a href="%s"' % cgi.escape(
+        create_url(urlbase, urlargd, escape_urlargd), True)
     if linkattrd:
         output += ' '
         if escape_linkattrd:
@@ -357,28 +357,19 @@ def string_to_numeric_char_reference(string):
     return out
 
 
-def create_url(urlbase, urlargd, escape_urlargd=True):
-    """Creates a W3C compliant URL. Output will look like this:
-    'urlbase?param1=value1&amp;param2=value2'
+def create_html_url(urlbase, urlargd):
+    """Creates a W3C compliant URL suitable to be used inside "a" tag in the
+    href attribute. Output will look like this:
+    'urlbase?param1=value1&amp;param2=value2' with all special characters
+    already escaped.
     @param urlbase: base url (e.g. invenio.config.CFG_SITE_URL/search)
     @param urlargd: dictionary of parameters. (e.g. p={'recid':3, 'of'='hb'}
-    @param escape_urlargd: boolean indicating if the function should escape
-                           arguments (e.g. < becomes &lt; or " becomes &quot;)
     """
-    separator = '&amp;'
-    output = urlbase
+    urlargd = urlencode(urlargd)
     if urlargd:
-        output += '?'
-        if escape_urlargd:
-            arguments = [escape(quote(str(key)), quote=True) + '=' + \
-                         escape(quote(str(urlargd[key])), quote=True)
-                                for key in urlargd.keys()]
-        else:
-            arguments = [str(key) + '=' + str(urlargd[key])
-                            for key in urlargd.keys()]
-        output += separator.join(arguments)
-    return output
-
+        return escape('%s?%s' % (urlbase, urlargd))
+    else:
+        return escape(urlbase)
 
 def same_urls_p(a, b):
     """ Compare two URLs, ignoring reorganizing of query arguments """
