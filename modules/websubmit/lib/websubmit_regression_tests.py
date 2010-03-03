@@ -53,8 +53,8 @@ class WebSubmitWebPagesAvailabilityTest(unittest.TestCase):
 
         baseurl = CFG_SITE_URL
 
-        _exports = ['/approve.py', '/publiline.py',
-                    '/yourapprovals.py']
+        _exports = ['/submit/approve', '/submit/publiline',
+                    '/yourapprovals']
 
         error_messages = []
         for url in [baseurl + page for page in _exports]:
@@ -68,7 +68,7 @@ class WebSubmitWebPagesAvailabilityTest(unittest.TestCase):
 
         baseurl = CFG_SITE_URL
 
-        _exports = ['/yoursubmissions.py']
+        _exports = ['/yoursubmissions']
 
         error_messages = []
         for url in [baseurl + page for page in _exports]:

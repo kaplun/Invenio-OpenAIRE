@@ -24,6 +24,7 @@ import time
 import cgi
 import sys
 import shutil
+import re
 
 from urllib import urlencode
 
@@ -38,13 +39,16 @@ from invenio.config import \
      CFG_WEBSUBMIT_STORAGEDIR, \
      CFG_PREFIX, \
      CFG_CERN_SITE, \
-     CFG_SITE_RECORD
+     CFG_SITE_RECORD, \
+     CFG_SITE_SUPPORT_EMAIL, \
+     CFG_SITE_ADMIN_EMAIL
 from invenio import webinterface_handler_config as apache
 from invenio.dbquery import run_sql
 from invenio.access_control_config import VIEWRESTRCOLL
 from invenio.access_control_mailcookie import mail_cookie_create_authorize_action
 from invenio.access_control_engine import acc_authorize_action
-from invenio.access_control_admin import acc_is_role
+from invenio.access_control_admin import acc_is_role, acc_find_possible_roles, \
+    acc_get_role_users, acc_get_role_id
 from invenio.webpage import page, create_error_box, pageheaderonly, \
     pagefooteronly
 from invenio.webuser import getUid, page_not_authorized, collect_user_info, isGuestUser, isUserSuperAdmin
@@ -56,10 +60,11 @@ from invenio.messages import gettext_set_language
 from invenio.search_engine import \
      guess_primary_collection_of_a_record, get_colID, record_exists, \
      create_navtrail_links, check_user_can_view_record, record_empty, \
-     is_user_owner_of_record
+     is_user_owner_of_record, search_pattern, get_fieldvalues
 from invenio.bibdocfile import BibRecDocs, normalize_format, file_strip_ext, \
     stream_restricted_icon, BibDoc, InvenioWebSubmitFileError, stream_file, \
     decompose_file, propose_next_docname, get_subformat_from_format
+from invenio.mailutils import send_email
 from invenio.errorlib import register_exception
 from invenio.htmlutils import is_html_text_editor_installed
 from invenio.websubmit_icon_creator import create_icon, InvenioWebSubmitIconCreatorError
@@ -67,8 +72,11 @@ from ckeditor_invenio_connector import process_CKEditor_upload, send_response
 import invenio.template
 websubmit_templates = invenio.template.load('websubmit')
 from invenio.websearchadminlib import get_detailed_page_tabs
+from invenio.websubmit_functions.Retrieve_Data import Get_Field
 from invenio.session import get_session
 from invenio.jsonutils import json, CFG_JSON_AVAILABLE
+from invenio.bibrecord import create_records, record_get_field_value, \
+    record_get_field_values
 import invenio.template
 webstyle_templates = invenio.template.load('webstyle')
 websearch_templates = invenio.template.load('websearch')
@@ -78,6 +86,253 @@ from invenio.websubmit_managedocfiles import \
      get_upload_file_interface_javascript, \
      get_upload_file_interface_css, \
      move_uploaded_files_to_storage
+
+CFG_WEBSUBMIT_PENDING_DIR = "%s/pending" % CFG_WEBSUBMIT_STORAGEDIR
+CFG_WEBSUBMIT_DUMMY_MARC_XML_REC = "dummy_marcxml_rec"
+CFG_WEBSUBMIT_MARC_XML_REC = "recmysql"
+
+class WebInterfaceYourSubmissionsPages(WebInterfaceDirectory):
+    _exports = ['', 'display']
+
+    def index(self, req, form):
+        redirect_to_url(req, '%s/yoursubmissions/display' % CFG_SITE_SECURE_URL)
+
+    def display(self, req, form):
+        argd = wash_urlargd(form, {
+            'order': (str, ''),
+            'doctype': (str, ''),
+            'deletedId': (str, ''),
+            'deletedAction': (str, ''),
+            'deletedDoctype': (str, ''),
+        })
+        order = argd['order']
+        doctype = argd['doctype']
+        deletedId = argd['deletedId']
+        deletedAction = argd['deletedAction']
+        deletedDoctype = argd['deletedDoctype']
+        ln = argd['ln']
+
+        # load the right message language
+        _ = gettext_set_language(ln)
+
+        t=""
+
+        uid = getUid(req)
+        if isGuestUser(uid):
+            return redirect_to_url(req, "%s/youraccount/login%s" % (
+                CFG_SITE_SECURE_URL,
+                    make_canonical_urlargd({
+                'referer': CFG_SITE_URL + req.unparsed_uri, 'ln': ln}, {})))
+
+        user_info = collect_user_info(req)
+        u_email = user_info['email']
+
+        if deletedId:
+            t += self.deleteSubmission(deletedId, deletedAction, deletedDoctype, u_email)
+
+        # doctypes
+        res = run_sql("select ldocname,sdocname from sbmDOCTYPE order by ldocname")
+        doctypes = []
+        for row in res:
+            doctypes.append({
+                            'id' : row[1],
+                            'name' : row[0],
+                            'selected' : (doctype == row[1]),
+                            })
+
+        # submissions
+        # request order default value
+        query_params = [u_email]
+        reqorder = "sbmSUBMISSIONS.md DESC, lactname"
+        # requested value
+        if order == "actiondown":
+            reqorder = "lactname ASC, sbmSUBMISSIONS.md DESC"
+        elif order == "actionup":
+            reqorder = "lactname DESC, sbmSUBMISSIONS.md DESC"
+        elif order == "refdown":
+            reqorder = "reference ASC, sbmSUBMISSIONS.md DESC, lactname DESC"
+        elif order == "refup":
+            reqorder = "reference DESC, sbmSUBMISSIONS.md DESC, lactname DESC"
+        elif order == "cddown":
+            reqorder = "sbmSUBMISSIONS.cd DESC, lactname"
+        elif order == "cdup":
+            reqorder = "sbmSUBMISSIONS.cd ASC, lactname"
+        elif order == "mddown":
+            reqorder = "sbmSUBMISSIONS.md DESC, lactname"
+        elif order == "mdup":
+            reqorder = "sbmSUBMISSIONS.md ASC, lactname"
+        elif order == "statusdown":
+            reqorder = "sbmSUBMISSIONS.status DESC, lactname"
+        elif order == "statusup":
+            reqorder = "sbmSUBMISSIONS.status ASC, lactname"
+        if doctype != "":
+            docselect = " and doctype=%s "
+            query_params.append(doctype)
+        else:
+            docselect = ""
+
+        res = run_sql("SELECT sbmSUBMISSIONS.* FROM sbmSUBMISSIONS,sbmACTION WHERE sactname=action and email=%s and id!='' " + docselect + " ORDER BY doctype," + reqorder, query_params)
+        currentdoctype = ""
+        currentaction = ""
+        currentstatus = ""
+
+        submissions = []
+        for row in res:
+            if currentdoctype != row[1]:
+                currentdoctype = row[1]
+                currentaction = ""
+                currentstatus = ""
+                res2 = run_sql("SELECT ldocname FROM sbmDOCTYPE WHERE  sdocname=%s", (currentdoctype, ))
+                if res2:
+                    ldocname = res2[0][0]
+                else:
+                    ldocname = """***Unknown Document Type - (%s)""" % (currentdoctype,)
+
+            if currentaction != row[2]:
+                currentaction = row[2]
+                res2 = run_sql("SELECT lactname FROM sbmACTION WHERE  sactname=%s", (currentaction, ))
+                if res2:
+                    lactname = res2[0][0]
+                else:
+                    lactname = "\""
+            else:
+                lactname = "\""
+
+            if currentstatus != row[3]:
+                currentstatus = row[3]
+                status=row[3]
+            else:
+                status = "\""
+
+            submissions.append({
+                                'docname': ldocname,
+                                'actname': lactname,
+                                'status': status,
+                                'cdate': row[6],
+                                'mdate': row[7],
+                                'reference': row[5],
+                                'id': row[4],
+                                'act': currentaction,
+                                'doctype': currentdoctype,
+                                'pending': (row[3] == "pending")})
+        # display
+        t += websubmit_templates.tmpl_yoursubmissions(
+            ln = ln,
+            order = order,
+            doctypes = doctypes,
+            submissions = submissions,
+            )
+
+        return page(title=_("Your Submissions"),
+                    navtrail= """<a class="navtrail" href="%(sitesecureurl)s/youraccount/display">%(account)s</a>""" % {
+                                'sitesecureurl' : CFG_SITE_SECURE_URL,
+                                'account' : _("Your Account"),
+                            },
+                    body=t,
+                    description="",
+                    keywords="",
+                    uid=uid,
+                    language=ln,
+                    req=req,
+                    navmenuid='yoursubmissions')
+
+    def deleteSubmission(id, action, doctype, u_email):
+        run_sql("delete from sbmSUBMISSIONS WHERE doctype=%s and action=%s and email=%s and status='pending' and id=%s", (doctype, action, u_email, id,))
+        res = run_sql("select dir from sbmACTION where sactname=%s", (action,))
+        dir = res[0][0]
+        if not ('..' in doctype or '..' in id) and id != "":
+            full = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, dir, doctype, id)
+            if os.path.isdir(full):
+                shutil.rmtree(full)
+        return ""
+    deleteSubmission = staticmethod(deleteSubmission)
+
+
+class WebInterfaceYourApprovalsPages(WebInterfaceDirectory):
+    _exports = ['', 'display']
+
+    def index(self, req, form):
+        redirect_to_url(req, '%s/yoursubmissions/display' % CFG_SITE_SECURE_URL)
+
+    def display(self, req, form):
+
+        argd = wash_urlargd(form, {})
+        ln = argd['ln']
+
+        # load the right message language
+        _ = gettext_set_language(ln)
+
+        t=""
+        # get user ID:
+        uid = getUid(req)
+        if isGuestUser(uid):
+            return redirect_to_url(req, "%s/youraccount/login%s" % (
+                CFG_SITE_SECURE_URL,
+                    make_canonical_urlargd({
+                'referer': CFG_SITE_SECURE_URL + req.unparsed_uri, 'ln': ln}, {})))
+
+        user_info = collect_user_info(req)
+        if not user_info['precached_useapprove']:
+            return page_not_authorized(req, "../", \
+                                        text = _("You are not authorized to use approval system."))
+
+        res = run_sql("SELECT sdocname,ldocname FROM sbmDOCTYPE ORDER BY ldocname")
+        referees = []
+        for row in res:
+            doctype = row[0]
+            docname = row[1]
+            reftext = ""
+            if self.is_refereed(doctype) and self.is_referee(user_info, doctype):
+                referees.append ({'doctype': doctype,
+                                'docname': docname,
+                                'categories': None})
+            else:
+                res2 = run_sql("select sname,lname from sbmCATEGORIES where doctype=%s", (doctype,))
+                categories = []
+                for row2 in res2:
+                    category = row2[0]
+                    categname = row2[1]
+                    if self.is_refereed(doctype, category) and self.is_referee(user_info, doctype, category):
+                        categories.append({
+                                            'id' : category,
+                                            'name' : categname,
+                                        })
+                if categories:
+                    referees.append({
+                                'doctype' : doctype,
+                                'docname' : docname,
+                                'categories' : categories
+                            })
+
+        t = websubmit_templates.tmpl_yourapprovals(ln=ln, referees=referees)
+        return page(title=_("Your Approvals"),
+                    navtrail= """<a class="navtrail" href="%(sitesecureurl)s/youraccount/display">%(account)s</a>""" % {
+                                'sitesecureurl' : CFG_SITE_SECURE_URL,
+                                'account' : _("Your Account"),
+                            },
+                    body=t,
+                    description="",
+                    keywords="",
+                    uid=uid,
+                    language=ln,
+                    req=req,
+                    navmenuid='yourapprovals')
+
+    def is_referee(user_info, doctype="", categ="*"):
+        (auth_code, auth_message) = acc_authorize_action(user_info, "referee", doctype=doctype, categ=categ)
+        if auth_code == 0:
+            return 1
+        else:
+            return 0
+    is_referee = staticmethod(is_referee)
+
+    def is_refereed(doctype, categ="*"):
+        """Check if the given doctype, categ is refereed by at least a role. different than SUPERADMINROLE"""
+        roles = acc_find_possible_roles('referee', always_add_superadmin=False, doctype=doctype, categ=categ)
+        if roles:
+            return True
+        return False
+    is_refereed = staticmethod(is_refereed)
 
 
 class WebInterfaceFilesPages(WebInterfaceDirectory):
@@ -345,7 +600,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
 
     _exports = ['summary', 'sub', 'direct', '', 'attachfile', 'uploadfile', \
                 'getuploadedfile', 'managedocfiles', 'managedocfilesasync', \
-                'upload_video']
+                'upload_video', 'approve', 'publiline']
 
     def managedocfiles(self, req, form):
         """
@@ -378,8 +633,8 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
                                        navmenuid="admin")
 
         # Prepare navtrail
-        navtrail = '''<a class="navtrail" href="%(CFG_SITE_URL)s/help/admin">Admin Area</a> &gt; %(manage_files)s''' \
-        % {'CFG_SITE_URL': CFG_SITE_URL,
+        navtrail = '''<a class="navtrail" href="%(CFG_SITE_SECURE_URL)s/help/admin">Admin Area</a> &gt; %(manage_files)s''' \
+        % {'CFG_SITE_SECURE_URL': CFG_SITE_SECURE_URL,
            'manage_files': _("Manage Document Files")}
 
         body = ''
@@ -410,14 +665,14 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
 
         if not argd['recid'] or argd['do'] != 0:
             body += '''
-        <form method="post" action="%(CFG_SITE_URL)s/submit/managedocfiles">
+        <form method="post" action="%(CFG_SITE_SECURE_URL)s/submit/managedocfiles">
         <label for="recid">%(edit_record)s:</label>
         <input type="text" name="recid" id="recid" />
         <input type="submit" value="%(edit)s" class="adminbutton" />
         </form>
         ''' % {'edit': _('Edit'),
                'edit_record': _('Edit record'),
-               'CFG_SITE_URL': CFG_SITE_URL}
+               'CFG_SITE_SECURE_URL': CFG_SITE_SECURE_URL}
 
         access = time.strftime('%Y%m%d_%H%M%S')
         if argd['recid'] and argd['do'] == 0:
@@ -425,11 +680,11 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
             # Prepare navtrail
             title, description, keywords = websearch_templates.tmpl_record_page_header_content(req, argd['recid'],
                                                                                                argd['ln'])
-            navtrail = '''<a class="navtrail" href="%(CFG_SITE_URL)s/help/admin">Admin Area</a> &gt;
-        <a class="navtrail" href="%(CFG_SITE_URL)s/submit/managedocfiles">%(manage_files)s</a> &gt;
+            navtrail = '''<a class="navtrail" href="%(CFG_SITE_SECURE_URL)s/help/admin">Admin Area</a> &gt;
+        <a class="navtrail" href="%(CFG_SITE_SECURE_URL)s/submit/managedocfiles">%(manage_files)s</a> &gt;
         %(record)s: %(title)s
         ''' \
-            % {'CFG_SITE_URL': CFG_SITE_URL,
+            % {'CFG_SITE_SECURE_URL': CFG_SITE_SECURE_URL,
                'title': title,
                'manage_files': _("Document File Manager"),
                'record': _("Record #%i") % argd['recid']}
@@ -469,7 +724,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
                 display_hidden_files=True)[1]
 
             body += '''<br />
-            <form method="post" action="%(CFG_SITE_URL)s/submit/managedocfiles">
+            <form method="post" action="%(CFG_SITE_SECURE_URL)s/submit/managedocfiles">
             <input type="hidden" name="recid" value="%(recid)s" />
             <input type="hidden" name="do" value="1" />
             <input type="hidden" name="access" value="%(access)s" />
@@ -483,7 +738,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
      'recid': argd['recid'],
      'access': access,
      'ln': argd['ln'],
-     'CFG_SITE_URL': CFG_SITE_URL}
+     'CFG_SITE_SECURE_URL': CFG_SITE_SECURE_URL}
 
             body += websubmit_templates.tmpl_page_do_not_leave_submission_js(argd['ln'], enabled=True)
 
@@ -1026,9 +1281,9 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
 
 
         # URL where the file can be fetched after upload
-        user_files_path = '%(CFG_SITE_URL)s/submit/getattachedfile/%(uid)s' % \
+        user_files_path = '%(CFG_SITE_SECURE_URL)s/submit/getattachedfile/%(uid)s' % \
                           {'uid': uid,
-                           'CFG_SITE_URL': CFG_SITE_URL,
+                           'CFG_SITE_SECURE_URL': CFG_SITE_SECURE_URL,
                            'filetype': filetype}
 
         # Path to directory where uploaded files are saved
@@ -1348,6 +1603,93 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
 
         return _index(req, **args)
 
+    def approve(self, req, form):
+        """Approval web Interface.
+        GET params:
+
+        """
+        argd = wash_urlargd(form, {
+            'access': (str, '')
+        })
+
+        ln = argd['ln']
+        access = argd['access']
+
+        uid = getUid(req)
+        if isGuestUser(uid):
+            return redirect_to_url(req, "%s/youraccount/login%s" % (
+                CFG_SITE_SECURE_URL,
+                    make_canonical_urlargd({
+                'referer': CFG_SITE_SECURE_URL + req.unparsed_uri, 'ln': ln}, {})))
+
+        _ = gettext_set_language(ln)
+        if access:
+            # form keys can be a list of 'access pw' and ln, so remove 'ln':
+            res = run_sql("select doctype,rn from sbmAPPROVAL where access=%s",(access,))
+            if len(res) == 0:
+                return warningMsg(_("approve.py: cannot find document in database"), req)
+            else:
+                doctype = res[0][0]
+                rn = res[0][1]
+            res = run_sql("select value from sbmPARAMETERS where name='edsrn' and doctype=%s",(doctype,))
+            edsrn = res[0][0]
+            url = "%s/submit/direct?%s" % (CFG_SITE_SECURE_URL, urlencode({
+                edsrn: rn,
+                'access' : access,
+                'sub' : 'APP%s' % doctype,
+                'ln' : ln
+            }))
+            redirect_to_url(req, url)
+        else:
+            return warningMsg(_("Sorry parameter missing..."), req, ln=ln)
+
+    def publiline(self, req, form):
+        argd = wash_urlargd(form, {
+            'doctype': (str, ''),
+            'categ': (str, ''),
+            'RN': (str, ''),
+            'send': (str, '')
+        })
+
+        ln = argd['ln']
+        doctype = argd['doctype']
+        categ = argd['categ']
+        RN = argd['RN']
+        send = argd['send']
+
+        # load the right message language
+        _ = gettext_set_language(ln)
+
+        t=""
+        uid = getUid(req)
+        if isGuestUser(uid):
+            return redirect_to_url(req, "%s/youraccount/login%s" % (
+                CFG_SITE_SECURE_URL,
+                    make_canonical_urlargd({
+                'referer': CFG_SITE_SECURE_URL + req.unparsed_uri, 'ln': ln}, {})))
+
+        if doctype == "":
+            t = selectDoctype(ln)
+        elif categ == "":
+            t = selectCateg(doctype, ln)
+        elif RN == "":
+            t = selectDocument(doctype, categ, ln)
+        else:
+            t = displayDocument(req, doctype, categ, RN, send, ln)
+        return page(title=_("Approval and Refereeing Workflow"),
+                    navtrail= """<a class="navtrail" href="%(sitesecureurl)s/youraccount/display">%(account)s</a>""" % {
+                                    'sitesecureurl' : CFG_SITE_SECURE_URL,
+                                    'account' : _("Your Account"),
+                                },
+                    body=t,
+                    description="",
+                    keywords="",
+                    uid=uid,
+                    language=ln,
+                    req=req,
+                    navmenuid='yourapprovals')
+
+
     # Answer to both /submit/ and /submit
     __call__ = index
 
@@ -1421,3 +1763,610 @@ def print_warning(msg, type='', prologue='<br />', epilogue='<br />'):
 ##             break
 
 ##     return os.path.join(base_path, most_recent_filename)
+
+def selectDoctype(ln = CFG_SITE_LANG):
+    res = run_sql("select DISTINCT doctype from sbmAPPROVAL")
+    docs = []
+    for row in res:
+        res2 = run_sql("select ldocname from sbmDOCTYPE where sdocname=%s", (row[0],))
+        docs.append({
+                     'doctype' : row[0],
+                     'docname' : res2[0][0],
+                    })
+    t = websubmit_templates.tmpl_publiline_selectdoctype(
+          ln = ln,
+          docs = docs,
+        )
+    return t
+
+def selectCateg(doctype, ln = CFG_SITE_LANG):
+    t=""
+    res = run_sql("select ldocname from sbmDOCTYPE where sdocname=%s",(doctype,))
+    title = res[0][0]
+    sth = run_sql("select * from sbmCATEGORIES where doctype=%s order by lname",(doctype,))
+    if len(sth) == 0:
+        categ = "unknown"
+        return selectDocument(doctype,categ, ln = ln)
+
+    categories = []
+    for arr in sth:
+        waiting = 0
+        rejected = 0
+        approved = 0
+        sth2 = run_sql("select COUNT(*) from sbmAPPROVAL where doctype=%s and categ=%s and status='waiting'", (doctype,arr[1],))
+        waiting = sth2[0][0]
+        sth2 = run_sql("select COUNT(*) from sbmAPPROVAL where doctype=%s and categ=%s and status='approved'",(doctype,arr[1],))
+        approved = sth2[0][0]
+        sth2 = run_sql("select COUNT(*) from sbmAPPROVAL where doctype=%s and categ=%s and status='rejected'",(doctype,arr[1],))
+        rejected = sth2[0][0]
+        categories.append({
+                            'waiting' : waiting,
+                            'approved' : approved,
+                            'rejected' : rejected,
+                            'id' : arr[1],
+                          })
+
+    t = websubmit_templates.tmpl_publiline_selectcateg(
+          ln = ln,
+          categories = categories,
+          doctype = doctype,
+          title = title,
+        )
+    return t
+
+def selectDocument(doctype,categ, ln = CFG_SITE_LANG):
+    t=""
+    res = run_sql("select ldocname from sbmDOCTYPE where sdocname=%s", (doctype,))
+    title = res[0][0]
+    if categ == "":
+        categ == "unknown"
+
+    docs = []
+    sth = run_sql("select rn,status from sbmAPPROVAL where doctype=%s and categ=%s order by status DESC,rn DESC",(doctype,categ))
+    for arr in sth:
+        docs.append({
+                     'RN' : arr[0],
+                     'status' : arr[1],
+                    })
+
+    t = websubmit_templates.tmpl_publiline_selectdocument(
+          ln = ln,
+          doctype = doctype,
+          title = title,
+          categ = categ,
+          docs = docs,
+        )
+    return t
+
+def displayDocument(req, doctype, categ, RN, send, ln=CFG_SITE_LANG):
+
+    # load the right message language
+    _ = gettext_set_language(ln)
+
+    t=""
+    res = run_sql("select ldocname from sbmDOCTYPE where sdocname=%s", (doctype,))
+    docname = res[0][0]
+    if categ == "":
+        categ = "unknown"
+    sth = run_sql("select rn,status,dFirstReq,dLastReq,dAction,access,note from sbmAPPROVAL where rn=%s",(RN,))
+    if len(sth) > 0:
+        arr = sth[0]
+        rn = arr[0]
+        status = arr[1]
+        dFirstReq = arr[2]
+        dLastReq = arr[3]
+        dAction = arr[4]
+        access = arr[5]
+        note = arr[6]
+    else:
+        return _("Approval has never been requested for this document.") + "<br />&nbsp;"
+
+    ## Get the details of the pending item:
+    item_details = get_pending_item_details(doctype, RN)
+    ## get_pending_item_details has returned either None or a dictionary
+    ## with the following structure:
+    ##   { 'title'            : '-', ## String - the item's title
+    ##     'recid'            : '',  ## String - recid
+    ##     'report-number'    : '',  ## String - the item's report number
+    ##     'authors'          : [],  ## List   - the item's authors
+    ##   }
+    if item_details is not None:
+        authors = ", ".join(item_details['authors'])
+        newrn = item_details['report-number']
+        title = item_details['title']
+        sysno = item_details['recid']
+    else:
+        # Was not found in the pending directory. Already approved?
+        try:
+            (authors, title, sysno) = get_info(RN)
+            newrn = RN
+            if sysno is None:
+                return _("Unable to display document.")
+        except:
+            return _("Unable to display document.")
+
+    user_info = collect_user_info(req)
+    can_view_record_p, msg = check_user_can_view_record(user_info, sysno)
+    if can_view_record_p != 0:
+        return msg
+
+    confirm_send = 0
+    if send == _("Send Again"):
+        if authors == "unknown" or title == "unknown":
+            send_warning(doctype,categ,RN,title,authors,access)
+        else:
+            # @todo - send in different languages
+            #send_english(doctype,categ,RN,title,authors,access,sysno)
+            send_approval(doctype, categ, RN, title, authors, access, sysno)
+            run_sql("update sbmAPPROVAL set dLastReq=NOW() where rn=%s",(RN,))
+            confirm_send = 1
+
+    if status == "waiting":
+        if categ == "unknown":
+            ## FIXME: This was necessary for document types without categories,
+            ## such as DEMOBOO:
+            categ = "*"
+        (auth_code, auth_message) = acc_authorize_action(req, "referee",verbose=0,doctype=doctype, categ=categ)
+    else:
+        (auth_code, auth_message) = (None, None)
+
+    t = websubmit_templates.tmpl_publiline_displaydoc(
+          ln = ln,
+          docname = docname,
+          doctype = doctype,
+          categ = categ,
+          rn = rn,
+          status = status,
+          dFirstReq = dFirstReq,
+          dLastReq = dLastReq,
+          dAction = dAction,
+          access = access,
+          confirm_send = confirm_send,
+          auth_code = auth_code,
+          auth_message = auth_message,
+          authors = authors,
+          title = title,
+          sysno = sysno,
+          newrn = newrn,
+          note = note,
+        )
+    return t
+
+def get_pending_item_details(doctype, reportnumber):
+    """Given a doctype and reference number, try to retrieve an item's details.
+       The first place to search for them should be the WebSubmit pending
+       directory. If nothing is retrieved from there, and attempt is made
+       to retrieve them from the CDS Invenio repository itself.
+       @param doctype: (string) - the doctype of the item for which brief
+        details are to be retrieved.
+       @param reportnumber: (string) - the report number of the item
+        for which details are to be retrieved.
+       @return: (dictionary or None) - If details are found for the item,
+        they will be returned in a dictionary structured as follows:
+            { 'title'         : '-', ## String - the item's title
+              'recid'         : '',  ## String - recid taken from the SN file
+              'report-number' : '',  ## String - the item's report number
+              'authors'       : [],  ## List   - the item's authors
+            }
+        If no details were found a NoneType is returned.
+    """
+    ## First try to get the details of a document from the pending dir:
+    item_details = get_brief_doc_details_from_pending(doctype, \
+                                                      reportnumber)
+    if item_details is None:
+        item_details = get_brief_doc_details_from_repository(reportnumber)
+    ## Return the item details:
+    return item_details
+
+# Retrieve info about document
+def get_info(RN):
+    """
+    Retrieve basic info from record with given report number.
+    Returns (authors, title, sysno)
+    """
+    authors = None
+    title = None
+    sysno = None
+
+    recids = search_pattern(p=RN, f='037__a')
+    if len(recids) == 1:
+        sysno = int(recids.tolist()[0])
+        authors = ','.join(get_fieldvalues(sysno, "100__a") + get_fieldvalues(sysno, "700__a"))
+        title = ','.join(get_fieldvalues(sysno, "245__a"))
+
+    return (authors, title, sysno)
+
+#seek info in Alice database
+def get_in_alice(doctype, categ, RN):
+    """FIXME: DEPRECATED!"""
+    # initialize sysno variable
+    sysno = ""
+    searchresults = list(search_pattern(req=None, p=RN, f="reportnumber"))
+    if len(searchresults) == 0:
+        return 0
+    sysno = searchresults[0]
+    if sysno != "":
+        title = Get_Field('245__a',sysno)
+        emailvalue = Get_Field('8560_f',sysno)
+        authors = Get_Field('100__a',sysno)
+        authors += "\n%s" % Get_Field('700__a',sysno)
+        newrn = Get_Field('037__a',sysno)
+        return (authors,title,sysno,newrn)
+    else:
+        return 0
+
+#seek info in pending directory
+def get_in_pending(doctype,categ,RN):
+    """FIXME: DEPRECATED!"""
+    PENDIR="%s/pending" % CFG_WEBSUBMIT_STORAGEDIR
+    if os.path.exists("%s/%s/%s/AU" % (PENDIR,doctype,RN)):
+        fp = open("%s/%s/%s/AU" % (PENDIR,doctype,RN),"r")
+        authors=fp.read()
+        fp.close()
+    else:
+        authors = ""
+    if os.path.exists("%s/%s/%s/TI" % (PENDIR,doctype,RN)):
+        fp = open("%s/%s/%s/TI" % (PENDIR,doctype,RN),"r")
+        title=fp.read()
+        fp.close()
+    else:
+        title = ""
+    if os.path.exists("%s/%s/%s/SN" % (PENDIR,doctype,RN)):
+        fp = open("%s/%s/%s/SN" % (PENDIR,doctype,RN),"r")
+        sysno=fp.read()
+        fp.close()
+    else:
+        sysno = ""
+    if title == "" and os.path.exists("%s/%s/%s/TIF" % (PENDIR,doctype,RN)):
+        fp = open("%s/%s/%s/TIF" % (PENDIR,doctype,RN),"r")
+        title=fp.read()
+        fp.close()
+    if title == "":
+        return 0
+    else:
+        return (authors,title,sysno,"")
+
+def send_approval(doctype, categ, rn, title, authors, access, sysno):
+    fromaddr = '%s Submission Engine <%s>' % (CFG_SITE_NAME, CFG_SITE_SUPPORT_EMAIL)
+    if not categ:
+        categ = "nocategory"
+    if not doctype:
+        doctype = "nodoctype"
+    addresses = acc_get_authorized_emails('referee', categ=categ, doctype=doctype)
+    if not addresses:
+        return SendWarning(doctype, categ, rn, title, authors, access)
+    if not authors:
+        authors = "-"
+    message = """
+    The document %s has been published as a Communication.
+    Your approval is requested for it to become an official Note.
+
+    Title: %s
+
+    Author(s): %s
+
+    To access the document(s), select the file(s) from the location:
+    <%s/%s/%s/files/>
+
+    As a referee for this document, you may approve or reject it
+    from the submission interface:
+    <%s/submit?doctype=%s>
+
+    ---------------------------------------------
+    Best regards.
+    The submission team.""" % (rn, title, authors, CFG_SITE_SECURE_URL, CFG_SITE_RECORD, sysno, CFG_SITE_SECURE_URL, doctype)
+    # send the mail
+    return send_email(fromaddr, ', '.join(addresses), "Request for Approval of %s" % rn, message, footer="")
+
+def send_english(doctype, categ, RN, title, authors, access, sysno):
+    FROMADDR = '%s Submission Engine <%s>' % (CFG_SITE_NAME,CFG_SITE_SUPPORT_EMAIL)
+    # retrieve useful information from webSubmit configuration
+    res = run_sql("select value from sbmPARAMETERS where name='categformatDAM' and doctype=%s", (doctype,))
+    categformat = res[0][0]
+    categformat = re.sub("<CATEG>","([^-]*)",categformat)
+    categs = re.match(categformat,RN)
+    if categs is not None:
+        categ = categs.group(1)
+    else:
+        categ = "unknown"
+    res = run_sql("select value from sbmPARAMETERS where name='addressesDAM' and doctype=%s",(doctype,))
+    if len(res) > 0:
+        otheraddresses = res[0][0]
+        otheraddresses = otheraddresses.replace("<CATEG>",categ)
+    else:
+        otheraddresses = ""
+    # Build referee's email address
+    refereeaddress = ""
+    # Try to retrieve the referee's email from the referee's database
+    for user in acc_get_role_users(acc_get_role_id("referee_%s_%s" % (doctype,categ))):
+        refereeaddress += user[1] + ","
+    # And if there are general referees
+    for user in acc_get_role_users(acc_get_role_id("referee_%s_*" % doctype)):
+        refereeaddress += user[1] + ","
+    refereeaddress = re.sub(",$","",refereeaddress)
+    # Creation of the mail for the referee
+    addresses = ""
+    if refereeaddress != "":
+        addresses = refereeaddress + ","
+    if otheraddresses != "":
+        addresses += otheraddresses
+    else:
+        addresses = re.sub(",$","",addresses)
+    if addresses=="":
+        send_warning(doctype,categ,RN,title,authors,access)
+        return 0
+    if authors == "":
+        authors = "-"
+    res = run_sql("select value from sbmPARAMETERS where name='directory' and doctype=%s", (doctype,))
+    directory = res[0][0]
+    message = """
+    The document %s has been published as a Communication.
+    Your approval is requested for it to become an official Note.
+
+    Title: %s
+
+    Author(s): %s
+
+    To access the document(s), select the file(s) from the location:
+    <%s/%s/%s/files/>
+
+    To approve/reject the document, you should go to this URL:
+    <%s/submit/approve?access=%s>
+
+    ---------------------------------------------
+    Best regards.
+    The submission team.""" % (RN,title,authors,CFG_SITE_SECURE_URL,CFG_SITE_RECORD,sysno,CFG_SITE_SECURE_URL,access)
+    # send the mail
+    send_email(FROMADDR,addresses,"Request for Approval of %s" % RN, message,footer="")
+    return ""
+
+def send_warning(doctype,categ,RN,title,authors,access):
+    FROMADDR = '%s Submission Engine <%s>' % (CFG_SITE_NAME,CFG_SITE_SUPPORT_EMAIL)
+    message = "Failed sending approval email request for %s" % RN
+    # send the mail
+    send_email(FROMADDR,CFG_SITE_ADMIN_EMAIL,"Failed sending approval email request",message)
+    return ""
+
+def get_brief_doc_details_from_pending(doctype, reportnumber):
+    """Try to get some brief details about the submission that is awaiting
+       the referee's decision.
+       Details sought are:
+        + title
+        + Authors
+        + recid (why?)
+        + report-number (why?)
+       This function searches for a MARC XML record in the pending submission's
+       working directory. It prefers the so-called 'dummy' record, but will
+       search for the final MARC XML record that would usually be passed to
+       bibupload (i.e. recmysql) if that is not present. If neither of these
+       records are present, no details will be found.
+       @param doctype: (string) - the WebSubmit document type of the item
+        to be refereed. It is used in order to locate the submission's
+        working directory in the WebSubmit pending directory.
+       @param reportnumber: (string) - the report number of the item for
+        which details are to be recovered. It is used in order to locate the
+        submission's working directory in the WebSubmit pending directory.
+       @return: (dictionary or None) - If details are found for the item,
+        they will be returned in a dictionary structured as follows:
+            { 'title'            : '-', ## String - the item's title
+              'recid'            : '',  ## String - recid taken from the SN file
+              'report-number'    : '',  ## String - the item's report number
+              'authors'          : [],  ## List   - the item's authors
+            }
+        If no details were found (i.e. no MARC XML files in the submission's
+        working directory), a NoneType is returned.
+    """
+    pending_doc_details = None
+    marcxml_rec_name = None
+    ## Check for a MARC XML record in the pending dir.
+    ## If it's there, we will use it to obtain certain bibliographic
+    ## information such as title, author(s), etc, which we will then
+    ## display to the referee.
+    ## We favour the "dummy" record (created with the WebSubmit function
+    ## "Make_Dummy_MARC_XML_Record"), because it was made for this
+    ## purpose. If it's not there though, we'll take the normal
+    ## (final) recmysql record that would generally be passed to bibupload.
+    if os.access("%s/%s/%s/%s" % (CFG_WEBSUBMIT_PENDING_DIR, \
+                                  doctype, \
+                                  reportnumber, \
+                                  CFG_WEBSUBMIT_DUMMY_MARC_XML_REC), \
+                 os.F_OK|os.R_OK):
+        ## Found the "dummy" marc xml record in the submission dir.
+        ## Use it:
+        marcxml_rec_name = CFG_WEBSUBMIT_DUMMY_MARC_XML_REC
+    elif os.access("%s/%s/%s/%s" % (CFG_WEBSUBMIT_PENDING_DIR, \
+                                    doctype, \
+                                    reportnumber, \
+                                    CFG_WEBSUBMIT_MARC_XML_REC), \
+                   os.F_OK|os.R_OK):
+        ## Although we didn't find the "dummy" marc xml record in the
+        ## submission dir, we did find the "real" one (that which would
+        ## normally be passed to bibupload). Use it:
+        marcxml_rec_name = CFG_WEBSUBMIT_MARC_XML_REC
+
+    ## If we have a MARC XML record in the pending submission's
+    ## working directory, go ahead and use it:
+    if marcxml_rec_name is not None:
+        try:
+            fh_marcxml_record = open("%s/%s/%s/%s" \
+                                     % (CFG_WEBSUBMIT_PENDING_DIR, \
+                                        doctype, \
+                                        reportnumber, \
+                                        marcxml_rec_name), "r")
+            xmltext = fh_marcxml_record.read()
+            fh_marcxml_record.close()
+        except IOError:
+            ## Unfortunately, it wasn't possible to read the details of the
+            ## MARC XML record. Register the exception.
+            exception_prefix = "Error: Publiline was unable to read the " \
+                               "MARC XML record [%s/%s/%s/%s] when trying to " \
+                               "use it to recover details about a pending " \
+                               "submission." % (CFG_WEBSUBMIT_PENDING_DIR, \
+                                                doctype, \
+                                                reportnumber, \
+                                                marcxml_rec_name)
+            register_exception(prefix=exception_prefix)
+        else:
+            ## Attempt to use bibrecord to create an internal representation
+            ## of the record, from which we can extract certain bibliographic
+            ## information:
+            records = create_records(xmltext, 1, 1)
+            try:
+                record = records[0][0]
+                if record is None:
+                    raise ValueError
+            except (IndexError, ValueError):
+                ## Bibrecord couldn't successfully represent the record
+                ## contained in the xmltext string. The record must have
+                ## been empty or badly formed (or something).
+                pass
+            else:
+                ## Dictionary to hold the interesting details of the
+                ## pending item:
+                pending_doc_details = { 'title'         : '-',
+                                        'recid'         : '',
+                                        'report-number' : '',
+                                        'authors'       : [],
+                                      }
+                ## Get the recid:
+                ## Note - the old "get_in_pending" function reads the "SN"
+                ## file from the submission's working directory and since
+                ## the "SN" file is currently "magic" and hardcoded
+                ## throughout WebSubmit, I'm going to stick to this model.
+                ## I could, however, have tried to get it from the MARC XML
+                ## record as so:
+                ## recid = record_get_field_value(rec=record, tag="001")
+                try:
+                    fh_recid = open("%s/%s/%s/SN" \
+                                    % (CFG_WEBSUBMIT_PENDING_DIR, \
+                                       doctype, \
+                                       reportnumber), "r")
+                    recid = fh_recid.read()
+                    fh_recid.close()
+                except IOError:
+                    ## Probably, there was no "SN" file in the submission's
+                    ## working directory.
+                    pending_doc_details['recid'] = ""
+                else:
+                    pending_doc_details['recid'] = recid.strip()
+
+                ## Item report number (from record):
+                ## Note: I don't know what purpose this serves. It appears
+                ## to be used in the email that is sent to the author, but
+                ## it seems funny to me, since we already have the report
+                ## number (which is indeed used to find the submission's
+                ## working directory in pending). Perhaps it's used for
+                ## cases when the reportnumber is changed after approval?
+                ## To investigate when time allows:
+                finalrn = record_get_field_value(rec=record, \
+                                                 tag="037", \
+                                                 code="a")
+                if finalrn != "":
+                    pending_doc_details['report-number'] = finalrn
+
+                ## Item title:
+                title = record_get_field_value(rec=record, \
+                                               tag="245", \
+                                               code="a")
+                if title != "":
+                    pending_doc_details['title'] = title
+                else:
+                    ## Alternative title:
+                    alt_title = record_get_field_value(rec=record, \
+                                                       tag="246", \
+                                                       ind1="1", \
+                                                       code="a")
+                    if alt_title != "":
+                        pending_doc_details['title'] = alt_title
+
+                ## Item first author:
+                first_author = record_get_field_value(rec=record, \
+                                                      tag="100", \
+                                                      code="a")
+                if first_author != "":
+                    pending_doc_details['authors'].append(first_author)
+
+                ## Other Authors:
+                other_authors = record_get_field_values(rec=record, \
+                                                        tag="700", \
+                                                        code="a")
+                for author in other_authors:
+                    pending_doc_details['authors'].append(author)
+
+    ## Return the details discovered about the pending document:
+    return pending_doc_details
+
+
+def get_brief_doc_details_from_repository(reportnumber):
+    """Try to get some brief details about the submission that is awaiting
+       the referee's decision.
+       Details sought are:
+        + title
+        + Authors
+        + recid (why?)
+        + report-number (why?)
+        + email
+       This function searches in the CDS Invenio repository, based on
+       "reportnumber" for a record and then pulls the interesting fields
+       from it.
+       @param reportnumber: (string) - the report number of the item for
+        which details are to be recovered. It is used in the search.
+       @return: (dictionary or None) - If details are found for the item,
+        they will be returned in a dictionary structured as follows:
+            { 'title'            : '-', ## String - the item's title
+              'recid'            : '',  ## String - recid taken from the SN file
+              'report-number'    : '',  ## String - the item's report number
+              'authors'          : [],  ## List   - the item's authors
+            }
+        If no details were found a NoneType is returned.
+    """
+    ## Details of the pending document, as found in the repository:
+    pending_doc_details = None
+    ## Search for records matching this "report number"
+    found_record_ids = list(search_pattern(req=None, \
+                                           p=reportnumber, \
+                                           f="reportnumber", \
+                                           m="e"))
+    ## How many records were found?
+    if len(found_record_ids) == 1:
+        ## Found only 1 record. Get the fields of interest:
+        pending_doc_details = { 'title'         : '-',
+                                'recid'         : '',
+                                'report-number' : '',
+                                'authors'       : [],
+                                'email'         : '',
+                              }
+        recid = found_record_ids[0]
+        ## Authors:
+        first_author  = get_fieldvalues(recid, "100__a")
+        for author in first_author:
+            pending_doc_details['authors'].append(author)
+        other_authors = get_fieldvalues(recid, "700__a")
+        for author in other_authors:
+            pending_doc_details['authors'].append(author)
+        ## Title:
+        title = get_fieldvalues(recid, "245__a")
+        if len(title) > 0:
+            pending_doc_details['title'] = title[0]
+        else:
+            ## There was no value for title - check for an alternative title:
+            alt_title = get_fieldvalues(recid, "2641_a")
+            if len(alt_title) > 0:
+                pending_doc_details['title'] = alt_title[0]
+        ## Record ID:
+        pending_doc_details['recid'] = recid
+        ## Report Number:
+        reptnum = get_fieldvalues(recid, "037__a")
+        if len(reptnum) > 0:
+            pending_doc_details['report-number'] = reptnum[0]
+        ## Email:
+        email = get_fieldvalues(recid, "859__f")
+        if len(email) > 0:
+            pending_doc_details['email'] = email[0]
+    elif len(found_record_ids) > 1:
+        ## Oops. This is unexpected - there shouldn't be me multiple matches
+        ## for this item. The old "get_in_alice" function would have simply
+        ## taken the first record in the list. That's not very nice though.
+        ## Some kind of warning or error should be raised here. FIXME.
+        pass
+    return pending_doc_details

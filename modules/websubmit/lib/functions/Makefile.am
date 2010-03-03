@@ -25,7 +25,6 @@ pylib_DATA = __init__.py \
              Check_Group.py \
              Convert_RecXML_to_RecALEPH.py \
              Convert_RecXML_to_RecALEPH_DELETE.py \
-             Create_Cplx_Approval.py \
              Create_Modify_Interface.py \
              Create_Recid.py \
              Export_Via_SWORD.py \
@@ -40,7 +39,6 @@ pylib_DATA = __init__.py \
              Insert_Record.py \
              Is_Original_Submitter.py \
              Is_Referee.py \
-             Mail_Approval_Request_to_Committee_Chair.py \
              Mail_Approval_Request_to_Referee.py \
              Mail_Approval_Withdrawn_to_Referee.py \
              Mail_Submitter.py \
@@ -55,7 +53,6 @@ pylib_DATA = __init__.py \
              Print_Success.py \
              Print_Success_Approval_Request.py \
              Print_Success_APP.py \
-             Print_Success_CPLX.py \
              Print_Success_DEL.py \
              Print_Success_MBI.py \
              Print_Success_SRV.py \
@@ -66,12 +63,8 @@ pylib_DATA = __init__.py \
              Retrieve_Data.py \
              Second_Report_Number_Generation.py \
              Send_APP_Mail.py \
-             Send_Approval_Request.py \
              Send_Delete_Mail.py \
              Send_Modify_Mail.py \
-             Send_Request_For_Direct_Approval.py \
-             Send_Request_For_Publication.py \
-             Send_Request_For_Refereeing_Process.py \
              Send_SRV_Mail.py \
              Set_Embargo.py \
              Stamp_Replace_Single_File_Approval.py \

@@ -626,15 +626,15 @@ class Template:
 
         if submissions:
             submission_description = _("You can consult the list of %(x_url_open)syour submissions%(x_url_close)s and inquire about their status.")
-            submission_description %= {'x_url_open': '<a href="' + CFG_SITE_URL + '/yoursubmissions.py?ln=' + ln + '">',
+            submission_description %= {'x_url_open': '<a href="' + CFG_SITE_URL + '/yoursubmissions/display?ln=' + ln + '">',
                                    'x_url_close': '</a>'}
-            out += self.tmpl_account_template(_("Your Submissions"), submission_description, ln, '/yoursubmissions.py?ln=%s' % ln)
+            out += self.tmpl_account_template(_("Your Submissions"), submission_description, ln, '/yoursubmissions/display?ln=%s' % ln)
 
         if approvals:
             approval_description =  _("You can consult the list of %(x_url_open)syour approvals%(x_url_close)s with the documents you approved or refereed.")
-            approval_description %=  {'x_url_open': '<a href="' + CFG_SITE_URL + '/yourapprovals.py?ln=' + ln + '">',
+            approval_description %=  {'x_url_open': '<a href="' + CFG_SITE_URL + '/yourapprovals/display?ln=' + ln + '">',
                                   'x_url_close': '</a>'}
-            out += self.tmpl_account_template(_("Your Approvals"), approval_description, ln, '/yourapprovals.py?ln=%s' % ln)
+            out += self.tmpl_account_template(_("Your Approvals"), approval_description, ln, '/yourapprovals/display?ln=%s' % ln)
 
         #check if this user might have tickets
         if tickets:
@@ -1256,7 +1256,7 @@ class Template:
                 'alerts' : _('Your alerts')
                 }
         if referee:
-            out += '<li><a href="%(CFG_SITE_SECURE_URL)s/yourapprovals.py?ln=%(ln)s">%(approvals)s</a></li>'  % {
+            out += '<li><a href="%(CFG_SITE_SECURE_URL)s/yourapprovals/display?ln=%(ln)s">%(approvals)s</a></li>'  % {
                 'CFG_SITE_SECURE_URL' : CFG_SITE_SECURE_URL,
                 'ln' : ln,
                 'approvals' : _('Your approvals')
@@ -1286,7 +1286,7 @@ class Template:
                 'messages' : _('Your messages')
                 }
         if submitter:
-            out += '<li><a href="%(CFG_SITE_SECURE_URL)s/yoursubmissions.py?ln=%(ln)s">%(submissions)s</a></li>'  % {
+            out += '<li><a href="%(CFG_SITE_SECURE_URL)s/yoursubmissions/display?ln=%(ln)s">%(submissions)s</a></li>'  % {
                 'CFG_SITE_SECURE_URL' : CFG_SITE_SECURE_URL,
                 'ln' : ln,
                 'submissions' : _('Your submissions')

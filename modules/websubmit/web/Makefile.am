@@ -17,13 +17,6 @@
 
 SUBDIRS = admin
 
-docdir = $(localstatedir)/www
-
-doc_DATA = approve.py \
-           publiline.py \
-           yourapprovals.py \
-           yoursubmissions.py
-
 testdir = $(libdir)/webtest/invenio
 
 test_DATA = test.pdf \
@@ -41,6 +34,6 @@ test_DATA = test.pdf \
             test_submit_book_approval.html \
             test_submit_journal.html
 
-EXTRA_DIST = $(doc_DATA) $(test_DATA)
+EXTRA_DIST = $(test_DATA)
 
 CLEANFILES = *~ *.tmp *.pyc

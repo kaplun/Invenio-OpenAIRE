@@ -100,6 +100,18 @@ except:
     WebInterfaceSubmitPages = WebInterfaceDumbPages
 
 try:
+    from invenio.websubmit_webinterface import WebInterfaceYourSubmissionsPages
+except:
+    register_exception(alert_admin=True, subject='EMERGENCY')
+    WebInterfaceYourSubmissionsPages = WebInterfaceDumbPages
+
+try:
+    from invenio.websubmit_webinterface import WebInterfaceYourApprovalsPages
+except:
+    register_exception(alert_admin=True, subject='EMERGENCY')
+    WebInterfaceYourApprovalsPages = WebInterfaceDumbPages
+
+try:
     from invenio.websession_webinterface import WebInterfaceYourAccountPages
 except:
     register_exception(alert_admin=True, subject='EMERGENCY')
@@ -243,6 +255,8 @@ class WebInterfaceInvenio(WebInterfaceSearchInterfacePages):
         'yourmessages',
         'yourloans',
         'yourgroups',
+        'yoursubmissions',
+        'yourapprovals',
         'yourtickets',
         'comments',
         'error',
@@ -276,6 +290,8 @@ class WebInterfaceInvenio(WebInterfaceSearchInterfacePages):
     yourmessages = WebInterfaceYourMessagesPages()
     yourloans = WebInterfaceYourLoansPages()
     yourgroups = WebInterfaceYourGroupsPages()
+    yoursubmissions = WebInterfaceYourSubmissionsPages()
+    yourapprovals = WebInterfaceYourApprovalsPages()
     yourtickets = WebInterfaceYourTicketsPages()
     comments = WebInterfaceCommentsPages()
     error = WebInterfaceErrorPages()
