@@ -1,0 +1,13 @@
+<name>Default HTML Meta</name>
+<description>HTML Meta tags suitable to be parsed by search engines (e.g. Google Scholar)</description>
+<BFE_LANGUAGE prefix='<meta name="citation_language" content="' suffix='" />' />
+<BFE_SERVER_INFO var='recurl' prefix='<meta name="citation_abstract_html_url" content="' suffix='" />' />
+<BFE_TITLE prefix='<meta name="citation_title" content="' suffix='" />' />
+<BFE_AUTHORS prefix='<meta name="citation_authors" content="' suffix='" />' print_links='no' />
+<BFE_ISSN prefix='<meta name="citation_issn" content="' suffix='" />' />
+<BFE_DATE date_format='%m/%Y' prefix='<meta name="citation_date" content="' suffix='" />' />
+<!-- BFE_JOURNAL for citation_journal -->
+<BFE_FIELD tag="773__v" prefix='<meta name="citation_volume" content="' suffix='" />' />
+<BFE_FIELD tag="773__v" prefix='<meta name="citation_volume" content="' suffix='" />' />
+
+
