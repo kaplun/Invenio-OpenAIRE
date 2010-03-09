@@ -773,7 +773,7 @@ class Collection:
         # last but not least, update the speed-up flag:
         self.calculate_reclist_run_already = 1
 
-    def update_reclist(self):
+    def update_reclist(self, timestamp):
         "Update the record universe for given collection; nbrecs, reclist of the collection table."
         if self.update_reclist_run_already:
             # do we have to reupdate?
@@ -781,8 +781,8 @@ class Collection:
         write_message("... updating reclist of %s (%s recs)" % (self.name, self.nbrecs), verbose=6)
         sys.stdout.flush()
         try:
-            run_sql("UPDATE collection SET nbrecs=%s, reclist=%s WHERE id=%s",
-                    (self.nbrecs, self.reclist.fastdump(), self.id))
+            run_sql("UPDATE collection SET nbrecs=%s, reclist=%s, last_updated=%s WHERE id=%s",
+                    (self.nbrecs, self.reclist.fastdump(), timestamp, self.id))
             self.reclist_updated_since_start = 1
         except Error, e:
             print "Database Query Error %d: %s." % (e.args[0], e.args[1])
@@ -854,23 +854,7 @@ def get_database_last_updated_timestamp():
 
 def get_cache_last_updated_timestamp():
     """Return last updated cache timestamp."""
-    try:
-        f = open(cfg_cache_last_updated_timestamp_file, "r")
-    except:
-        return "1970-01-01 00:00:00"
-    timestamp = f.read()
-    f.close()
-    return timestamp
-
-def set_cache_last_updated_timestamp(timestamp):
-    """Set last updated cache timestamp to TIMESTAMP."""
-    try:
-        f = open(cfg_cache_last_updated_timestamp_file, "w")
-    except:
-        pass
-    f.write(timestamp)
-    f.close()
-    return timestamp
+    return run_sql("SELECT MIN(last_updated) FROM collection")[0][0].strftime("%Y-%m-%d %H:%M:%S")
 
 def main():
     """Main that construct all the bibtask."""
@@ -944,28 +928,6 @@ def task_submit_check_options():
 
 def task_run_core():
     """ Reimplement to add the body of the task."""
-##
-## ------->--->time--->------>
-##  (-1)  |   ( 0)    |  ( 1)
-##        |     |     |
-## [T.db] |  [T.fc]   | [T.db]
-##        |     |     |
-##        |<-tol|tol->|
-##
-## the above is the compare_timestamps_with_tolerance result "diagram"
-## [T.db] stands fore the database timestamp and [T.fc] for the file cache timestamp
-## ( -1, 0, 1) stand for the returned value
-## tol stands for the tolerance in seconds
-##
-## When a record has been added or deleted from one of the collections the T.db becomes greater that the T.fc
-## and when webcoll runs it is fully ran. It recalculates the reclists and nbrecs, and since it updates the
-## collections db table it also updates the T.db. The T.fc is set as the moment the task started running thus
-## slightly before the T.db (practically the time distance between the start of the task and the last call of
-## update_reclist). Therefore when webcoll runs again, and even if no database changes have taken place in the
-## meanwhile, it fully runs (because compare_timestamps_with_tolerance returns 0). This time though, and if
-## no databases changes have taken place, the T.db remains the same while T.fc is updated and as a result if
-## webcoll runs again it will not be fully ran
-##
     task_run_start_timestamp = get_current_time_timestamp()
     colls = []
     # decide whether we need to run or not, by comparing last updated timestamps:
@@ -1002,7 +964,7 @@ def task_run_core():
                 else:
                     coll.calculate_reclist()
                 task_sleep_now_if_required()
-                coll.update_reclist()
+                coll.update_reclist(task_run_start_timestamp)
                 task_update_progress("Part 1/2: done %d/%d" % (i, len(colls)))
                 task_sleep_now_if_required(can_stop_too=True)
         # thirdly, update collection webpage cache:
@@ -1014,13 +976,6 @@ def task_run_core():
                 coll.update_webpage_cache()
                 task_update_progress("Part 2/2: done %d/%d" % (i, len(colls)))
                 task_sleep_now_if_required(can_stop_too=True)
-
-        # finally update the cache last updated timestamp:
-        # (but only when all collections were updated, not when only
-        # some of them were forced-updated as per admin's demand)
-        if not task_has_option("collection"):
-            set_cache_last_updated_timestamp(task_run_start_timestamp)
-            write_message("Collection cache timestamp is set to %s." % get_cache_last_updated_timestamp(), verbose=3)
     else:
         ## cache up to date, we don't have to run
         write_message("Collection cache is up to date, no need to run.")

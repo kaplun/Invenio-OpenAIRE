@@ -479,5 +479,9 @@ update-v0.99.1-tables:
 	echo "INSERT INTO sbmFUNDESC VALUES ('Stamp_Uploaded_Files','layer');" | ${prefix}/bin/dbexec
 	echo "INSERT INTO sbmFUNDESC VALUES ('Stamp_Replace_Single_File_Approval','layer');" | ${prefix}/bin/dbexec
 	echo "INSERT INTO sbmFUNDESC VALUES ('Stamp_Replace_Single_File_Approval','switch_file');" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE collection ADD last_updated datetime NOT NULL default '0000-00-00';" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE collection ADD KEY last_updated (last_updated);" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE collection ADD KEY nbrecs (nbrecs);" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE collection ADD KEY last_updated (last_updated);" | ${prefix}/bin/dbexec
 
 CLEANFILES = *~ *.pyc *.tmp
