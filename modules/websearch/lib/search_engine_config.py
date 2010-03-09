@@ -27,6 +27,11 @@ __revision__ = \
 ## do we want experimental features? (0=no, 1=yes)
 CFG_EXPERIMENTAL_FEATURES = 0
 
+## Magic name used to store and retrieve the hitset of *all* the restricted
+## records.
+CFG_SCHBAG_RESTRICTED_RECIDS_NAME = 'restricted_recids'
+
+
 class InvenioWebSearchUnknownCollectionError(Exception):
     """Exception for bad collection."""
     def __init__(self, colname):

@@ -2509,12 +2509,12 @@ CREATE TABLE IF NOT EXISTS collection (
   dbquery text,
   nbrecs int(10) unsigned default '0',
   reclist longblob,
-  last_updated datetime NOT NULL default '0000-00-00',
+  last_updated datetime NOT NULL default '1970-01-01',
   PRIMARY KEY  (id),
   UNIQUE KEY name (name),
   KEY dbquery (dbquery(50)),
-  KEY nbrecs,
-  KEY last_updated
+  KEY nbrecs (nbrecs),
+  KEY last_updated (last_updated)
 ) TYPE=MyISAM;
 
 CREATE TABLE IF NOT EXISTS collectionname (

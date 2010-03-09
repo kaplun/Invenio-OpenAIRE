@@ -67,7 +67,8 @@ from invenio.config import \
      CFG_BIBFORMAT_HIDDEN_TAGS, \
      CFG_SITE_URL, \
      CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS
-from invenio.search_engine_config import InvenioWebSearchUnknownCollectionError
+from invenio.search_engine_config import \
+    InvenioWebSearchUnknownCollectionError, CFG_SCHBAG_RESTRICTED_RECIDS_NAME
 from invenio.bibrecord import create_record, record_get_field_instances
 from invenio.bibrank_record_sorter import get_bibrank_methods, rank_records, is_method_valid
 from invenio.bibrank_downloads_similarity import register_page_view_event, calculate_reading_similarity_list
@@ -87,6 +88,7 @@ from invenio.dbquery import DatabaseError
 from invenio.access_control_engine import acc_authorize_action
 from invenio.errorlib import register_exception
 from invenio.textutils import encode_for_xml
+from invenio.bibtask import load_value_from_bag
 
 import invenio.template
 webstyle_templates = invenio.template.load('webstyle')
@@ -192,7 +194,7 @@ class RestrictedCollectionDataCacher(DataCacher):
             return ret
 
         def timestamp_verifier():
-            return max(get_table_update_time('accROLE_accACTION_accARGUMENT'), get_table_update_time('accARGUMENT'))
+            return run_sql("SELECT MAX(last_updated) FROM collection")[0][0].strftime("%Y-%m-%d %H:%M:%S")
 
         DataCacher.__init__(self, cache_filler, timestamp_verifier)
 
@@ -219,6 +221,12 @@ def get_restricted_collections_for_recid(recid):
     """
     Return the list of restricted collection names to which recid belongs.
     """
+    try:
+        ## Very quick check to see if a record is *not* restricted at all
+        if recid not in HitSet(load_value_from_bag(CFG_SCHBAG_RESTRICTED_RECIDS_NAME)):
+            return []
+    except ValueError:
+        pass
     restricted_collections = run_sql("""SELECT c.name, c.reclist FROM accROLE_accACTION_accARGUMENT raa JOIN accARGUMENT ar ON raa.id_accARGUMENT = ar.id JOIN collection c ON ar.value=c.name WHERE ar.keyword = 'collection' AND raa.id_accACTION = %s""", (VIEWRESTRCOLL_ID,))
     return [row[0] for row in restricted_collections if recid in HitSet(row[1])]
 
@@ -309,18 +317,10 @@ class CollectionRecListDataCacher(DataCacher):
     """
     def __init__(self):
         def cache_filler():
-            ret = {}
-            try:
-                res = run_sql("SELECT name,reclist FROM collection")
-            except Exception:
-                # database problems, return empty cache
-                return {}
-            for name, reclist in res:
-                ret[name] = None # this will be filled later during runtime by calling get_collection_reclist(coll)
-            return ret
+            return dict([(row[0], HitSet(row[1])) for row in run_sql("SELECT name, reclist FROM collection")])
 
         def timestamp_verifier():
-            return get_table_update_time('collection')
+            return run_sql("SELECT MAX(last_updated) FROM collection")[0][0].strftime("%Y-%m-%d %H:%M:%S")
 
         DataCacher.__init__(self, cache_filler, timestamp_verifier)
 
@@ -333,19 +333,7 @@ except Exception:
 def get_collection_reclist(coll):
     """Return hitset of recIDs that belong to the collection 'coll'."""
     collection_reclist_cache.recreate_cache_if_needed()
-    if not collection_reclist_cache.cache[coll]:
-        # not yet it the cache, so calculate it and fill the cache:
-        set = HitSet()
-        query = "SELECT nbrecs,reclist FROM collection WHERE name=%s"
-        res = run_sql(query, (coll, ), 1)
-        if res:
-            try:
-                set = HitSet(res[0][1])
-            except:
-                pass
-        collection_reclist_cache.cache[coll] = set
-    # finally, return reclist:
-    return collection_reclist_cache.cache[coll]
+    return collection_reclist_cache.cache.get(coll, HitSet())
 
 class SearchResultsCache(DataCacher):
     """
@@ -4871,6 +4859,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
                                              ln=ln, display_email_alert_part=display_email_alert_part))
             except:
                 # do not log query if req is None (used by CLI interface)
+                raise
                 pass
             log_query_info("ss", p, f, colls_to_search, results_final_nb_total)
 

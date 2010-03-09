@@ -53,7 +53,8 @@ from invenio.websearch_external_collections import \
      external_collection_sort_engine_by_name
 from invenio.bibtask import task_init, task_get_option, task_set_option, \
     write_message, task_has_option, task_update_progress, \
-    task_sleep_now_if_required
+    task_sleep_now_if_required, store_value_in_bag
+from invenio.search_engine_config import CFG_SCHBAG_RESTRICTED_RECIDS_NAME
 import invenio.template
 websearch_templates = invenio.template.load('websearch')
 
@@ -856,6 +857,19 @@ def get_cache_last_updated_timestamp():
     """Return last updated cache timestamp."""
     return run_sql("SELECT MIN(last_updated) FROM collection")[0][0].strftime("%Y-%m-%d %H:%M:%S")
 
+def store_restricted_records_hitset():
+    """
+    Store in CFG_SCHBAG_RESTRICTED_RECIDS_NAME the hitset of all the
+    restricted records (for performance reasons)
+    """
+    from invenio.search_engine import restricted_collection_cache, get_collection_reclist
+    from invenio.intbitset import intbitset
+    restricted_collection_cache.recreate_cache_if_needed()
+    res = intbitset()
+    for collection in restricted_collection_cache.cache:
+        res |= get_collection_reclist(collection)
+    store_value_in_bag(CFG_SCHBAG_RESTRICTED_RECIDS_NAME, res.fastdump(), "hitset of all the restricted records")
+
 def main():
     """Main that construct all the bibtask."""
     task_init(authorization_action="runwebcoll",
@@ -976,6 +990,7 @@ def task_run_core():
                 coll.update_webpage_cache()
                 task_update_progress("Part 2/2: done %d/%d" % (i, len(colls)))
                 task_sleep_now_if_required(can_stop_too=True)
+        store_restricted_records_hitset()
     else:
         ## cache up to date, we don't have to run
         write_message("Collection cache is up to date, no need to run.")
