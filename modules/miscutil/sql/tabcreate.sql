@@ -3354,6 +3354,15 @@ CREATE TABLE IF NOT EXISTS hstTASK (
   KEY priority (priority)
 ) TYPE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS schBAG (
+  name varchar(255) NOT NULL,
+  value blob NOT NULL default '',
+  last_updated datetime NOT NULL default '0000-00-00 00:00:00',
+  description varchar(255) NULL default NULL,
+  PRIMARY KEY (name),
+  KEY last_updated (last_updated)
+) TYPE=MyISAM;
+
 -- Batch Upload History
 
 CREATE TABLE IF NOT EXISTS hstBATCHUPLOAD (
@@ -3366,7 +3375,6 @@ CREATE TABLE IF NOT EXISTS hstBATCHUPLOAD (
   batch_mode varchar(15) NOT NULL,
   PRIMARY KEY (id),
   KEY user (user)
-) TYPE=MyISAM;
 
 -- External collections
 

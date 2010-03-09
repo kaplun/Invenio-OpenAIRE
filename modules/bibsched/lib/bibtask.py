@@ -206,6 +206,39 @@ def setup_loggers(task_id=None):
     return logger
 
 
+def store_value_in_bag(name, value, description=None):
+    """
+    Store the given value in the shared bibliographic tasks bag.
+
+    @param name: the name of the unique key to which the value will be mapped.
+    @type name: string
+    @param value: the actual value to store (this can be any string)
+    @type value: string
+    @param description: an optional description, useful to inform external
+        client about the value being stored.
+    @see: L{load_value_from_bag}
+    """
+    run_sql("INSERT INTO schBAG(name, value, last_updated, description) VALUES(%s, %s, NOW(), %s) ON DUPLICATE KEY UPDATE value=%s, last_updated=NOW(), description=%s", (name, value, description, value, description))
+
+
+def load_value_from_bag(name):
+    """
+    Load the value mapped to name from the shared bibliographic bag.
+
+    @param name: the name of the unique key to which the value is mapped.
+    @type name: string
+    @return: the value.
+    @rtype: string
+    @raise KeyError: in case the name is not mapped to any value.
+    @see: L{store_value_in_bag}
+    """
+    res = run_sql("SELECT value FROm schBAG WHERE name=%s", (name, ))
+    if res:
+        return res[0][0]
+    else:
+        raise KeyError("No value is mapped to name %s" % repr(name))
+
+
 def task_init(
     authorization_action="",
     authorization_msg="",
