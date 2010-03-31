@@ -98,6 +98,7 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
             uid = getUid(req)
             user_info = collect_user_info(req)
 
+            livestream = args['livestream']
             verbose = args['verbose']
             if verbose >= 1 and not isUserSuperAdmin(user_info):
                 # Only SuperUser can see all the details!
@@ -207,7 +208,7 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                                     ip = str(req.remote_ip)
                                     res = doc.register_download(ip, version, format, uid)
                                 try:
-                                    return docfile.stream(req)
+                                    return docfile.stream(req, livestream=livestream)
                                 except InvenioWebSubmitFileError, msg:
                                     register_exception(req=req, alert_admin=True)
                                     req.status = apache.HTTP_INTERNAL_SERVER_ERROR
@@ -215,7 +216,6 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                             else:
                                 req.status = apache.HTTP_UNAUTHORIZED
                                 warn = print_warning(_("The requested file is hidden and can not be accessed."))
-
                         except InvenioWebSubmitFileError, msg:
                             register_exception(req=req, alert_admin=True)
 

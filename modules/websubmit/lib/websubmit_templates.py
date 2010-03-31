@@ -41,6 +41,7 @@ class Template:
         'format' : (str, ""), # the format
         'verbose' : (int, 0), # the verbosity
         'subformat' : (str, ""), # the subformat
+        'livestream' : (int, 0), # whether to stream or not the file
         }
 
 

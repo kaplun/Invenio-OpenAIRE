@@ -58,6 +58,7 @@ import base64
 import binascii
 import cgi
 import sys
+import uuid
 if sys.hexversion < 0x2060000:
     from md5 import md5
 else:
@@ -112,9 +113,13 @@ from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, \
     CFG_TMPDIR, CFG_TMPSHAREDDIR, CFG_PATH_MD5SUM, \
     CFG_WEBSUBMIT_STORAGEDIR, \
     CFG_BIBDOCFILE_USE_XSENDFILE, \
-    CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY
+    CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY \
+    CFG_BIBDOCFILE_LIVESTREAM_PATH, \
+    CFG_BIBDOCFILE_LIVESTREAM_URL
 from invenio.websubmit_config import CFG_WEBSUBMIT_ICON_SUBFORMAT_RE, \
     CFG_WEBSUBMIT_DEFAULT_ICON_SUBFORMAT
+from invenio.urlutils import redirect_to_url
+
 import invenio.template
 websubmit_templates = invenio.template.load('websubmit')
 websearch_templates = invenio.template.load('websearch')
@@ -2763,7 +2768,10 @@ class BibDocFile:
         if os.path.exists(self.fullpath):
             if random.random() < CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY and calculate_md5(self.fullpath) != self.checksum:
                 raise InvenioWebSubmitFileError, "File %s, version %i, for record %s is corrupted!" % (self.fullname, self.version, self.recid)
-            stream_file(req, self.fullpath, "%s%s" % (self.name, self.superformat), self.mime, self.encoding, self.etag, self.checksum, self.fullurl)
+            if livestream and CFG_BIBDOCFILE_LIVESTREAM_PATH:
+                live_stream_file(req, self.fullpath, self.format)
+            else:
+                stream_file(req, self.fullpath, "%s%s" % (self.name, self.superformat), self.mime, self.encoding, self.etag, self.checksum, self.fullurl)
             raise apache.SERVER_RETURN, apache.DONE
         else:
             req.status = apache.HTTP_NOT_FOUND
@@ -2833,6 +2841,32 @@ def check_bibdoc_authorization(user_info, status):
         raise ValueError, 'Unexpected authorization type %s for %s' % (repr(auth_type), repr(auth_value))
     return (0, CFG_WEBACCESS_WARNING_MSGS[0])
 
+
+def live_stream_file(req, fullpath, format=None):
+    """
+    This will stream the given multimedia file using LIVE555 Streaming Media
+    <http://www.live555.com/liveMedia/>
+    liveMedia is able to stream files in the same directory where it is stored
+    for this reason the fullpath will be simlinked in the same directory
+    using a UUID (while keeping the format).
+    """
+    def get_unique_name():
+        return os.path.join(CFG_BIBDOCFILE_LIVESTREAM_PATH, '%s%s' % (uuid.uuid4(), format))
+    if format is None:
+        format = decompose_file(fullpath, skip_version=True)
+    unique_name = get_unique_name()
+    while os.path.exists(unique_name):
+        unique_name = get_unique_name()
+
+    os.symlink(fullpath, unique_name)
+
+    if not CFG_BIBDOCFILE_LIVESTREAM_URL:
+        netloc = urllib2.urlparse.urlsplit(CFG_SITE_URL)[1]
+        hostname = netloc.split(':', 1)[0]
+        url = 'rtsp://%s/%s' (hostname, os.path.basename(unique_name))
+    else:
+        url = '%s%s' % (CFG_BIBDOCFILE_LIVESTREAM_URL, os.path.basename(unique_name))
+    redirect_to_url(req, url, HTTP_MOVED_TEMPORARILY)
 
 def stream_file(req, fullpath, fullname=None, mime=None, encoding=None, etag=None, md5=None, location=None):
     """This is a generic function to stream a file to the user.
