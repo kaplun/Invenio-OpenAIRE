@@ -326,6 +326,7 @@ template function generated it.
  <link rel="alternate" type="application/rss+xml" title="%(sitename)s RSS" href="%(rssurl)s" />
  <link rel="search" type="application/opensearchdescription+xml" href="%(siteurl)s/opensearchdescription" title="%(sitename)s" />
  <link rel="unapi-server" type="application/xml" title="unAPI" href="%(unAPIurl)s" />
+ <link rel="sword" href="%(swordurl)s" />
  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
  <meta http-equiv="Content-Language" content="%(ln)s" />
  <meta name="description" content="%(description)s" />
@@ -432,7 +433,8 @@ template function generated it.
           'msg_personalize' : _("Personalize"),
           'msg_help' : _("Help"),
           'languagebox' : self.tmpl_language_selection_box(req, ln),
-          'unAPIurl' : cgi.escape('%s/unapi' % CFG_SITE_URL),
+          'unAPIurl' : cgi.escape('%s/unapi' % CFG_SITE_URL, True),
+          'swordurl' : cgi.escape('%s/sword' % CFG_SITE_URL, True)
           'inspect_templates_message' : inspect_templates_message
         }
         return out
