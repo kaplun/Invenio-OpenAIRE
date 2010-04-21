@@ -28,6 +28,7 @@ import time
 import re
 import marshal
 import getopt
+import datetime
 from socket import gethostname
 import signal
 
@@ -42,8 +43,10 @@ from invenio.config import \
      CFG_BIBSCHED_GC_TASKS_TO_REMOVE, \
      CFG_BIBSCHED_GC_TASKS_TO_ARCHIVE, \
      CFG_BIBSCHED_MAX_NUMBER_CONCURRENT_TASKS, \
-     CFG_SITE_URL
-from invenio.dbquery import run_sql, escape_string
+     CFG_SITE_URL, \
+     CFG_BIBSCHED_AFFECTED_THRESHOLD
+from invenio.dbquery import run_sql, escape_string, get_table_update_time
+from invenio.dateutils import convert_datetext_to_datestruct
 from invenio.textutils import wrap_text_in_a_box
 from invenio.errorlib import register_exception, register_emergency
 
@@ -1228,9 +1231,42 @@ def report_queue_status(verbose=True, status=None, since=None, tasks=None):
                            proc_sleeptime, proc_status, proc_progress))
         return
 
+    def get_queue_status():
+        """
+        Based on current interactive tasks, bibrec, webcoll, bibindex, bibsched
+        status and on CFG_BIBSCHED_AFFECTED_THRESHOLD configuration report
+        queue status as either: "AUTOMATIC", "STRESSED", "MANUAL", "AFFECTED"
+        """
+        max_task_runtime = run_sql("SELECT MAX(runtime) FROM schTASK WHERE status='waiting' AND runtime<=NOW()")[0][0]
+        if max_task_runtime:
+            if (datetime.datetime.now() - max_task_runtime).seconds / 60 > CFG_BIBSCHED_AFFECTED_THRESHOLD:
+                ## Interactive tasks are getting old...
+                msg = "Interactive tasks are not executed within the expected time threshold (%s minutes)" % CFG_BIBSCHED_AFFECTED_THRESHOLD
+                return "%s (%s)" % (server_pid() and "STRESSED" or "AFFECTED", msg)
+        bibrec_update_time = run_sql("SELECT MAX(modification_date) FROM bibrec")[0][0]
+        if not bibrec_update_time:
+            ## No records yet? OK...
+            return server_pid() and "AUTOMATIC" or "MANUAL"
+        else:
+            bibrec_update_time = time.mktime(bibrec_update_time.timetuple())
+        webcoll_update_time = time.mktime(convert_datetext_to_datestruct(get_table_update_time ("collection")))
+        bibindex_global_update_time = run_sql("SELECT last_updated FROM idxINDEX WHERE name='global'")
+        if not bibindex_global_update_time:
+            ## No global index, OK it's not our problem :-)
+            bibindex_global_update_time = webcoll_update_time
+        else:
+            bibindex_global_update_time = time.mktime(bibindex_global_update_time[0][0].timetuple())
+        if (bibrec_update_time - min(webcoll_update_time, bibindex_global_update_time)) / 60 > CFG_BIBSCHED_AFFECTED_THRESHOLD:
+            ## Webcoll/BibIndex can't stay behind BibUploads... record are not quickly becoming visible
+            msg = "Indexes are not updated within the expected time threshold (%s minutes) WRT incoming records" % CFG_BIBSCHED_AFFECTED_THRESHOLD
+            return "%s (%s)" % (server_pid() and "STRESSED" or "AFFECTED", msg)
+        if run_sql("SELECT id FROM schTASK WHERE status = 'ERROR' OR status = 'DONE WITH ERRORS' LIMIT 1"):
+            ## At least an error!
+            return "AFFECTED (at least one task is in status 'ERROR' or 'DONE WITH ERRORS')"
+        return server_pid() and "AUTOMATIC" or "MANUAL"
+
     write_message("BibSched queue status report for %s:" % gethostname())
-    mode = server_pid() and "AUTOMATIC" or "MANUAL"
-    write_message("BibSched queue running mode: %s" % mode)
+    write_message("BibSched queue running mode: %s" % get_queue_status())
     if status is None:
         report_about_processes('Running', since, tasks)
         report_about_processes('Waiting', since, tasks)
