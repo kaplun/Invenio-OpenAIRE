@@ -36,7 +36,7 @@ def Insert_Record(parameters, curdir, form, user_info=None):
     else:
         raise InvenioWebSubmitFunctionError("Could not find record file")
     initialfile = "%s/%s" % (curdir,recfile)
-    finalfile = "%s/%s_%s" % (CFG_TMPDIR,rn,time.strftime("%Y-%m-%d_%H:%M:%S"))
+    finalfile = "%s/%s_%s" % (CFG_TMPDIR, rn.replace('/', '-'), time.strftime("%Y-%m-%d_%H:%M:%S"))
     shutil.copy(initialfile,finalfile)
     task_low_level_submission('bibupload', 'websubmit.Insert_Record', '-r', '-i', finalfile)
     return ""
