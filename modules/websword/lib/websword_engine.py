@@ -32,3 +32,4 @@ def is_verbose_request(req):
     return req.headers_in.get("X-Verbose", "false").lower() == 'true'
 
 
+def get_sword_service_description(req):
