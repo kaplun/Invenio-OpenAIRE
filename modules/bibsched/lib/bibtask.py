@@ -60,8 +60,13 @@ import logging.handlers
 from invenio.dbquery import run_sql, _db_login
 from invenio.access_control_engine import acc_authorize_action
 from invenio.config import CFG_PREFIX, CFG_BINDIR, CFG_LOGDIR, \
-    CFG_BIBSCHED_PROCESS_USER, CFG_TMPDIR
+    CFG_BIBSCHED_PROCESS_USER, CFG_TMPDIR, CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG, \
+    CFG_OAI_ID_FIELD, CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG, \
+    CFG_BIBUPLOAD_EXTERNAL_OAIID_PROVENANCE_TAG
 from invenio.errorlib import register_exception
+
+from invenio.bibrecord import record_get_field_values, \
+    record_get_field_value
 
 from invenio.access_control_config import CFG_EXTERNAL_AUTH_USING_SSO, \
     CFG_EXTERNAL_AUTHENTICATION
@@ -150,6 +155,53 @@ def task_low_level_submission(name, user, *argv):
                     pass
         return priority
 
+    def get_runtime(argv):
+        """Try to get the runtime by analysing the arguments."""
+        runtime = ""
+        argv = list(argv)
+        while True:
+            try:
+                opts, args = getopt.gnu_getopt(argv, 't:', ['runtime='])
+            except getopt.GetoptError, err:
+                ## We remove one by one all the non recognized parameters
+                if len(err.opt) > 1:
+                    argv = [arg for arg in argv if arg != '--%s' % err.opt and not arg.startswith('--%s=' % err.opt)]
+                else:
+                    argv = [arg for arg in argv if not arg.startswith('-%s' % err.opt)]
+            else:
+                break
+        for opt in opts:
+            if opt[0] in ('-t', '--runtime'):
+                try:
+                    runtime = get_datetime(opt[1])
+                except ValueError:
+                    pass
+        return runtime
+
+    def get_sleeptime(argv):
+        """Try to get the runtime by analysing the arguments."""
+        sleeptime = ""
+        argv = list(argv)
+        while True:
+            try:
+                opts, args = getopt.gnu_getopt(argv, 's:', ['sleeptime='])
+            except getopt.GetoptError, err:
+                ## We remove one by one all the non recognized parameters
+                if len(err.opt) > 1:
+                    argv = [arg for arg in argv if arg != '--%s' % err.opt and not arg.startswith('--%s=' % err.opt)]
+                else:
+                    argv = [arg for arg in argv if not arg.startswith('-%s' % err.opt)]
+            else:
+                break
+        for opt in opts:
+            if opt[0] in ('-s', '--sleeptime'):
+                try:
+                    sleeptime = get_datetime(opt[1])
+                except ValueError:
+                    pass
+        return sleeptime
+
+
     def get_special_name(argv):
         """Try to get the special name by analysing the arguments."""
         special_name = ''
@@ -178,6 +230,8 @@ def task_low_level_submission(name, user, *argv):
 
         priority = get_priority(argv)
         special_name = get_special_name(argv)
+        runtime = get_runtime(argv)
+        sleeptime = get_sleeptime(argv)
         argv = tuple([os.path.join(CFG_BINDIR, name)] + list(argv))
 
         if special_name:
@@ -186,8 +240,8 @@ def task_low_level_submission(name, user, *argv):
         ## submit task:
         task_id = run_sql("""INSERT INTO schTASK (proc,user,
             runtime,sleeptime,status,progress,arguments,priority)
-            VALUES (%s,%s,NOW(),'','WAITING','',%s,%s)""",
-            (name, user, marshal.dumps(argv), priority))
+            VALUES (%s,%s,%s,%s,'WAITING','',%s,%s)""",
+            (name, user, runtime, sleeptime, marshal.dumps(argv), priority))
 
     except Exception:
         register_exception(alert_admin=True)
@@ -237,7 +291,8 @@ def task_init(
     task_stop_helper_fnc=None,
     task_submit_elaborate_specific_parameter_fnc=None,
     task_submit_check_options_fnc=None,
-    task_run_fnc=None):
+    task_run_fnc=None,
+    task_used_records_fnc=None):
     """ Initialize a BibTask.
     @param authorization_action: is the name of the authorization action
     connected with this task;
@@ -255,6 +310,7 @@ def task_init(
     bibtask_get_option) once all the options where parsed;
     @param task_run_fnc: will be called as the main core function. Must return
     False in case of errors.
+    @param task_used_records:
     """
     global _TASK_PARAMS, _OPTIONS
     _TASK_PARAMS = {
@@ -324,18 +380,14 @@ def task_init(
                         if sort not in required_sorts:
                             required_sorts.append(sort)
                     if sys.hexversion < 0x02050000:
-                        import hotshot
-                        import hotshot.stats
+                        import hotshot, hotshot.stats
                         pr = hotshot.Profile(filename)
                         ret = pr.runcall(_task_run, task_run_fnc)
                         for sort_type in required_sorts:
                             tmp_out = sys.stdout
                             sys.stdout = StringIO()
                             hotshot.stats.load(filename).strip_dirs().sort_stats(sort_type).print_stats()
-                            # pylint: disable=E1103
-                            # This is a hack. sys.stdout is a StringIO in this case.
                             profile_dump.append(sys.stdout.getvalue())
-                            # pylint: enable=E1103
                             sys.stdout = tmp_out
                     else:
                         import cProfile
@@ -351,12 +403,12 @@ def task_init(
                     open(os.path.join(CFG_LOGDIR, 'bibsched_task_%d.log' % _TASK_PARAMS['task_id']), 'a').write("%s" % profile_dump)
                     os.remove(filename)
                 except ImportError:
-                    ret = _task_run(task_run_fnc)
+                    ret = _task_run(task_run_fnc, task_used_records_fnc)
                     write_message("ERROR: The Python Profiler is not installed!", stream=sys.stderr)
             else:
-                ret = _task_run(task_run_fnc)
-            if not ret:
-                write_message("Error occurred.  Exiting.", sys.stderr)
+                ret = _task_run(task_run_fnc, task_used_records_fnc)
+                if not ret:
+                    write_message("Error occurred.  Exiting.", sys.stderr)
         except Exception, e:
             register_exception(alert_admin=True)
             write_message("Unexpected error occurred: %s." % e, sys.stderr)
@@ -364,7 +416,7 @@ def task_init(
             write_messages(''.join(traceback.format_tb(sys.exc_info()[2])), sys.stderr)
             write_message("Exiting.", sys.stderr)
             task_update_status("ERROR")
-        logging.shutdown()
+    logging.shutdown()
 
 def _task_build_params(
     task_name,
@@ -437,8 +489,7 @@ def _task_build_params(
             elif opt[0] in ("--profile", ):
                 _TASK_PARAMS["profile"] += opt[1].split(',')
             elif opt[0] in ("--post-process"):
-                _TASK_PARAMS["post-process"] += [opt[1]];
-
+                _TASK_PARAMS["post-process"] += [opt[1]]
             elif not callable(task_submit_elaborate_specific_parameter_fnc) or \
                 not task_submit_elaborate_specific_parameter_fnc(opt[0],
                     opt[1], opts, args):
@@ -692,11 +743,9 @@ def _task_get_options(task_id, task_name):
     write_message('Options retrieved: %s' % (out, ), verbose=9)
     return out
 
-def _task_run(task_run_fnc):
+def _task_run(task_run_fnc, task_used_records_fnc):
     """Runs the task by fetching arguments from the BibSched task queue.
     This is what BibSched will be invoking via daemon call.
-    The task prints Fibonacci numbers for up to NUM on the stdout, and some
-    messages on stderr.
     @param task_run_fnc: will be called as the main core function. Must return
     False in case of errors.
     Return True in case of success and False in case of failure."""
@@ -721,6 +770,27 @@ def _task_run(task_run_fnc):
         write_message("Error: The task #%d is %s.  I expected WAITING or SCHEDULED." %
             (_TASK_PARAMS['task_id'], task_status), sys.stderr)
         return False
+
+    locked_records_set = task_get_locked_record_identifiers()
+    # if there is at least one bad record
+    if locked_records_set:
+        try:
+            if callable(task_used_records_fnc):
+                task_used_records_set= task_used_records_fnc()
+                intersection = locked_records_set & task_used_records_set
+                if intersection: #If the task uses at least one locked record
+                    for record in intersection:
+                        id_schlock = run_sql("SELECT id_schlock from schLOCKREC WHERE rec_identifier_type=%s AND rec_identifier=%s", (record[0], record[1],))
+                        for identifier in id_schlock:
+                            task_lock_record_identifiers(task_used_records_set , identifier[0], _TASK_PARAMS['task_id'])
+                    task_update_status("MANUAL")
+                    os.remove(pidfile_name)
+                    return True
+            else:
+                task_update_status("ERROR")
+
+        except SystemExit:
+            pass
 
     time_now = time.time()
     if _TASK_PARAMS['runtime_limit'] is not None and os.environ.get('BIBSCHED_MODE', 'manual') != 'manual':
@@ -939,3 +1009,24 @@ appropriately and rerun "inveniocfg --update-config-py".""" % \
         {'x_proc': os.path.basename(sys.argv[0]), 'x_user': guess_apache_process_user()}
         sys.exit(1)
     return
+
+def task_get_locked_record_identifiers():
+    """Returns a set with all the record identifiers in the schLOCKREC table"""
+
+    sql_query = "SELECT rec_identifier_type, rec_identifier FROM schLOCKREC"
+    locked_records_set = set(run_sql(sql_query))
+    return locked_records_set
+
+
+def task_create_lock(marcxml=None, id_schTASK=None, lockprocess=None, lockuser=None, lockreason= None):
+    """Inserts in the DB the data of the lock"""
+    id_lock = run_sql("INSERT INTO schLOCK (marcxml, id_schTASK, locktime, lockreason, lockprocess, lockuser) VALUES (%s, %s, NOW(), %s, %s, %s)", (marcxml, id_schTASK, lockreason, lockprocess, lockuser))
+    return id_lock
+
+
+def task_lock_record_identifiers(record_identifiers_set, lock_id, task_id=None):
+    """Inserts in the DB all the identifiers of the records that should be locked"""
+    for identifier_type, identifier in record_identifiers_set:
+        run_sql("INSERT INTO schLOCKREC (rec_identifier, rec_identifier_type, id_schLOCK, id_schTASK) VALUES (%s, %s, %s, %s)", (identifier, identifier_type, lock_id, task_id))
+
+

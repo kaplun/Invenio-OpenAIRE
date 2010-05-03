@@ -42,12 +42,17 @@ from invenio.config import \
      CFG_BIBSCHED_GC_TASKS_TO_REMOVE, \
      CFG_BIBSCHED_GC_TASKS_TO_ARCHIVE, \
      CFG_BIBSCHED_MAX_NUMBER_CONCURRENT_TASKS, \
-     CFG_SITE_URL
+     CFG_SITE_URL, \
+     CFG_TMPDIR, \
+     CFG_BIBSCHED_MARCXML_EDITOR
+     
 from invenio.dbquery import run_sql, real_escape_string
+from invenio.bibupload import open_marc_file
 from invenio.textutils import wrap_text_in_a_box
 from invenio.errorlib import register_exception, register_emergency
+from invenio.bibtask import task_low_level_submission
 
-CFG_VALID_STATUS = ('WAITING', 'SCHEDULED', 'RUNNING', 'CONTINUING', '% DELETED', 'ABOUT TO STOP', 'ABOUT TO SLEEP', 'STOPPED', 'SLEEPING', 'KILLED')
+CFG_VALID_STATUS = ('WAITING', 'SCHEDULED', 'RUNNING', 'CONTINUING', '% DELETED', 'ABOUT TO STOP', 'ABOUT TO SLEEP', 'STOPPED', 'SLEEPING', 'KILLED', 'MANUAL')
 
 shift_re = re.compile("([-\+]{0,1})([\d]+)([dhms])")
 def get_datetime(var, format_string="%Y-%m-%d %H:%M:%S"):
@@ -186,9 +191,10 @@ class Manager:
         self.curses = curses
         self.helper_modules = CFG_BIBTASK_VALID_TASKS
         self.running = 1
+        locked_records = run_sql("SELECT COUNT(DISTINCT rec_identifier, rec_identifier_type) FROM schLOCKREC")
         #self.footer_move_mode = "[KeyUp/KeyDown Move] [M Select mode] [Q Quit]"
-        self.footer_auto_mode = "Automatic Mode [A Manual] [1/2/3 Display] [P Purge] [l/L Log] [O Opts] [Q Quit]"
-        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3 Display Type] [P Purge] [l/L Log] [O Opts] [Q Quit]"
+        self.footer_auto_mode = "Automatic Mode [A Manual] [1/2/3/4 Display] [P Purge] [l/L Log] [O Opts] [Q Quit] #LR =%s" %locked_records[0][0]
+        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3/4 Display Type] [P Purge] [l/L Log] [O Opts] [Q Quit] LR =%s" %locked_records[0][0]  
         self.footer_waiting_item = "[R Run] [D Delete] [N Priority]"
         self.footer_running_item = "[S Sleep] [T Stop] [K Kill]"
         self.footer_stopped_item = "[I Initialise] [D Delete] [K Acknowledge]"
@@ -226,7 +232,10 @@ class Manager:
             #self.display_in_footer("in move mode")
             #self.stdscr.refresh()
         else:
-            status = self.currentrow and self.currentrow[5] or None
+            try:
+                status = self.currentrow and self.currentrow[5] or None
+            except:
+                pass
             if chr == self.curses.KEY_UP:
                 #if self.move_mode:
                     #self.move_up()
@@ -255,17 +264,29 @@ class Manager:
                 self.selected_line = len(self.rows) + 1
                 self.repaint()
             elif chr in (ord("a"), ord("A")):
-                self.change_auto_mode()
+                if self.display != 4:
+                    self.change_auto_mode()
             elif chr == ord("l"):
-                self.openlog()
+                if self.display == 4:
+                    self.list_locked_records()
+                else:
+                    self.openlog()
+                
             elif chr == ord("L"):
-                self.openlog(err=True)
+                if self.display == 4:
+                    self.list_locked_records()
+                else:
+                    self.openlog(err=True)
             elif chr in (ord("w"), ord("W")):
-                self.wakeup()
+                if self.display != 4:
+                    self.wakeup()
             elif chr in (ord("n"), ord("N")):
-                self.change_priority()
+                if self.display != 4:
+                    self.change_priority()
             elif chr in (ord("r"), ord("R")):
-                if status in ('WAITING', 'SCHEDULED'):
+                if self.display == 4:
+                    self.task_run()
+                elif status in ('WAITING', 'SCHEDULED'):
                     self.run()
             elif chr in (ord("s"), ord("S")):
                 self.sleep()
@@ -275,17 +296,31 @@ class Manager:
                 elif status is not None:
                     self.kill()
             elif chr in (ord("t"), ord("T")):
-                self.stop()
+                if self.display != 4:
+                    self.stop()
             elif chr in (ord("d"), ord("D")):
-                self.delete()
+                if self.display != 4:
+                    self.delete()
             elif chr in (ord("i"), ord("I")):
-                self.init()
+                if self.display != 4:
+                    self.init()
+            elif chr in (ord("v"), ord("V")):
+                if self.display == 4:
+                    self.task_view()
+            elif chr in (ord("e"), ord("E")):
+                if self.display == 4:
+                    self.task_edit()
+            elif chr in (ord("u"), ord("U")):
+                if self.display == 4:
+                    self.unlock_task()
             #elif chr in (ord("m"), ord("M")):
                 #self.change_select_mode()
             elif chr in (ord("p"), ord("P")):
-                self.purge_done()
+                if self.display != 4:
+                    self.purge_done()
             elif chr in (ord("o"), ord("O")):
-                self.display_task_options()
+                if self.display != 4:
+                    self.display_task_options()
             elif chr == ord("1"):
                 self.display = 1
                 self.first_visible_line = 0
@@ -301,6 +336,11 @@ class Manager:
                 self.first_visible_line = 0
                 self.selected_line = 2
                 self.display_in_footer("only archived processes are displayed")
+            elif chr == ord("4"):
+                self.display = 4
+                self.first_visible_line = 0
+                self.selected_line = 2
+                self.display_in_footer("only task to run manually are displayed")
             elif chr in (ord("q"), ord("Q")):
                 if self.curses.panel.top_panel() == self.panel:
                     self.panel.bottom()
@@ -325,6 +365,256 @@ class Manager:
                 self.old_stdout.flush()
                 raw_input()
                 self.curses.panel.update_panels()
+
+    def list_locked_records(self):
+        """Shows all the record identifiers locked by the current lock"""
+        lock_id = self.currentrow[0]
+        record_list = run_sql("SELECT DISTINCT rec_identifier_type, rec_identifier, id_schTASK from schLOCKREC WHERE id_schLOCK=%s", (lock_id,))
+        if record_list:
+            tmp_list_name = os.path.join(CFG_TMPDIR, 'tmp_list_%d.xm' % lock_id)
+            tmp_view = open(tmp_list_name, "a")
+            msg = "ID TYPE    ID    TASK ID\n"
+            for row in record_list:
+                for item in row:
+                    msg += str(item)
+                    msg += '     '
+                msg += '\n'
+            tmp_view.write(msg)
+            
+            tmp_view.close()
+        try:    
+            if os.path.exists(tmp_list_name):
+            
+                pager = CFG_BIBSCHED_LOG_PAGER or os.environ.get('PAGER', '/bin/more')
+                if os.path.exists(pager):
+                    self.curses.endwin()
+                    os.system('clear')
+                    os.system('%s %s' % (pager, tmp_list_name))
+                    print >> self.old_stdout, "\rPress ENTER to continue",
+                    self.old_stdout.flush()
+                    raw_input()
+                    self.curses.panel.update_panels()
+                    os.remove(tmp_list_name)                  
+        except:
+            pass
+                
+
+    def task_view(self):
+        """Shows detailled information of the task"""
+        
+        task_id = self.currentrow[3]
+        lock_id = self.currentrow[0]
+        lock_reason = self.currentrow[4]
+        task_information = run_sql("SELECT id,proc,user,runtime,sleeptime,status,progress,arguments,priority FROM schTASK WHERE id=%s", (task_id,))
+        msg = '            TASK DETAILLED VIEW\n\n'
+        msg += 'Id: %i\n' % task_information[0][0]
+        msg += 'Priority: %s\n' % task_information[0][8]
+        msg += 'Proc: %s\n' % task_information[0][1]
+        msg += 'User: %s\n' % task_information[0][2]
+        msg += 'Runtime: %s\n' % task_information[0][3].strftime("%Y-%m-%d %H:%M:%S")
+        msg += 'Sleeptime: %s\n' % task_information[0][4]
+        msg += 'Status: %s\n' % task_information[0][5]
+        msg += 'Progress: %s\n' % task_information[0][6]
+        arguments = marshal.loads(task_information[0][7])
+        if type(arguments) is dict:
+            # FIXME: REMOVE AFTER MAJOR RELEASE 1.0
+            msg += 'Options : %s\n' % arguments
+        else:
+            msg += 'Executable : %s\n' % arguments[0]
+            msg += 'Arguments : %s\n' % ' '.join(arguments[1:])
+        msg += 'Reason: %s\n' %lock_reason
+
+        locked_tasks = run_sql("SELECT DISTINCT id_schTASK FROM schLOCKREC WHERE id_schLOCK=%s ORDER BY id_schTASK ASC", (lock_id,))
+        if locked_tasks:
+            msg += 'TASKS AFFECTED BY THIS LOCK:\n'
+            for task_id in locked_tasks:
+                task_info =  run_sql("SELECT id,proc,user,arguments FROM schTASK WHERE id=%s", (task_id[0],))
+                msg +=  'Id: %i\n' % task_info[0][0]
+                msg += 'Proc: %s\n' % task_info[0][1]
+                msg += 'User: %s\n' % task_info[0][2]
+                arguments = marshal.loads(task_info[0][3])
+                if type(arguments) is dict:
+                    # FIXME: REMOVE AFTER MAJOR RELEASE 1.0
+                    msg += 'Options : %s\n' % arguments
+                else:
+                    msg += 'Executable : %s\n' % arguments[0]
+                    msg += 'Arguments : %s\n' % ' '.join(arguments[1:])
+                msg += '------------------------------------------------------------\n'
+        tmp_detailledview_name = os.path.join(CFG_TMPDIR, 'tmp_detailledview_%d.xm' % lock_id)
+        tmp_view = open(tmp_detailledview_name, "a")
+        tmp_view.write(msg)
+        tmp_view.close()
+
+        try:    
+            if os.path.exists(tmp_detailledview_name):
+            
+                pager = CFG_BIBSCHED_LOG_PAGER or os.environ.get('PAGER', '/bin/more')
+                if os.path.exists(pager):
+                    self.curses.endwin()
+                    os.system('%s %s' % (pager, tmp_detailledview_name))
+                    print >> self.old_stdout, "\rPress ENTER to continue",
+                    self.old_stdout.flush()
+                    raw_input()
+                    self.curses.panel.update_panels()
+                    os.remove(tmp_detailledview_name)
+                  
+        except:
+            pass
+        
+    def task_run(self):
+        """Prints a message with the previous arguments of the task, ask for the new ones
+        and submits the new task to bibsched"""
+        
+        task_id = self.currentrow[3]
+        lock_id = self.currentrow[0]
+        msg = """This were the previous arguments:
+
+"""
+        for argument in get_task_options(task_id):
+            msg += (str(argument))
+        msg += """
+
+Please select an option:\n"""
+        msg +="""
+        a, append\n
+        c, correct\n
+        i, insert\n
+        r, replace\n
+        z, reference\n
+        d, delete\n
+        o, holdingpen\n
+        x, insert or replace\n
+        """
+        msg += """
+
+Press 'q' to exit"""
+        msg = wrap_text_in_a_box(msg, style='no_border')
+        rows = msg.split('\n')
+        height = len(rows) + 2
+        width = max([len(row) for row in rows]) + 4
+        try:
+            self.win = self.curses.newwin(
+                height,
+                width,
+                (self.height - height) / 2 + 1,
+                (self.width - width) / 2 + 1
+                )
+            self.panel = self.curses.panel.new_panel( self.win )
+            self.panel.top()
+            self.win.border()
+            i = 1
+            for row in rows:
+                self.win.addstr(i, 2, row, self.current_attr)
+                i += 1
+            self.win.refresh()
+            option = ''
+            while not option:
+                c = self.win.getkey()
+                if c in 'aA':
+                    option = ' -a '
+                    self.curses.panel.update_panels()
+                elif c in 'cC':
+                    option = ' -c '
+                    self.curses.panel.update_panels()
+                elif c in 'iI':
+                    option = ' -i '
+                    self.curses.panel.update_panels()
+                elif c in 'rR':
+                    option = ' -r '
+                    self.curses.panel.update_panels()
+                elif c in 'zZ':
+                    option = ' -z '
+                    self.curses.panel.update_panels()
+                elif c in 'dD':
+                    option = ' -d '
+                    self.curses.panel.update_panels()
+                elif c in 'oO':
+                    option = ' -o '
+                    self.curses.panel.update_panels()
+                elif c in 'xX':
+                    option = ' -i -r '
+                    self.curses.panel.update_panels()
+                elif c in 'qQ':
+                    option = 'q'
+
+            if option !='q':
+                task_name = 'bibupload'
+                marc = run_sql("SELECT marcxml from schLOCK WHERE id=%s", (lock_id,))
+                if marc[0][0]:
+                    tmp_marc_name = os.path.join(CFG_TMPDIR, 'tmp_marc_%d.xm' % task_id)
+                    tmp_view = open(tmp_marc_name, "a")
+                    tmp_view.write(marc[0][0])
+                    tmp_view.close()
+                    user = 'bibsched'
+                    runtime = run_sql("SELECT runtime from schTASK WHERE id=%s", (task_id,))
+                    arguments = [option, tmp_marc_name, "-t", runtime[0][0].strftime("%Y-%m-%d %H:%M:%S")]
+                    task_low_level_submission(task_name, user, *arguments)
+                    self.unlock(lock_id)
+        except:
+            pass
+
+            
+        
+    def unlock_task(self):
+        """Displays a confirmation message and calls the unlock function"""
+
+        lock_id =self.currentrow[0]      
+        if self._display_YN_box("All quarantined records by this lock \n\n"
+             "will be unlocked.\n\n"
+             "Do you want to proceed?"):
+            self.unlock(lock_id)
+            
+
+    def unlock(self, lock_id):
+        """Removes all locked records from the database, sets all afected task to manual and
+        acknowledges the error that created the lock"""
+
+        task_locked_set_old = set()
+        task_locked_set_new = set()
+        first_task_locked = run_sql("SELECT DISTINCT id_schtask from schLOCK WHERE id=%s", (lock_id,))
+        task_locked_set_old.add(run_sql("SELECT DISTINCT id_schTASK from schLOCKREC WHERE NOT id_schTASK=%s", (first_task_locked[0][0],)))
+        run_sql("DELETE FROM schLOCK WHERE id=%s", (lock_id,))
+        run_sql("DELETE FROM schLOCKREC WHERE id_schLOCK=%s", (lock_id,))
+        task_locked_set_new.add(run_sql("SELECT DISTINCT id_schTASK from schLOCKREC WHERE NOT id_schTASK=%s", (first_task_locked[0][0],)))
+        unlocked_tasks = task_locked_set_old.difference(task_locked_set_new)
+        for task_tuple in unlocked_tasks:
+            for task in task_tuple:
+                bibsched_set_status(task[0], "WAITING")
+        status = run_sql("SELECT status from schTASK WHERE id=%s", (first_task_locked[0][0],))
+        bibsched_set_status(first_task_locked[0][0], "ACK " + status[0][0])    
+        
+    def task_edit(self):
+        """Opens the configured editor to edit the marcxml code of the record that created the lock"""
+
+        lock_id =self.currentrow[0]
+        marc = run_sql("SELECT marcxml from schLOCK WHERE id=%s", (lock_id,))
+        if marc[0][0]:
+            tmp_marc_name = os.path.join(CFG_TMPDIR, 'tmp_marc_%d.xm' % lock_id)
+            tmp_view = open(tmp_marc_name, "a")
+            tmp_view.write(marc[0][0])
+            tmp_view.close()
+
+        try:    
+            if os.path.exists(tmp_marc_name):
+            
+                pager = CFG_BIBSCHED_MARCXML_EDITOR or os.environ.get('EDITOR', '/usr/bin/emacs')
+                if os.path.exists(pager):
+                    self.curses.endwin()
+                    os.system('%s %s' % (pager, tmp_marc_name))
+                    status = os.stat(tmp_marc_name)
+                    if status.st_mtime > status.st_atime:
+                        new_marc = open_marc_file(tmp_marc_name)
+                        run_sql("UPDATE schLOCK SET marcxml=%s WHERE id =%s", (new_marc, lock_id))
+                    print >> self.old_stdout, "\rPress ENTER to continue",
+                    self.old_stdout.flush()
+                    raw_input()
+                    
+                    self.curses.panel.update_panels()
+                    os.remove(tmp_marc_name)
+
+        except:
+            pass
+
 
     def display_task_options(self):
         """Nicely display information about current process."""
@@ -543,6 +833,7 @@ class Manager:
 
     def delete(self):
         task_id = self.currentrow[0]
+        
         status = self.currentrow[5]
         if status not in ('RUNNING', 'CONTINUING', 'SLEEPING', 'SCHEDULED', 'ABOUT TO STOP', 'ABOUT TO SLEEP'):
             bibsched_set_status(task_id, "%s_DELETED" % status, status)
@@ -621,6 +912,8 @@ class Manager:
             attr = self.curses.color_pair(6) + self.curses.A_BOLD
         elif row[5].find("ERROR") > -1:
             attr = self.curses.color_pair(4) + self.curses.A_BOLD
+        elif row[5].find("MANUAL") > -1:
+            attr = self.curses.color_pair(4) + self.curses.A_BOLD
         elif row[5] == "WAITING":
             attr = self.curses.color_pair(3) + self.curses.A_BOLD
         elif row[5] in ("RUNNING","CONTINUING") :
@@ -656,6 +949,48 @@ class Manager:
             pass
         self.y = self.y+1
 
+
+    def manual_display(self, row, header=False):
+       
+        col_w = [12 , 15, 10, 10, 12, 11]
+        maxx = self.width
+        if self.y == self.selected_line - self.first_visible_line and self.y > 1:
+            self.currentrow = row
+        if self.y == 0:
+            attr = self.curses.color_pair(8) + self.curses.A_STANDOUT + self.curses.A_BOLD
+        elif self.y == 1:
+            attr =  self.curses.color_pair(8) 
+            
+        else:
+            attr = self.curses.color_pair(5)  + self.curses.A_BOLD
+
+        if self.y == self.selected_line - self.first_visible_line and self.y > 1:
+            self.current_attr = attr
+            attr += self.curses.A_STANDOUT
+        num_identifiers = run_sql("SELECT COUNT(DISTINCT rec_identifier, rec_identifier_type) FROM schLOCKREC WHERE id_schLOCK=%s", (row[0],))
+        if header: 
+            myline = str(row[0]).ljust(col_w[0])
+            myline += str(row[1]).ljust(col_w[1])
+            myline += str(row[2])[:10].ljust(col_w[2])
+            myline += str(row[3]).ljust(col_w[3])
+            myline += str(row[4]).ljust(col_w[4])
+            myline += str(row[5]).ljust(col_w[5])
+        else:
+            myline = str(row[0]).ljust(col_w[0])
+            myline += str(row[1]).ljust(col_w[1])
+            myline += str(row[2])[:10].ljust(col_w[2])
+            myline += str(row[3]).ljust(col_w[3])
+            myline += str(num_identifiers[0][0]).ljust(col_w[4])
+            myline += str(row[4]).ljust(col_w[5])
+        myline = myline.ljust(maxx)
+        try:
+            self.stdscr.addnstr(self.y, 0, myline, maxx, attr)
+        except self.curses.error:
+            pass
+        self.y = self.y+1
+
+
+
     def display_in_footer(self, footer, i = 0, print_time_p=0):
         if print_time_p:
             footer = "%s %s" % (footer, time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
@@ -683,33 +1018,53 @@ class Manager:
         self.stdscr.clear()
         self.height, self.width = self.stdscr.getmaxyx()
         maxy = self.height - 2
-        #maxx = self.width
-        self.put_line(("ID", "PROC [PRI]", "USER", "RUNTIME", "SLEEP", "STATUS", "PROGRESS"), True)
-        self.put_line(("------", "---------", "----", "-------------------", "-----", "-----", "--------"), True)
-        if self.selected_line > maxy + self.first_visible_line - 1:
-            self.first_visible_line = self.selected_line - maxy + 1
-        if self.selected_line < self.first_visible_line + 2:
-            self.first_visible_line = self.selected_line - 2
-        for row in self.rows[self.first_visible_line:self.first_visible_line+maxy-2]:
-            self.put_line(row)
-        self.y = self.stdscr.getmaxyx()[0] - 1
-        if self.auto_mode:
-            self.display_in_footer(self.footer_auto_mode, print_time_p=1)
-        #elif self.move_mode:
-            #self.display_in_footer(self.footer_move_mode, print_time_p=1)
+        maxx = self.width
+        if self.display == 4:
+            locked_records = run_sql("SELECT COUNT(id) FROM schLOCK")
+            self.footer = "[V View] [E Edit] [R Run] [U Unlock] [L List Records] [Q Quit] #LR =%s" %locked_records[0][0]
+            self.manual_display(("LOCK ID", "PROCESS", "USER", "TASK ID", "#LR", "L REASON"), True)
+            self.manual_display(("------", "--------", "------", "-------", "------", "-------"), True)
+            self.rows = run_sql("""SELECT id, lockprocess,  lockuser, id_schTASK, lockreason FROM schLOCK""")
+            if self.selected_line > maxy + self.first_visible_line - 1:
+                self.first_visible_line = self.selected_line - maxy + 1
+                if self.selected_line < self.first_visible_line + 2:
+                    self.first_visible_line = self.selected_line - 2
+            for row in self.rows[self.first_visible_line:self.first_visible_line+maxy-2]:
+#                status = run_sql("SELECT status FROM schTASK WHERE id=%s" %row[3])
+#                row += status[0]
+                self.manual_display(row)
+            self.y = self.stdscr.getmaxyx()[0] - 1
+            self.display_in_footer(self.footer, print_time_p=1) 
+
+        
         else:
-            self.display_in_footer(self.footer_select_mode, print_time_p=1)
-            footer2 = ""
-            if self.item_status.find("DONE") > -1 or self.item_status in ("ERROR", "STOPPED", "KILLED"):
-                footer2 += self.footer_stopped_item
-            elif self.item_status in ("RUNNING", "CONTINUING", "ABOUT TO STOP", "ABOUT TO SLEEP"):
-                footer2 += self.footer_running_item
-            elif self.item_status == "SLEEPING":
-                footer2 += self.footer_sleeping_item
-            elif self.item_status == "WAITING":
-                footer2 += self.footer_waiting_item
-            self.display_in_footer(footer2, 1)
+            self.put_line(("ID", "PROC [PRI]", "USER", "RUNTIME", "SLEEP", "STATUS", "PROGRESS"), True)
+            self.put_line(("------", "---------", "----", "-------------------", "-----", "-----", "--------"), True)
+            if self.selected_line > maxy + self.first_visible_line - 1:
+                self.first_visible_line = self.selected_line - maxy + 1
+            if self.selected_line < self.first_visible_line + 2:
+                self.first_visible_line = self.selected_line - 2
+            for row in self.rows[self.first_visible_line:self.first_visible_line+maxy-2]:
+                self.put_line(row)
+            self.y = self.stdscr.getmaxyx()[0] - 1
+            if self.auto_mode:
+                self.display_in_footer(self.footer_auto_mode, print_time_p=1)
+            #elif self.move_mode:
+                #self.display_in_footer(self.footer_move_mode, print_time_p=1)
+            else:
+                self.display_in_footer(self.footer_select_mode, print_time_p=1)
+                footer2 = ""
+                if self.item_status.find("DONE") > -1 or self.item_status in ("ERROR", "STOPPED", "KILLED"):
+                    footer2 += self.footer_stopped_item
+                elif self.item_status in ("RUNNING", "CONTINUING", "ABOUT TO STOP", "ABOUT TO SLEEP"):
+                    footer2 += self.footer_running_item
+                elif self.item_status == "SLEEPING":
+                    footer2 += self.footer_sleeping_item
+                elif self.item_status == "WAITING":
+                    footer2 += self.footer_waiting_item
+                self.display_in_footer(footer2, 1)
         self.stdscr.refresh()
+
 
     def start(self, stdscr):
         os.environ['BIBSCHED_MODE'] = 'manual'
@@ -735,18 +1090,28 @@ class Manager:
         while self.running:
             if ring == 4:
                 if self.display == 1:
+                    fields = "id,proc,user,runtime,sleeptime,status,progress,arguments,priority"
                     table = "schTASK"
-                    where = "and (status='DONE' or status LIKE 'ACK%')"
+                    where = "WHERE status NOT LIKE '%%_DELETED' and (status='DONE' or status LIKE 'ACK%')"
                     order = "runtime DESC"
                 elif self.display == 2:
+                    fields = "id,proc,user,runtime,sleeptime,status,progress,arguments,priority"
                     table = "schTASK"
-                    where = "and (status<>'DONE' and status NOT LIKE 'ACK%')"
+                    where = "WHERE status NOT LIKE '%%_DELETED' and (status<>'DONE' and status NOT LIKE 'ACK%')"
                     order = "runtime ASC"
+                elif self.display == 4:
+                    fields = "id, marcxml, comments"
+                    table = "errors"
+                    order = "creationdate DESC"
+                    where = ''
                 else:
+                    fields = "id,proc,user,runtime,sleeptime,status,progress,arguments,priority"
                     table = "hstTASK"
                     order = "runtime DESC"
-                    where = ''
-                self.rows = run_sql("""SELECT id,proc,user,runtime,sleeptime,status,progress,arguments,priority FROM %s WHERE status NOT LIKE '%%_DELETED' %s ORDER BY %s""" % (table, where, order))
+                    where = "WHERE status NOT LIKE '%%_DELETED'"
+
+
+                self.rows = run_sql("""SELECT %s FROM %s %s ORDER BY %s""" % (fields, table, where, order))
                 ring = 0
                 self.repaint()
             ring += 1
@@ -943,17 +1308,33 @@ class BibSched:
 
     def watch_loop(self):
         def calculate_rows():
-            """Return all the rows to work on."""
-            if run_sql("SELECT count(id) FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")[0][0] > 0:
-                errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")
-                errors = ["    #%s %s -> %s" % row for row in errors]
-                raise StandardError('BibTask with ERRORS:\n%s' % "\n".join(errors))
-            max_bibupload_priority = run_sql("SELECT max(priority) FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()")
-            if max_bibupload_priority:
-                run_sql("UPDATE schTASK SET priority=%s WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()", ( max_bibupload_priority[0][0], ))
-            self.next_bibupload = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW() ORDER BY id ASC LIMIT 1", n=1)
-            self.waitings = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE (status='WAITING' AND runtime<=NOW()) OR status='SLEEPING' ORDER BY priority DESC, runtime ASC, id ASC")
-            self.rows = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status IN ('RUNNING','CONTINUING','SCHEDULED','ABOUT TO STOP','ABOUT TO SLEEP')")
+			"""Return all the rows to work on."""
+			errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS' AND proc NOT IN (SELECT proc FROM schTASK WHERE proc='bibupload' AND status='DONE WITH ERRORS' )")
+        #                errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")
+			if errors:
+			#	for each_task in errors:
+				errors = ["    #%s %s -> %s" % row for row in errors]
+				raise StandardError('BibTask with ERRORS:\n%s' % "\n".join(errors)) 
+                    
+			else:
+				max_bibupload_priority = run_sql("SELECT max(priority) FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()")
+				if max_bibupload_priority:
+					run_sql("UPDATE schTASK SET priority=%s WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()", ( max_bibupload_priority[0][0], ))
+				self.next_bibupload = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW() ORDER BY id ASC LIMIT 1", n=1)
+				self.waitings = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE (status='WAITING' AND runtime<=NOW()) OR status='SLEEPING' ORDER BY priority DESC, runtime ASC, id ASC")
+				self.rows = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status IN ('RUNNING','CONTINUING','SCHEDULED','ABOUT TO STOP','ABOUT TO SLEEP', 'MANUAL')")
+        # def calculate_rows():
+        #     """Return all the rows to work on."""
+        #     if run_sql("SELECT count(id) FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")[0][0] > 0:
+        #         errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")
+        #         errors = ["    #%s %s -> %s" % row for row in errors]
+        #         raise StandardError('BibTask with ERRORS:\n%s' % "\n".join(errors))
+        #     max_bibupload_priority = run_sql("SELECT max(priority) FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()")
+        #     if max_bibupload_priority:
+        #         run_sql("UPDATE schTASK SET priority=%s WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()", ( max_bibupload_priority[0][0], ))
+        #     self.next_bibupload = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW() ORDER BY id ASC LIMIT 1", n=1)
+        #     self.waitings = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE (status='WAITING' AND runtime<=NOW()) OR status='SLEEPING' ORDER BY priority DESC, runtime ASC, id ASC")
+        #     self.rows = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status IN ('RUNNING','CONTINUING','SCHEDULED','ABOUT TO STOP','ABOUT TO SLEEP')")
 
         def calculate_task_status():
             """Return a handy data structure to analize the task status."""
@@ -964,9 +1345,9 @@ class BibSched:
                 'WAITING' : {},
                 'ABOUT TO STOP' : {},
                 'ABOUT TO SLEEP' : {},
-                'SCHEDULED' : {}
+                'SCHEDULED' : {},
+                'MANUAL':{}
             }
-
             for (id, proc, runtime, status, priority) in self.rows + self.waitings:
                 self.task_status[status][id] = (proc, runtime, priority)
 
@@ -1236,8 +1617,6 @@ def report_queue_status(verbose=True, status=None, since=None, tasks=None):
         return
 
     write_message("BibSched queue status report for %s:" % gethostname())
-    mode = server_pid() and "AUTOMATIC" or "MANUAL"
-    write_message("BibSched queue running mode: %s" % mode)
     if status is None:
         report_about_processes('Running', since, tasks)
         report_about_processes('Waiting', since, tasks)
@@ -1332,6 +1711,7 @@ def main():
     except IndexError:
         cmd = 'monitor'
 
+    
     try:
         if cmd in ('status', 'purge'):
             { 'status' : report_queue_status,
@@ -1345,7 +1725,8 @@ def main():
             'monitor': monitor} [cmd] (verbose)
     except KeyError:
         usage(1, 'unkown command: %s' % cmd)
-
+    except:
+        register_exception(alert_admin=True)
     return
 
 if __name__ == '__main__':

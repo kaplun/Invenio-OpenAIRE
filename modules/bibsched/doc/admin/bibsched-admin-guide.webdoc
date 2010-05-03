@@ -51,11 +51,14 @@ launch the tasks manually.</p>
 <h2>Bibsched graphical interface</h2>
 
 <p>bibsched interface is text mode graphical interface to display running tasks.
-It has three views, one for listing done tasks, one for scheduled/running/failed
-tasks and a third one for displaying archived tasks. You can switch among these
-three views by pressing respectively "<tt>1</tt>", "<tt>2</tt>" or "<tt>3</tt>".</p>
+It has four views, one for listing done tasks, one for scheduled/running/failed
+tasks, one for displaying archived tasks and a fourth one for display
+  task that should be run manually because there is a conflict. You can switch among these
+three views by pressing respectively "<tt>1</tt>", "<tt>2</tt>",
+  "<tt>3</tt>" or "<tt>4</tt>".</p>
 
-<p>With the harrows you can move from one task to the other</p>
+<p>With the arrows you can move from one task to the other</p>
+<p>The following options are common between the three first views:</p>
 
 <p>By pressing "<tt>O</tt>" you can see all the details of the selected task</p>
 
@@ -83,6 +86,23 @@ selecting you're given different actions.</p>
 <p>On a running task you can press "<tt>K</tt>" to kill the task immediately in case of emergency. "<tt>T</tt>" for stopping it cleanly. "<tt>S</tt>" for putting it temporarily to sleep. A sleeping task can be waken up by pressing "<tt>W</tt>". Note that for stopping or putting to sleep a task, a signal is sent to the given bibtask and this, in turn, will acknowledge it and decide to stop or go to sleep whenever it thinks it's safe.</p>
 
 <p>On a failed task you can press "<tt>K</tt>" the acknowledge the error. This is necessary in case you wish to put bibsched back to automatic mode.</p>
+
+<p>While you are in Manual mode if you press "<tt>4</tt>" the fourth
+  task view is displayed. In this view you can use this options.</p>
+
+<p>By pressing "<tt>V</tt>" you can see all the details of the
+  selected task</p>
+
+<p>By pressing "<tt>E</tt>" you can edit the marcxml code of the
+  record that created the lock.</p>
+
+<p>You can press "<tt>R</tt>" for running the task, removing its lock
+  automatically.</p>
+
+<p>You can press "<tt>U</tt>" for deleting the lock.</p>
+
+<p>By pressing "<tt>L</tt>" you can see all the identifiers of the
+  locked records.</p>
 
 <h3>Automatic mode</h3>
 <p>In automatic mode bibsched will take care of launching tasks based on their priority and runtime schedule. The available option are only those that allow you to query a given task (see the logs and the options).</p>
@@ -171,6 +191,8 @@ interface, only the latest log will be displayed.</p>
         --profile=STATS   Print profile information. STATS is a comma-separated
                           list of desired output stats (calls, cumulative,
                           file, line, module, name, nfl, pcalls, stdname, time).
+    --post-process=BIB_TASKLET_NAME[parameters]   Postprocesses the specified bibtasklet with the given parameters BETWEEN SQUARE BRACKETS.
+                        Example:--post-process "bst_send_email[fromaddr='foo@xxx.com', toaddr='bar@xxx.com', subject='hello', content='hellp']" -v9
 
 </pre>
 </p>

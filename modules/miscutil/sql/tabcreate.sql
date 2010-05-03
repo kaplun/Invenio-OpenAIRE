@@ -3939,4 +3939,21 @@ CREATE TABLE IF NOT EXISTS `aidVIRTUALAUTHORSCLUSTERS` (
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS schLOCK(
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
+  marcxml TEXT DEFAULT NULL, 
+  id_schTASK INT(9) DEFAULT NULL, 
+  locktime DATETIME,
+  lockreason TEXT,
+  lockprocess TEXT,
+  lockuser TEXT DEFAULT NULL
+) TYPE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS schLOCKREC(
+  rec_identifier VARCHAR(255),
+  rec_identifier_type VARCHAR(9), 
+  id_schLOCK INT,
+  id_schTASK INT 
+) TYPE=MyISAM;
+
 -- end of file

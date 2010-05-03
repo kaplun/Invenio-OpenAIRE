@@ -97,21 +97,22 @@ from invenio.bibrecord import create_records, \
                               record_delete_fields, \
                               record_add_subfield_into, \
                               record_find_field, \
-                              record_extract_oai_id
-from invenio.search_engine import get_record
+                              record_extract_oai_id, \
+                              record_get_all_identifiers
+from invenio.search_engine import get_record, search_pattern
 from invenio.dateutils import convert_datestruct_to_datetext
 from invenio.errorlib import register_exception
 from invenio.intbitset import intbitset
 from invenio.config import CFG_WEBSUBMIT_FILEDIR
 from invenio.bibtask import task_init, write_message, \
     task_set_option, task_get_option, task_get_task_param, task_update_status, \
-    task_update_progress, task_sleep_now_if_required, fix_argv_paths
+    task_update_progress, task_sleep_now_if_required, fix_argv_paths, \
+    task_lock_record_identifiers, task_create_lock
+
 from invenio.bibdocfile import BibRecDocs, file_strip_ext, normalize_format, \
     get_docname_from_url, check_valid_url, download_url, \
     KEEP_OLD_VALUE, decompose_bibdocfile_url, InvenioWebSubmitFileError, \
     bibdocfile_url_p, CFG_BIBDOCFILE_AVAILABLE_FLAGS, guess_format_from_url
-
-from invenio.search_engine import search_pattern
 
 #Statistic variables
 stat = {}
@@ -167,13 +168,17 @@ def bibupload(record, opt_tag=None, opt_mode=None,
 
     Return (error_code, recID) of the processed record.
     """
+    original_incoming_record = copy.copy(record)
     assert(opt_mode in ('insert', 'replace', 'replace_or_insert', 'reference',
         'correct', 'append', 'format', 'holdingpen', 'delete'))
     error = None
     # If there are special tags to proceed check if it exists in the record
     if opt_tag is not None and not(record.has_key(opt_tag)):
-        write_message("    Failed: Tag not found, enter a valid tag to update.",
-                    verbose=1, stream=sys.stderr)
+        message= "Failed: Tag not found, enter a valid tag to update."
+
+        write_message("   " + message, verbose=1, stream=sys.stderr)
+        lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+        task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
         return (1, -1)
 
     # Extraction of the Record Id from 001, SYSNO or OAIID tags:
@@ -188,9 +193,12 @@ def bibupload(record, opt_tag=None, opt_mode=None,
             # should add it now:
             error = record_add_field(record, '001', controlfield_value=rec_id)
             if error is None:
-                write_message("   Failed: " \
+                message = "Failed: " \
                                             "Error during adding the 001 controlfield "  \
-                                            "to the record", verbose=1, stream=sys.stderr)
+                                            "to the record"
+                write_message("   " + message, verbose=1, stream=sys.stderr)
+                lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
                 return (1, int(rec_id))
             else:
                 error = None
@@ -201,8 +209,10 @@ def bibupload(record, opt_tag=None, opt_mode=None,
     if opt_mode == 'reference':
         error = extract_tag_from_record(record, CFG_BIBUPLOAD_REFERENCE_TAG)
         if error is None:
-            write_message("   Failed: No reference tags has been found...",
-                        verbose=1, stream=sys.stderr)
+            message="Failed: No reference tags has been found..."
+            write_message("   " + message, verbose=1, stream=sys.stderr)
+            lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+            task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
             return (1, -1)
         else:
             error = None
@@ -219,9 +229,12 @@ def bibupload(record, opt_tag=None, opt_mode=None,
         # we add the record Id control field to the record
         error = record_add_field(record, '001', controlfield_value=rec_id)
         if error is None:
-            write_message("   Failed: " \
+            message="Failed: " \
                                         "Error during adding the 001 controlfield "  \
-                                        "to the record", verbose=1, stream=sys.stderr)
+                                        "to the record"
+            write_message("   " + message, verbose=1, stream=sys.stderr)
+            lock = task_create_lock( record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+            task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
             return (1, int(rec_id))
         else:
             error = None
@@ -235,8 +248,12 @@ def bibupload(record, opt_tag=None, opt_mode=None,
         # Also save a copy to restore previous situation in case of errors
         original_record = get_record(rec_id)
         if rec_old is None:
-            write_message("   Failed during the creation of the old record!",
-                        verbose=1, stream=sys.stderr)
+            message="Failed during the creation of the old record!"
+
+            write_message("   " + message, verbose=1, stream=sys.stderr)
+            lock = task_create_lock( record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+            task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
+
             return (1, int(rec_id))
         else:
             write_message("   -Retrieve the old record to update: DONE", verbose=2)
@@ -280,8 +297,10 @@ def bibupload(record, opt_tag=None, opt_mode=None,
             extract_tag_from_record(record, 'FMT') is not None:
             record = insert_fmt_tags(record, rec_id, opt_mode, pretend=pretend)
             if record is None:
-                write_message("   Stage 1 failed: Error while inserting FMT tags",
-                            verbose=1, stream=sys.stderr)
+                message="Stage 1 failed: Error while inserting FMT tags"
+                write_message("   " + message, verbose=1, stream=sys.stderr)
+                lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
                 return (1, int(rec_id))
             elif record == 0:
                 # Mode format finished
@@ -306,12 +325,18 @@ def bibupload(record, opt_tag=None, opt_mode=None,
                 record = elaborate_fft_tags(record, rec_id, opt_mode, pretend=pretend)
             except Exception, e:
                 register_exception()
-                write_message("   Stage 2 failed: Error while elaborating FFT tags: %s" % e,
-                    verbose=1, stream=sys.stderr)
+                message="Stage 2 failed: Error while elaborating FFT tags: %s" % e
+                write_message("   " + message, verbose=1, stream=sys.stderr)
+                lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
+
                 return (1, int(rec_id))
             if record is None:
-                write_message("   Stage 2 failed: Error while elaborating FFT tags",
-                            verbose=1, stream=sys.stderr)
+                message="Stage 2 failed: Error while elaborating FFT tags: %s" % e
+                write_message("   " + message, verbose=1, stream=sys.stderr)
+                lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
+
                 return (1, int(rec_id))
             write_message("   -Stage COMPLETED", verbose=2)
         else:
@@ -325,12 +350,19 @@ def bibupload(record, opt_tag=None, opt_mode=None,
                 record = synchronize_8564(rec_id, record, record_had_FFT, pretend=pretend)
             except Exception, e:
                 register_exception(alert_admin=True)
-                write_message("   Stage 2B failed: Error while synchronizing 8564 tags: %s" % e,
-                    verbose=1, stream=sys.stderr)
+                message="Stage 2B failed: Error while synchronizing 8564 tags: %s" % e
+                write_message("   " + message, verbose=1, stream=sys.stderr)
+
+                lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
+
                 return (1, int(rec_id))
             if record is None:
-                write_message("   Stage 2B failed: Error while synchronizing 8564 tags",
-                            verbose=1, stream=sys.stderr)
+                message="Stage 2B failed: Error while synchronizing 8564 tags: %s"
+                write_message("   " + message, verbose=1, stream=sys.stderr)
+                lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
+
                 return (1, int(rec_id))
             write_message("   -Stage COMPLETED", verbose=2)
         else:
@@ -345,20 +377,26 @@ def bibupload(record, opt_tag=None, opt_mode=None,
             if opt_mode != 'format':
                 error = update_bibfmt_format(rec_id, rec_xml_new, 'xm', pretend=pretend)
                 if error == 1:
-                    write_message("   Failed: error during update_bibfmt_format 'xm'",
-                                verbose=1, stream=sys.stderr)
+                    message="Failed: error during update_bibfmt_format 'xm'"
+                    write_message("   " + message, verbose=1, stream=sys.stderr)
+                    lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                    task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
                     return (1, int(rec_id))
                 if CFG_BIBUPLOAD_SERIALIZE_RECORD_STRUCTURE:
                     error = update_bibfmt_format(rec_id, marshal.dumps(record), 'recstruct', pretend=pretend)
                     if error == 1:
-                        write_message("   Failed: error during update_bibfmt_format 'recstruct'",
-                                    verbose=1, stream=sys.stderr)
+                        message="Failed: error during update_bibfmt_format 'recstruct'"
+                        write_message("   " + message, verbose=1, stream=sys.stderr)
+                        lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                        task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
                         return (1, int(rec_id))
                 # archive MARCXML format of this record for version history purposes:
                 error = archive_marcxml_for_history(rec_id, pretend=pretend)
                 if error == 1:
-                    write_message("   Failed to archive MARCXML for history",
-                                verbose=1, stream=sys.stderr)
+                    message="Failed to archive MARCXML for history"
+                    write_message("   " + message, verbose=1, stream=sys.stderr)
+                    lock = task_create_lock(record_xml_output(original_incoming_record), task_get_task_param('task_id', 0), 'bibupload',  task_get_task_param('user','UNKNOWN'), message)
+                    task_lock_record_identifiers(record_get_all_identifiers(original_incoming_record), lock, task_get_task_param('task_id', 0))
                     return (1, int(rec_id))
                 else:
                     write_message("   -Archived MARCXML for history : DONE", verbose=2)
@@ -650,6 +688,7 @@ def retrieve_rec_id(record, opt_mode):
                           " correct or append to replace an existing" \
                           " record. (-h for help)",
                           verbose=1, stream=sys.stderr)
+
             return -1
         else:
             # we found the rec id and we are not in insert mode => continue
@@ -1652,7 +1691,7 @@ def append_new_tag_to_old_record(record, rec_old, opt_tag, opt_mode):
                     if '%s%s%s' % (tag, ind1 == ' ' and '_' or ind1, ind2 == ' ' and '_' or ind2) in (CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[:5], CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[:5]):
                         ## We don't want to append the external identifier
                         ## if it is already existing.
-                        if record_find_field(rec_old, tag, single_tuple)[0] is not None:
+                        if record_find_field(rec_old, tag, single_tuple):
                             write_message("      Not adding tag: %s ind1=%s ind2=%s subfields=%s: it's already there" % (tag, ind1, ind2, subfield_list), verbose=9)
                             continue
                     # We add the datafield to the old record
@@ -1823,12 +1862,23 @@ Examples:
                    "pretend"
                  ]),
             task_submit_elaborate_specific_parameter_fnc=task_submit_elaborate_specific_parameter,
-            task_run_fnc=task_run_core)
+            task_run_fnc=task_run_core,
+            task_used_records_fnc=task_used_records)
+
+def task_used_records():
+    """ Returns a set with the record identifiers that will be used by the function"""
+    bibupload_used_records_set = set()
+    if task_get_option('file_path') is not None:
+        recs = xml_marc_to_records(open_marc_file(task_get_option('file_path')))
+
+        for record in recs:
+            bibupload_used_records_set = bibupload_used_records_set.union((record_get_all_identifiers(record)))
+    return bibupload_used_records_set
 
 def task_submit_elaborate_specific_parameter(key, value, opts, args):
     """ Given the string key it checks it's meaning, eventually using the
     value. Usually it fills some key in the options dict.
-    It must return True if it has elaborated the key, False, if it doesn't
+    It must return True if it has elaborated the key, Fase, if it doesn't
     know that key.
     eg:
     if key in ['-n', '--number']:

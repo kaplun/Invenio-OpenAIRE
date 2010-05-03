@@ -23,7 +23,9 @@ The BibRecord test suite.
 
 import unittest
 
-from invenio.config import CFG_TMPDIR
+from invenio.config import CFG_TMPDIR, \
+     CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG, CFG_BIBUPLOAD_EXTERNAL_OAIID_PROVENANCE_TAG, \
+     CFG_OAI_ID_FIELD, CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG
 from invenio import bibrecord, bibrecord_config
 from invenio.testutils import make_test_suite, run_test_suite
 
@@ -58,7 +60,7 @@ class BibRecordSuccessTest(unittest.TestCase):
 
     def test_records_created(self):
         """ bibrecord - demo file how many records are created """
-        self.assertEqual(104, len(self.recs))
+        self.assertEqual(102, len(self.recs))
 
     def test_tags_created(self):
         """ bibrecord - demo file which tags are created """
@@ -139,7 +141,6 @@ class BibRecordParsersTest(unittest.TestCase):
             '001': [([], ' ', ' ', '33', 1)],
             '041': [([('a', 'eng')], ' ', ' ', '', 2)]
             }
-
     if parser_pyrxp_available:
         def test_pyRXP(self):
             """ bibrecord - create_record() with pyRXP """
@@ -325,6 +326,7 @@ class BibRecordGettingFieldValuesTest(unittest.TestCase):
         <datafield tag="245" ind1=" " ind2="2">
         <subfield code="a">On the foo and bar2</subfield>
         </datafield>
+
         </record>
         """
         self.rec = bibrecord.create_record(xml_example_record, 1, 1)[0]
@@ -1514,6 +1516,68 @@ class BibRecordNumCharRefTest(unittest.TestCase):
             #self.assertEqual(rec, self.rec_expected)
             self.assertEqual(rec, None)
 
+
+class BibRecordRetrieveAllIdentifiersTest(unittest.TestCase):
+    """bibrecord - testing retrieving all identifiers"""
+    def setUp(self):
+        """Initialize stuff"""
+        self.expected_set = set([('external_oai_id', '()extoaiid2'), \
+                                 ('rec_id', '123456789'), ('external_oai_id',\
+                                '(extoaisrc1)extoaiid1'), ('oai_id', 'oai:foo:1'),\
+                                 ('sysno', 'sysno1')])
+
+        self.xm_testrec1 = """
+        <record>
+        <controlfield tag="001">123456789</controlfield>
+        <datafield tag="%(extoaiidtag)s" ind1="%(extoaiidind1)s" ind2="%(extoaiidind2)s">
+        <subfield code="%(extoaiidsubfieldcode)s">extoaiid1</subfield>
+        <subfield code="%(extoaisrcsubfieldcode)s">extoaisrc1</subfield>
+        </datafield>
+        <datafield tag="%(extoaiidtag)s" ind1="%(extoaiidind1)s" ind2="%(extoaiidind2)s">
+        <subfield code="%(extoaiidsubfieldcode)s">extoaiid2</subfield>
+        </datafield>
+        <datafield tag="%(extoaiidtag)s" ind1="%(extoaiidind1)s" ind2="%(extoaiidind2)s">
+        <subfield code="0">extoaiid2</subfield>
+        </datafield>
+        <datafield tag="%(oaitag)s" ind1="%(oaiind1)s" ind2="%(oaiind2)s">
+        <subfield code="%(oaisubfieldcode)s">oai:foo:1</subfield>
+        </datafield>
+        <datafield tag="%(oaitag)s" ind1="%(oaiind1)s" ind2="%(oaiind2)s">
+        <subfield code="0">oai:foo:2</subfield>
+        </datafield>
+        <datafield tag="%(sysnotag)s" ind1="%(sysnoind1)s" ind2="%(sysnoind2)s">
+        <subfield code="%(sysnosubfieldcode)s">sysno1</subfield>
+        </datafield>
+        <datafield tag="%(sysnotag)s" ind1="%(sysnoind1)s" ind2="%(sysnoind2)s">
+        <subfield code="0">sysno2</subfield>
+        </datafield>
+        </record>
+        """ % {'extoaiidtag': CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[0:3],
+               'extoaiidind1': CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[3:4] != "_" and \
+                            CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[3:4] or " ",
+               'extoaiidind2': CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[4:5] != "_" and \
+                            CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[4:5] or " ",
+               'extoaiidsubfieldcode': CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[5:6],
+               'extoaisrcsubfieldcode' : CFG_BIBUPLOAD_EXTERNAL_OAIID_PROVENANCE_TAG[5:6],
+               'oaitag': CFG_OAI_ID_FIELD[0:3],
+               'oaiind1': CFG_OAI_ID_FIELD[:4] != "_" and \
+                          CFG_OAI_ID_FIELD[3:4] or " ",
+               'oaiind2': CFG_OAI_ID_FIELD[4:5] != "_" and \
+                          CFG_OAI_ID_FIELD[4:5] or " ",
+               'oaisubfieldcode': CFG_OAI_ID_FIELD[5:6],
+               'sysnotag': CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[0:3],
+               'sysnoind1': CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[3:4] != "_" and \
+                            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[3:4] or "",
+               'sysnoind2': CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[4:5] != "_" and \
+                            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[4:5] or "",
+               'sysnosubfieldcode': CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[5:6],
+               }
+
+        record =  bibrecord.create_record(self.xm_testrec1)
+        result = bibrecord.record_get_all_identifiers(record[0])
+        self.assertEqual(result, self.expected_set)
+
+
 TEST_SUITE = make_test_suite(
     BibRecordSuccessTest,
     BibRecordParsersTest,
@@ -1536,7 +1600,8 @@ TEST_SUITE = make_test_suite(
     BibRecordFindFieldTest,
     BibRecordDeleteSubfieldTest,
     BibRecordSingletonTest,
-    BibRecordNumCharRefTest
+    BibRecordNumCharRefTest,
+    BibRecordRetrieveAllIdentifiersTest
     )
 
 if __name__ == '__main__':
