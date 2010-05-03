@@ -17,6 +17,23 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
+import tempfile
+import time
+if sys.hexversion < 0x2060000:
+    try:
+        import simplejson as json
+        simplejson_available = True
+    except ImportError:
+        # Okay, no Ajax app will be possible, but continue anyway,
+        # since this package is only recommended, not mandatory.
+        simplejson_available = False
+else:
+    import json
+    simplejson_available = True
+
+from invenio.config import CFG_TMPDIR
+from invenio.datetime
+
 def is_dry_run_request(req):
     """
     @return: True if the current request is a dry_run (or No-Op) request.
@@ -32,4 +49,10 @@ def is_verbose_request(req):
     return req.headers_in.get("X-Verbose", "false").lower() == 'true'
 
 
+def create_sword_session(info):
+    session = tempfile.mkdtemp(dir=CFG_TMPDIR, prefix="sword-session-%s" % time.strftime("%Y-%m-%d_%H:%M:%S"))
+    open(os.path.join(session, '.info'), 'w').write()
+
+
 def get_sword_service_description(req):
+

@@ -3663,4 +3663,11 @@ CREATE TABLE IF NOT EXISTS user_expJOB (
   KEY id_expJOB (id_expJOB)
 ) TYPE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS sword (
+  id int(15) unsigned NOT NULL auto_increment,
+  creation_date datetime NOT NULL,
+  modification_date datetime NOT NULL,
+
+)
+
 -- end of file

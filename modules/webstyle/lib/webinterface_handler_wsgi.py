@@ -90,6 +90,7 @@ class SimulatedModPythonRequest(object):
             self.__headers_in['content-length'] = environ['CONTENT_LENGTH']
         if environ.get('CONTENT_TYPE'):
             self.__headers_in['content-type'] = environ['CONTENT_TYPE']
+        if self.__headers_in['']
         self.get_post_form()
 
     def get_wsgi_environ(self):

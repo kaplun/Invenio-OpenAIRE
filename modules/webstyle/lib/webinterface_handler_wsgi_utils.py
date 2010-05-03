@@ -721,7 +721,7 @@ class FieldStorage:
 
         if not ctype.startswith("multipart/"):
             # we don't understand this content-type
-            raise SERVER_RETURN, HTTP_NOT_IMPLEMENTED
+            return
 
         # figure out boundary
         try:
