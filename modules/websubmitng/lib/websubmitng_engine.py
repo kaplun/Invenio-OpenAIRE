@@ -57,6 +57,38 @@ class WebSubmitStatus(object):
     DONE = 'DONE'
 
 def python2xml(obj, indent=0):
+    """
+    <?xml version="1.0"?>
+    <map>
+        <key name="authors">
+            <list>
+                <value>
+                    <list>
+                        <value>Kaplun, Samuele</value>
+                        <value>CERN</value>
+                    </list>
+                </value>
+                <value>
+                    <list>
+                        <value>Caffaro, Jerome</value>
+                        <value>CERN</value>
+                    </list>
+                </value
+            </list>
+        </key>
+        <key name="abstract">
+            <value>
+                the foo and the bar
+            </value>
+        </key>
+        <key name="date">
+            <value>
+                2000/02/32
+            </value>
+        </key>
+    </map>
+    """
+
     if not indent:
         out = '<?xml version="1.0"?>\n'
     else:
