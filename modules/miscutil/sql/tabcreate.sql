@@ -3665,9 +3665,10 @@ CREATE TABLE IF NOT EXISTS user_expJOB (
 
 CREATE TABLE IF NOT EXISTS sword (
   id int(15) unsigned NOT NULL auto_increment,
+  id_user(15) unsigned NOT NULL,
   creation_date datetime NOT NULL,
   modification_date datetime NOT NULL,
-
+  info BLOB NULL,
 )
 
 -- end of file
