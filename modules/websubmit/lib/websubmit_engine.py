@@ -701,6 +701,289 @@ def interface(req,
                 req = req,
                 navmenuid='submit')
 
+def websubmit_workflow_wrapper(user_info, doctype, act, form, step=1, curpage=1, recid=None, marcxml=None, ln=CFG_SITE_LANG):
+    """@param ln: (string), defaulted to CFG_SITE_LANG. The language in which to
+        display the pages.
+       @param doctype: (string) - the doctype ID of the doctype for which the
+        submission is being made.
+       @param act: (string) - The ID of the action being performed (e.g.
+        submission of bibliographic information; modification of bibliographic
+        information, etc).
+       @param step: (integer) - the current step of the submission. Defaults to
+        1.
+    """
+    # load the right message language
+    _ = gettext_set_language(ln)
+    # get user ID:
+    uid = user_info['uid']
+    uid_email = user_info['email']
+    access = "%(now)i_%(pid)s" % (time.time(), os.getpid())
+    # Preliminary tasks
+    # check that the user is logged in
+    if uid_email == "" or uid_email == "guest":
+        raise InvenioWebSubmitFunctionError("Sorry, you must log in to perform this action.")
+
+    ## check we have minimum fields
+    if not doctype or not act:
+        ## We don't have all the necessary information to go ahead
+        ## with this submission:
+        raise InvenioWebSubmitFunctionError("Not enough information to go ahead with the submission.")
+
+    if doctype and act:
+        ## Let's clean the input
+        details = get_details_of_submission(doctype, act)
+        if not details:
+            return InvenioWebSubmitFunctionError("Invalid doctype and act parameters")
+        doctype = details[0]
+        act = details[1]
+
+    ## Before continuing to process the submitted data, verify that
+    ## this submission has not already been completed:
+    if submission_is_finished(doctype, act, access, uid_email):
+        ## This submission has already been completed.
+        ## This situation can arise when, having completed a submission,
+        ## the user uses the browser's back-button to go back to the form
+        ## stage of the submission and then tries to submit once more.
+        ## This is unsafe and should not be allowed. Instead of re-processing
+        ## the submitted data, display an error message to the user:
+        wrnmsg = """<b>This submission has been completed. Please go to the""" \
+                 """ <a href="/submit?doctype=%(doctype)s&amp;ln=%(ln)s">""" \
+                 """main menu</a> to start a new submission.</b>""" \
+                 % { 'doctype' : quote_plus(doctype), 'ln' : ln }
+        raise InvenioWebSubmitFunctionError(wrnmsg)
+
+    ## Get the number of pages for this submission:
+    subname = "%s%s" % (act, doctype)
+
+    ## retrieve the action and doctype data
+    ## Get the submission storage directory from the DB:
+    submission_dir = get_storage_directory_of_action(act)
+    if submission_dir:
+        indir = submission_dir
+    else:
+        ## Unable to determine the submission-directory:
+        raise InvenioWebSubmitFunctionError("Unable to find the submission directory for the action: %s" % escape(str(act)))
+
+    # The following words are reserved and should not be used as field names
+    reserved_words = ["stop", "file", "nextPg", "startPg", "access", "curpage", "nbPg", "act", \
+                      "indir", "doctype", "mode", "step", "deleted", "file_path", "userfile_name"]
+    # This defines the path to the directory containing the action data
+    curdir = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, indir, doctype, access)
+    assert(curdir == os.path.abspath(curdir))
+
+    ## If the submission directory still does not exist, we create it
+    if not os.path.exists(curdir):
+        os.makedirs(curdir)
+
+    if marcxml:
+        open(os.path.join(curdir, 'recmysql'), 'w').write(marcxml)
+
+    if recid:
+        open(os.path.join(curdir, 'SN'), 'w').write(recid)
+
+    if uid_email:
+        open(os.path.join(curdir, 'SuE'), 'w').write(uid_email)
+
+    mainmenu = "%s/submit" % (CFG_SITE_URL,)
+
+    ## retrieve the name of the file in which the reference of
+    ## the submitted document will be stored
+    rn_filename = get_parameter_value_for_doctype(doctype, "edsrn")
+    if rn_filename is not None:
+        edsrn = rn_filename
+    else:
+        ## Unknown value for edsrn - set it to an empty string:
+        edsrn = ""
+
+    ## Determine whether the action is finished
+    ## (ie there are no other steps after the current one):
+    finished = function_step_is_last(doctype, act, step)
+
+    ## Let's write in curdir file under curdir the curdir value
+    ## in case e.g. it is needed in FFT.
+    fp = open(os.path.join(curdir, "curdir"), "w")
+    fp.write(curdir)
+    fp.close()
+
+    # Save the form fields entered in the previous submission page
+    # If the form was sent with the GET method
+    #value = ""
+    # we parse all the form variables
+    for key, formfields in form.iteritems():
+        filename = key.replace("[]", "")
+
+        file_to_open = os.path.join(curdir, filename)
+        assert(file_to_open == os.path.abspath(file_to_open))
+        assert(file_to_open.startswith(CFG_WEBSUBMIT_STORAGEDIR))
+
+        # Do not write reserved filenames to disk
+        if filename in CFG_RESERVED_SUBMISSION_FILENAMES:
+            # Unless there is really an element with that name in the
+            # interface, which means that admin authorized it
+            if not filename in [submission_field[3] for submission_field in get_form_fields_on_submission_page(subname, curpage)]:
+                # Still this will filter out reserved field names that
+                # might have been called by functions such as
+                # Create_Modify_Interface function in MBI step, or
+                # dynamic fields in response elements, but that is
+                # unlikely to be a problem.
+                continue
+
+        # Skip variables containing characters that are not allowed in
+        # WebSubmit elements
+        if not string_is_alphanumeric_including_underscore(filename):
+            continue
+
+        # the field is an array
+        if isinstance(formfields,types.ListType):
+            fp = open(file_to_open, "w")
+            for formfield in formfields:
+                #stripslashes(value)
+                value = specialchars(formfield)
+                fp.write(value+"\n")
+            fp.close()
+        # the field is a normal string
+        elif isinstance(formfields, types.StringTypes) and formfields != "":
+            value = formfields
+            fp = open(file_to_open, "w")
+            fp.write(specialchars(value))
+            fp.close()
+        # the field is a file
+        elif hasattr(formfields, "filename") and formfields.filename:
+            dir_to_open = os.path.join(curdir, 'files', key)
+            assert(dir_to_open == os.path.abspath(dir_to_open))
+            assert(dir_to_open.startswith(CFG_WEBSUBMIT_STORAGEDIR))
+
+            if not os.path.exists(dir_to_open):
+                os.makedirs(dir_to_open)
+            filename = formfields.filename
+            ## Before saving the file to disc, wash the filename (in particular
+            ## washing away UNIX and Windows (e.g. DFS) paths):
+            filename = os.path.basename(filename.split('\\')[-1])
+            filename = filename.strip()
+            if filename != "":
+                # This may be dangerous if the file size is bigger than the available memory
+                data = formfields.file.read()
+                fp = open(os.path.join(dir_to_open, filename), "w")
+                fp.write(data)
+                fp.close()
+                fp = open(os.path.join(curdir, "lastuploadedfile"), "w")
+                fp.write(filename)
+                fp.close()
+                fp = open(file_to_open, "w")
+                fp.write(filename)
+                fp.close()
+            else:
+                raise InvenioWebSubmitFunctionError("No file uploaded?")
+        ## if the found field is the reference of the document
+        ## we save this value in the "journal of submissions"
+        if uid_email != "" and uid_email != "guest":
+            if key == edsrn:
+                update_submission_reference_in_log(doctype, access, uid_email, value)
+
+    ## get the document type's long-name:
+    doctype_lname = get_longname_of_doctype(doctype)
+    if doctype_lname is not None:
+        ## Got the doctype long-name: replace spaces with HTML chars:
+        docname = doctype_lname.replace(" ", "&nbsp;")
+    else:
+        ## Unknown document type:
+        raise InvenioWebSubmitFunctionError("Unknown document type: %s" % repr(doctype))
+
+    ## get the action's long-name:
+    actname = get_longname_of_action(act)
+    if actname is None:
+        ## Unknown action:
+        raise InvenioWebSubmitFunctionError("Unknown action: %s" % repr(act))
+
+    num_submission_pages = get_num_pages_of_submission(subname)
+    if num_submission_pages is not None:
+        nbpages = num_submission_pages
+    else:
+        ## Unable to determine the number of pages for this submission:
+        raise InvenioWebSubmitFunctionError("Unable to determine the number of submission pages.")
+
+    ## Determine whether the action is finished
+    ## (ie there are no other steps after the current one):
+    last_step = function_step_is_last(doctype, act, step)
+
+    next_action = '' ## The next action to be proposed to the user
+
+    # Prints the action details, returning the mandatory score
+    action_score = action_details(doctype, act)
+    current_level = get_level(doctype, act)
+
+    # Calls all the function's actions
+    function_content = ''
+    try:
+        ## Handle the execution of the functions for this
+        ## submission/step:
+        start_time = time.time()
+        (function_content, last_step, action_score) = print_function_calls(
+                                                req=req,
+                                                doctype=doctype,
+                                                action=act,
+                                                step=step,
+                                                form=form,
+                                                start_time=start_time,
+                                                access=access,
+                                                curdir=curdir,
+                                                dismode=mode,
+                                                rn=rn,
+                                                last_step=last_step,
+                                                action_score=action_score,
+                                                ln=ln)
+    except InvenioWebSubmitFunctionStop, e:
+        ## For one reason or another, one of the functions has determined that
+        ## the data-processing phase (i.e. the functions execution) should be
+        ## halted and the user should be returned to the form interface once
+        ## more. (NOTE: Redirecting the user to the Web-form interface is
+        ## currently done using JavaScript. The "InvenioWebSubmitFunctionStop"
+        ## exception contains a "value" string, which is effectively JavaScript
+        ## - probably an alert box and a form that is submitted). **THIS WILL
+        ## CHANGE IN THE FUTURE WHEN JavaScript IS REMOVED!**
+        if e.value is not None:
+            function_content = e.value
+        else:
+            function_content = e
+    else:
+        ## No function exceptions (InvenioWebSubmitFunctionStop,
+        ## InvenioWebSubmitFunctionError) were raised by the functions. Propose
+        ## the next action (if applicable), and log the submission as finished:
+
+        ## If the action was mandatory we propose the next
+        ## mandatory action (if any)
+        if action_score != -1 and last_step == 1:
+            next_action = Propose_Next_Action(doctype, \
+                                              action_score, \
+                                              access, \
+                                              current_level, \
+                                              indir)
+
+        ## If we are in the last step of an action, we can update
+        ## the "journal of submissions"
+        if last_step == 1:
+            if uid_email != "" and uid_email != "guest" and rn != "":
+                ## update the "journal of submission":
+                ## Does the submission already exist in the log?
+                submission_exists = \
+                     submission_exists_in_log(doctype, act, access, uid_email)
+                if submission_exists == 1:
+                    ## update the rn and status to finished for this submission
+                    ## in the log:
+                    update_submission_reference_and_status_in_log(doctype, \
+                                                                  act, \
+                                                                  access, \
+                                                                  uid_email, \
+                                                                  rn, \
+                                                                  "finished")
+                else:
+                    ## Submission doesn't exist in log - create it:
+                    log_new_completed_submission(doctype, \
+                                                 act, \
+                                                 access, \
+                                                 uid_email, \
+                                                 rn)
+    return function_content, curdir
 
 def endaction(req,
               c=CFG_SITE_NAME,

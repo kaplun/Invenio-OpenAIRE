@@ -1097,7 +1097,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
             elif int(step)==0:
                 return interface(req, c, ln, doctype, act, startPg, access, mainmenu, fromdir, nextPg, nbPg, curpage)
             else:
-                return endaction(req, c, ln, doctype, act, startPg, access,mainmenu, fromdir, nextPg, nbPg, curpage, step, mode)
+                return endaction(req, c, ln, doctype, act, startPg, access, mainmenu, fromdir, nextPg, nbPg, curpage, step, mode)
 
         return _index(req, **args)
 

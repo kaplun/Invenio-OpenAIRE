@@ -82,3 +82,10 @@ class Template:
         atom_feed.write(out, 'UTF8')
         return out.getvalue()
 
+    def tmpl_sword_error(error_url, summary):
+        return """\
+<<?xml version="1.0" encoding='utf-8'?>
+<sword:error xmlns="http://www.w3.org/2007/app"
+         xmlns:atom="http://www.w3.org/2005/Atom"
+         xmlns:sword="http://purl.org/net/sword/"
+         xmlns:dcterms="http://purl.org/dc/terms/">

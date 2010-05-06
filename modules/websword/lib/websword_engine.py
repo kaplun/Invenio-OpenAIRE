@@ -48,6 +48,28 @@ def is_verbose_request(req):
     """
     return req.headers_in.get("X-Verbose", "false").lower() == 'true'
 
+def get_on_behalf_of(req):
+    """
+    @return: uid of the user on behalf of which this deposition is performed.
+    @see: section 2 in http://www.swordapp.org/docs/sword-profile-1.3.html
+    @raise: ValueError if the user is not known.
+    """
+    user = req.headers_in.get("X-On-Behalf-Of", None)
+    if user is None:
+        return
+    elif user.isdigit() and run_sql("SELECT id FROM user WHERE id=%s", (user, )):
+        return int(user)
+    uid = run_sql("SELECT id FROM user WHERE email=%s OR nickname=%s" % (user, user))
+    if uid:
+        return uid[0][0]
+    raise ValueError("Unknown user %s specified in X-On-Behalf-Of header" % repr(user))
+
+def sword_session_gc():
+    run_sql()
+
+class SwordSession(object):
+    def __init__(self):
+
 
 def create_sword_session(info):
     session = tempfile.mkdtemp(dir=CFG_TMPDIR, prefix="sword-session-%s" % time.strftime("%Y-%m-%d_%H:%M:%S"))
@@ -56,3 +78,4 @@ def create_sword_session(info):
 
 def get_sword_service_description(req):
 
+def create_error_document()
