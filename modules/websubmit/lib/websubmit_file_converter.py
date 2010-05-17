@@ -87,117 +87,6 @@ class InvenioWebSubmitFileConverterError(Exception):
     pass
 
 
-def get_conversion_map():
-    """Return a dictionary of the form:
-    '.pdf' : {'.ps.gz' : ('pdf2ps', {param1 : value1...})
-    """
-    ret = {
-        '.csv': {},
-        '.djvu': {},
-        '.doc': {},
-        '.docx': {},
-        '.htm': {},
-        '.html': {},
-        '.odp': {},
-        '.ods': {},
-        '.odt': {},
-        '.pdf': {},
-        '.ppt': {},
-        '.pptx': {},
-        '.ps': {},
-        '.ps.gz': {},
-        '.rtf': {},
-        '.tif': {},
-        '.tiff': {},
-        '.txt': {},
-        '.xls': {},
-        '.xlsx': {},
-        '.xml': {},
-        '.hocr': {},
-    }
-    if CFG_PATH_GZIP:
-        ret['.ps']['.ps.gz'] = (gzip, {})
-    if CFG_PATH_GUNZIP:
-        ret['.ps.gz']['.ps'] = (gunzip, {})
-    if CFG_PATH_ANY2DJVU:
-        ret['.pdf']['.djvu'] = (any2djvu, {})
-        ret['.ps']['.djvu'] = (any2djvu, {})
-        ret['.ps.gz']['.djvu'] = (any2djvu, {})
-    if CFG_PATH_DJVUPS:
-        ret['.djvu']['.ps'] = (djvu2ps, {'compress': False})
-        if CFG_PATH_GZIP:
-            ret['.djvu']['.ps.gz'] = (djvu2ps, {'compress': True})
-    if CFG_PATH_DJVUTXT:
-        ret['.djvu']['.txt'] = (djvu2text, {})
-    if CFG_PATH_PSTOTEXT:
-        ret['.ps']['.txt'] = (pstotext, {})
-        if CFG_PATH_GUNZIP:
-            ret['.ps.gz']['.txt'] = (pstotext, {})
-    if CFG_PATH_GS:
-        ret['.ps']['.pdf'] = (ps2pdfa, {})
-        if CFG_PATH_GUNZIP:
-            ret['.ps.gz']['.pdf'] = (ps2pdfa, {})
-    if CFG_PATH_PDFTOPS:
-        ret['.pdf']['.ps'] = (pdf2ps, {'compress': False})
-        if CFG_PATH_GZIP:
-            ret['.pdf']['.ps.gz'] = (pdf2ps, {'compress': True})
-    if CFG_PATH_PDFTOTEXT:
-        ret['.pdf']['.txt'] = (pdf2text, {})
-    if CFG_PATH_PDFTOPPM and CFG_PATH_OCROSCRIPT and CFG_PATH_PAMFILE:
-        ret['.pdf']['.hocr'] = (pdf2hocr, {})
-    if CFG_PATH_PDFTOPS and CFG_PATH_GS and CFG_PATH_PDFOPT and CFG_PATH_PDFINFO:
-        ret['.pdf']['.pdf'] = (pdf2pdfa, {})
-    ret['.txt']['.txt'] = (txt2text, {})
-    ret['.csv']['.txt'] = (txt2text, {})
-    ret['.html']['.txt'] = (html2text, {})
-    ret['.htm']['.txt'] = (html2text, {})
-    ret['.xml']['.txt'] = (html2text, {})
-    if CFG_HAS_REPORTLAB:
-        ret['.hocr']['.pdf'] = (hocr2pdf, {})
-    if CFG_PATH_TIFF2PDF:
-        ret['.tiff']['.pdf'] = (tiff2pdf, {})
-        ret['.tif']['.pdf'] = (tiff2pdf, {})
-    if CFG_PATH_OPENOFFICE_PYTHON and CFG_OPENOFFICE_SERVER_HOST:
-        ret['.rtf']['.odt'] = (unoconv, {'output_format': 'odt'})
-        ret['.rtf']['.doc'] = (unoconv, {'output_format': 'doc'})
-        ret['.rtf']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.rtf']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.doc']['.odt'] = (unoconv, {'output_format': 'odt'})
-        ret['.doc']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.doc']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.docx']['.odt'] = (unoconv, {'output_format': 'odt'})
-        ret['.docx']['.doc'] = (unoconv, {'output_format': 'doc'})
-        ret['.docx']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.docx']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.odt']['.doc'] = (unoconv, {'output_format': 'doc'})
-        ret['.odt']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.odt']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.ppt']['.odp'] = (unoconv, {'output_format': 'odp'})
-        ret['.ppt']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.ppt']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.pptx']['.odp'] = (unoconv, {'output_format': 'odp'})
-        ret['.pptx']['.ppt'] = (unoconv, {'output_format': 'ppt'})
-        ret['.pptx']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.pptx']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.odp']['.ppt'] = (unoconv, {'output_format': 'ppt'})
-        ret['.odp']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.odp']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.xls']['.ods'] = (unoconv, {'output_format': 'ods'})
-        ret['.xls']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.xls']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.xls']['.csv'] = (unoconv, {'output_format': 'csv'})
-        ret['.xlsx']['.xls'] = (unoconv, {'output_format': 'xls'})
-        ret['.xlsx']['.ods'] = (unoconv, {'output_format': 'ods'})
-        ret['.xlsx']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.xlsx']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.xlsx']['.csv'] = (unoconv, {'output_format': 'csv'})
-        ret['.ods']['.xls'] = (unoconv, {'output_format': 'xls'})
-        ret['.ods']['.pdf'] = (unoconv, {'output_format': 'pdf'})
-        ret['.ods']['.txt'] = (unoconv, {'output_format': 'text'})
-        ret['.ods']['.csv'] = (unoconv, {'output_format': 'csv'})
-    return ret
-
-
 def get_best_format_to_extract_text_from(filelist, best_formats=CFG_WEBSUBMIT_BEST_FORMATS_TO_EXTRACT_TEXT_FROM):
     """
     Return among the filelist the best file whose format is best suited for
@@ -517,38 +406,6 @@ def pdf2pdfa(input_file, output_file=None, title=None, pdfopt=True, **dummy):
     return output_file
 
 
-def pdf2pdfopt(input_file, output_file=None, **dummy):
-    """
-    Linearize the input PDF in order to improve the web-experience when
-    visualizing the document through the web.
-    @param input_file [string] the input input_file
-    @param output_file [string] the output_file file name, None for temporary generated
-    @return [string] output_file input_file
-    raise InvenioWebSubmitFileConverterError in case of errors.
-    """
-    input_file, output_file, dummy = prepare_io(input_file, output_file, '.pdf', need_working_dir=False)
-    execute_command(CFG_PATH_PDFOPT, input_file, output_file)
-    return output_file
-
-
-def pdf2ps(input_file, output_file=None, level=2, compress=True, **dummy):
-    """
-    Convert from Pdf to Postscript.
-    """
-    if compress:
-        suffix = '.ps.gz'
-    else:
-        suffix = '.ps'
-    input_file, output_file, working_dir = prepare_io(input_file, output_file, suffix)
-    execute_command(CFG_PATH_PDFTOPS, '-level%i' % level, input_file, os.path.join(working_dir, 'output.ps'))
-    if compress:
-        execute_command(CFG_PATH_GZIP, '-c', os.path.join(working_dir, 'output.ps'), filename_out=output_file)
-    else:
-        shutil.move(os.path.join(working_dir, 'output.ps'), output_file)
-    clean_working_dir(working_dir)
-    return output_file
-
-
 def ps2pdfa(input_file, output_file=None, title=None, pdfopt=True, **dummy):
     """
     Transform any PS into a PDF/A (see: <http://www.pdfa.org/>)
@@ -746,28 +603,6 @@ def pdf2hocr2pdf(input_file, output_file=None, font="Courier", author=None, keyw
     return output_file
 
 
-def pdf2text(input_file, output_file=None, perform_ocr=True, ln='en', **dummy):
-    """
-    Return the text content in input_file.
-    """
-    input_file, output_file, dummy = prepare_io(input_file, output_file, '.txt', need_working_dir=False)
-    execute_command(CFG_PATH_PDFTOTEXT, '-enc', 'UTF-8', '-eol', 'unix', '-nopgbrk', input_file, output_file)
-    if perform_ocr and can_perform_ocr():
-        ocred_output = pdf2hocr(input_file, ln=ln, extract_only_text=True)
-        open(output_file, 'a').write(open(ocred_output).read())
-        os.remove(ocred_output)
-    return output_file
-
-
-def txt2text(input_file, output_file=None, **dummy):
-    """
-    Return the text content in input_file
-    """
-    input_file, output_file, dummy = prepare_io(input_file, output_file, '.txt', need_working_dir=False)
-    shutil.copy(input_file, output_file)
-    return output_file
-
-
 def html2text(input_file, output_file=None, **dummy):
     """
     Return the text content of an HTML/XML file.
@@ -802,89 +637,6 @@ def html2text(input_file, output_file=None, **dummy):
     for line in open(input_file):
         html_stripper.feed(line)
     html_stripper.close()
-    return output_file
-
-
-def djvu2text(input_file, output_file=None, **dummy):
-    """
-    Return the text content in input_file.
-    """
-    input_file, output_file, dummy = prepare_io(input_file, output_file, '.txt', need_working_dir=False)
-    execute_command(CFG_PATH_DJVUTXT, input_file, output_file)
-    return output_file
-
-
-def djvu2ps(input_file, output_file=None, level=2, compress=True, **dummy):
-    """
-    Convert a djvu into a .ps[.gz]
-    """
-    if compress:
-        input_file, output_file, working_dir = prepare_io(input_file, output_file, output_ext='.ps.gz')
-        execute_command(CFG_PATH_DJVUPS, input_file, os.path.join(working_dir, 'output.ps'))
-        execute_command(CFG_PATH_GZIP, '-c', os.path.join(working_dir, 'output.ps'), filename_out=output_file)
-    else:
-        input_file, output_file, working_dir = prepare_io(input_file, output_file, output_ext='.ps')
-        execute_command(CFG_PATH_DJVUPS, '-level=%i' % level, input_file, output_file)
-    clean_working_dir(working_dir)
-    return output_file
-
-
-def tiff2pdf(input_file, output_file=None, pdfopt=True, pdfa=True, perform_ocr=True, **args):
-    """
-    Convert a .tiff into a .pdf
-    """
-    if pdfa or pdfopt or perform_ocr:
-        input_file, output_file, working_dir = prepare_io(input_file, output_file, '.pdf')
-        partial_output = os.path.join(working_dir, 'output.pdf')
-        execute_command(CFG_PATH_TIFF2PDF, '-o', partial_output, input_file)
-        if perform_ocr:
-            pdf2hocr2pdf(partial_output, output_file, pdfopt=pdfopt, **args)
-        elif pdfa:
-            pdf2pdfa(partial_output, output_file, pdfopt=pdfopt, **args)
-        else:
-            pdfopt(partial_output, output_file)
-        clean_working_dir(working_dir)
-    else:
-        input_file, output_file, dummy = prepare_io(input_file, output_file, '.pdf', need_working_dir=False)
-        execute_command(CFG_PATH_TIFF2PDF, '-o', output_file, input_file)
-    return output_file
-
-
-def pstotext(input_file, output_file=None, **dummy):
-    """
-    Convert a .ps[.gz] into text.
-    """
-    input_file, output_file, working_dir = prepare_io(input_file, output_file, '.txt')
-    if input_file.endswith('.gz'):
-        new_input_file = os.path.join(working_dir, 'input.ps')
-        execute_command(CFG_PATH_GUNZIP, '-c', input_file, filename_out=new_input_file)
-        input_file = new_input_file
-    execute_command(CFG_PATH_PSTOTEXT, '-output', output_file, input_file)
-    clean_working_dir(working_dir)
-    return output_file
-
-
-def gzip(input_file, output_file=None, **dummy):
-    """
-    Compress a file.
-    """
-    input_file, output_file, dummy = prepare_io(input_file, output_file, '.gz', need_working_dir=False)
-    execute_command(CFG_PATH_GZIP, '-c', input_file, filename_out=output_file)
-    return output_file
-
-
-def gunzip(input_file, output_file=None, **dummy):
-    """
-    Uncompress a file.
-    """
-    from invenio.bibdocfile import decompose_file
-    input_ext = decompose_file(input_file, skip_version=True)[2]
-    if input_ext.endswith('.gz'):
-        input_ext = input_ext[:-len('.gz')]
-    else:
-        input_ext = None
-    input_file, output_file, dummy = prepare_io(input_file, output_file, input_ext, need_working_dir=False)
-    execute_command(CFG_PATH_GUNZIP, '-c', input_file, filename_out=output_file)
     return output_file
 
 
