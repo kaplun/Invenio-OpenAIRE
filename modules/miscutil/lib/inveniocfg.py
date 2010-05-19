@@ -57,6 +57,9 @@ Options to update DB tables:
    --reset-fieldnames       reset tables to take account of new I18N names from PO files
    --reset-recstruct-cache  reset record structure cache according to CFG_BIBUPLOAD_SERIALIZE_RECORD_STRUCTURE
 
+Options to perform specific tasks:
+   --perform-update-filesystem update the directory file structure to reflect changes in CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT
+
 Options to help the work:
    --list                   print names and values of all options from conf files
    --get <some-opt>         get value of a given option from conf files
@@ -351,6 +354,41 @@ def cli_cmd_update_web_tests(conf):
             fdesc.write(out)
             fdesc.close()
     print ">>> web tests updated successfully."
+
+def cli_cmd_perform_update_filesystem(conf):
+    """
+    This method MUST be run each time the CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT
+    config variable is changed.
+    """
+    def correct(bdir, gdir, fdir):
+        from invenio.bibdocfile import _make_base_dir
+        original_dir = os.path.join(bdir, gdir, fdir)
+        final_dir = _make_base_dir(fdir)
+        if original_dir != final_dir:
+            print "    Migrating %s to %s..." % (original_dir, final_dir),
+            if os.path.exists(final_dir):
+                print >> sys.stderr, "\nWARNING: %s already exists. It's impossible to migrate %s."
+                return True
+            shutil.move(original_dir, final_dir)
+            print "Done."
+        return False
+    warnings = False
+    from invenio.bibtask import check_running_process_user
+    check_running_process_user()
+    print ">>> Going to update CFG_WEBSUBMIT_FILEDIR structure..."
+    bibdoc_group_limit = int(conf.get("Invenio", "CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT"))
+    bdir = conf.get("Invenio", "CFG_WEBSUBMIT_FILEDIR").strip()
+    for gdir in os.listdir(bdir):
+        for fdir in os.listdir(os.path.join(bdir, gdir)):
+            if not fdir.startswith('.'):
+                if fdir.isdigit() and os.path.isdir(os.path.join(bdir, gdir, fdir)):
+                    warnings |= correct(bdir, gdir, fdir)
+                else:
+                    print >> sys.stderr, "WARNING: estraneous directory/file %s in %s" % (fdir, os.path.join(bdir, gdir))
+                    warnings = True
+    print ">>> Done."
+    if warnings:
+        print "NOTE: some WARNINGS have been issued."
 
 def cli_cmd_reset_sitename(conf):
     """
@@ -1201,6 +1239,9 @@ def main():
                 done = True
             elif opt == '--update-web-tests':
                 cli_cmd_update_web_tests(conf)
+                done = True
+            elif opt == '--perform-update-filesystem':
+                cli_cmd_perform_update_filesystem(conf)
                 done = True
             elif opt == '--reset-all':
                 cli_cmd_reset_sitename(conf)
