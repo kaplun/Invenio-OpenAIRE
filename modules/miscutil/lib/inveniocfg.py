@@ -49,6 +49,7 @@ Options to update config files in situ:
    --update-dbexec          update dbexec with DB credentials from invenio.conf
    --update-bibconvert-tpl  update bibconvert templates with CFG_SITE_URL from invenio.conf
    --update-web-tests       update web test cases with CFG_SITE_URL from invenio.conf
+   --update-file-struct     update the directory file structure to reflect changes in CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT
 
 Options to update DB tables:
    --reset-all              perform all the reset options
@@ -83,7 +84,7 @@ def print_version():
     """Print version information."""
     print __revision__
 
-def convert_conf_option(option_name, option_value):
+def convert_conf_option(option_name, option_value, conf):
     """
     Convert conf option into Python config.py line, converting
     values to ints or strings as appropriate.
@@ -124,7 +125,7 @@ def convert_conf_option(option_name, option_value):
         option_value = option_value[1:-1]
 
     ## 3c) special cases: dicts
-    if option_name in ['CFG_WEBSEARCH_FIELDS_CONVERT', 'CFG_BATCHUPLOADER_WEB_ROBOT_RIGHTS']:
+    if option_name in ['CFG_WEBSEARCH_FIELDS_CONVERT', 'CFG_BATCHUPLOADER_WEB_ROBOT_RIGHTS', 'CFG_WEBSUBMIT_CONVERSION_MAP']:
         option_value = option_value[1:-1]
 
     ## 3d) special cases: comma-separated lists
@@ -207,12 +208,20 @@ def cli_cmd_update_config_py(conf):
     for section in sections:
         options = conf.options(section)
         options.sort()
+        options_to_put_at_end = []
         for option in options:
-            if not option.startswith('CFG_DATABASE_'):
+            if option.startswith('CFG_WEBSUBMIT_CONVERSION_MAP'):
+                # This option might depend on other options (e.g. CFG_PATH_*)
+                options_to_put_at_end.append(option)
+            elif not option.startswith('CFG_DATABASE_'):
                 # put all options except for db credentials into config.py
-                line_out = convert_conf_option(option, conf.get(section, option))
+                line_out = convert_conf_option(option, conf.get(section, option), conf)
                 if line_out:
                     fdesc.write(line_out + "\n")
+        for option in options_to_put_at_end:
+            line_out = convert_conf_option(option, conf.get(section, option), conf)
+            if line_out:
+                fdesc.write(line_out + "\n")
     ## FIXME: special treatment for experimental variables
     ## CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES and CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE
     ## (not offering them in invenio.conf since they will be refactored)
@@ -351,6 +360,41 @@ def cli_cmd_update_web_tests(conf):
             fdesc.write(out)
             fdesc.close()
     print ">>> web tests updated successfully."
+
+def cli_cmd_update_file_struct(conf):
+    """
+    This method MUST be run each time the CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT
+    config variable is changed.
+    """
+    def correct(bdir, gdir, fdir):
+        from invenio.bibdocfile import _make_base_dir
+        original_dir = os.path.join(bdir, gdir, fdir)
+        final_dir = _make_base_dir(fdir)
+        if original_dir != final_dir:
+            print "    Migrating %s to %s..." % (original_dir, final_dir),
+            if os.path.exists(final_dir):
+                print >> sys.stderr, "\nWARNING: %s already exists. It's impossible to migrate %s."
+                return True
+            shutil.move(original_dir, final_dir)
+            print "Done."
+        return False
+    warnings = False
+    from invenio.bibtask import check_running_process_user
+    check_running_process_user()
+    print ">>> Going to update CFG_WEBSUBMIT_FILEDIR structure..."
+    bibdoc_group_limit = int(conf.get("Invenio", "CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT"))
+    bdir = conf.get("Invenio", "CFG_WEBSUBMIT_FILEDIR").strip()
+    for gdir in os.listdir(bdir):
+        for fdir in os.listdir(os.path.join(bdir, gdir)):
+            if not fdir.startswith('.'):
+                if fdir.isdigit() and os.path.isdir(os.path.join(bdir, gdir, fdir)):
+                    warnings |= correct(bdir, gdir, fdir)
+                else:
+                    print >> sys.stderr, "WARNING: estraneous directory/file %s in %s" % (fdir, os.path.join(bdir, gdir))
+                    warnings = True
+    print ">>> Done."
+    if warnings:
+        print "NOTE: some WARNINGS have been issued."
 
 def cli_cmd_reset_sitename(conf):
     """
@@ -1201,6 +1245,9 @@ def main():
                 done = True
             elif opt == '--update-web-tests':
                 cli_cmd_update_web_tests(conf)
+                done = True
+            elif opt == '--update-file-struct':
+                cli_cmd_update_file_struct(conf)
                 done = True
             elif opt == '--reset-all':
                 cli_cmd_reset_sitename(conf)

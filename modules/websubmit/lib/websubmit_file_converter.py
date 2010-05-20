@@ -69,23 +69,9 @@ from invenio.errorlib import register_exception
 #logger = getLogger()
 #logger.setLevel(DEBUG)
 
-CFG_TWO2THREE_LANG_CODES = {
-    'en': 'eng',
-    'nl': 'nld',
-    'es': 'spa',
-    'de': 'deu',
-    'it': 'ita',
-    'fr': 'fra',
-}
-
 CFG_OPENOFFICE_TMPDIR = os.path.join(CFG_TMPDIR, 'ooffice-tmp-files')
 
 _RE_CLEAN_SPACES = re.compile(r'\s+')
-
-
-class InvenioWebSubmitFileConverterError(Exception):
-    pass
-
 
 def get_best_format_to_extract_text_from(filelist, best_formats=CFG_WEBSUBMIT_BEST_FORMATS_TO_EXTRACT_TEXT_FROM):
     """
@@ -362,79 +348,6 @@ def any2djvu(input_file, output_file=None, resolution=400, ocr=True, input_forma
     return output_file
 
 
-_RE_FIND_TITLE = re.compile(r'^Title:\s*(.*?)\s*$')
-
-
-def pdf2pdfa(input_file, output_file=None, title=None, pdfopt=True, **dummy):
-    """
-    Transform any PDF into a PDF/A (see: <http://www.pdfa.org/>)
-    @param input_file [string] the input file name
-    @param output_file [string] the output_file file name, None for temporary generated
-    @param title [string] the title of the document. None for autodiscovery.
-    @param pdfopt [bool] whether to linearize the pdf, too.
-    @return [string] output_file input_file
-    raise InvenioWebSubmitFileConverterError in case of errors.
-    """
-
-    input_file, output_file, working_dir = prepare_io(input_file, output_file, '.pdf')
-
-    if title is None:
-        stdout = execute_command(CFG_PATH_PDFINFO, input_file)
-        for line in stdout.split('\n'):
-            g = _RE_FIND_TITLE.match(line)
-            if g:
-                title = g.group(1)
-                break
-    if not title:
-        raise InvenioWebSubmitFileConverterError("It's impossible to automatically discover the title. Please specify it as a parameter")
-
-    debug("Extracted title is %s" % title)
-
-    shutil.copy(os.path.join(CFG_ETCDIR, 'websubmit', 'file_converter_templates', 'ISOCoatedsb.icc'), working_dir)
-    pdfa_header = open(os.path.join(CFG_ETCDIR, 'websubmit', 'file_converter_templates', 'PDFA_def.ps')).read()
-    pdfa_header = pdfa_header.replace('<<<<TITLEMARKER>>>>', title)
-    inputps = os.path.join(working_dir, 'input.ps')
-    outputpdf = os.path.join(working_dir, 'output_file.pdf')
-    open(os.path.join(working_dir, 'PDFA_def.ps'), 'w').write(pdfa_header)
-    execute_command(CFG_PATH_PDFTOPS, '-level3', input_file, inputps)
-    execute_command(CFG_PATH_GS, '-sProcessColorModel=DeviceCMYK', '-dPDFA', '-dBATCH', '-dNOPAUSE', '-dNOOUTERSAVE', '-dUseCIEColor', '-sDEVICE=pdfwrite', '-sOutputFile=output_file.pdf', 'PDFA_def.ps', 'input.ps', cwd=working_dir)
-    if pdfopt:
-        execute_command(CFG_PATH_PDFOPT, outputpdf, output_file)
-    else:
-        shutil.move(outputpdf, output_file)
-    clean_working_dir(working_dir)
-    return output_file
-
-
-def ps2pdfa(input_file, output_file=None, title=None, pdfopt=True, **dummy):
-    """
-    Transform any PS into a PDF/A (see: <http://www.pdfa.org/>)
-    @param input_file [string] the input file name
-    @param output_file [string] the output_file file name, None for temporary generated
-    @param title [string] the title of the document. None for autodiscovery.
-    @param pdfopt [bool] whether to linearize the pdf, too.
-    @return [string] output_file input_file
-    raise InvenioWebSubmitFileConverterError in case of errors.
-    """
-
-    input_file, output_file, working_dir = prepare_io(input_file, output_file, '.pdf')
-    if not title:
-        raise InvenioWebSubmitFileConverterError("It's impossible to automatically discover the title. Please specify it as a parameter")
-
-    shutil.copy(os.path.join(CFG_ETCDIR, 'websubmit', 'file_converter_templates', 'ISOCoatedsb.icc'), working_dir)
-    pdfa_header = open(os.path.join(CFG_ETCDIR, 'websubmit', 'file_converter_templates', 'PDFA_def.ps')).read()
-    pdfa_header = pdfa_header.replace('<<<<TITLEMARKER>>>>', title)
-    outputpdf = os.path.join(working_dir, 'output_file.pdf')
-    open(os.path.join(working_dir, 'PDFA_def.ps'), 'w').write(pdfa_header)
-    execute_command(CFG_PATH_GS, '-sProcessColorModel=DeviceCMYK', '-dPDFA', '-dBATCH', '-dNOPAUSE', '-dNOOUTERSAVE', '-dUseCIEColor', '-sDEVICE=pdfwrite', '-sOutputFile=output_file.pdf', 'PDFA_def.ps', input_file, cwd=working_dir)
-    if pdfopt:
-        execute_command(CFG_PATH_PDFOPT, outputpdf, output_file)
-    else:
-        shutil.move(outputpdf, output_file)
-    clean_working_dir(working_dir)
-    return output_file
-
-
 def pdf2hocr(input_file, output_file=None, ln='en', return_working_dir=False, extract_only_text=False, **dummy):
     """
     Return the text content in input_file.
@@ -601,113 +514,6 @@ def pdf2hocr2pdf(input_file, output_file=None, font="Courier", author=None, keyw
     os.remove(output_hocr_file)
     clean_working_dir(working_dir)
     return output_file
-
-
-def html2text(input_file, output_file=None, **dummy):
-    """
-    Return the text content of an HTML/XML file.
-    """
-
-    class HTMLStripper(HTMLParser.HTMLParser):
-
-        def __init__(self, output_file):
-            HTMLParser.HTMLParser.__init__(self)
-            self.output_file = output_file
-
-        def handle_entityref(self, name):
-            if name in entitydefs:
-                self.output_file.write(entitydefs[name].decode('latin1').encode('utf8'))
-
-        def handle_data(self, data):
-            if data.strip():
-                self.output_file.write(_RE_CLEAN_SPACES.sub(' ', data))
-
-        def handle_charref(self, data):
-            try:
-                self.output_file.write(unichr(int(data)).encode('utf8'))
-            except:
-                pass
-
-        def close(self):
-            self.output_file.close()
-            HTMLParser.HTMLParser.close(self)
-
-    input_file, output_file, dummy = prepare_io(input_file, output_file, '.txt', need_working_dir=False)
-    html_stripper = HTMLStripper(open(output_file, 'w'))
-    for line in open(input_file):
-        html_stripper.feed(line)
-    html_stripper.close()
-    return output_file
-
-
-def prepare_io(input_file, output_file=None, output_ext=None, need_working_dir=True):
-    """Clean input_file and the output_file."""
-    from invenio.bibdocfile import decompose_file, normalize_format
-    output_ext = normalize_format(output_ext)
-    debug('Preparing IO for input=%s, output=%s, output_ext=%s' % (input_file, output_file, output_ext))
-    if output_ext is None:
-        if output_file is None:
-            output_ext = '.tmp'
-        else:
-            output_ext = decompose_file(output_file, skip_version=True)[2]
-    if output_file is None:
-        try:
-            (fd, output_file) = tempfile.mkstemp(suffix=output_ext, dir=CFG_TMPDIR)
-            os.close(fd)
-        except IOError, err:
-            raise InvenioWebSubmitFileConverterError("It's impossible to create a temporary file: %s" % err)
-    else:
-        output_file = os.path.abspath(output_file)
-        if os.path.exists(output_file):
-            os.remove(output_file)
-
-    if need_working_dir:
-        try:
-            working_dir = tempfile.mkdtemp(dir=CFG_TMPDIR, prefix='conversion')
-        except IOError, err:
-            raise InvenioWebSubmitFileConverterError("It's impossible to create a temporary directory: %s" % err)
-
-        input_ext = decompose_file(input_file, skip_version=True)[2]
-        new_input_file = os.path.join(working_dir, 'input' + input_ext)
-        shutil.copy(input_file, new_input_file)
-        input_file = new_input_file
-    else:
-        working_dir = None
-        input_file = os.path.abspath(input_file)
-
-    debug('IO prepared: input_file=%s, output_file=%s, working_dir=%s' % (input_file, output_file, working_dir))
-    return (input_file, output_file, working_dir)
-
-
-def clean_working_dir(working_dir):
-    """
-    Remove the working_dir.
-    """
-    debug('Cleaning working_dir: %s' % working_dir)
-    shutil.rmtree(working_dir)
-
-
-def execute_command(*args, **argd):
-    """Wrapper to run_process_with_timeout."""
-    debug("Executing: %s" % (args, ))
-    res, stdout, stderr = run_process_with_timeout(args, cwd=argd.get('cwd'), filename_out=argd.get('filename_out'), filename_err=argd.get('filename_err'))
-    if res != 0:
-        error("Error when executing %s" % (args, ))
-        raise InvenioWebSubmitFileConverterError("Error in running %s\n stdout:\n%s\nstderr:\n%s\n" % (args, stdout, stderr))
-    return stdout
-
-
-def execute_command_with_stderr(*args, **argd):
-    """Wrapper to run_process_with_timeout."""
-    debug("Executing: %s" % (args, ))
-    res, stdout, stderr = run_process_with_timeout(args, cwd=argd.get('cwd'), filename_out=argd.get('filename_out'))
-    if res != 0:
-        error("Error when executing %s" % (args, ))
-        raise InvenioWebSubmitFileConverterError("Error in running %s\n stdout:\n%s\nstderr:\n%s\n" % (args, stdout, stderr))
-    return stdout, stderr
-
-__CONVERSION_MAP = get_conversion_map()
-
 
 def main_cli():
     """

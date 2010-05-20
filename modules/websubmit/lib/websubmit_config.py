@@ -165,19 +165,7 @@ class InvenioWebSubmitFunctionWarning(Exception):
 
        Extends: Exception.
     """
-    def __init__(self, value):
-        """Set the internal "value" attribute to that of the passed "value"
-           parameter.
-           @param value: (string) - a string to write to the log.
-        """
-        Exception.__init__(self)
-        self.value = value
-    def __str__(self):
-        """Return oneself as a string (actually, return the contents of
-           self.value).
-           @return: (string)
-        """
-        return str(self.value)
+    pass
 
 
 class InvenioWebSubmitFileStamperError(Exception):
@@ -188,19 +176,7 @@ class InvenioWebSubmitFileStamperError(Exception):
 
        Extends: Exception.
     """
-    def __init__(self, value):
-        """Set the internal "value" attribute to that of the passed "value"
-           parameter.
-           @param value: (string) - a string to write to the log.
-        """
-        Exception.__init__(self)
-        self.value = value
-    def __str__(self):
-        """Return oneself as a string (actually, return the contents of
-           self.value).
-           @return: (string)
-        """
-        return str(self.value)
+    pass
 
 
 class InvenioWebSubmitIconCreatorError(Exception):
@@ -211,16 +187,11 @@ class InvenioWebSubmitIconCreatorError(Exception):
 
        Extends: Exception.
     """
-    def __init__(self, value):
-        """Set the internal "value" attribute to that of the passed "value"
-           parameter.
-           @param value: (string) - a string to write to the log.
-        """
-        Exception.__init__(self)
-        self.value = value
-    def __str__(self):
-        """Return oneself as a string (actually, return the contents of
-           self.value).
-           @return: (string)
-        """
-        return str(self.value)
+    pass
+
+class InvenioWebSubmitFileConverterError(Exception):
+    """
+    Exception raised in case of errors while converting files.
+    """
+    pass
+

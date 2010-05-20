@@ -257,3 +257,11 @@ def escape_shell_arg(shell_arg):
         raise TypeError(msg)
 
     return "'%s'" % shell_arg.replace("'", r"'\''")
+
+def is_executable(path):
+    """
+    @return: True if path correspond to an existing file with executable rights
+        for the current user.
+    @rtype: bool
+    """
+    return os.path.exists(path) and os.access(executable, os.X_OK)
