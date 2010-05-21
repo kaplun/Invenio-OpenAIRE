@@ -119,7 +119,7 @@ def OAI_Session(server, script, http_param_dict , method="POST", output="",
 
     a = OAI_Request(server, script,
                     http_request_parameters(http_param_dict, method), method,
-                    secure, user, password, cert_file, key_file)
+                    secure, user, password, cert_file, key_file, interactive=not write_to_open_file)
 
     rt_obj = re.search('<resumptionToken.*>(.+)</resumptionToken>',
         a, re.DOTALL)
@@ -138,7 +138,8 @@ def OAI_Session(server, script, http_param_dict , method="POST", output="",
             else:
                 # hmm, were there no records in output? Do not create
                 # a file and warn user
-                sys.stderr.write("\n<!--\n*** WARNING: NO RECORDS IN THE HARVESTED DATA: "
+                if not write_to_open_file:
+                    sys.stderr.write("\n<!--\n*** WARNING: NO RECORDS IN THE HARVESTED DATA: "
                                  +  "\n" + repr(a) + "\n***\n-->\n")
         else:
             sys.stdout.write(a)
@@ -151,7 +152,7 @@ def OAI_Session(server, script, http_param_dict , method="POST", output="",
 
         a = OAI_Request(server, script,
                         http_request_parameters(http_param_dict, method), method,
-                        secure, user, password, cert_file, key_file)
+                        secure, user, password, cert_file, key_file, interactive=not write_to_open_file)
 
         rt_obj = re.search('<resumptionToken.*>(.+)</resumptionToken>',
             a, re.DOTALL)
