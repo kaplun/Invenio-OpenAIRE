@@ -220,6 +220,40 @@ def txt2html(msg):
     rows = "<p>" + "</p><p>".join(rows) + "</p>"
     return rows
 
+def get_all_values_in_curdir(curdir):
+    """
+    Return a dictionary with all the content of curdir.
+
+    @param curdir: the path to the current directory.
+    @type curdir: string
+    @return: the content
+    @rtype: dict
+    """
+    ret = {}
+    for filename in os.listdir(curdir):
+        if not filename.startswith('.') and os.path.isfile(os.path.join(curdir, filename)):
+            ret[filename] = open(os.path.join(curdir, filename)).read().strip()
+    return ret
+
+def get_current_record(curdir, system_number_file='SN'):
+    """
+    Return the current record (in case it's being modified).
+
+    @param curdir: the path to the current directory.
+    @type curdir: string
+    @param system_number_file: is the name of the file on disk in curdir, that
+        is supposed to contain the record id.
+    @type system_number_file: string
+    @return: the record
+    @rtype: as in L{get_record}
+    """
+    if os.path.exists(os.path.join(curdir, system_number_file)):
+        recid = open(os.path.join(curdir, system_number_file)).read().strip()
+        if recid:
+            recid = int(recid)
+            return get_record(recid)
+    return {}
+
 def retrieve_field_values(curdir, field_name, separator=None, system_number_file='SN', tag=None):
     """
     This is a handy function to retrieve values either from the current
