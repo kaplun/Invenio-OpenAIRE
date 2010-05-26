@@ -1111,7 +1111,7 @@ def collect_user_info(req, login_time=False, refresh=False):
         is_req = False
         if req is None:
             uid = -1
-        elif type(req) in (type(1), type(1L)):
+        elif isinstance(req, (int, long)):
             ## req is infact a user identification
             uid = req
         elif type(req) is dict:
@@ -1162,11 +1162,10 @@ def collect_user_info(req, login_time=False, refresh=False):
             if login_object and ((datetime.datetime.now() - get_last_login(uid)).seconds > 3600):
                 ## The user uses an external authentication method and it's a bit since
                 ## she has not performed a login
-                if not CFG_EXTERNAL_AUTH_USING_SSO or (
-                    is_req and req.is_https()):
+                if is_req and (not CFG_EXTERNAL_AUTH_USING_SSO or req.is_https()):
                     ## If we're using SSO we must be sure to be in HTTPS
                     ## otherwise we can't really read anything, hence
-                    ## it's better skeep the synchronization
+                    ## it's better to skip the synchronization
                     try:
                         groups = login_object.fetch_user_groups_membership(user_info['email'], req=req)
                         # groups is a dictionary {group_name : group_description,}
@@ -1211,7 +1210,7 @@ def collect_user_info(req, login_time=False, refresh=False):
                 user_info['precached_useapprove'] = isUserReferee(user_info)
                 user_info['precached_useadmin'] = isUserAdmin(user_info)
     except Exception, e:
-        register_exception()
+        register_exception(alert_admin=True)
     return user_info
 
 ## --- follow some functions for Apache user/group authentication
