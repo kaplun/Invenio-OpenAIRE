@@ -17,6 +17,6 @@
 
 CLEANFILES = *~ *.tmp
 
-EXTRA_DIST = bibdocfile.in
+EXTRA_DIST = bibdocfile.in websubmit_dump.in
 
-bin_SCRIPTS = bibdocfile
+bin_SCRIPTS = bibdocfile websubmit_dump

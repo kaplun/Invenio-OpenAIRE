@@ -765,6 +765,7 @@ AC_CONFIG_FILES([config.nice  \
 	  modules/websubmit/Makefile \
 	  modules/websubmit/bin/Makefile \
 	  modules/websubmit/bin/bibdocfile \
+	  modules/websubmit/bin/websubmit_dump \
 	  modules/websubmit/doc/Makefile \
 	  modules/websubmit/doc/admin/Makefile \
 	  modules/websubmit/doc/hacking/Makefile \
