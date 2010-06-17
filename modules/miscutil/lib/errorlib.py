@@ -226,7 +226,10 @@ def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
                     print >> tracestack_data_stream, "*" * 79
                 except:
                     pass
-                for key, value in frame.f_locals.items():
+                keys = frame.f_locals.keys()
+                keys.sort()
+                for key in keys:
+                    value = frame.f_locals[key]
                     print >> tracestack_data_stream, "\t%20s = " % key,
                     for to_hide in values_to_hide:
                         ## Let's hide passwords
