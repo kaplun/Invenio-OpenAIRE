@@ -188,7 +188,7 @@ def create_record(marcxml, verbose=CFG_BIBRECORD_DEFAULT_VERBOSE_LEVEL,
         # Correct the structure of the record.
         errs = _correct_record(rec)
 
-    return (rec, int(not not errs), errs)
+    return (rec, int(not errs), errs)
 
 def record_get_field_instances(rec, tag="", ind1=" ", ind2=" "):
     """Returns the list of field instances for the specified tag and
