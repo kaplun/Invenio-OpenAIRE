@@ -36,9 +36,9 @@ keyword_suffix="</small>" />
 
 <!-- BEGIN OpenAIRE specific -->
 
-<BFE_FIELD tag="536__a" prefix="Founded by: ", separator=', ' />
+<BFE_FIELD tag="536__a" prefix="<br /><small><strong>Founded by project(s): </strong></small><small>", instances_separator=', ' suffix="</small>" />
 
-<BFE_FIELD tag="542__l" prefix="Access mode: " />
+<BFE_FIELD tag="542__l" prefix="<br /><small><strong>Access mode: " suffix="</small>" />
 
 <!-- END OpenAIRE specific -->
 
