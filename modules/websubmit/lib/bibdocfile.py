@@ -967,6 +967,8 @@ class BibRecDocs:
             format = decompose_file(fullpath)[2]
         if flags is None:
             flags = []
+        if 'pdfa' in get_subformat_from_format(format).split(';') and not 'PDF/A' in flags:
+            flags.append('PDF/A')
         bibdoc = self.get_bibdoc(docname=docname)
         bibdoc.add_file_new_version(fullpath, description=description, comment=comment, format=format, flags=flags)
         self.build_bibdoc_list()
@@ -1003,6 +1005,8 @@ class BibRecDocs:
             format = decompose_file(fullpath)[2]
         if flags is None:
             flags = []
+        if 'pdfa' in get_subformat_from_format(format).split(';') and not 'PDF/A' in flags:
+            flags.append('PDF/A')
         bibdoc = self.get_bibdoc(docname=docname)
         bibdoc.add_file_new_format(fullpath, description=description, comment=comment, format=format, flags=flags)
         self.build_bibdoc_list()
@@ -1673,6 +1677,8 @@ class BibDoc:
                 self.more_info.set_comment(comment, format, myversion)
                 if flags is None:
                     flags = []
+                if 'pdfa' in get_subformat_from_format(format).split(';') and not 'PDF/A' in flags:
+                    flags.append('PDF/A')
                 for flag in flags:
                     if flag == 'PERFORM_HIDE_PREVIOUS':
                         for afile in self.list_all_files():
@@ -1733,6 +1739,8 @@ class BibDoc:
                 self.more_info.set_description(description, format, version)
                 if flags is None:
                     flags = []
+                if 'pdfa' in get_subformat_from_format(format).split(';') and not 'PDF/A' in flags:
+                    flags.append('PDF/A')
                 for flag in flags:
                     if flag != 'PERFORM_HIDE_PREVIOUS':
                         self.more_info.set_flag(flag, format, version)
