@@ -34,7 +34,13 @@ prefix="<br /><small><strong>Keyword(s): </strong></small>"
 keyword_prefix="<small>"
 keyword_suffix="</small>" />
 
+<!-- BEGIN OpenAIRE specific -->
 
+<BFE_FIELD tag="536__a" prefix="Founded by: ", separator=', ' />
+
+<BFE_FIELD tag="542__l" prefix="Access mode: " />
+
+<!-- END OpenAIRE specific -->
 
 <BFE_NOTES
 note_prefix="<br /><small><strong>Note: </strong>"
