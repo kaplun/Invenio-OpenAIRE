@@ -180,7 +180,7 @@ def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
                 "contextual information: %s" % err
 
         ## Let's extract the traceback:
-        if not exc_name.startswith('Invenio') or force_stack:
+        if force_stack:
             tracestack_data_stream = StringIO()
             tb = sys.exc_info()[2]
             while 1:
