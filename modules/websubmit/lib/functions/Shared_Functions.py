@@ -52,7 +52,7 @@ def createRelatedFormats(fullpath, overwrite=True):
     basedir, filename, extension = decompose_file(fullpath)
     extension = extension.lower()
 
-    filelist = glob.glob(os.path.join(basedir, '%s*' % filename))
+    filelist = glob.glob(os.path.join(basedir, '%s.*' % filename))
     missing_formats = get_missing_formats(filelist)
     for path, formats in missing_formats.iteritems():
         for aformat in formats:
