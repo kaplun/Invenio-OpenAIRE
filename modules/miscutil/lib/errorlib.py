@@ -156,6 +156,8 @@ def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
     """
     Given an optional request object and an optional exc_info,
     returns a text string representing many details about an exception.
+
+    @note: force_stack is deprecated and actually ignored.
     """
     if exc_info is None:
         exc_info = sys.exc_info()
@@ -179,70 +181,66 @@ def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
             client_data = "Error in retrieving " \
                 "contextual information: %s" % err
 
-        ## Let's extract the traceback:
-        if force_stack:
-            tracestack_data_stream = StringIO()
-            tb = sys.exc_info()[2]
-            while 1:
-                if not tb.tb_next:
-                    break
-                tb = tb.tb_next
-            stack = []
-            f = tb.tb_frame
-            while f:
-                stack.append(f)
-                f = f.f_back
-            stack.reverse()
-            stack = stack[-10:] ## Let's just take the last few frames
-            traceback.print_exc(file=tracestack_data_stream)
+        tracestack_data_stream = StringIO()
+        tb = sys.exc_info()[2]
+        while 1:
+            if not tb.tb_next:
+                break
+            tb = tb.tb_next
+        stack = []
+        f = tb.tb_frame
+        while f:
+            stack.append(f)
+            f = f.f_back
+        stack.reverse()
+        stack = stack[-10:] ## Let's just take the last few frames
+        traceback.print_exc(file=tracestack_data_stream)
+        print >> tracestack_data_stream, \
+                "Locals by frame, innermost last"
+        values_to_hide = set()
+        for frame in stack:
+            print >> tracestack_data_stream
             print >> tracestack_data_stream, \
-                    "Locals by frame, innermost last"
-            values_to_hide = set()
-            for frame in stack:
-                print >> tracestack_data_stream
-                print >> tracestack_data_stream, \
-                        ">>>> Frame %s in %s at line %s" % (
-                            frame.f_code.co_name,
-                            frame.f_code.co_filename,
-                            frame.f_lineno)
-                try:
-                    values_to_hide |= find_all_values_to_hide(frame.f_locals)
+                    ">>>> Frame %s in %s at line %s" % (
+                        frame.f_code.co_name,
+                        frame.f_code.co_filename,
+                        frame.f_lineno)
+            try:
+                values_to_hide |= find_all_values_to_hide(frame.f_locals)
 
-                    code = open(frame.f_code.co_filename).readlines()
-                    first_line = max(1, frame.f_lineno-3)
-                    last_line = min(len(code), frame.f_lineno+3)
-                    print >> tracestack_data_stream, "*" * 79
-                    for line in xrange(first_line, last_line+1):
-                        code_line = code[line-1].rstrip()
-                        for value in values_to_hide:
-                            ## Let's hide passwords
-                            code_line = code_line.replace(value, '<*****>')
-                        if line == frame.f_lineno:
-                            print >> tracestack_data_stream, \
-                                "----> %4i %s" % (line, code_line)
-                        else:
-                            print >> tracestack_data_stream, \
-                                "      %4i %s" % (line, code_line)
-                    print >> tracestack_data_stream, "*" * 79
-                except:
-                    pass
-                keys = frame.f_locals.keys()
-                keys.sort()
-                for key in keys:
-                    value = frame.f_locals[key]
-                    print >> tracestack_data_stream, "\t%20s = " % key,
-                    for to_hide in values_to_hide:
+                code = open(frame.f_code.co_filename).readlines()
+                first_line = max(1, frame.f_lineno-3)
+                last_line = min(len(code), frame.f_lineno+3)
+                print >> tracestack_data_stream, "*" * 79
+                for line in xrange(first_line, last_line+1):
+                    code_line = code[line-1].rstrip()
+                    for value in values_to_hide:
                         ## Let's hide passwords
-                        value = repr(value).replace(to_hide, '<*****>')
-                    try:
+                        code_line = code_line.replace(value, '<*****>')
+                    if line == frame.f_lineno:
                         print >> tracestack_data_stream, \
-                            _truncate_dynamic_string(value)
-                    except:
+                            "----> %4i %s" % (line, code_line)
+                    else:
                         print >> tracestack_data_stream, \
-                            "<ERROR WHILE PRINTING VALUE>"
-            tracestack_data = tracestack_data_stream.getvalue()
-        else:
-            tracestack_data = ''
+                            "      %4i %s" % (line, code_line)
+                print >> tracestack_data_stream, "*" * 79
+            except:
+                pass
+            keys = frame.f_locals.keys()
+            keys.sort()
+            for key in keys:
+                value = frame.f_locals[key]
+                print >> tracestack_data_stream, "\t%20s = " % key,
+                for to_hide in values_to_hide:
+                    ## Let's hide passwords
+                    value = repr(value).replace(to_hide, '<*****>')
+                try:
+                    print >> tracestack_data_stream, \
+                        _truncate_dynamic_string(value)
+                except:
+                    print >> tracestack_data_stream, \
+                        "<ERROR WHILE PRINTING VALUE>"
+        tracestack_data = tracestack_data_stream.getvalue()
 
         ## Okay, start printing:
         output = StringIO()
@@ -279,9 +277,7 @@ def register_exception(force_stack=False,
             local stack variables are checked for length, and only first 500
             chars of their values are printed.
 
-    @param force_stack: when True stack is always printed, while when False,
-    stack is printed only whenever the Exception type is not containing the
-    word Invenio
+    @param force_stack: ignored
 
     @param stream: 'error' or 'warning'
 
@@ -306,7 +302,7 @@ def register_exception(force_stack=False,
         ## Let's extract exception information
         exc_info = sys.exc_info()
         output = get_pretty_traceback(
-            req=req, exc_info=exc_info, force_stack=force_stack)
+            req=req, exc_info=exc_info)
         if output:
             ## Okay, start printing:
             log_stream = StringIO()
