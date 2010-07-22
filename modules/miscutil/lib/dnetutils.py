@@ -22,6 +22,8 @@ CDS Invenio utilities to interact with D-NET.
 import os
 import sys
 import threading
+import thread
+import psycopg2
 
 from xml.dom.minidom import parseString
 if sys.hexversion < 0x2060000:
@@ -37,7 +39,7 @@ else:
     simplejson_available = True
 
 
-from invenio.config import CFG_CACHEDIR
+from invenio.config import CFG_CACHEDIR, CFG_DNET_PG_DSN
 
 CFG_DNET_VOCABULARY_DIR = os.path.join(CFG_CACHEDIR, 'D-NET', 'vocabularies')
 
@@ -54,6 +56,100 @@ try:
     _autocomplete_cache = {}
 finally:
     _autocomplete_cache_lock.release()
+
+_DB_CONN = {}
+
+try:
+    _db_cache
+except NameError:
+    _db_cache = {}
+
+def _db_login(relogin = 0):
+    """Login to the database."""
+
+    ## Note: we are using "use_unicode=False", because we want to
+    ## receive strings from MySQL as Python UTF-8 binary string
+    ## objects, not as Python Unicode string objects, as of yet.
+
+    ## Note: "charset='utf8'" is needed for recent MySQLdb versions
+    ## (such as 1.2.1_p2 and above).  For older MySQLdb versions such
+    ## as 1.2.0, an explicit "init_command='SET NAMES utf8'" parameter
+    ## would constitute an equivalent.  But we are not bothering with
+    ## older MySQLdb versions here, since we are recommending to
+    ## upgrade to more recent versions anyway.
+
+    thread_ident = thread.get_ident()
+    if relogin:
+        _DB_CONN[thread_ident] =psycopg2.connect(CFG_DNET_PG_DSN)
+        return _DB_CONN[thread_ident]
+    else:
+        if _DB_CONN.has_key(thread_ident):
+            return _DB_CONN[thread_ident]
+        else:
+            _DB_CONN[thread_ident] =psycopg2.connect(CFG_DNET_PG_DSN)
+            return _DB_CONN[thread_ident]
+
+def dnet_run_sql(sql, param=None, n=0, with_desc=0):
+    """Run SQL on the server with PARAM and return result.
+
+    @param param: tuple of string params to insert in the query (see
+        notes below)
+
+    @param n: number of tuples in result (0 for unbounded)
+
+    @param with_desc: if True, will return a DB API 7-tuple describing
+        columns in query.
+
+    @return: If SELECT, SHOW, DESCRIBE statements, return tuples of
+        data, followed by description if parameter with_desc is
+        provided.  If INSERT, return last row id.  Otherwise return
+        SQL result as provided by database.
+
+    @note: When the site is closed for maintenance (as governed by the
+        config variable CFG_ACCESS_CONTROL_LEVEL_SITE), do not attempt
+        to run any SQL queries but return empty list immediately.
+        Useful to be able to have the website up while MySQL database
+        is down for maintenance, hot copies, table repairs, etc.
+
+    @note: In case of problems, exceptions are returned according to
+        the Python DB API 2.0.  The client code can import them from
+        this file and catch them.
+    """
+
+    ### log_sql_query(sql, param) ### UNCOMMENT ONLY IF you REALLY want to log all queries
+
+    if param:
+        param = tuple(param)
+
+    try:
+        db = _db_login()
+        cur = db.cursor()
+        rc = cur.execute(sql, param)
+        cur.commit()
+    except psycopg2.OperationalError: # unexpected disconnect, bad malloc error, etc
+        # FIXME: now reconnect is always forced, we may perhaps want to ping() first?
+        try:
+            db = _db_login(relogin=1)
+            cur = db.cursor()
+            rc = cur.execute(sql, param)
+            cur.commit()
+        except psycopg2.OperationalError: # again an unexpected disconnect, bad malloc error, etc
+            raise
+
+    if sql.split()[0].upper() in ("SELECT", "SHOW", "DESC", "DESCRIBE"):
+        if n:
+            recset = cur.fetchmany(n)
+        else:
+            recset = cur.fetchall()
+        if with_desc:
+            return recset, cur.description
+        else:
+            return recset
+    else:
+        if sql.split()[0].upper() == "INSERT":
+            rc =  cur.lastrowid
+        return rc
+
 
 def load_vocabulary(text, inverted=False):
     """
