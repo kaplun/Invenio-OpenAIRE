@@ -22,11 +22,12 @@ __revision__ = "$Id$"
 from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, \
      CFG_WEBCOMMENT_NB_REPORTS_BEFORE_SEND_EMAIL_TO_ADMIN
 from invenio.webcomment import query_get_comment, \
-     query_retrieve_comments_or_remarks
+     get_reply_order_cache_data
 from invenio.urlutils import wash_url_argument
 from invenio.dbquery import run_sql
 from invenio.messages import gettext_set_language, wash_language
-from invenio.webuser import get_user_info, collect_user_info
+from invenio.webuser import get_user_info, collect_user_info, \
+                            isUserAdmin
 from invenio.access_control_engine import acc_authorize_action, \
      acc_get_authorized_emails
 from invenio.search_engine import perform_request_search
@@ -78,7 +79,7 @@ def get_user_collections(req):
     collections = run_sql('SELECT name FROM collection')
     for collection in collections:
         collection_emails = acc_get_authorized_emails('moderatecomments', collection=collection[0])
-        if user_info['email'] in collection_emails:
+        if user_info['email'] in collection_emails or isUserAdmin(user_info):
             res.append(collection[0])
     return res
 
@@ -234,7 +235,7 @@ def perform_request_comments(req=None, ln=CFG_SITE_LANG, uid="", comID="", recID
 
 
 
-def perform_request_hot(req=None, ln=CFG_SITE_LANG, comments=1, top=10, collection=""):
+def perform_request_hot(req=None, ln=CFG_SITE_LANG, comments=1, top=10, collection="Show all"):
     """
     Display the list of hottest comments/reviews along with information about the comment.
 
@@ -512,7 +513,7 @@ def perform_request_del_com(ln=CFG_SITE_LANG, comIDs=[]):
         comIDs = map(coerce, comIDs, ('0 '*len(comIDs)).split(' ')[:-1])
         return webcomment_templates.tmpl_admin_del_com(del_res=comIDs, ln=ln)
 
-    del_res=[]
+    del_res = []
     for comID in comIDs:
         del_res.append((comID, query_delete_comment_mod(comID)))
     return webcomment_templates.tmpl_admin_del_com(del_res=del_res, ln=ln)
@@ -533,7 +534,7 @@ def perform_request_undel_com(ln=CFG_SITE_LANG, comIDs=[]):
         comIDs = map(coerce, comIDs, ('0 '*len(comIDs)).split(' ')[:-1])
         return webcomment_templates.tmpl_admin_undel_com(del_res=comIDs, ln=ln)
 
-    del_res=[]
+    del_res = []
     for comID in comIDs:
         del_res.append((comID, query_undel_single_comment(comID)))
     return webcomment_templates.tmpl_admin_undel_com(del_res=del_res, ln=ln)
@@ -588,7 +589,7 @@ def suppress_abuse_report(ln=CFG_SITE_LANG, comIDs=[]):
         comIDs = map(coerce, comIDs, ('0 '*len(comIDs)).split(' ')[:-1])
         return webcomment_templates.tmpl_admin_del_com(del_res=comIDs, ln=ln)
 
-    del_res=[]
+    del_res = []
     for comID in comIDs:
         del_res.append((comID, query_suppress_abuse_report(comID)))
     return webcomment_templates.tmpl_admin_suppress_abuse_report(del_res=del_res, ln=ln)
@@ -639,3 +640,22 @@ def check_user_is_author(user_id, com_id):
         return 1
     return 0
 
+def migrate_comments_populate_threads_index():
+    """
+    Fill in the `reply_order_cached_data' columns in cmtRECORDCOMMENT and
+    bskRECORDCOMMENT tables with adequate values so that thread
+    are displayed correctly.
+    """
+    # Update WebComment comments
+    res = run_sql("SELECT id FROM cmtRECORDCOMMENT WHERE reply_order_cached_data is NULL")
+    for row in res:
+        reply_order_cached_data = get_reply_order_cache_data(row[0])
+        run_sql("UPDATE cmtRECORDCOMMENT set reply_order_cached_data=%s WHERE id=%s",
+                (reply_order_cached_data, row[0]))
+
+    # Update WebBasket comments
+    res = run_sql("SELECT id FROM bskRECORDCOMMENT WHERE reply_order_cached_data is NULL")
+    for row in res:
+        reply_order_cached_data = get_reply_order_cache_data(row[0])
+        run_sql("UPDATE cmtRECORDCOMMENT set reply_order_cached_data=%s WHERE id=%s",
+                (reply_order_cached_data, row[0]))

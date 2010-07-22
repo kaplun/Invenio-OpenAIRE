@@ -108,7 +108,7 @@ class WebInterfaceMultiEditPages(WebInterfaceDirectory):
                                        text = auth_msg)
 
         if argd[self._JSON_DATA_KEY]:
-            return self._process_json_request(form)
+            return self._process_json_request(form, req)
 
         body = multi_edit_engine.perform_request_index(language)
         title = _("Multi-Record Editor")
@@ -123,7 +123,7 @@ class WebInterfaceMultiEditPages(WebInterfaceDirectory):
 
     __call__ = index
 
-    def _process_json_request(self, form):
+    def _process_json_request(self, form, req):
         """Takes care about the json requests."""
 
         argd = wash_urlargd(form, {
@@ -185,7 +185,7 @@ class WebInterfaceMultiEditPages(WebInterfaceDirectory):
 
         elif action_type == self._action_types.submit_changes:
             commands_list, upload_mode, tag_list = self._create_commands_list(commands)
-            return multi_edit_engine.perform_request_submit_changes(search_criteria, commands_list, language, upload_mode, tag_list, collection)
+            return multi_edit_engine.perform_request_submit_changes(search_criteria, commands_list, language, upload_mode, tag_list, collection, req)
 
         # In case we obtain wrong action type we return empty page.
         return " "
@@ -206,15 +206,17 @@ class WebInterfaceMultiEditPages(WebInterfaceDirectory):
             subfield_code = current_subfield["subfieldCode"]
             value = current_subfield["value"]
             new_value = current_subfield["newValue"]
+            condition = current_subfield["condition"]
+            condition_subfield = current_subfield["conditionSubfield"]
 
             if action == self._subfield_action_types.add:
-                subfield_command = multi_edit_engine.AddSubfieldCommand(subfield_code, value)
+                subfield_command = multi_edit_engine.AddSubfieldCommand(subfield_code, value, condition=condition, condition_subfield=condition_subfield)
             elif action == self._subfield_action_types.delete:
-                subfield_command = multi_edit_engine.DeleteSubfieldCommand(subfield_code)
+                subfield_command = multi_edit_engine.DeleteSubfieldCommand(subfield_code, condition=condition, condition_subfield=condition_subfield)
             elif action == self._subfield_action_types.replace_content:
-                subfield_command = multi_edit_engine.ReplaceSubfieldContentCommand(subfield_code, value)
+                subfield_command = multi_edit_engine.ReplaceSubfieldContentCommand(subfield_code, value, condition=condition, condition_subfield=condition_subfield)
             elif action == self._subfield_action_types.replace_text:
-                subfield_command = multi_edit_engine.ReplaceTextInSubfieldCommand(subfield_code, value, new_value)
+                subfield_command = multi_edit_engine.ReplaceTextInSubfieldCommand(subfield_code, value, new_value, condition=condition, condition_subfield=condition_subfield)
             else:
                 subfield_command = multi_edit_engine.BaseFieldCommand(subfield_code, value, new_value)
 
