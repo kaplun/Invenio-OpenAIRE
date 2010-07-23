@@ -3674,4 +3674,31 @@ CREATE TABLE IF NOT EXISTS user_expJOB (
   KEY id_expJOB (id_expJOB)
 ) TYPE=MyISAM;
 
+-- OpenAIRE specific tables
+CREATE TABLE IF NOT EXISTS projects (
+  id int(15) NOT NULL,
+  ec_project_website varchar(255) NULL,
+  acronym varchar(255) NULL,
+  title varchar(255) NULL,
+  website varchar(255) NULL,
+  grant_agreement_number int(15) NOT NULL,
+  PRIMARY KEY (id),
+  KEY (acronym),
+  KEY (title),
+  UNIQUE (grant_agreement_number)
+) TYPE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS projectsubject (
+  id varchar(255) NOT NULL,
+  name varchar(255) NULL,
+  PRIMARY KEY (id),
+  KEY (name)
+) TYPE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS projects_projectsubject (
+  id_project int(15) NOT NULL,
+  id_projectsubject varchar(255) NOT NULL,
+  PRIMARY KEY (id_project, id_projectsubject),
+) TYPE=MyISAM;
+
 -- end of file
