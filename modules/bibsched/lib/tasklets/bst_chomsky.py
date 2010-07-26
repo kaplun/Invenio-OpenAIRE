@@ -25,7 +25,7 @@ def bst_chomsky():
 
     rns = marshal.load(open(os.path.join(CFG_CHOMSKY_DIR, "rns.dat")))
 
-    def random_date(from_date=datetime.strptime('2008-01-01', '%Y-%m-%d'), to_date=datetime.strptime('2011-01-01', '%Y-%m-%d')):
+    def random_date(from_date=datetime.date(2008, 1, 1), to_date=datetime.date(2011, 1, 1)):
         delta = to_date - from_date
         int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
         random_second = random.randrange(int_delta)
