@@ -44,9 +44,9 @@
     </xsl:if>
   </xsl:template>
   <xsl:template match="record">
-    <xsl:if test="fn:eval_bibformat(marc:controlfield[@tag='001'],'&lt;BFE_PUBLI_INFO />')">
+    <xsl:if test="fn:eval_bibformat(controlfield[@tag=001], &quot;&lt;BFE_PUBLI_INFO />&quot;)">
       <dc:source>
-        <xsl:value-of select="fn:eval_bibformat(marc:controlfield[@tag='001'],'&lt;BFE_PUBLI_INFO />')" />
+        <xsl:value-of select="fn:eval_bibformat(controlfield[@tag=001], &quot;&lt;BFE_PUBLI_INFO />&quot;)" />
       </dc:source>
     </xsl:if>
     <xsl:for-each select="datafield[@tag=041]">
@@ -99,9 +99,11 @@
       </dc:identifier>
     </xsl:for-each>
     <xsl:for-each select="datafield[@tag=856 and @ind1=4]">
-      <dc:format>
-        <xsl:value-of select="subfield[@code='q']"/>
-      </dc:format>
+      <xsl:if test="subfield[@code='q']">
+        <dc:format>
+            <xsl:value-of select="subfield[@code='q']"/>
+        </dc:format>
+      </xsl:if>
     </xsl:for-each>
     <xsl:for-each select="datafield[@tag=520]">
       <dc:description>
@@ -112,11 +114,6 @@
       <dc:publisher>
         <xsl:value-of select="subfield[@code='p']"/>
       </dc:publisher>
-    </xsl:for-each>
-    <xsl:for-each select="datafield[@tag=536]">
-      <dc:relation>
-        <xsl:value-of select="subfield[@code='c']"/>
-      </dc:relation>
     </xsl:for-each>
     <xsl:for-each select="datafield[@tag=536]">
       <dc:relation>
