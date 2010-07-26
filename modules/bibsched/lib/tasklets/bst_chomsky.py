@@ -3,7 +3,7 @@
 import random, os
 import tempfile
 import marshal
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 
 from invenio.bibtask import task_low_level_submission
 from invenio.bibknowledge import get_kbr_keys
@@ -25,7 +25,7 @@ def bst_chomsky():
 
     rns = marshal.load(open(os.path.join(CFG_CHOMSKY_DIR, "rns.dat")))
 
-    def random_date(from_date=datetime.date(2008, 1, 1), to_date=datetime.date(2011, 1, 1)):
+    def random_date(from_date=date(2008, 1, 1), to_date=date(2011, 1, 1)):
         delta = to_date - from_date
         int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
         random_second = random.randrange(int_delta)
