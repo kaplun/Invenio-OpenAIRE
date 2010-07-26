@@ -75,6 +75,7 @@ _TASK_PARAMS = {
         'task_stop_helper_fnc': None,
         'task_name': os.path.basename(sys.argv[0]),
         'task_specific_name': '',
+        'task_id': 0,
         'user': '',
         # If the task is not initialized (usually a developer debugging
         # a single method), output all messages.
