@@ -848,20 +848,18 @@ def check_arguments_compatibility(the_callable, argd):
         args_dict[tmp_args.pop()] = None
 
     for arg, value in argd.iteritems():
-        if arg in args_dict:
-            del args_dict[arg]
+        if arg in tmp_args:
+            tmp_args.remove(arg)
+        if arg in args:
+            del args[arg]
         elif not varkw:
             raise ValueError('Argument %s not expected when calling callable '
                 '"%s" with arguments %s' % (
                     arg, get_callable_signature_as_string(the_callable), argd))
 
-    for arg, value in args_dict.items():
-        if value:
-            del args_dict[arg]
-
-    if args_dict:
+    if tmp_args:
         raise ValueError('Arguments %s not specified when calling callable '
             '"%s" with arguments %s' % (
-                ', '.join(args_dict.keys()),
+                ', '.join(tmp_args),
                 get_callable_signature_as_string(the_callable),
                 argd))
