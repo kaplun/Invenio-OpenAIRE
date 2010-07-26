@@ -15,10 +15,13 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-pylibdir=$(libdir)/python/invenio/bibsched_tasklets
+tmpdir = $(prefix)/var/tmp/chomsky
+pylibdir = $(libdir)/python/invenio
 
-pylib_DATA = __init__.py bst_fibonacci.py bst_send_email.py bst_load_OpenAIRE_kbs.py bst_chomsky.py
+pylib_DATA = chomsky.py
 
-EXTRA_DIST = $(pylib_DATA)
+tmp_DATA = names-data.txt names.txt projects.txt template_marcxml.xml rns.dat
+
+EXTRA_DIST = $(pylib_DATA) $(tmp_DATA)
 
 CLEANFILES = *~ *.tmp *.pyc
