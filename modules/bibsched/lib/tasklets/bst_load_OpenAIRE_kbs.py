@@ -6,6 +6,8 @@ from invenio.bibknowledge import add_kb_mapping, kb_exists, update_kb_mapping, a
 from invenio.dnetutils import dnet_run_sql
 from invenio.errorlib import register_exception
 
+import urllib
+
 def _init_journals():
     import gzip
     run_sql(gzip.open("journals.sql.gz").read())
@@ -20,9 +22,11 @@ CFG_JOURNAL_KBS = {
 CFG_DNET_KBS = {
     'project_acronym': 'SELECT grant_agreement_number, acronym FROM projects',
     'project_title': 'SELECT grant_agreement_number, title FROM projects',
-    'language': 'SELECT name,name FROM languages',
 }
 
+CFG_LANGUAGE_KBS = {
+    'languages': None
+}
 
 def load_kbs(cfg, run_sql):
     for kb, query in cfg.iteritems():
@@ -47,10 +51,22 @@ def load_kbs(cfg, run_sql):
             continue
 
 
-def bst_load_OpenAIRE_kbs(journals=False):
+def run_sql_like_for_languages(dummy):
+    res = []
+    for language in urllib.urlopen("http://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt"):
+        three, alias, two, english, french = language.split('|')
+        if alias:
+            res.append(('%s/%s' % (three, alias), english))
+        else:
+            res.append((three, english))
+    return tuple(res)
+
+def bst_load_OpenAIRE_kbs(journals=False, languages=True):
     load_kbs(CFG_DNET_KBS, dnet_run_sql)
     if journals:
         load_kbs(CFG_JOURNAL_KBS, run_sql)
+    if languages:
+        load_kbs(CFG_LANGUAGE_KBS, run_sql_like_for_languages)
 
 if __name__ == '__main__':
     bst_load_OpenAIRE_kbs(journals=True)
