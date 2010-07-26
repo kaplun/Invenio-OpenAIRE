@@ -125,14 +125,14 @@ def dnet_run_sql(sql, param=None, n=0, with_desc=0):
         db = _db_login()
         cur = db.cursor()
         rc = cur.execute(sql, param)
-        cur.commit()
+        db.commit()
     except psycopg2.OperationalError: # unexpected disconnect, bad malloc error, etc
         # FIXME: now reconnect is always forced, we may perhaps want to ping() first?
         try:
             db = _db_login(relogin=1)
             cur = db.cursor()
             rc = cur.execute(sql, param)
-            cur.commit()
+            db.commit()
         except psycopg2.OperationalError: # again an unexpected disconnect, bad malloc error, etc
             raise
 
