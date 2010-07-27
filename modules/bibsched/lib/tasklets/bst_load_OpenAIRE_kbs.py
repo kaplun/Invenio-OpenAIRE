@@ -61,7 +61,7 @@ def run_sql_like_for_languages(dummy):
             res.append((three, english))
     return tuple(res)
 
-def bst_load_OpenAIRE_kbs(journals=False, languages=True):
+def bst_load_OpenAIRE_kbs(journals=False, languages=False):
     load_kbs(CFG_DNET_KBS, dnet_run_sql)
     if journals:
         load_kbs(CFG_JOURNAL_KBS, run_sql)

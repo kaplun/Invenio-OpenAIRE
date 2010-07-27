@@ -20,7 +20,7 @@ pylibdir = $(libdir)/python/invenio
 
 pylib_DATA = chomsky.py
 
-tmp_DATA = names-data.txt names.txt projects.txt template_marcxml.xml rns.dat
+tmp_DATA = names-data.txt names.txt projects.txt template_marcxml.xml
 
 EXTRA_DIST = $(pylib_DATA) $(tmp_DATA)
 
