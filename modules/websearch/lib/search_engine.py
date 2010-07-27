@@ -1545,6 +1545,21 @@ def is_hosted_collection(coll):
     except:
         return False
 
+def normalize_collection_name(collection_name):
+    """
+    Collection names are caseless in the DB, so their case in Python
+    must be normalized to avoid nasty bugs (e.g. KeyErrors).
+    @param collection_name: the name of the collection
+    @type collection_name: string
+    @return: the normalized collection name
+    @rtype: string
+    """
+    collection_name = run_sql("SELECT name FROM collection WHERE name=%s", (collection_name, ))
+    if collection_name:
+        return collection_name[0][0]
+    else:
+        return ""
+
 def get_colID(c):
     "Return collection ID for collection name C.  Return None if no match found."
     colID = None
@@ -2698,13 +2713,14 @@ def guess_collection_of_a_record(recID, referer=None):
         dummy, hostname, path, dummy, query, dummy = urlparse.urlparse(referer)
         g = _re_collection_url.match(path)
         if g:
-            name = urllib.unquote_plus(g.group(1))
-            if recID in get_collection_reclist(name):
+            name = normalize_collection_name(urllib.unquote_plus(g.group(1)))
+            if name and recID in get_collection_reclist(name):
                 return name
         elif path.startswith('/search'):
             query = cgi.parse_qs(query)
             for name in query.get('cc', []) + query.get('c', []):
-                if recID in get_collection_reclist(name):
+                name = normalize_collection_name(name)
+                if name and recID in get_collection_reclist(name):
                     return name
     return guess_primary_collection_of_a_record(recID)
 

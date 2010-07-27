@@ -97,7 +97,8 @@ from invenio.webpage import page, create_error_box
 from invenio.messages import gettext_set_language
 from invenio.search_engine import get_colID, get_coll_i18nname, \
     check_user_can_view_record, collection_restricted_p, restricted_collection_cache, \
-    get_fieldvalues, get_fieldvalues_alephseq_like, get_most_popular_field_values, get_mysql_recid_from_aleph_sysno
+    get_fieldvalues, get_fieldvalues_alephseq_like, get_most_popular_field_values, get_mysql_recid_from_aleph_sysno, \
+    normalize_collection_name
 from invenio.access_control_engine import acc_authorize_action
 from invenio.access_control_config import VIEWRESTRCOLL
 from invenio.access_control_mailcookie import mail_cookie_create_authorize_action
@@ -953,6 +954,7 @@ def display_collection(req, c, aas, verbose, ln):
     req.send_http_header()
     # deduce collection id:
     colID = get_colID(c)
+    c = normalize_collection_name(c)
     if type(colID) is not int:
         page_body = '<p>' + (_("Sorry, collection %s does not seem to exist.") % ('<strong>' + str(c) + '</strong>')) + '</p>'
         page_body = '<p>' + (_("You may want to start browsing from %s.") % ('<a href="' + CFG_SITE_URL + '?ln=' + ln + '">' + get_coll_i18nname(CFG_SITE_NAME, ln) + '</a>')) + '</p>'
