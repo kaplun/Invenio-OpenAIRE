@@ -193,8 +193,8 @@ class Manager:
         self.running = 1
         locked_records = run_sql("SELECT COUNT(DISTINCT rec_identifier, rec_identifier_type) FROM schLOCKREC")
         #self.footer_move_mode = "[KeyUp/KeyDown Move] [M Select mode] [Q Quit]"
-        self.footer_auto_mode = "Automatic Mode [A Manual] [1/2/3/4 Display] [P Purge] [l/L Log] [O Opts] [Q Quit] #LR =%s" %locked_records[0][0]
-        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3/4 Display Type] [P Purge] [l/L Log] [O Opts] [Q Quit] LR =%s" %locked_records[0][0]  
+        self.footer_auto_mode = "Automatic Mode [A Manual] [1/2/3/4 Display] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] #LR =%s" %locked_records[0][0]
+        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3/4 Display Type] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] LR =%s" %locked_records[0][0]  
         self.footer_waiting_item = "[R Run] [D Delete] [N Priority]"
         self.footer_running_item = "[S Sleep] [T Stop] [K Kill]"
         self.footer_stopped_item = "[I Initialise] [D Delete] [K Acknowledge]"
@@ -207,6 +207,7 @@ class Manager:
         self.first_visible_line = 0
         #self.move_mode = 0
         self.auto_mode = 0
+        self.sort_mode = "runtime"
         self.currentrow = None
         self.current_attr = 0
         wrapper(self.start)
@@ -266,6 +267,8 @@ class Manager:
             elif chr in (ord("a"), ord("A")):
                 if self.display != 4:
                     self.change_auto_mode()
+            elif chr in (ord("x"), ord("X")):
+                self.change_sort_mode()
             elif chr == ord("l"):
                 if self.display == 4:
                     self.list_locked_records()
@@ -879,6 +882,15 @@ Press 'q' to exit"""
             self.move_mode = 0
         self.stdscr.refresh()
 
+    def change_sort_mode(self):
+        if self.sort_mode == "runtime":
+            self.sort_mode = "priority"
+            self.display_in_footer("Tasks ordered by priority.")
+        else:
+            self.sort_mode = "runtime"
+            self.display_in_footer("Tasks ordered by runtime.")
+        self.stdscr.refresh()
+
     #def move_up(self):
         #self.display_in_footer("not implemented yet")
         #self.stdscr.refresh()
@@ -1098,7 +1110,10 @@ Press 'q' to exit"""
                     fields = "id,proc,user,runtime,sleeptime,status,progress,arguments,priority"
                     table = "schTASK"
                     where = "WHERE status NOT LIKE '%%_DELETED' and (status<>'DONE' and status NOT LIKE 'ACK%')"
-                    order = "runtime ASC"
+                    if self.sort_mode == "runtime":
+                        order = "runtime ASC"
+                    else:
+                        order = "priority DESC"
                 elif self.display == 4:
                     fields = "id, marcxml, comments"
                     table = "errors"
