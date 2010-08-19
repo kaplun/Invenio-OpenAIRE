@@ -31,11 +31,10 @@ from zlib import compress, decompress
 import sys
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
-from invenio.webgroup_dblayer import get_users_in_group, get_group_id
 from invenio.access_control_config import InvenioWebAccessFireroleError
 from invenio.dbquery import run_sql, blob_to_string
 from invenio.config import CFG_CERN_SITE

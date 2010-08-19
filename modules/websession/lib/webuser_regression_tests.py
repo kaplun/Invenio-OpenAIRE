@@ -17,7 +17,7 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=E1102
+# pylint: disable=E1102
 
 """WebSession Regression Test Suite."""
 
@@ -29,9 +29,8 @@ import unittest
 from mechanize import Browser
 
 from invenio.dbquery import run_sql
-from invenio.config import CFG_SITE_SECURE_URL, CFG_SITE_ADMIN_EMAIL
-from invenio.testutils import make_test_suite, run_test_suite, \
-                              test_web_page_content, merge_error_messages
+from invenio.config import CFG_SITE_SECURE_URL
+from invenio.testutils import make_test_suite, run_test_suite
 
 class WebSessionYourSettingsTest(unittest.TestCase):
     """Check WebSession web pages whether they are up or not."""

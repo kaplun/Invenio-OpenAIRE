@@ -23,13 +23,12 @@ __revision__ = "$Id$"
 
 import unittest
 
-from invenio import bibrank_citation_searcher
 from invenio.testutils import make_test_suite, run_test_suite
 
 class TestCitationSearcher(unittest.TestCase):
 
     def setUp(self):
-        # pylint: disable-msg=C0103
+        # pylint: disable=C0103
         """Initialize stuff"""
         self.recid = 339705
         self.recids = [339705, 339706]

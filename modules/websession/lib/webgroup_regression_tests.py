@@ -17,27 +17,26 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=E1102
+# pylint: disable=E1102
 
 """Unit tests for the user handling library."""
 
 __revision__ = "$Id$"
 
 from mechanize import Browser
-from invenio.config import CFG_SITE_SECURE_URL, CFG_SITE_ADMIN_EMAIL
+from invenio.config import CFG_SITE_SECURE_URL
 
 from invenio.dbquery import run_sql
 from invenio.webgroup import synchronize_external_groups, synchronize_all_external_groups
 from invenio.webgroup_dblayer import get_external_groups, get_all_login_method_groups
-from invenio.testutils import make_test_suite, run_test_suite, \
-                              test_web_page_content, merge_error_messages
+from invenio.testutils import make_test_suite, run_test_suite
 import unittest
 
 class WebGroupTest(unittest.TestCase):
     """Test functions related to the Apache authentication."""
 
     def setUp(self):
-        # pylint: disable-msg=C0103
+        # pylint: disable=C0103
         """setting up helper variables for tests"""
         self.email = 'ciccio@pasticcio.it'
         self.pwd = '123'

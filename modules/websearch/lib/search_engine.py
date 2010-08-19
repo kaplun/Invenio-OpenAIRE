@@ -17,7 +17,7 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 """CDS Invenio Search Engine in mod_python."""
 
@@ -39,9 +39,9 @@ import zlib
 import sys
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 ## import CDS Invenio stuff:
 from invenio.config import \
@@ -83,7 +83,7 @@ from invenio.access_control_config import VIEWRESTRCOLL, \
     CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS
 from invenio.websearchadminlib import get_detailed_page_tabs
 from invenio.intbitset import intbitset as HitSet
-from invenio.dbquery import DatabaseError
+from invenio.dbquery import DatabaseError, deserialize_via_marshal
 from invenio.access_control_engine import acc_authorize_action
 from invenio.errorlib import register_exception
 from invenio.textutils import encode_for_xml
@@ -96,7 +96,7 @@ from invenio.bibrank_citation_searcher import get_cited_by_count, calculate_cite
     calculate_co_cited_with_list, get_records_with_num_cites, get_self_cited_by
 from invenio.bibrank_citation_grapher import create_citation_history_graph_and_box
 
-from invenio.dbquery import run_sql, run_sql_cached, get_table_update_time, Error
+from invenio.dbquery import run_sql, run_sql_cached, get_table_update_time
 from invenio.webuser import getUid, collect_user_info
 from invenio.webpage import pageheaderonly, pagefooteronly, create_error_box
 from invenio.messages import gettext_set_language
@@ -3619,13 +3619,11 @@ def print_records_epilogue(req, format):
 
 def get_record(recid):
     """Directly the record object corresponding to the recid."""
-    from marshal import loads, dumps
-    from zlib import compress, decompress
     if CFG_BIBUPLOAD_SERIALIZE_RECORD_STRUCTURE:
-        value = run_sql('SELECT value FROM bibfmt WHERE id_bibrec=%s AND FORMAT=\'recstruct\'',  (recid, ))
+        value = run_sql("SELECT value FROM bibfmt WHERE id_bibrec=%s AND FORMAT='recstruct'",  (recid, ))
         if value:
             try:
-                return loads(decompress(value[0][0]))
+                return deserialize_via_marshal(value[0][0])
             except:
                 ### In case of corruption, let's rebuild it!
                 pass
@@ -3633,7 +3631,7 @@ def get_record(recid):
 
 def print_record(recID, format='hb', ot='', ln=CFG_SITE_LANG, decompress=zlib.decompress,
                  search_pattern=None, user_info=None, verbose=0):
-    """Prints record 'recID' formatted accoding to 'format'."""
+    """Prints record 'recID' formatted according to 'format'."""
     if format == 'recstruct':
         return get_record(recID)
 

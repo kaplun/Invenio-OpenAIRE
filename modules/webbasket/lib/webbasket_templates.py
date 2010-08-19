@@ -1294,6 +1294,37 @@ class Template:
 
             return out
 
+        #If no recids were specified the page is asking which external item to add, so we remind to the user to use the search engine for internal items
+        out=""
+        if len(recids) == 0:
+            out += """
+    <table class="bskbasket">
+      <thead class="bskbasketheader">
+        <tr>
+          <td class="bskactions">
+            <img src="%(logo)s" alt="%(label)s" />
+          </td>
+          <td class="bsktitle">
+            <b>Adding items to your basket</b><br />
+          </td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="2">
+            <table>
+            To add internal items to your basket please select them through the  <a href="%(search_link)s">search page</a>
+            and use the "Add to basket" functionality. For any external resource please use the
+            "External item" form below.
+            </table>
+          </td>
+        </tr>
+      </tbody>
+    </table>"""
+            out %= {'logo': "%s/img/tick.gif"% (CFG_SITE_URL,),
+                  'label':"tick",
+                  'search_link':"%s"%(CFG_SITE_URL,) }
+
         note_editor = get_html_text_editor(name="note_body",
                                            content=note_body,
                                            textual_content=note_body,
@@ -1315,7 +1346,7 @@ class Template:
 
         action = "%s/yourbaskets/add" % (CFG_SITE_URL,)
 
-        out = """
+        out += """
 <form name="add_to_basket" action="%(action)s" method="post">""" % {'action': action}
 
         if colid == -1:
@@ -1843,13 +1874,13 @@ class Template:
                     ln=CFG_SITE_LANG):
         """Template for basket display."""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out = """
 <table class="bskbasket" width="100%">"""
         else:
             out = ""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += self.tmpl_basket_header(bskid,
                                            name,
                                            nb_items,
@@ -1864,7 +1895,7 @@ class Template:
                                            share_level,
                                            ln)
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += self.tmpl_basket_footer(bskid,
                                            nb_items,
                                            (user_can_view_content,
@@ -1887,18 +1918,17 @@ class Template:
                                         of,
                                         ln)
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += """
 </table>"""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += self.tmpl_create_export_as_list(selected_category,
                                                    selected_topic,
                                                    selected_group,
                                                    bskid,
                                                    None,
                                                    False)
-
         return out
 
     def tmpl_basket_header(self,
@@ -1928,6 +1958,9 @@ class Template:
                             ''
         last_update_field = '<br />' + _('last update') + ': ' + date_modification
         if user_can_edit_basket:
+            add_ext_resource_url = """%s/yourbaskets/add?category=%s&bskid=%i""" % (CFG_SITE_URL,selected_category,bskid,)
+            add_ext_resource_logo = """<img src="%s/img/wb-create-basket.png" />""" % (CFG_SITE_URL,)
+            add_ext_resource = """<a href="%s">%s%s</a>""" % (add_ext_resource_url, add_ext_resource_logo, _("Add item"))
             edit_basket_url = """%s/yourbaskets/edit?bskid=%i&amp;topic=%s&amp;ln=%s""" % (CFG_SITE_URL, bskid, cgi.escape(selected_topic, True), ln)
             edit_basket_logo = """<img src="%s/img/wb-edit-basket.png" />""" % (CFG_SITE_URL,)
             edit_basket = """<a href="%s">%s%s</a>""" % (edit_basket_url, edit_basket_logo, _("Edit basket"))
@@ -1961,6 +1994,8 @@ class Template:
               </small>
             </td>
             <td class="bskbasketheaderoptions">
+              %(add_ext_resource)s
+              &nbsp;&nbsp;
               %(edit_basket)s
               &nbsp;&nbsp;
               %(delete_basket)s
@@ -1978,6 +2013,7 @@ class Template:
                 'comments_field': comments_field,
                 'subscribers_field': subscribers_field,
                 'last_update_field': last_update_field,
+                'add_ext_resource': add_ext_resource,
                 'edit_basket': edit_basket,
                 'delete_basket': delete_basket,
                 'unsubscribe': unsubscribe,
@@ -2000,6 +2036,9 @@ class Template:
 
         optional_colspan = nb_items and user_can_view_content and ' colspan="3"' or ''
         if user_can_edit_basket:
+            add_ext_resource_url = """%s/yourbaskets/add?category=%s&bskid=%i""" % (CFG_SITE_URL,selected_category,bskid,)
+            add_ext_resource_logo = """<img src="%s/img/wb-create-basket.png" />""" % (CFG_SITE_URL,)
+            add_ext_resource = """<a href="%s">%s%s</a>""" % (add_ext_resource_url, add_ext_resource_logo, _("Add item"))
             edit_basket_url = """%s/yourbaskets/edit?bskid=%i&amp;topic=%s&amp;ln=%s""" % (CFG_SITE_URL, bskid, selected_topic, ln)
             edit_basket_logo = """<img src="%s/img/wb-edit-basket.png" />""" % (CFG_SITE_URL,)
             edit_basket = """<a href="%s">%s%s</a>""" % (edit_basket_url, edit_basket_logo, _("Edit basket"))
@@ -2033,6 +2072,8 @@ class Template:
               </small>
             </td>
             <td class="bskbasketfooteroptions">
+              %(add_ext_resource)s
+              &nbsp;&nbsp;
               %(edit_basket)s
               &nbsp;&nbsp;
               %(delete_basket)s
@@ -2046,6 +2087,7 @@ class Template:
 
         out %= {'optional_colspan': optional_colspan,
                 'display_public': display_public,
+                'add_ext_resource': add_ext_resource,
                 'edit_basket': edit_basket,
                 'delete_basket': delete_basket,
                 'unsubscribe': unsubscribe}
@@ -2067,7 +2109,7 @@ class Template:
                             ln=CFG_SITE_LANG):
         """Template for basket content display."""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             _ = gettext_set_language(ln)
             items_html = """
   <tbody>"""
@@ -2121,6 +2163,7 @@ class Template:
             for item in items:
                 items_xml += item[4] + "\n"
             return items_xml
+
 
     def __tmpl_basket_item(self,
                            count,
@@ -3703,7 +3746,7 @@ class Template:
                                    public=False):
         """Tamplate that creates a bullet list of export as formats for a basket or an item."""
 
-        list_of_export_as_formats = [('MARCXML', 'xm')]
+        list_of_export_as_formats = [('BibTeX','hx'), ('DC','xd'), ('EndNote','xe'), ('MARCXML', 'xm'), ('NLM','xn'), ('RefWorks','xw')]
 
         recid = item and "&recid=" + str(item[0]) or ""
 
@@ -3723,9 +3766,10 @@ class Template:
 
         export_as_html = ""
         for format in list_of_export_as_formats:
-            export_as_html += """<a style="text-decoration:underline;font-weight:normal" href="%s&of=%s">%s</a>""" % \
+            export_as_html += """<a style="text-decoration:underline;font-weight:normal" href="%s&of=%s">%s</a>, """ % \
                               (href, format[1], format[0])
-
+        if export_as_html:
+            export_as_html = export_as_html[:-2]
         out = """
 <div style="float:right; text-align:right;">
   <ul class="bsk_export_as_list">
