@@ -126,7 +126,8 @@ def convert_conf_option(option_name, option_value):
                        'CFG_BIBMATCH_FUZZY_WORDLIMITS',
                        'CFG_BIBMATCH_QUERY_TEMPLATES',
                        'CFG_WEBSEARCH_SYNONYM_KBRS',
-                       'CFG_BIBINDEX_SYNONYM_KBRS']:
+                       'CFG_BIBINDEX_SYNONYM_KBRS',
+                       'CFG_BIBUPLOAD_FFT_ALLOWED_EXTERNAL_URLS']:
         option_value = option_value[1:-1]
 
     ## 3cbis) very special cases: dicts with backward compatible string
