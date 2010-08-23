@@ -140,7 +140,7 @@ class WebInterfaceCommentsPages(WebInterfaceDirectory):
 
         user_info = collect_user_info(req)
         (auth_code, auth_msg) = check_user_can_view_comments(user_info, self.recid)
-        if auth_code and user_info['email'] == 'guest' and not user_info['apache_user']:
+        if auth_code and user_info['email'] == 'guest':
             cookie = mail_cookie_create_authorize_action(VIEWRESTRCOLL, {'collection' : guess_primary_collection_of_a_record(self.recid)})
             target = '/youraccount/login' + \
                 make_canonical_urlargd({'action': cookie, 'ln' : argd['ln'], 'referer' : \
@@ -157,7 +157,7 @@ class WebInterfaceCommentsPages(WebInterfaceDirectory):
 
         can_attach_files = False
         (auth_code, auth_msg) = check_user_can_attach_file_to_comments(user_info, self.recid)
-        if not auth_code and (user_info['email'] != 'guest' or user_info['apache_user']):
+        if not auth_code and (user_info['email'] != 'guest'):
             can_attach_files = True
 
         subscription = get_user_subscription_to_discussion(self.recid, uid)
@@ -332,7 +332,7 @@ class WebInterfaceCommentsPages(WebInterfaceDirectory):
         user_info = collect_user_info(req)
         can_attach_files = False
         (auth_code, auth_msg) = check_user_can_attach_file_to_comments(user_info, self.recid)
-        if not auth_code and (user_info['email'] != 'guest' or user_info['apache_user']):
+        if not auth_code and (user_info['email'] != 'guest'):
             can_attach_files = True
 
         warning_msgs = []
@@ -534,7 +534,7 @@ class WebInterfaceCommentsPages(WebInterfaceDirectory):
 
         user_info = collect_user_info(req)
         (auth_code, auth_msg) = check_user_can_view_comments(user_info, self.recid)
-        if auth_code and user_info['email'] == 'guest' and not user_info['apache_user']:
+        if auth_code and user_info['email'] == 'guest':
             cookie = mail_cookie_create_authorize_action(VIEWRESTRCOLL, {'collection' : guess_primary_collection_of_a_record(self.recid)})
             target = '/youraccount/login' + \
                 make_canonical_urlargd({'action': cookie, 'ln' : argd['ln'], 'referer' : \
@@ -593,7 +593,7 @@ class WebInterfaceCommentsPages(WebInterfaceDirectory):
 
         user_info = collect_user_info(req)
         (auth_code, auth_msg) = check_user_can_view_comments(user_info, self.recid)
-        if (auth_code and not user_info['apache_user']) or user_info['email'] == 'guest':
+        if auth_code or user_info['email'] == 'guest':
             cookie = mail_cookie_create_authorize_action(VIEWRESTRCOLL, {'collection' : guess_primary_collection_of_a_record(self.recid)})
             target = '/youraccount/login' + \
                 make_canonical_urlargd({'action': cookie, 'ln' : argd['ln'], 'referer' : \
@@ -714,7 +714,7 @@ class WebInterfaceCommentsFiles(WebInterfaceDirectory):
         # Check that user can view record, and its comments (protected
         # with action "viewcomment")
         (auth_code, auth_msg) = check_user_can_view_comments(user_info, self.recid)
-        if auth_code and user_info['email'] == 'guest' and not user_info['apache_user']:
+        if auth_code and user_info['email'] == 'guest':
             cookie = mail_cookie_create_authorize_action(VIEWRESTRCOLL, {'collection' : guess_primary_collection_of_a_record(self.recid)})
             target = '/youraccount/login' + \
                 make_canonical_urlargd({'action': cookie, 'ln' : argd['ln'], 'referer' : \
@@ -734,7 +734,7 @@ class WebInterfaceCommentsFiles(WebInterfaceDirectory):
         # Check that user can view this particular comment, protected
         # using its own restriction
         (auth_code, auth_msg) = check_user_can_view_comment(user_info, argd['comid'])
-        if auth_code and user_info['email'] == 'guest' and not user_info['apache_user']:
+        if auth_code and user_info['email'] == 'guest':
             cookie = mail_cookie_create_authorize_action(VIEWRESTRCOLL, {'collection' : guess_primary_collection_of_a_record(self.recid)})
             target = '/youraccount/login' + \
                 make_canonical_urlargd({'action': cookie, 'ln' : argd['ln'], 'referer' : \
@@ -795,7 +795,7 @@ class WebInterfaceCommentsFiles(WebInterfaceDirectory):
 ##         # Check that user can upload attachments for comments.
 ##         user_info = collect_user_info(req)
 ##         (auth_code, auth_msg) = check_user_can_attach_file_to_comments(user_info, self.recid)
-##         if user_info['email'] == 'guest' and not user_info['apache_user']:
+##         if user_info['email'] == 'guest':
 ##             # User is guest: must login prior to upload
 ##             data = conn.sendUploadResults(1, '', '', 'Please login before uploading file.')
 ##         elif auth_code:
