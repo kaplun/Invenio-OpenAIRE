@@ -117,12 +117,12 @@
     </xsl:for-each>
     <xsl:for-each select="datafield[@tag=536]">
       <dc:relation>
-        <xsl:value-of select="subfield[@code='c']"/>
+        info:eu-repo/grantAgreement/EC/FP7/<xsl:value-of select="subfield[@code='c']"/>
       </dc:relation>
     </xsl:for-each>
     <xsl:for-each select="datafield[@tag=542]">
       <dc:rights>
-        <xsl:value-of select="subfield[@code='l']"/>
+        info:eu-repo/semantics/<xsl:value-of select="subfield[@code='l']"/>
       </dc:rights>
     </xsl:for-each>
     <dc:audience>
