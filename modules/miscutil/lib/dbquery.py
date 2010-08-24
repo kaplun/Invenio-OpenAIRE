@@ -28,23 +28,20 @@ but see the others as well.
 __revision__ = "$Id$"
 
 # dbquery clients can import these from here:
-# pylint: disable-msg=W0611
+# pylint: disable=W0611
 from MySQLdb import Warning, Error, InterfaceError, DataError, \
                     DatabaseError, OperationalError, IntegrityError, \
                     InternalError, NotSupportedError, \
                     ProgrammingError
-import warnings
 import string
 import time
 import marshal
 import re
-import sys
 from zlib import compress, decompress
 from thread import get_ident
 from invenio.config import CFG_ACCESS_CONTROL_LEVEL_SITE, \
     CFG_MISCUTIL_SQL_MAX_CACHED_QUERIES, CFG_MISCUTIL_SQL_USE_SQLALCHEMY, \
     CFG_MISCUTIL_SQL_RUN_SQL_MANY_LIMIT
-from invenio.errorlib import register_exception
 
 if CFG_MISCUTIL_SQL_USE_SQLALCHEMY:
     try:

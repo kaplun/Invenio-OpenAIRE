@@ -22,7 +22,7 @@ some utilities function in bibformat_utils module"""
 
 __revision__ = "$Id$"
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 import unittest
 import os
@@ -33,7 +33,6 @@ from invenio import bibformat_engine
 from invenio import bibformat_utils
 from invenio import bibformat_config
 from invenio import bibformatadminlib
-from invenio import bibrecord
 from invenio.config import CFG_TMPDIR
 from invenio.testutils import make_test_suite, run_test_suite
 
@@ -112,7 +111,7 @@ class FormatElementTest(unittest.TestCase):
     """ bibformat - tests on format templates"""
 
     def setUp(self):
-        # pylint: disable-msg=C0103
+        # pylint: disable=C0103
         """bibformat - setting python path to test elements"""
         sys.path.append('%s' % CFG_TMPDIR)
 
@@ -622,7 +621,7 @@ class FormatTest(unittest.TestCase):
     """ bibformat - generic tests on function that do the formatting. Main functions"""
 
     def setUp(self):
-        # pylint: disable-msg=C0103
+        # pylint: disable=C0103
         """ bibformat - prepare BibRecord objects"""
 
         self.xml_text_1 = '''

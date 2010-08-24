@@ -17,14 +17,13 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=E1102
+# pylint: disable=E1102
 
 """Unit tests for bibmatch."""
 
 __revision__ = "$Id$"
 
-from invenio.testutils import make_test_suite, run_test_suite, \
-                              test_web_page_content, merge_error_messages
+from invenio.testutils import make_test_suite, run_test_suite
 from invenio.bibrecord import create_records
 from invenio.bibmatch_engine import match_records
 import unittest

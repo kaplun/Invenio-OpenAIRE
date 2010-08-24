@@ -18,7 +18,6 @@
 
 __revision__ = "$Id$"
 
-import re
 import os
 import cgi
 import glob
@@ -27,7 +26,6 @@ from invenio.config import \
      CFG_PATH_CONVERT, \
      CFG_PATH_GUNZIP, \
      CFG_PATH_GZIP, \
-     CFG_CERN_SITE, \
      CFG_SITE_LANG
 from invenio.bibdocfile import decompose_file
 from invenio.errorlib import register_exception

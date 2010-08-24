@@ -30,9 +30,9 @@ import sys
 import time
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 from stat import ST_SIZE
 from tempfile import mkstemp
@@ -60,7 +60,6 @@ from invenio.bibtask import \
 from invenio.bibrecord import \
      record_delete_subfield, \
      field_xml_output
-from invenio.bibformat import format_record
 
 DATAFIELD_SET_HEAD = \
                    "<datafield tag=\"%s\" ind1=\"%s\" ind2=\"%s\">" % \

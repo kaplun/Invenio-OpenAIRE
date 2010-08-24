@@ -78,9 +78,9 @@ from invenio import webinterface_handler_config as apache
 socket.setdefaulttimeout(40)
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 from invenio.shellutils import escape_shell_arg
 from invenio.dbquery import run_sql, DatabaseError, blob_to_string
@@ -102,7 +102,6 @@ from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, \
     CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY
 from invenio.websubmit_config import CFG_WEBSUBMIT_ICON_SUBFORMAT_RE, \
     CFG_WEBSUBMIT_DEFAULT_ICON_SUBFORMAT
-from invenio.bibformat import format_record
 import invenio.template
 websubmit_templates = invenio.template.load('websubmit')
 websearch_templates = invenio.template.load('websearch')

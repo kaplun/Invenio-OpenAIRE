@@ -36,7 +36,7 @@ from invenio import webinterface_handler_config as apache
 import cgi
 import urllib
 import urlparse
-from socket import gethostbyname, gaierror
+from socket import gaierror
 import os
 import crypt
 import socket
@@ -88,7 +88,7 @@ tmpl = invenio.template.load('websession')
 
 re_invalid_nickname = re.compile(""".*[,'@]+.*""")
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 def createGuestUser():
     """Create a guest user , insert into user null values in all fields

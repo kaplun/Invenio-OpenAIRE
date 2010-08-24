@@ -15,7 +15,7 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0103
+# pylint: disable=C0103
 """CDS Invenio BibEdit Engine."""
 
 __revision__ = "$Id"
@@ -63,8 +63,6 @@ from invenio.search_engine import record_exists, search_pattern
 from invenio.webuser import session_param_get, session_param_set
 from invenio.bibcatalog import bibcatalog_system
 from invenio.webpage import page
-from invenio.bibformat import format_record
-from invenio.bibmerge_differ import match_subfields, record_diff
 from invenio.bibknowledge import get_kbd_values_for_bibedit, get_kbr_values, \
      get_kbt_items_for_bibedit #autosuggest
 
