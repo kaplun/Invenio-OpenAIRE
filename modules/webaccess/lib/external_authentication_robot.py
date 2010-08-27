@@ -183,9 +183,9 @@ def test_create_example_url(email, assertion=None, timeout=None, referer=None, r
     if robot is None:
         robot = robot_keys.keys()[0]
     if login_method is None:
-        for a_login_method, details in CFG_EXTERNAL_AUTHENTICATION.iteritems():
-            if details[2]:
-                login_method = a_login_method
+        for method_name, method in CFG_EXTERNAL_AUTHENTICATION.iteritems():
+            if method and method.robot_login_method_p():
+                login_method = method_name
                 break
     assertion = json.dumps(assertion)
     shared_key = robot_keys[robot]
