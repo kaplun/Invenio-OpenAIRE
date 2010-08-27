@@ -61,7 +61,7 @@ from invenio.access_control_config import DEF_DEMO_USER_ROLES, \
     DEF_DEMO_ROLES, DEF_DEMO_AUTHS, WEBACCESSACTION, MAXPAGEUSERS, \
     SUPERADMINROLE, CFG_EXTERNAL_AUTHENTICATION, DELEGATEADDUSERROLE, \
     CFG_ACC_EMPTY_ROLE_DEFINITION_SRC, InvenioWebAccessFireroleError, \
-    MAXSELECTUSERS
+    MAXSELECTUSERS, CFG_EXTERNAL_AUTH_DEFAULT
 from invenio.bibtask import authenticate
 from cgi import escape
 
@@ -739,7 +739,7 @@ def perform_accesspolicy(req, callback='yes', confirm=0):
     methods = CFG_EXTERNAL_AUTHENTICATION.keys()
     methods.sort()
     for system in methods:
-        output += """%s %s<br />""" % (system, (CFG_EXTERNAL_AUTHENTICATION[system][1] and "(Default)" or ""))
+        output += """%s %s<br />""" % (system, (CFG_EXTERNAL_AUTH_DEFAULT == system and "(Default)" or ""))
 
     output += "<br /><b>Changing the settings:</b><br />"
     output += "Currently, all changes must be done using your favourite editor, and the webserver restarted for changes to take effect. For the settings to change, either look in the guide or in access_control_config.py ."
