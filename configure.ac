@@ -780,7 +780,9 @@ AC_CONFIG_FILES([config.nice  \
 	  modules/websubmit/lib/functions/Makefile \
 	  modules/websubmit/web/Makefile \
 	  modules/websubmit/web/admin/Makefile \
-          OpenAIRE/Makefile \
+	  modules/OpenAIRE/Makefile \
+	  modules/OpenAIRE/etc/Makefile \
+	  modules/OpenAIRE/lib/Makefile \
 	  ])
 
 ## Finally, write output files:

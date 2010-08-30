@@ -15,14 +15,3 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-tmpdir = $(prefix)/var/tmp/chomsky
-confdir = $(sysconfdir)
-pylibdir = $(libdir)/python/invenio
-
-pylib_DATA = chomsky.py openaire_deposit_webinterface.py
-tmp_DATA = names-data.txt names.txt projects.txt template_marcxml.xml
-conf_DATA = openaire.tpl
-
-EXTRA_DIST = $(pylib_DATA) $(tmp_DATA) ${conf_DATA}
-
-CLEANFILES = *~ *.tmp *.pyc

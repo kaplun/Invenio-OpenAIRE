@@ -109,6 +109,24 @@ def ask_publication_remote_url_form(req, curdir, ln):
 
     return out
 
+def autocomplete_input_field(curdir, field_name, kbname):
+    curdir_dict = get_all_values_in_curdir(curdir)
+    field_value = curdir_dict.get(field_name, '')
+    out = """<script type="text/javascript">
+    $(document).ready(function() {
+        $("#field_name").autocomplete({
+            source: "%(site)s/kb/export?kbname=%(kb)s&format=jquery"
+        });
+    });
+    </script>
+    <div class="ui-widget"><input id="%(field_name)s" name="%(field_name)s" value="%(value)s"/></div>""" % {
+        'site': CFG_SITE_URL
+        'kb': kbname,
+        'field_name': field_name,
+        'value': field_value,
+        }
+    return out
+
 def license_field(req, curdir, ln, access_mode_field='OPENACCESSMODE', embargo_end_date_field='OPEN_EMBARGO_END_DATE'):
     curdir_dict = get_all_values_in_curdir(curdir)
     access_mode = curdir_dict.get(access_mode_field, 'Select:')

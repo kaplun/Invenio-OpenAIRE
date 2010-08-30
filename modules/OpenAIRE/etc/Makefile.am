@@ -15,6 +15,12 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = bibcatalog bibcheck bibcirculation bibclassify bibconvert bibedit bibexport bibharvest bibknowledge bibmatch bibmerge bibsched bibindex bibrank bibupload bibformat elmsubmit miscutil webstyle websession webhelp webbasket webalert websearch websubmit webaccess webmessage webstat webcomment webjournal OpenAIRE
+tmpdir = $(prefix)/var/tmp/chomsky
+confdir = $(sysconfdir)
 
-CLEANFILES = *~
+tmp_DATA = names-data.txt names.txt projects.txt template_marcxml.xml
+conf_DATA = openaire.tpl
+
+EXTRA_DIST = $(tmp_DATA) ${conf_DATA}
+
+CLEANFILES = *~ *.tmp *.pyc
