@@ -24,7 +24,7 @@
 div.wrapper { width: 900px; }
     -->
   </style>
-  <script type="text/javascript" src="/templates/yoo_level/lib/js/mootools/mootools-release-1.12.js"></script>
+<!--  <script type="text/javascript" src="/templates/yoo_level/lib/js/mootools/mootools-release-1.12.js"></script>
   <script type="text/javascript" src="/includes/js/joomla.javascript.js"></script>
   <script type="text/javascript" src="/media/system/js/caption.js"></script>
   <script type="text/javascript" src="http://www.openaire.eu/modules/mod_yoo_search/mod_yoo_search.js"></script>
@@ -35,9 +35,10 @@ var YtSettings = { tplurl: '/templates/yoo_level', color: 'openaire2', itemColor
 <script type="text/javascript" src="/templates/yoo_level/lib/js/addons/accordionmenu.js"></script>
 <script type="text/javascript" src="/templates/yoo_level/lib/js/addons/fancymenu.js"></script>
 <script type="text/javascript" src="/templates/yoo_level/lib/js/addons/dropdownmenu.js"></script>
-<script type="text/javascript" src="/templates/yoo_level/lib/js/yoo_tools.js"></script>
+<script type="text/javascript" src="/templates/yoo_level/lib/js/yoo_tools.js"></script> -->
 
 <link rel="apple-touch-icon" href="/templates/yoo_level/apple_touch_icon.png" />
+%(headers)s
 </head>
 
 <body id="page" class="yoopage left   ">
@@ -73,12 +74,7 @@ var YtSettings = { tplurl: '/templates/yoo_level', color: 'openaire2', itemColor
 		<div class="resultbox" style="width: 400px;"></div>
 
 	</div>
-</div><script type="text/javascript">
-// <!--
-window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': 'http://www.openaire.eu/index.php?option=com_search&tmpl=raw&type=json&ordering=&searchphrase=all&Itemid=22', 'fieldText': 'search...', 'msgResults': 'Search results', 'msgCategories': 'Search categories', 'msgNoResults': 'No results found', 'msgMoreResults': 'More results' }); });
-// -->
-</script>
-
+</div>
 				</div>
 			</div>
 						<div class="mod-blank">
