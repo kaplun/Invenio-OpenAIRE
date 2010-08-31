@@ -31,12 +31,12 @@ It also contains Apache-related user authentication stuff.
 
 __revision__ = "$Id$"
 
-from invenio import webinterface_handler_wsgi_utils as apache
+from invenio import webinterface_handler_config as apache
 
 import cgi
 import urllib
 import urlparse
-from socket import gethostbyname, gaierror
+from socket import gaierror
 import os
 import crypt
 import socket
@@ -88,7 +88,7 @@ tmpl = invenio.template.load('websession')
 
 re_invalid_nickname = re.compile(""".*[,'@]+.*""")
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 def createGuestUser():
     """Create a guest user , insert into user null values in all fields
@@ -897,18 +897,21 @@ def create_adminactivities_menu(req, uid, navmenuid, ln="en"):
     user_info = collect_user_info(req)
     activities = acc_find_possible_activities(user_info, ln)
 
-    # For BibEdit menu item, take into consideration current record
-    # whenever possible
-    if activities.has_key(_("Run Record Editor")) and \
+    # For BibEdit and BibDocFile menu items, take into consideration
+    # current record whenever possible
+    if activities.has_key(_("Run Record Editor")) or \
+           activities.has_key(_("Run Document File Manager")) and \
            user_info['uri'].startswith('/record/'):
         try:
             # Get record ID and try to cast it to an int
-            current_record_id = int(urlparse.urlparse(user_info['uri'])[2].split('/')[-1])
-
+            current_record_id = int(urlparse.urlparse(user_info['uri'])[2].split('/')[2])
         except:
             pass
         else:
-            activities[_("Run Record Editor")] = activities[_("Run Record Editor")] + '&amp;#state=edit&amp;recid=' + str(current_record_id)
+            if activities.has_key(_("Run Record Editor")):
+                activities[_("Run Record Editor")] = activities[_("Run Record Editor")] + '&amp;#state=edit&amp;recid=' + str(current_record_id)
+            if activities.has_key(_("Run File Manager")):
+                activities[_("Run File Manager")] = activities[_("Run File Manager")] + '&amp;recid=' + str(current_record_id)
 
     try:
         return tmpl.tmpl_create_adminactivities_menu(

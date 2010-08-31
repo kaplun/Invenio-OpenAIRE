@@ -45,13 +45,17 @@ Thankyou."""
 
 
 def Send_Delete_Mail(parameters, curdir, form, user_info=None):
-    """In the event of a record having been deleted, this function is used
-       to the mail the submitter (and possibly the record "managers")
-       informing them about the record's deletion.
-       @parameters:
+    """
+    In the event of a record having been deleted, this function is used
+    to the mail the submitter (and possibly the record "managers")
+    informing them about the record's deletion.
+
+    @parameters:
+
          + edsrn: The name of the file in the current submission's
                   working directory, in which the record's report number
                   is stored.
+
          + record_managers: A comma-separated string of the email
                             addresses of the record's managers. If given,
                             they will be (blind*) copied into the mail.
@@ -60,7 +64,9 @@ def Send_Delete_Mail(parameters, curdir, form, user_info=None):
                               blind copying everyone if "To" contains
                               multiple addresses. Anyway, blind was
                               wanted . . .
+
        @return: empty string.
+
        @Exceptions raised: None.
     """
     ## Get any addresses to which the mail should be copied:
@@ -147,7 +153,7 @@ def Send_Delete_Mail_read_file(filename):
             ## so that the admin is informed.
             err_msg = """Error in a WebSubmit function. An unexpected """ \
                       """error was encountered when trying to read from """ \
-                      """the file [%S].""" % filename
+                      """the file [%s].""" % filename
             register_exception(prefix=err_msg)
     return file_contents
 

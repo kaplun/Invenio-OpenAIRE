@@ -20,10 +20,31 @@ __revision__ = "$Id$"
 import os
 
 from invenio.config import CFG_SITE_NAME
+from invenio.websubmit_functions.Shared_Functions import get_nice_bibsched_related_message, txt2html
 
 # FIXME: cannot import Request_Print(), is defined in websubmit_engine.py
 
 def Print_Success(parameters, curdir, form, user_info=None):
+    """
+    This function simply displays a text on the screen, telling the
+    user the submission went fine. To be used in the 'Submit New
+    Record' action.
+
+    Parameters:
+
+       * status: Depending on the value of this parameter, the
+         function adds an additional text to the email.
+         This parameter can be one of:
+           - ADDED: The file has been integrated in the database.
+           - APPROVAL: The file has been sent for approval to a referee.
+                       or can stay empty.
+
+       * edsrn: Name of the file containing the reference of the
+                document
+
+       * newrnin: Name of the file containing the 2nd reference of the
+                  document (if any)
+    """
     t=""
     edsrn = parameters['edsrn']
     newrnin = parameters['newrnin']
@@ -46,4 +67,5 @@ def Print_Success(parameters, curdir, form, user_info=None):
         t=t+Request_Print("A",  "It will soon appear on our server.<br /><br />\n")
     t=t+Request_Print("A",  "Thank you for using %s!" % CFG_SITE_NAME)
     t=t+Request_Print("A",  "<br /><br /><br /><br />")
+    t += txt2html(get_nice_bibsched_related_message(curdir))
     return t

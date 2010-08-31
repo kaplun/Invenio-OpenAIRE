@@ -28,7 +28,9 @@ from invenio.bibtask import task_low_level_submission
 
 def Insert_Record(parameters, curdir, form, user_info=None):
     """
-    Insert record in curdir/recmysql using BibUpload.
+    Insert record in curdir/recmysql using BibUpload.  The file must
+    therefore already have been created prior to this execution of
+    this function, for eg. using "Make_Record".
     """
     global rn
     if os.path.exists(os.path.join(curdir, "recmysql")):
@@ -40,5 +42,6 @@ def Insert_Record(parameters, curdir, form, user_info=None):
                               (rn.replace('/', '_'),
                                time.strftime("%Y-%m-%d_%H:%M:%S")))
     shutil.copy(initial_file, final_file)
-    task_low_level_submission('bibupload', 'websubmit.Insert_Record', '-r', '-i', final_file, '-P', '3')
+    bibupload_id = task_low_level_submission('bibupload', 'websubmit.Insert_Record', '-r', '-i', final_file, '-P', '3')
+    open(os.path.join(curdir, 'bibupload_id'), 'w').write(str(bibupload_id))
     return ""

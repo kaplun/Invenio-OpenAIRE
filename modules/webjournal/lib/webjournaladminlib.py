@@ -14,7 +14,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 """CDS Invenio WebJournal Administration Interface."""
 
 __revision__ = "$Id$"
@@ -26,9 +26,9 @@ import os
 from urllib2 import urlopen
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 from invenio.errorlib import register_exception
 from invenio.config import \
@@ -75,8 +75,6 @@ from invenio.bibrecord import \
      print_rec
 from invenio.bibformat import format_record
 from invenio.bibtask import task_low_level_submission
-from invenio.webjournal_config import \
-     InvenioWebJournalNoJournalOnServerError
 import invenio.template
 wjt = invenio.template.load('webjournal')
 
@@ -534,19 +532,19 @@ def perform_request_configure(journal_name, xml_config, action, ln=CFG_SITE_LANG
 
     <controller>
         <issue_grouping>2</issue_grouping>
-	<issues_per_year>52</issues_per_year>
-	<hide_unreleased_issues>all</hide_unreleased_issues>
+    <issues_per_year>52</issues_per_year>
+    <hide_unreleased_issues>all</hide_unreleased_issues>
         <marc_tags>
             <issue_number>773__n</issue_number>
-	    <order_number>773__c</order_number>
+        <order_number>773__c</order_number>
         </marc_tags>
-	<alert_sender>%(CFG_SITE_SUPPORT_EMAIL)s</alert_sender>
-	<alert_recipients>recipients@atlantis.atl</alert_recipients>
-	<languages>en,fr</languages>
-	<submission>
+    <alert_sender>%(CFG_SITE_SUPPORT_EMAIL)s</alert_sender>
+    <alert_recipients>recipients@atlantis.atl</alert_recipients>
+    <languages>en,fr</languages>
+    <submission>
             <doctype>DEMOJRN</doctype>
             <report_number_field>DEMOJRN_RN</report_number_field>
-	</submission>
+    </submission>
         <first_issue>02/2009</first_issue>
         <draft_keyword>DRAFT</draft_keyword>
     </controller>

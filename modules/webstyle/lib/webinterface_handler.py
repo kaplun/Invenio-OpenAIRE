@@ -34,7 +34,7 @@ import re
 import os
 import gc
 
-from invenio import webinterface_handler_wsgi_utils as apache
+from invenio import webinterface_handler_config as apache
 from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL, CFG_TMPDIR
 from invenio.access_control_config import CFG_EXTERNAL_AUTH_USING_SSO
 from invenio.messages import wash_language
@@ -42,6 +42,7 @@ from invenio.urlutils import redirect_to_url
 from invenio.errorlib import register_exception
 from invenio.webuser import get_preferred_user_language, isGuestUser, \
     getUid, loginUser, update_Uid, isUserSuperAdmin, collect_user_info
+from invenio.webinterface_handler_wsgi_utils import StringField
 
 ## The following variable is True if the installation make any difference
 ## between HTTP Vs. HTTPS connections.
@@ -308,7 +309,10 @@ def create_handler(root):
                     tmp_out = sys.stdout
                     sys.stdout = StringIO()
                     hotshot.stats.load(filename).strip_dirs().sort_stats(sort_type).print_stats()
+                    # pylint: disable=E1103
+                    # This is a hack. sys.stdout was replaced by a StringIO.
                     profile_dump.append(sys.stdout.getvalue())
+                    # pylint: enable=E1103
                     sys.stdout = tmp_out
             else:
                 import cProfile
@@ -412,7 +416,7 @@ def wash_urlargd(form, content):
     content. Content is a dictionary containing the field names as a
     key, and a tuple (type, default) as value.
 
-    'type' can be list, str, int, tuple, or
+    'type' can be list, str, invenio.webinterface_handler_wsgi_utils.StringField, int, tuple, or
     invenio.webinterface_handler_wsgi_utils.Field (for
     file uploads).
 
@@ -461,7 +465,10 @@ def wash_urlargd(form, content):
         # Maybe we already have what is expected? Then don't change
         # anything.
         if isinstance(value, dst_type):
-            result[k] = value
+            if isinstance(value, StringField):
+                result[k] = str(value)
+            else:
+                result[k] = value
             continue
 
         # Since we got here, 'value' is sure to be a single symbol,

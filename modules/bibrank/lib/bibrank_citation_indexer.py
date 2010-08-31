@@ -23,13 +23,12 @@ import re
 import time
 import sys
 import os
-import marshal
-from zlib import decompress, error
+import zlib
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 from invenio.dbquery import run_sql, serialize_via_marshal, \
                             deserialize_via_marshal
@@ -183,20 +182,20 @@ def last_updated_result(rank_method_code):
     if rdict and rdict[0] and rdict[0][0]:
         #has to be prepared for corrupted data!
         try:
-            dic = marshal.loads(decompress(rdict[0][0]))
-        except error:
+            dic = deserialize_via_marshal(rdict[0][0])
+        except zlib.error:
             return [{}, {}, {}]
         query = "select object_value from rnkCITATIONDATA where object_name='citationdict'"
         cit_compressed = run_sql(query)
         cit = []
         if cit_compressed and cit_compressed[0] and cit_compressed[0][0]:
-            cit = marshal.loads(decompress(cit_compressed[0][0]))
+            cit = deserialize_via_marshal(cit_compressed[0][0])
             if cit:
                 query = """select object_value from rnkCITATIONDATA
                            where object_name='reversedict'"""
                 ref_compressed = run_sql(query)
                 if ref_compressed and ref_compressed[0] and ref_compressed[0][0]:
-                    ref = marshal.loads(decompress(ref_compressed[0][0]))
+                    ref = deserialize_via_marshal(ref_compressed[0][0])
                     result = (dic, cit, ref)
     return result
 
@@ -963,8 +962,6 @@ def insert_into_cit_db(dic, name):
                      (name,s))
         run_sql("UPDATE rnkCITATIONDATA SET last_updated = %s where object_name = %s",
                (ndate,name))
-        #finally, update the rnkmethod table.
-        run_sql("UPDATE rnkMETHOD SET last_updated=%s WHERE name=%s", (ndate, 'citation'))
     except:
         register_exception(prefix="could not write "+name+" into db", alert_admin=True)
 
@@ -976,7 +973,7 @@ def get_cit_dict(name):
         cdict = run_sql("select object_value from rnkCITATIONDATA where object_name = %s",
                        (name,))
         if cdict and cdict[0] and cdict[0][0]:
-            dict_from_db = marshal.loads(decompress(cdict[0][0]))
+            dict_from_db = deserialize_via_marshal(cdict[0][0])
             return dict_from_db
         else:
             return {}

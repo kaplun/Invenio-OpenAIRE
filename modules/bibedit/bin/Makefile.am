@@ -9,14 +9,22 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-bin_SCRIPTS = refextract xmlmarclint xmlmarc2textmarc bibedit
+bin_SCRIPTS = refextract \
+              xmlmarclint \
+              xmlmarc2textmarc \
+              textmarc2xmlmarc \
+              bibedit
 
-EXTRA_DIST = refextract.in xmlmarclint.in xmlmarc2textmarc.in bibedit.in
+EXTRA_DIST = refextract.in \
+             xmlmarclint.in \
+             xmlmarc2textmarc.in \
+             textmarc2xmlmarc.in \
+             bibedit.in
 
 CLEANFILES = *~ *.tmp

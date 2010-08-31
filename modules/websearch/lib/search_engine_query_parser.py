@@ -17,17 +17,16 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 """CDS Invenio Search Engine query parsers."""
 
 import re
 import string
-from invenio.config import CFG_INSPIRE_SITE
 
 from invenio.bibindex_engine_tokenizer import BibIndexFuzzyNameTokenizer as FNT
 
-QueryScanner = FNT()
+NameScanner = FNT()
 
 
 class SearchQueryParenthesisedParser:
@@ -47,59 +46,52 @@ class SearchQueryParenthesisedParser:
     In case of error: Exception is raised
     """
 
-    # string containing the query that will be parsed
-    _query = ""
-    # operators before and after the current pattern matched during parsing
-    _preceding_operator = ""
-    _preceding_operator_position = -1
-
-    _following_operator = ""
-    _following_operator_position = -1
-    # indexes in the parsed query of beginning and end of currently parsed pattern
-    _pattern_beginning = 0
-    _pattern_end = 0
-    # list of parsed patterns and operators
-    _patterns = []
-    # flag indicating if processed symbols are inside parenthesis
-    _inside_parentheses = False
     # all operator symbols recognized in expression
     _operators = ['+', '|', '-']
-    # default operator if operator is missing between patterns
-    _DEFAULT_OPERATOR = '+'
 
     # error messages
     _error_message_mismatched_parentheses = "Mismatched parenthesis."
     _error_message_nested_parentheses_not_supported = "Nested parenthesis are currently not supported."
 
-    def __init__(self):
+    def __init__(self, default_operator='+'):
         """Initialize the state of the parser"""
-        self._init_parsing()
 
-    def _init_parsing(self, query=""):
-        """Initialize variables before parsing """
+        # default operator to be used if operator is missing between patterns
+        self._DEFAULT_OPERATOR = default_operator
 
-        self._compile_regular_expressions()
+        self._re_quotes_match = re.compile('[^\\\\](".*?[^\\\\]")|[^\\\\](\'.*?[^\\\\]\')')
 
-        # clean the query replacing some of the content e.g. replace 'AND' with '+'
-        query = self._clean_query(query)
-        self._query = query
-
+        self._query = ''
+        # list of parsed patterns and operators
         self._patterns = []
+        # indexes in the parsed query of beginning and end of currently parsed pattern
         self._pattern_beginning = 0
         self._pattern_end = 0
 
-        self._clear_preceding_operator()
-        self._clear_following_operator()
+        # operators before and after the current pattern matched during parsing
+        _preceding_operator = ""
+        _preceding_operator_position = -1
 
+        _following_operator = ""
+        _following_operator_position = -1
+
+        # flag indicating if processed symbols are inside parenthesis
         self._inside_parentheses = False
 
-    def _compile_regular_expressions(self):
-        """Compiles some of the regular expressions that are used in the class
-        for higher performance."""
+        # all operator symbols recognized in expression
+        _operators = ['+', '|', '-']
+        #print "\n__init__ called!" # FIXME: why can't operator be defined local?
 
-        # regular expression that matches the contents in single and double quotes
-        # taking in mind if they are escaped.
-        self._re_quotes_match = re.compile('[^\\\\](".*?[^\\\\]")|[^\\\\](\'.*?[^\\\\]\')')
+    def _reset_parse_state(self):
+        """Clean up state from any previous parse operations."""
+
+        # FIXME: Can this be done away with?  Is parse_query overly stateful?
+        self._patterns = []
+        self._pattern_beginning = 0
+        self._pattern_end = 0
+        self._clear_preceding_operator()
+        self._clear_following_operator()
+        self._inside_parentheses = False
 
     def _clean_query(self, query):
         """Clean the query performing replacement of AND, OR, NOT operators with their
@@ -134,21 +126,9 @@ class SearchQueryParenthesisedParser:
         """Replaces some of the content of the query with equivalent content
         (e.g. replace 'AND' operator with '+' operator) for easier processing after that."""
 
-        query = self._replace_word_case_insensitive(query, "not", "-")
-        query = self._replace_word_case_insensitive(query, "and", "+")
-        query = self._replace_word_case_insensitive(query, "or", "|")
-
+        for word, symbol in (('not', '-'), ('and', '+'), ('or', '|')):
+            query = re.sub('(?i)\\b'+word+'\\b', symbol, query)
         return query
-
-    def _replace_word_case_insensitive(self, input_string, old_word, new_word):
-        """Returns a copy of string input_string where all occurrences of old_word
-        are replaced by new_word"""
-
-        regular_expression = re.compile('\\b'+old_word+'\\b', re.IGNORECASE)
-
-        result = regular_expression.sub(new_word, input_string)
-
-        return result
 
     def parse_query(self, query=""):
         """Parses the query and generates as an output a list of values
@@ -165,7 +145,11 @@ class SearchQueryParenthesisedParser:
             # we add the default operator in front of the query
             return [self._DEFAULT_OPERATOR, query]
 
-        self._init_parsing(query)
+        # clean the query replacing some of the content e.g. replace 'AND' with '+'
+        query = self._clean_query(query)
+        self._query = query
+
+        self._reset_parse_state()
         # flag indicating if we are inside quotes
         inside_quotes = False
         # used for detecting escape sequences. Contains previously processed character.
@@ -214,7 +198,7 @@ class SearchQueryParenthesisedParser:
 
         # check for mismatched parentheses
         if self._inside_parentheses:
-            self._raise_error(self._error_message_mismatched_parentheses)
+            raise InvenioWebSearchQueryParserException("Mismatched parenthesis.")
 
         return self._patterns
 
@@ -233,7 +217,7 @@ class SearchQueryParenthesisedParser:
 
         # check if we are already inside parentheses
         if self._inside_parentheses:
-            self._raise_error(self._error_message_nested_parentheses_not_supported)
+            raise InvenioWebSearchQueryParserException("Nested parentheses currently unsupported.")
 
         # both operators preceding and following the pattern before parenthesis
         # are known and also the pattern itself so append them to the result list.
@@ -253,7 +237,7 @@ class SearchQueryParenthesisedParser:
 
         # check if we are inside parentheses
         if not self._inside_parentheses:
-            self._raise_error(self._error_message_mismatched_parentheses)
+            raise InvenioWebSearchQueryParserException("Mismatched parenthesis.")
 
         # append the pattern between the parentheses
         self._append_pattern()
@@ -384,15 +368,13 @@ class SearchQueryParenthesisedParser:
         # after the value is cleaned the position is also cleaned. We accept -1 for cleaned value.
         self._following_operator_position = -1
 
-    def _raise_error(self, error_message_text):
-        """Raises an exception with the specified error message"""
-        raise InvenioWebSearchQueryParserException(error_message_text)
 
 class InvenioWebSearchQueryParserException(Exception):
     """Exception for parsing errors."""
     def __init__(self, message):
         """Initialization."""
         self.message = message
+
 
 class SpiresToInvenioSyntaxConverter:
     """Converts queries defined with SPIRES search syntax into queries
@@ -403,6 +385,10 @@ class SpiresToInvenioSyntaxConverter:
     _DATE_ADDED_FIELD = '961__x:'
     _DATE_UPDATED_FIELD = '961__c:' # FIXME: define and use dateupdate:
     _DATE_FIELD = '269__c:'
+
+    _A_TAG = 'author:'
+    _EA_TAG = 'exactauthor:'
+
 
     # Dictionary containing the matches between SPIRES keywords
     # and their corresponding Invenio keywords or fields
@@ -575,7 +561,7 @@ class SpiresToInvenioSyntaxConverter:
 
     def __init__(self):
         """Initialize the state of the converter"""
-        self._init_monthes()
+        self._init_months()
         self._compile_regular_expressions()
 
     def _compile_regular_expressions(self):
@@ -586,28 +572,17 @@ class SpiresToInvenioSyntaxConverter:
         # taking in mind if they are escaped.
         self._re_quotes_match = re.compile('[^\\\\](".*?[^\\\\]")|[^\\\\](\'.*?[^\\\\]\')')
 
+        # for matching cases where kw needs distributing
+        self._re_distribute_keywords = re.compile(r'\b(?P<keyword>\S*:)(?P<content>.+?)\s*(?P<combination>and not | and | or | not )\s*(?P<last_content>[^:]*?)(?= and not | and | or | not |$)', re.IGNORECASE)
+
         # regular expression that matches author patterns
-        # the groups defined in this regular expression are used in the method
-        # _convert_spires_author_search_to_invenio_author_search(...) In case
-        # of changing them, correct also the code in this method
-        self._re_author_match = re.compile(
-            # author:ellis, jacqueline
-            r'\bauthor:\s*(?P<surname1>\w+),\s*(?P<name1>\w{3,})\b(?= and | or | not |$)' + '|' + \
-            # author:jacqueline ellis
-            r'\bauthor:\s*(?P<name2>\w+)\s+(?!and |or |not )(?P<surname2>\w+)\b(?= and | or | not |$)' + '|' +\
-            # author:ellis, j.
-            r'\bauthor:\s*(?P<surname3>\w+),\s*(?P<name3>\w{1,2})\b\.?(?= and | or | not |$)' + '|' +\
-            # author: ellis, j. r.
-            r'\bauthor:\s*(?P<surname4>\w+),\s*(?P<name4>\w+)\b\.?\s+(?!and |or |not )(?P<middle_name4>\w+)\b\.?' + '|' +\
-            # author j. r. ellis
-            r'\bauthor:\s*(?P<name5>\w+)\b\.?\s+(?!and |or |not )(?P<middle_name5>\w+)\b\.?\s+(?!and |or |not )(?P<surname5>\w+)\b\.?',
-            re.IGNORECASE)
+        self._re_author_match = re.compile(r'\bauthor:\s*(?P<name>.+?)\s*(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # regular expression that matches exact author patterns
         # the group defined in this regular expression is used in method
         # _convert_spires_exact_author_search_to_invenio_author_search(...)
         # in case of changes correct also the code in this method
-        self._re_exact_author_match = re.compile(r'\bexactauthor:(?P<author_name>.*?\b)(?= and | or | not |$)', re.IGNORECASE)
+        self._re_exact_author_match = re.compile(r'\bexactauthor:(?P<author_name>[^\'\"].*?[^\'\"]\b)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # regular expression that matches search term, its conent (words that
         # are searched)and the operator preceding the term. In case that the
@@ -642,6 +617,9 @@ class SpiresToInvenioSyntaxConverter:
 
         Queries are assumed SPIRES queries only if they start with FIND or FIN"""
 
+        # allow users to use "f" only...
+        query = re.sub('^[fF] ', 'find ', query)
+
         # SPIRES syntax allows searches with 'find' or 'fin'.
         if self._re_find_or_fin_at_start.match(query.lower()):
 
@@ -658,6 +636,7 @@ class SpiresToInvenioSyntaxConverter:
             # call to _replace_spires_keywords_with_invenio_keywords should be at the
             # beginning because the next methods use the result of the replacement
             query = self._replace_spires_keywords_with_invenio_keywords(query)
+            query = self._distribute_keywords_across_combinations(query)
 
             query = self._convert_dates(query)
             query = self._convert_spires_author_search_to_invenio_author_search(query)
@@ -671,12 +650,12 @@ class SpiresToInvenioSyntaxConverter:
 
         return query
 
-    def _init_monthes(self):
+    def _init_months(self):
         """Defines a dictionary matching the name
         of the month with its corresponding number"""
 
-        # this dictionary is used when generating match patterns for monthes
-        self._monthes = {'jan':'01', 'january':'01',
+        # this dictionary is used when generating match patterns for months
+        self._months = {'jan':'01', 'january':'01',
                          'feb':'02', 'february':'02',
                          'mar':'03', 'march':'03',
                          'apr':'04', 'april':'04',
@@ -703,19 +682,19 @@ class SpiresToInvenioSyntaxConverter:
                                             '10':'10',
                                             '11':'11',
                                             '12':'12',}
-        # combine it with monthes in order to cover all the cases
-        self._month_name_to_month_number.update(self._monthes)
+        # combine it with months in order to cover all the cases
+        self._month_name_to_month_number.update(self._months)
 
     def _get_month_names_match(self):
         """Retruns part of a patter that matches month in a date"""
 
-        monthes_match = ''
-        for month_name in self._monthes.keys():
-            monthes_match = monthes_match + month_name + '|'
+        months_match = ''
+        for month_name in self._months.keys():
+            months_match = months_match + month_name + '|'
 
-        monthes_match = r'\b(' + monthes_match[0:-1] + r')\b'
+        months_match = r'\b(' + months_match[0:-1] + r')\b'
 
-        return monthes_match
+        return months_match
 
     def _get_month_number(self, month_name):
         """Returns the corresponding number for a given month
@@ -867,7 +846,7 @@ class SpiresToInvenioSyntaxConverter:
         def create_replacement_pattern(match):
             # the regular expression where this group name is defined is in
             # the method _compile_regular_expressions()
-            return 'author:"' + match.group('author_name') + '"'
+            return self._EA_TAG + '"' + match.group('author_name') + '"'
 
         query = self._re_exact_author_match.sub(create_replacement_pattern, query)
 
@@ -875,79 +854,75 @@ class SpiresToInvenioSyntaxConverter:
 
     def _convert_spires_author_search_to_invenio_author_search(self, query):
         """Converts SPIRES search patterns for authors to search patterns in invenio
-        that give similar results to the spires search."""
+        that give similar results to the spires search.
+        """
 
         # result of the replacement
-        result = ""
+        result = ''
         current_position = 0
-
         for match in self._re_author_match.finditer(query):
-
-            result = result + query[current_position : match.start()]
-
-            # the regular expression where these group names are defined is in
-            # the method _compile_regular_expressions()
-            result = result + \
-                self._create_author_search_pattern(match.group('name1'), None, match.group('surname1')) + \
-                self._create_author_search_pattern(match.group('name2'), None, match.group('surname2')) + \
-                self._create_author_search_pattern(match.group('name3'), None, match.group('surname3')) + \
-                self._create_author_search_pattern(match.group('name4'), match.group('middle_name4'), match.group('surname4')) + \
-                self._create_author_search_pattern(match.group('name5'), match.group('middle_name5'), match.group('surname5'))
-
-            # move current position at the end of the processed content
+            result += query[current_position : match.start() ]
+            scanned_name = NameScanner.scan(match.group('name'))
+            author_atoms = self._create_author_search_pattern_from_fuzzy_name_dict(scanned_name)
+            if author_atoms.find(' ') == -1:
+                result += author_atoms + ' '
+            else:
+                result += '(' + author_atoms + ') '
             current_position = match.end()
         result += query[current_position : len(query)]
         return result
 
-    def _create_author_search_pattern(self, author_name, author_middle_name, author_surname):
-        """Creates search patter for author by given author's name and surname.
+    def _create_author_search_pattern_from_fuzzy_name_dict(self, fuzzy_name):
+        """Creates an invenio search pattern for an author from a fuzzy name dict"""
 
-        When the pattern is executed in invenio search, it produces results
-        similar to the results of SPIRES search engine."""
+        author_name = ''
+        author_middle_name = ''
+        author_surname = ''
+        if len(fuzzy_name['nonlastnames']) > 0:
+            author_name = fuzzy_name['nonlastnames'][0]
+        if len(fuzzy_name['nonlastnames']) == 2:
+            author_middle_name = fuzzy_name['nonlastnames'][1]
+        if len(fuzzy_name['nonlastnames']) > 2:
+            author_middle_name = ' '.join(fuzzy_name['nonlastnames'][1:])
+        author_surname = ' '.join(fuzzy_name['lastnames'])
 
-        AUTHOR_KEYWORD = 'author:'
+        NAME_IS_INITIAL = (len(author_name) == 1)
+        NAME_IS_NOT_INITIAL = not NAME_IS_INITIAL
 
         # we expect to have at least surname
         if author_surname == '' or author_surname == None:
             return ''
 
-        # SPIRES use dots at the end of the abbreviations of the names
-        # CERN don't use dots at the end of the abbreviations of the names
-        # when we are running Invenio with SPIRES date we add the dots, otherwise we don't
-        dot_symbol = ' '
-        if CFG_INSPIRE_SITE:
-            dot_symbol = "."
+        # ellis ---> "author:ellis"
+        #if author_name == '' or author_name == None:
+        if not author_name:
+            return self._A_TAG + author_surname
+
+        # ellis, j ---> "ellis, j*"
+        if NAME_IS_INITIAL and not author_middle_name:
+            return self._A_TAG + '"' + author_surname + ', ' + author_name + '*"'
 
         # if there is middle name we expect to have also name and surname
         # ellis, j. r. ---> ellis, j* r*
         # j r ellis ---> ellis, j* r*
         # ellis, john r. ---> ellis, j* r* or ellis, j. r. or ellis, jo. r.
-        if author_middle_name != None and author_middle_name != '':
-            search_pattern = AUTHOR_KEYWORD +  '"' + author_surname + ', ' + author_name + '*' + ' ' + author_middle_name + '*"'
-            if len(author_name)>1:
-                search_pattern = search_pattern + ' or ' +\
-                AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name[0] + dot_symbol  + author_middle_name + dot_symbol  + '" or ' +\
-                AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name[0:2] + dot_symbol + author_middle_name + dot_symbol + '"'
+        # ellis, john r. ---> author:ellis, j* r* or exactauthor:ellis, j r or exactauthor:ellis jo r
+        if author_middle_name:
+            search_pattern = self._A_TAG + '"' + author_surname + ', ' + author_name + '*' + ' ' + author_middle_name.replace(" ","* ") + '*"'
+            if NAME_IS_NOT_INITIAL:
+                for i in range(1,len(author_name)):
+                    search_pattern += ' or ' + self._EA_TAG + "\"%s, %s %s\"" % (author_surname, author_name[0:i], author_middle_name)
             return search_pattern
-
-        # ellis ---> "ellis"
-        if author_name == '' or author_name == None:
-            return AUTHOR_KEYWORD + author_surname
-
-        # ellis, j ---> "ellis, j*"
-        if len(author_name) == 1:
-            return AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name + '*"'
 
         # ellis, jacqueline ---> "ellis, jacqueline" or "ellis, j.*" or "ellis, j" or "ellis, ja.*" or "ellis, ja" or "ellis, jacqueline *"
         # in case we don't use SPIRES data, the ending dot is ommited.
+        search_pattern = self._A_TAG + '"' + author_surname + ', ' + author_name + '*"'
+        if NAME_IS_NOT_INITIAL:
+            for i in range(1,len(author_name)):
+                search_pattern += ' or ' + self._EA_TAG + "\"%s, %s\"" % (author_surname, author_name[0:i])
 
-        if len(author_name) > 1:
-            return AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name + '" or ' +\
-                AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name[0] + '.' + '*" or ' +\
-                AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name[0] + '" or ' +\
-                AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name[0:2] + '.' + '*" or ' +\
-                AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name[0:2] + '" or ' +\
-                AUTHOR_KEYWORD + '"' + author_surname + ', ' + author_name + ' *"'
+        return search_pattern
+
 
     def _replace_spires_keywords_with_invenio_keywords(self, query):
         """Replaces SPIRES keywords that have directly
@@ -1004,3 +979,15 @@ class SpiresToInvenioSyntaxConverter:
         result = regular_expression.sub(r'\g<operator>' + new_keyword + r'\g<end>', query)
         result = re.sub(':\s+', ':', result)
         return result
+
+    def _distribute_keywords_across_combinations(self, query):
+        # method used for replacement with regular expression
+
+        def create_replacement_pattern(match):
+            # the regular expression where this group name is defined is in
+            # the method _compile_regular_expressions()
+            return match.group('keyword') + ' ' + match.group('content') + \
+                   ' ' +  match.group('combination') + ' ' + match.group('keyword') + ' ' + match.group('last_content')
+
+        query = self._re_distribute_keywords.sub(create_replacement_pattern, query)
+        return query

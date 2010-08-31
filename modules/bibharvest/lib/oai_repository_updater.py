@@ -30,9 +30,9 @@ import sys
 import time
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 from stat import ST_SIZE
 from tempfile import mkstemp
@@ -60,7 +60,6 @@ from invenio.bibtask import \
 from invenio.bibrecord import \
      record_delete_subfield, \
      field_xml_output
-from invenio.bibformat import format_record
 
 DATAFIELD_SET_HEAD = \
                    "<datafield tag=\"%s\" ind1=\"%s\" ind2=\"%s\">" % \
@@ -466,7 +465,7 @@ def marcxml_filter_out_tags(recid, fields):
                                tag=field[0:3],
                                ind1=field[3:4],
                                ind2=field[4:5],
-                               subfield=field[5:6])
+                               subfield_code=field[5:6])
 
     # Select only datafields that share tag + indicators
     processed_tags_and_ind = []

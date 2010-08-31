@@ -58,18 +58,18 @@ class BibRecordSuccessTest(unittest.TestCase):
 
     def test_records_created(self):
         """ bibrecord - demo file how many records are created """
-        self.assertEqual(102, len(self.recs))
+        self.assertEqual(104, len(self.recs))
 
     def test_tags_created(self):
         """ bibrecord - demo file which tags are created """
         ## check if the tags are correct
 
-        tags = [u'003', u'005', '020', '035', '037', '041', '080', '088',
+        tags = ['003', '005', '020', '024', '035', '037', '041', '080', '088',
                 '100', '242', '245', '246', '250', '260', '269', '270', '300',
-                '340', '490', '500', '502', '520', '590', '595', '650', '653',
-                '690', '695', '700', '710', '720', '773', '856', '859', '901',
-                '909', '916', '960', '961', '962', '963', '970', '980', '999',
-                'FFT']
+                '340', '490', '500', '502', '506', '520', '590', '595', '650',
+                '653', '690', '694', '695', '700', '710', '720', '773', '856',
+                '859', '901', '909', '916', '960', '961', '962', '963', '964',
+                '970', '980', '999', 'FFT']
 
         t = []
         for rec in self.recs:
@@ -87,12 +87,13 @@ class BibRecordSuccessTest(unittest.TestCase):
         """bibrecord - demo file how many fields are created"""
         ## check if the number of fields for each record is correct
 
-        fields = [14, 14, 8, 11, 11, 12, 11, 15, 10, 18, 14, 16, 10, 9, 15, 10,
-            11, 11, 11, 9, 11, 11, 10, 9, 9, 9, 10, 9, 10, 10, 8, 9, 8, 9, 14,
-            13, 14, 14, 15, 12, 12, 12, 15, 14, 12, 16, 16, 15, 15, 14, 16, 15,
-            15, 15, 16, 15, 16, 15, 15, 16, 15, 14, 14, 15, 12, 13, 11, 15, 8,
-            11, 14, 13, 12, 13, 6, 6, 25, 24, 27, 26, 26, 24, 26, 27, 25, 28,
-            24, 23, 27, 25, 25, 26, 26, 24, 19, 26, 9, 8, 9, 9, 8, 7]
+        fields = [14, 14, 8, 11, 11, 13, 11, 15, 10, 18, 14, 16, 10, 9, 15, 10,
+                  11, 11, 11, 9, 11, 11, 10, 9, 9, 9, 10, 9, 10, 10, 8, 9, 8,
+                  9, 14, 13, 14, 14, 15, 12, 13, 12, 15, 14, 12, 16, 16, 15,
+                  15, 14, 16, 15, 15, 15, 16, 15, 16, 15, 15, 16, 15, 14, 14,
+                  15, 12, 13, 11, 15, 8, 11, 14, 13, 12, 13, 6, 6, 25, 24, 27,
+                  26, 26, 24, 26, 27, 25, 28, 24, 23, 27, 25, 25, 26, 26, 24,
+                  19, 26, 25, 22, 9, 8, 9, 9, 8, 7]
 
         cr = []
         ret = []
@@ -1441,23 +1442,26 @@ class BibRecordSingletonTest(unittest.TestCase):
 
     if parser_minidom_available:
         def test_singleton_removal_minidom(self):
-            """bibrecord - singleton removal with minidom"""
+            """bibrecord - enforcing singleton removal with minidom"""
             rec = bibrecord.create_records(self.xml, verbose=1,
-                                           correct=1, parser='minidom')[0][0]
+                                           correct=1, parser='minidom',
+                                           keep_singletons=False)[0][0]
             self.assertEqual(rec, self.rec_expected)
 
     if parser_4suite_available:
         def test_singleton_removal_4suite(self):
-            """bibrecord - singleton removal with 4suite"""
+            """bibrecord - enforcing singleton removal with 4suite"""
             rec = bibrecord.create_records(self.xml, verbose=1,
-                                           correct=1, parser='4suite')[0][0]
+                                           correct=1, parser='4suite',
+                                           keep_singletons=False)[0][0]
             self.assertEqual(rec, self.rec_expected)
 
     if parser_pyrxp_available:
         def test_singleton_removal_pyrxp(self):
-            """bibrecord - singleton removal with pyrxp"""
+            """bibrecord - enforcing singleton removal with pyrxp"""
             rec = bibrecord.create_records(self.xml, verbose=1,
-                                           correct=1, parser='pyrxp')[0][0]
+                                           correct=1, parser='pyrxp',
+                                           keep_singletons=False)[0][0]
             self.assertEqual(rec, self.rec_expected)
 
 class BibRecordNumCharRefTest(unittest.TestCase):

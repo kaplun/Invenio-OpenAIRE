@@ -20,7 +20,7 @@ pylibdir=$(libdir)/python/invenio/bibformat_elements
 pylib_DATA = bfe_field.py bfe_title.py bfe_authors.py bfe_abstract.py bfe_affiliation.py \
 	     bfe_imprint.py bfe_fulltext.py bfe_place.py bfe_publisher.py bfe_topbanner.py \
 	     bfe_date_rec.py bfe_keywords.py bfe_notes.py bfe_reprints.py bfe_publi_info.py \
-	     bfe_cited_by.py bfe_references.py bfe_photo_resources.py bfe_title_brief.py \
+	     bfe_cited_by.py bfe_references.py bfe_title_brief.py \
 	     bfe_report_numbers.py bfe_additional_report_numbers.py bfe_url.py \
 	     bfe_addresses.py bfe_contact.py bfe_photo_resources_brief.py \
 	     bfe_collection.py bfe_editors.py bfe_bibtex.py bfe_edit_record.py \
@@ -28,7 +28,8 @@ pylib_DATA = bfe_field.py bfe_title.py bfe_authors.py bfe_abstract.py bfe_affili
 	     bfe_bfx_engine.py bfe_creation_date.py bfe_server_info.py bfe_issn.py \
 	     bfe_client_info.py bfe_language.py bfe_record_id.py bfe_comments.py \
 	     bfe_pagination.py bfe_fulltext_mini.py bfe_year.py bfe_isbn.py \
-	     bfe_appears_in_collections.py bfe_photos.py bfe_record_stats.py
+	     bfe_appears_in_collections.py bfe_photos.py bfe_record_stats.py \
+	     bfe_edit_files.py
 
 tmpdir = $(prefix)/var/tmp/tests_bibformat_elements
 

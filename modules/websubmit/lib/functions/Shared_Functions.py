@@ -18,15 +18,20 @@
 
 __revision__ = "$Id$"
 
-from invenio.config import \
-     CFG_PATH_ACROREAD, \
-     CFG_PATH_CONVERT, \
-     CFG_PATH_DISTILLER, \
-     CFG_PATH_GUNZIP, \
-     CFG_PATH_GZIP
-from invenio.bibdocfile import decompose_file
-import re
 import os
+import cgi
+
+from invenio.config import \
+     CFG_PATH_CONVERT, \
+     CFG_PATH_GUNZIP, \
+     CFG_PATH_GZIP, \
+     CFG_SITE_LANG
+from invenio.bibdocfile import decompose_file
+from invenio.websubmit_file_converter import convert_file, InvenioWebSubmitFileConverterError
+from invenio.websubmit_config import InvenioWebSubmitFunctionError
+from invenio.dbquery import run_sql
+from invenio.bibsched import server_pid
+from invenio.messages import gettext_set_language
 
 def createRelatedFormats(fullpath, overwrite=True):
     """Given a fullpath, this function extracts the file's extension and
@@ -39,35 +44,41 @@ def createRelatedFormats(fullpath, overwrite=True):
     basedir, filename, extension = decompose_file(fullpath)
     extension = extension.lower()
     if extension == ".pdf":
-        if overwrite == True or \
+        if overwrite or \
                not os.path.exists("%s/%s.ps" % (basedir, filename)):
             # Create PostScript
-            os.system("%s -toPostScript %s" % (CFG_PATH_ACROREAD, fullpath))
-        if overwrite == True or \
+            try:
+                convert_file(fullpath, "%s/%s.ps" % (basedir, filename))
+                createdpaths.append("%s/%s.ps" % (basedir, filename))
+            except InvenioWebSubmitFileConverterError:
+                pass
+        if overwrite or \
                not os.path.exists("%s/%s.ps.gz" % (basedir, filename)):
             if os.path.exists("%s/%s.ps" % (basedir, filename)):
                 os.system("%s %s/%s.ps" % (CFG_PATH_GZIP, basedir, filename))
                 createdpaths.append("%s/%s.ps.gz" % (basedir, filename))
     if extension == ".ps":
-        if overwrite == True or \
+        if overwrite or \
                not os.path.exists("%s/%s.pdf" % (basedir, filename)):
             # Create PDF
-            os.system("%s %s %s/%s.pdf" % (CFG_PATH_DISTILLER, fullpath, \
-                                           basedir, filename))
-            if os.path.exists("%s/%s.pdf" % (basedir, filename)):
+            try:
+                convert_file(fullpath, "%s/%s.pdf" % (basedir, filename))
                 createdpaths.append("%s/%s.pdf" % (basedir, filename))
+            except InvenioWebSubmitFileConverterError:
+                pass
     if extension == ".ps.gz":
-        if overwrite == True or \
+        if overwrite or \
                not os.path.exists("%s/%s.ps" % (basedir, filename)):
             #gunzip file
             os.system("%s %s" % (CFG_PATH_GUNZIP, fullpath))
-        if overwrite == True or \
+        if overwrite or \
                not os.path.exists("%s/%s.pdf" % (basedir, filename)):
             # Create PDF
-            os.system("%s %s/%s.ps %s/%s.pdf" % (CFG_PATH_DISTILLER, basedir, \
-                                                 filename, basedir, filename))
-            if os.path.exists("%s/%s.pdf" % (basedir, filename)):
+            try:
+                convert_file("%s/%s.ps" % (basedir, filename), "%s/%s.pdf" % (basedir, filename))
                 createdpaths.append("%s/%s.pdf" % (basedir, filename))
+            except InvenioWebSubmitFileConverterError:
+                pass
         #gzip file
         if not os.path.exists("%s/%s.ps.gz" % (basedir, filename)):
             os.system("%s %s/%s.ps" % (CFG_PATH_GZIP, basedir, filename))
@@ -106,45 +117,22 @@ def get_dictionary_from_string(dict_string):
        @param dict_string: (string) - the string version of the dictionary.
        @return: (dictionary) - the dictionary build from the string.
     """
-    ## First, strip off the leading and trailing spaces and braces:
-    dict_string = dict_string.strip(" {}")
+    try:
+        # Evaluate the dictionary string in an empty local/global
+        # namespaces. An empty '__builtins__' variable is still
+        # provided, otherwise Python will add the real one for us,
+        # which would access to undesirable functions, such as
+        # 'file()', 'open()', 'exec()', etc.
+        evaluated_dict = eval(dict_string, {"__builtins__": {}}, {})
+    except:
+        evaluated_dict = {}
 
-    ## Next, split the string on commas (,) that have not been escaped
-    ## So, the following string: """'hello' : 'world', 'click' : 'here'""" will be split
-    ## into the following list: ["'hello' : 'world'", " 'click' : 'here'"]
-    ##
-    ## However, The following string: """'hello\, world' : '!', 'click' : 'here'"""
-    ## will be split into: ["'hello\, world' : '!'", " 'click' : 'here'"]
-    ## I.e. the comma that was escaped in the string has been kept.
-    ##
-    ## So basically, split on unescaped parameters at first:
-    key_vals = re.split(r'(?<!\\),', dict_string)
-
-    ## Now we should have a list of "key" : "value" terms. For each of them, check
-    ## it is OK. If not in the format "Key" : "Value" (quotes are optional), discard it.
-    ## As with the comma separator in the previous splitting, this one splits on any colon
-    ## (:) that is not escaped by a backslash.
-    final_dictionary = {}
-    for key_value_string in key_vals:
-        ## Split the pair apart, based on ":":
-        key_value_pair = re.split(r'(?<!\\):', key_value_string)
-        ## check that the length of the new list is 2:
-        if len(key_value_pair) != 2:
-            ## There was a problem with the splitting - pass this pair
-            continue
-        ## The split was made.
-        ## strip white-space, single-quotes and double-quotes from around the
-        ## key and value pairs:
-        key_term   = key_value_pair[0].strip(" '\"")
-        value_term = key_value_pair[1].strip(" '\"")
-
-        ## Is the left-side (key) term empty?
-        if len(key_term) == 0:
-            continue
-
-        ## Now, add the search-replace pair to the dictionary of search-replace terms:
-        final_dictionary[key_term] = value_term
-    return final_dictionary
+    # Check that returned value is a dict. Do not check with
+    # isinstance() as we do not even want to match subclasses of dict.
+    if type(evaluated_dict) is dict:
+        return evaluated_dict
+    else:
+        return {}
 
 def ParamFromFile(afile):
     """ Pipe a multi-line file into a single parameter"""
@@ -171,3 +159,34 @@ def write_file(filename, filedata):
     of.write(filedata)
     of.close()
     return ""
+
+def get_nice_bibsched_related_message(curdir, ln=CFG_SITE_LANG):
+    """
+    @return: a message suitable to display to the user, explaining the current
+        status of the system.
+    @rtype: string
+    """
+    bibupload_id = ParamFromFile(os.path.join(curdir, 'bibupload_id'))
+    if not bibupload_id:
+        ## No BibUpload scheduled? Then we don't care about bibsched
+        return ""
+    ## Let's get an estimate about how many processes are waiting in the queue.
+    ## Our bibupload might be somewhere in it, but it's not really so important
+    ## WRT informing the user.
+    _ = gettext_set_language(ln)
+    res = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE (status='WAITING' AND runtime<=NOW()) OR status='SLEEPING'")
+    pre = _("Note that your submission as been inserted into the bibliographic task queue and is waiting for execution.\n")
+    if server_pid():
+        ## BibSched is up and running
+        msg = _("The task queue is currently running in automatic mode, and there are currently %s tasks waiting to be executed. Your record should be available within a few minutes and searchable within an hour or thereabouts.\n") % (len(res))
+    else:
+        msg = _("Because of a human intervention or a temporary problem, the task queue is currently set to the manual mode. Your submission is well registered but may take longer than usual before it is fully integrated and searchable.\n")
+
+    return pre + msg
+
+def txt2html(msg):
+    """Transform newlines into paragraphs."""
+    rows = msg.split('\n')
+    rows = [cgi.escape(row) for row in rows]
+    rows = "<p>" + "</p><p>".join(rows) + "</p>"
+    return rows

@@ -17,28 +17,18 @@
 """
 This is the Create_Modify_Interface function (along with its helpers).
 It is used by WebSubmit for the "Modify Bibliographic Information" action.
-
-Create_Modify_Interface expects the following parameters:
-    * "fieldnameMBI" - the name of a text file in the submission working directory
-        that contains a list of the names of the WebSubmit fields to include in the
-        Modification interface.
-        These field names are separated by "\n" or "+".
-
-Given the list of WebSubmit fields to be included in the modification interface,
-the values for each field are retrieved for the given record (by way of each WebSubmit field
-being configured with a MARC Code in the WebSubmit database).
-An HTML FORM is then created. This form  allows a user to modify certain field values for
-a record.
 """
 __revision__ = "$Id$"
 
 import os
 import re
 import time
+import pprint
 
 from invenio.dbquery import run_sql
 from invenio.websubmit_config import InvenioWebSubmitFunctionError
 from invenio.websubmit_functions.Retrieve_Data import Get_Field
+from invenio.errorlib import register_exception
 
 def Create_Modify_Interface_getfieldval_fromfile(cur_dir, fld=""):
     """Read a field's value from its corresponding text file in 'cur_dir' (if it exists) into memory.
@@ -92,14 +82,77 @@ def Create_Modify_Interface_transform_date(fld_val):
 
 
 def Create_Modify_Interface(parameters, curdir, form, user_info=None):
-    """Create an interface for the modification of a document, based on the fields that the user has
-       chosen to modify
+    """
+    Create an interface for the modification of a document, based on
+    the fields that the user has chosen to modify. This avoids having
+    to redefine a submission page for the modifications, but rely on
+    the elements already defined for the initial submission i.e. SBI
+    action (The only page that needs to be built for the modification
+    is the page letting the user specify a document to modify).
+
+    This function should be added at step 1 of your modification
+    workflow, after the functions that retrieves report number and
+    record id (Get_Report_Number, Get_Recid). Functions at step 2 are
+    the one executed upon successful submission of the form.
+
+    Create_Modify_Interface expects the following parameters:
+
+       * "fieldnameMBI" - the name of a text file in the submission
+        working directory that contains a list of the names of the
+        WebSubmit fields to include in the Modification interface.
+        These field names are separated by"\n" or "+".
+
+    Given the list of WebSubmit fields to be included in the
+    modification interface, the values for each field are retrieved
+    for the given record (by way of each WebSubmit field being
+    configured with a MARC Code in the WebSubmit database).  An HTML
+    FORM is then created. This form allows a user to modify certain
+    field values for a record.
+
+    The file referenced by 'fieldnameMBI' is usually generated from a
+    multiple select form field): users can then select one or several
+    fields to modify
+
+    Note that the function will display WebSubmit Response elements,
+    but will not be able to set an initial value: this must be done by
+    the Response element iteself.
+
+    Additionally the function creates an internal field named
+    'Create_Modify_Interface_DONE' on the interface, that can be
+    retrieved in curdir after the form has been submitted.
+    This flag is an indicator for the function that displayed values
+    should not be retrieved from the database, but from the submitted
+    values (in case the page is reloaded). You can also rely on this
+    value when building your WebSubmit Response element in order to
+    retrieve value either from the record, or from the submission
+    directory.
     """
     global sysno,rn
     t = ""
     # variables declaration
     fieldname = parameters['fieldnameMBI']
     # Path of file containing fields to modify
+
+    the_globals = {
+        'doctype' : doctype,
+        'action' : action,
+        'step' : step,
+        'access' : access,
+        'ln' : ln,
+        'curdir' : curdir,
+        'uid' : user_info['uid'],
+        'uid_email' : user_info['email'],
+        'rn' : rn,
+        'last_step' : last_step,
+        'action_score' : action_score,
+        '__websubmit_in_jail__' : True,
+        'form': form,
+        'sysno': sysno,
+        'user_info' : user_info,
+        '__builtins__' : globals()['__builtins__'],
+        'Request_Print': Request_Print
+    }
+
     if os.path.exists("%s/%s" % (curdir, fieldname)):
         fp = open( "%s/%s" % (curdir, fieldname), "r" )
         fieldstext = fp.read()
@@ -191,24 +244,27 @@ def Create_Modify_Interface(parameters, curdir, form, user_info=None):
             elif element_type == "D":
                 text = fidesc
             elif element_type == "R":
-                co = compile(fidesc.replace("\r\n", "\n"), "<string>", "exec")
-                exec(co)
+                try:
+                    co = compile(fidesc.replace("\r\n", "\n"), "<string>", "exec")
+                    ## Note this exec is safe WRT global variable because the
+                    ## Create_Modify_Interface has already been parsed by
+                    ## execfile within a protected environment.
+                    the_globals['text'] = ''
+                    exec co in the_globals
+                    text = the_globals['text']
+                except:
+                    msg = "Error in evaluating response element %s with globals %s" % (pprint.pformat(field), pprint.pformat(globals()))
+                    register_exception(req=None, alert_admin=True, prefix=msg)
+                    raise InvenioWebSubmitFunctionError(msg)
             else:
                 text = "%s: unknown field type" % field
             t = t + "<small>%s</small>" % text
+
+    # output our flag field
+    t += '<input type="hidden" name="Create_Modify_Interface_DONE" value="DONE\n" />'
+
     # output some more text
     t = t + "<br /><br /><CENTER><small><INPUT type=\"button\" width=400 height=50 name=\"End\" value=\"END\" onClick=\"document.forms[0].step.value = 2;user_must_confirm_before_leaving_page = false;document.forms[0].submit();\"></small></CENTER></H4>"
-    # Flag File to be written if first call to page, which tells function that if page is reloaded,
-    # it should get field values from text files in curdir, instead of from DB record:
-    if not os.path.exists("%s/%s" % (curdir, "Create_Modify_Interface_DONE")):
-        # Write flag file:
-        try:
-            fp = open("%s/%s" % (curdir, "Create_Modify_Interface_DONE"), "w")
-            fp.write("DONE\n")
-            fp.flush()
-            fp.close()
-        except IOError, e:
-            # Can't open flag file for writing
-            pass
+
     return t
 

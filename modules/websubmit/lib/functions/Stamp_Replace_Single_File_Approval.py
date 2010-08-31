@@ -36,40 +36,67 @@ def Stamp_Replace_Single_File_Approval(parameters, \
                                        curdir, \
                                        form, \
                                        user_info=None):
-    """This function is intended to be called when a document has been
-       approved and needs to be stamped.
-       The function should be used when there is ONLY ONE file to be
-       stamped after approval (for example, the "main file").
-       The name of the file to be stamped should be known and should be stored
-       in a file in the submission's working directory (without the extension).
-       Generally, this will work our fine as the main file is named after the
-       report number of the document, this will be stored in the report number
-       file.
-       @param parameters: (dictionary) - must contain:
+    """
+    This function is intended to be called when a document has been
+    approved and needs to be stamped.
+    The function should be used when there is ONLY ONE file to be
+    stamped after approval (for example, the "main file").
+    The name of the file to be stamped should be known and should be stored
+    in a file in the submission's working directory (without the extension).
+    Generally, this will work our fine as the main file is named after the
+    report number of the document, this will be stored in the report number
+    file.
+
+    @param parameters: (dictionary) - must contain:
+
          + latex_template: (string) - the name of the LaTeX template that
             should be used for the creation of the stamp.
-         + latex_template_vars: (string) - a string-ified dictionary of
-            variables to be replaced in the LaTeX template and the values
-            (or names of files in curdir containing the values) with which to
-            replace them.
+
+         + latex_template_vars: (string) - a string-ified dictionary
+            of variables to be replaced in the LaTeX template and the
+            values (or names of files in curdir containing the values)
+            with which to replace them. Use prefix 'FILE:' to specify
+            that the stamped value must be read from a file in
+            submission directory instead of being a fixed value to
+            stamp.
             E.G.:
-               { 'TITLE' : 'DEMOTHESIS_TITLE',
-                 'DATE'  : 'DEMOTHESIS_DATE'
+               { 'TITLE' : 'FILE:DEMOTHESIS_TITLE',
+                 'DATE'  : 'FILE:DEMOTHESIS_DATE'
                }
+
          + file_to_be_stamped: (string) - this is the name of a file in the
             submission's working directory that contains the name of the
             bibdocfile that is to be stamped.
+
          + new_file_name: (string) - this is the name of a file in the
             submission's working directory that contains the name that is to
             be given to the file after it has been stamped. If empty, or if
             that file doesn't exist, the file will not be renamed after
             stamping.
+
+         + switch_file: (string) - when this value is set, specifies
+            the name of a file that will swith on/off the
+            stamping. The stamp will be applied if the file exists in
+            the submission directory and is not empty. If the file
+            cannot be found or is empty, the stamp is not applied.
+            Useful for eg. if you want to let your users control the
+            stamping with a checkbox on your submission page.
+            Leave this parameter empty to always stamp by default.
+
          + stamp: (string) - the type of stamp to be applied to the file.
             should be one of:
               + first (only the first page is stamped);
               + all (all pages are stamped);
               + coverpage (a separate cover-page is added to the file as a
                  first page);
+
+         + layer: (string) - the position of the stamp. Should be one of:
+              + background (invisible if original file has a white
+                -not transparent- background layer)
+              + foreground (on top of the stamped file.  If the stamp
+                does not have a transparent background, will hide all
+                of the document layers)
+           The default value is 'background'.
     """
     ############
     ## Definition of important variables:
@@ -81,6 +108,7 @@ def Stamp_Replace_Single_File_Approval(parameters, \
     ##    'input-file'          : "", ## INPUT FILE
     ##    'output-file'         : "", ## OUTPUT FILE
     ##    'stamp'               : "", ## STAMP TYPE
+    ##    'layer'               : "", ## LAYER TO STAMP
     ##    'verbosity'           : 0,  ## VERBOSITY (we don't care about it)
     ##  }
     file_stamper_options = { 'latex-template'      : "",
@@ -88,8 +116,20 @@ def Stamp_Replace_Single_File_Approval(parameters, \
                              'input-file'          : "",
                              'output-file'         : "",
                              'stamp'               : "",
+                             'layer'               : "",
                              'verbosity'           : 0,
                            }
+
+    ## Check if stamping is enabled
+    switch_file = parameters.get('switch_file', '')
+    if switch_file:
+        # Good, a "switch file" was specified. Check if it exists, and
+        # it its value is not empty.
+        if not _read_in_file(os.path.join(curdir, switch_file)):
+            # File does not exist, or is emtpy. Silently abort
+            # stamping.
+            return ""
+
     ## Submission access number:
     access = _read_in_file("%s/access" % curdir)
     ## record ID for the current submission. It is found in the special file
@@ -119,6 +159,13 @@ def Stamp_Replace_Single_File_Approval(parameters, \
     ## The type of stamp to be applied to the file(s):
     stamp = "%s" % ((type(parameters['stamp']) is str and \
                      parameters['stamp'].lower()) or "")
+    ## The layer to use for stamping:
+    try:
+        layer = parameters['layer']
+    except KeyError:
+        layer = "background"
+    if not layer in ('background', 'foreground'):
+        layer = "background"
     ## Get the name of the file to be stamped from the file indicated in
     ## the file_to_be_stamped parameter:
     try:
@@ -298,6 +345,8 @@ def Stamp_Replace_Single_File_Approval(parameters, \
     file_stamper_options['latex-template'] = latex_template
     file_stamper_options['latex-template-var'] = latex_template_vars
     file_stamper_options['stamp'] = stamp
+    file_stamper_options['layer'] = layer
+
     ## Put the input file and output file into the file_stamper_options
     ## dictionary:
     file_stamper_options['input-file'] = bibdocfile_file_to_stamp.fullpath
@@ -347,7 +396,8 @@ def Stamp_Replace_Single_File_Approval(parameters, \
                                              % (stamped_file_path_only, \
                                                 stamped_file_name), \
                                                 name_file_to_stamp, \
-                                                comment=file_comment)
+                                                comment=file_comment, \
+                                                flags=('STAMPED', ))
         except InvenioWebSubmitFileError:
             ## Unable to revise the file with the newly stamped version.
             wrn_msg = "Warning in Stamp_Replace_Single_File_Approval: " \

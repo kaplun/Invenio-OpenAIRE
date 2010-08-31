@@ -31,7 +31,8 @@ from cStringIO import StringIO
 from invenio.config import CFG_SITE_LANG, CFG_LOGDIR, \
     CFG_WEBALERT_ALERT_ENGINE_EMAIL, CFG_SITE_ADMIN_EMAIL, \
     CFG_SITE_SUPPORT_EMAIL, CFG_SITE_NAME, CFG_SITE_URL, CFG_VERSION, \
-    CFG_CERN_SITE, CFG_SITE_EMERGENCY_PHONE_NUMBERS
+    CFG_CERN_SITE, CFG_SITE_EMERGENCY_PHONE_NUMBERS, \
+    CFG_SITE_ADMIN_EMAIL_EXCEPTIONS
 from invenio.miscutil_config import CFG_MISCUTIL_ERROR_MESSAGES
 from invenio.urlutils import wash_url_argument
 from invenio.messages import wash_language, gettext_set_language
@@ -39,7 +40,7 @@ from invenio.dateutils import convert_datestruct_to_datetext
 
 ## Regular expression to match possible password related variable that should
 ## be disclosed in frame analysis.
-RE_PWD = re.compile(r"pwd|_pass|passw", re.I)
+RE_PWD = re.compile(r"pwd|pass", re.I)
 
 
 def get_client_info(req):
@@ -132,6 +133,133 @@ def register_emergency(msg, send_sms_function=send_sms):
     for phone_number in CFG_SITE_EMERGENCY_PHONE_NUMBERS:
         send_sms_function(phone_number, msg)
 
+def find_all_values_to_hide(local_variables, analyzed_stack=None):
+    """Return all the potential password to hyde."""
+    ## Let's add at least the DB password.
+    if analyzed_stack is None:
+        from invenio.dbquery import CFG_DATABASE_PASS
+        ret = set([CFG_DATABASE_PASS])
+        analyzed_stack = set()
+    else:
+        ret = set()
+    for key, value in local_variables.iteritems():
+        if id(value) in analyzed_stack:
+            ## Let's avoid loops
+            continue
+        analyzed_stack.add(id(value))
+        if RE_PWD.search(key):
+            ret.add(str(value))
+        if isinstance(value, dict):
+            ret |= find_all_values_to_hide(value, analyzed_stack)
+    return ret
+
+def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
+    """
+    Given an optional request object and an optional exc_info,
+    returns a text string representing many details about an exception.
+    """
+    if exc_info is None:
+        exc_info = sys.exc_info()
+    if exc_info[0]:
+        ## We found an exception.
+
+        ## We want to extract the name of the Exception
+        exc_name = exc_info[0].__name__
+        exc_value = str(exc_info[1])
+
+        ## Let's record when and where and what
+        www_data = "%(time)s -> %(name)s: %(value)s" % {
+            'time': time.strftime("%Y-%m-%d %H:%M:%S"),
+            'name': exc_name,
+            'value': exc_value}
+
+        ## Let's retrieve contextual user related info, if any
+        try:
+            client_data = get_pretty_wide_client_info(req)
+        except Exception, err:
+            client_data = "Error in retrieving " \
+                "contextual information: %s" % err
+
+        ## Let's extract the traceback:
+        if not exc_name.startswith('Invenio') or force_stack:
+            tracestack_data_stream = StringIO()
+            tb = sys.exc_info()[2]
+            while 1:
+                if not tb.tb_next:
+                    break
+                tb = tb.tb_next
+            stack = []
+            f = tb.tb_frame
+            while f:
+                stack.append(f)
+                f = f.f_back
+            stack.reverse()
+            stack = stack[-10:] ## Let's just take the last few frames
+            traceback.print_exc(file=tracestack_data_stream)
+            print >> tracestack_data_stream, \
+                    "Locals by frame, innermost last"
+            values_to_hide = set()
+            for frame in stack:
+                print >> tracestack_data_stream
+                print >> tracestack_data_stream, \
+                        ">>>> Frame %s in %s at line %s" % (
+                            frame.f_code.co_name,
+                            frame.f_code.co_filename,
+                            frame.f_lineno)
+                try:
+                    values_to_hide |= find_all_values_to_hide(frame.f_locals)
+
+                    code = open(frame.f_code.co_filename).readlines()
+                    first_line = max(1, frame.f_lineno-3)
+                    last_line = min(len(code), frame.f_lineno+3)
+                    print >> tracestack_data_stream, "*" * 79
+                    for line in xrange(first_line, last_line+1):
+                        code_line = code[line-1].rstrip()
+                        for value in values_to_hide:
+                            ## Let's hide passwords
+                            code_line = code_line.replace(value, '<*****>')
+                        if line == frame.f_lineno:
+                            print >> tracestack_data_stream, \
+                                "----> %4i %s" % (line, code_line)
+                        else:
+                            print >> tracestack_data_stream, \
+                                "      %4i %s" % (line, code_line)
+                    print >> tracestack_data_stream, "*" * 79
+                except:
+                    pass
+                for key, value in frame.f_locals.items():
+                    print >> tracestack_data_stream, "\t%20s = " % key,
+                    for to_hide in values_to_hide:
+                        ## Let's hide passwords
+                        value = repr(value).replace(to_hide, '<*****>')
+                    try:
+                        print >> tracestack_data_stream, \
+                            _truncate_dynamic_string(value)
+                    except:
+                        print >> tracestack_data_stream, \
+                            "<ERROR WHILE PRINTING VALUE>"
+            tracestack_data = tracestack_data_stream.getvalue()
+        else:
+            tracestack_data = ''
+
+        ## Okay, start printing:
+        output = StringIO()
+
+        print >> output, '\n',
+
+        print >> output, "The following problem occurred on <%s>" \
+            " (CDS Invenio %s)" % (CFG_SITE_URL, CFG_VERSION)
+        print >> output, "\n>> %s" % www_data
+        print >> output, "\n>>> User details\n"
+        print >> output, client_data
+
+        if tracestack_data:
+            print >> output, "\n>>> Traceback details\n"
+            print >> output, tracestack_data
+        return output.getvalue()
+    else:
+        return ""
+
 
 def register_exception(force_stack=False,
                        stream='error',
@@ -164,122 +292,20 @@ def register_exception(force_stack=False,
     the log
 
     @param alert_admin: wethever to send the exception to the administrator via
-        email
-
+        email. Note this parameter is bypassed when
+                CFG_SITE_ADMIN_EMAIL_EXCEPTIONS is set to a value different than 1
     @param subject: overrides the email subject
 
     @return: 1 if successfully wrote to stream, 0 if not
     """
 
-    def _truncate_dynamic_string(val, maxlength=500):
-        """
-        Return at most MAXLENGTH characters of VAL.  Useful for
-        sanitizing dynamic variable values in the output.
-        """
-        out = repr(val)
-        if len(out) > maxlength:
-            out = out[:maxlength] + ' [...]'
-        return out
-
-    def _get_filename_and_line(exc_info):
-        """
-        Return the filename and the line where the exception happened.
-        """
-        tb = exc_info[2]
-        exception_info = traceback.extract_tb(tb, 1)[0]
-        filename = os.path.basename(exception_info[0])
-        line_no = exception_info[1]
-        return filename, line_no
 
     try:
         ## Let's extract exception information
         exc_info = sys.exc_info()
-        if exc_info[0]:
-            ## We found an exception.
-
-            ## We want to extract the name of the Exception
-            exc_name = exc_info[0].__name__
-            exc_value = str(exc_info[1])
-
-            ## Let's record when and where and what
-            www_data = "%(time)s -> %(name)s: %(value)s" % {
-                'time': time.strftime("%Y-%m-%d %H:%M:%S"),
-                'name': exc_name,
-                'value': exc_value}
-
-            ## Let's retrieve contextual user related info, if any
-            try:
-                client_data = get_pretty_wide_client_info(req)
-            except Exception, err:
-                client_data = "Error in retrieving " \
-                    "contextual information: %s" % err
-
-            ## Let's extract the traceback:
-            if not exc_name.startswith('Invenio') or force_stack:
-                tracestack_data_stream = StringIO()
-                tb = sys.exc_info()[2]
-                while 1:
-                    if not tb.tb_next:
-                        break
-                    tb = tb.tb_next
-                stack = []
-                f = tb.tb_frame
-                while f:
-                    stack.append(f)
-                    f = f.f_back
-                stack.reverse()
-                stack = stack[-10:] ## Let's just take the last few frames
-                traceback.print_exc(file=tracestack_data_stream)
-                print >> tracestack_data_stream, \
-                        "Locals by frame, innermost last"
-                for frame in stack:
-                    print >> tracestack_data_stream
-                    print >> tracestack_data_stream, \
-                            ">>>> Frame %s in %s at line %s" % (
-                                frame.f_code.co_name,
-                                frame.f_code.co_filename,
-                                frame.f_lineno)
-                    try:
-                        values_to_hide = []
-                        for key, value in frame.f_locals.items():
-                            ## Let's look for potential passwords
-                            if RE_PWD.search(key):
-                                values_to_hide.append(str(value))
-
-                        code = open(frame.f_code.co_filename).readlines()
-                        first_line = max(1, frame.f_lineno-3)
-                        last_line = min(len(code), frame.f_lineno+3)
-                        print >> tracestack_data_stream, "*" * 79
-                        for line in xrange(first_line, last_line+1):
-                            code_line = code[line-1].rstrip()
-                            for value in values_to_hide:
-                                ## Let's hide passwords
-                                code_line = code_line.replace(value, '<*****>')
-                            if line == frame.f_lineno:
-                                print >> tracestack_data_stream, \
-                                    "***** %4i %s" % (line, code_line)
-                            else:
-                                print >> tracestack_data_stream, \
-                                    "      %4i %s" % (line, code_line)
-                        print >> tracestack_data_stream, "*" * 79
-                    except:
-                        pass
-                    for key, value in frame.f_locals.items():
-                        print >> tracestack_data_stream, "\t%20s = " % key,
-                        if RE_PWD.search(key):
-                            ## Let's hide passwords ;-)
-                            print >> tracestack_data_stream, "<*****>"
-                            continue
-                        try:
-                            print >> tracestack_data_stream, \
-                                _truncate_dynamic_string(value)
-                        except:
-                            print >> tracestack_data_stream, \
-                                "<ERROR WHILE PRINTING VALUE>"
-                tracestack_data = tracestack_data_stream.getvalue()
-            else:
-                tracestack_data = ''
-
+        output = get_pretty_traceback(
+            req=req, exc_info=exc_info, force_stack=force_stack)
+        if output:
             ## Okay, start printing:
             log_stream = StringIO()
             email_stream = StringIO()
@@ -292,24 +318,8 @@ def register_exception(force_stack=False,
                 print >> log_stream, prefix + '\n'
                 print >> email_stream, prefix + '\n'
 
-            print >> email_stream, "The following problem occurred on <%s>" \
-                " (CDS Invenio %s)" % (CFG_SITE_URL, CFG_VERSION)
-
-            print >> log_stream, "\n>> %s" % www_data
-            print >> email_stream, "\n>> %s" % www_data
-
-            print >> log_stream, "\n>>> User details\n"
-            print >> email_stream, "\n>>> User details\n"
-
-            print >> log_stream, client_data
-            print >> email_stream, client_data
-
-            if tracestack_data:
-                print >> log_stream, "\n>>> Traceback details\n"
-                print >> email_stream, "\n>>> Traceback details\n"
-
-                print >> log_stream, tracestack_data
-                print >> email_stream, tracestack_data
+            print >> log_stream, output
+            print >> email_stream, output
 
             ## If a suffix was requested let's print it
             if suffix:
@@ -336,13 +346,19 @@ def register_exception(force_stack=False,
             except:
                 written_to_log = False
 
-            if alert_admin or not written_to_log:
+            if CFG_SITE_ADMIN_EMAIL_EXCEPTIONS > 1 or \
+                (alert_admin and CFG_SITE_ADMIN_EMAIL_EXCEPTIONS > 0) or \
+                not written_to_log:
                 ## If requested or if it's impossible to write in the log
                 from invenio.mailutils import send_email
                 if not subject:
-                    filename, line_no = _get_filename_and_line(exc_info)
-                    subject = 'Exception (%s:%s)' % (filename, line_no)
+                    filename, line_no, function_name = _get_filename_and_line(exc_info)
+                    subject = 'Exception (%s:%s:%s)' % (filename, line_no, function_name)
                 subject = '%s at %s' % (subject, CFG_SITE_URL)
+                if not written_to_log:
+                        email_text += """\
+Note that this email was sent to you because it has been impossible to log
+this exception into %s""" % os.path.join(CFG_LOGDIR, 'invenio.' + stream)
                 send_email(
                     CFG_SITE_ADMIN_EMAIL,
                     CFG_SITE_ADMIN_EMAIL,
@@ -563,7 +579,6 @@ def get_msgs_for_code_list(code_list, stream='error', ln=CFG_SITE_LANG):
         out = None
     return out
 
-
 def send_error_report_to_admin(header, url, time_msg,
                                browser, client, error,
                                sys_error, traceback_msg):
@@ -601,3 +616,24 @@ Please see the %(logdir)s/invenio.err for traceback details.""" % {
             (CFG_SITE_SUPPORT_EMAIL, )}
     from invenio.mailutils import send_email
     send_email(from_addr, to_addr, subject="Error notification", content=body)
+
+def _get_filename_and_line(exc_info):
+    """
+    Return the filename, the line and the function_name where the exception happened.
+    """
+    tb = exc_info[2]
+    exception_info = traceback.extract_tb(tb)[-1]
+    filename = os.path.basename(exception_info[0])
+    line_no = exception_info[1]
+    function_name = exception_info[2]
+    return filename, line_no, function_name
+
+def _truncate_dynamic_string(val, maxlength=500):
+    """
+    Return at most MAXLENGTH characters of VAL.  Useful for
+    sanitizing dynamic variable values in the output.
+    """
+    out = repr(val)
+    if len(out) > maxlength:
+        out = out[:maxlength] + ' [...]'
+    return out

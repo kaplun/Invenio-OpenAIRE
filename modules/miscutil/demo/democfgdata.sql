@@ -83,6 +83,7 @@ INSERT INTO collectionname VALUES (2,'af','ln','Pre-drukke');
 INSERT INTO collectionname VALUES (2,'gl','ln','Preprints');
 INSERT INTO collectionname VALUES (2,'ro','ln','Preprinturi');
 INSERT INTO collectionname VALUES (2,'rw','ln','Preprints');
+INSERT INTO collectionname VALUES (2,'ka','ln','პრეპრინტები');
 
 INSERT INTO collectionname VALUES (3,'en','ln','Books');
 INSERT INTO collectionname VALUES (3,'fr','ln','Livres');
@@ -109,6 +110,7 @@ INSERT INTO collectionname VALUES (3,'af','ln','Boeke');
 INSERT INTO collectionname VALUES (3,'gl','ln','Libros');
 INSERT INTO collectionname VALUES (3,'ro','ln','Cărţi');
 INSERT INTO collectionname VALUES (3,'rw','ln','Ibitabo');
+INSERT INTO collectionname VALUES (3,'ka','ln','წიგნები');
 
 INSERT INTO collectionname VALUES (4,'en','ln','Theses');
 INSERT INTO collectionname VALUES (4,'fr','ln','Thèses');
@@ -135,6 +137,7 @@ INSERT INTO collectionname VALUES (4,'af','ln','Tesise');
 INSERT INTO collectionname VALUES (4,'gl','ln','Teses');
 INSERT INTO collectionname VALUES (4,'ro','ln','Teze');
 INSERT INTO collectionname VALUES (4,'rw','ln','Igitabo ky\'ubushakashatsi'); -- '
+INSERT INTO collectionname VALUES (4,'ka','ln','თეზისები');
 
 INSERT INTO collectionname VALUES (5,'en','ln','Reports');
 INSERT INTO collectionname VALUES (5,'fr','ln','Rapports');
@@ -161,6 +164,7 @@ INSERT INTO collectionname VALUES (5,'af','ln','Verslae');
 INSERT INTO collectionname VALUES (5,'gl','ln','Informes');
 INSERT INTO collectionname VALUES (5,'ro','ln','Rapoarte');
 INSERT INTO collectionname VALUES (5,'rw','ln','Raporo');
+INSERT INTO collectionname VALUES (5,'ka','ln','რეპორტები');
 
 INSERT INTO collectionname VALUES (6,'en','ln','Articles');
 INSERT INTO collectionname VALUES (6,'fr','ln','Articles');
@@ -187,6 +191,7 @@ INSERT INTO collectionname VALUES (6,'af','ln','Artikels');
 INSERT INTO collectionname VALUES (6,'gl','ln','Artigos');
 INSERT INTO collectionname VALUES (6,'ro','ln','Articole');
 INSERT INTO collectionname VALUES (6,'rw','ln','Ikinyamakuru ky\'ubushakashatsi'); -- '
+INSERT INTO collectionname VALUES (6,'ka','ln','სტატიები');
 
 INSERT INTO collectionname VALUES (8,'en','ln','Pictures');
 INSERT INTO collectionname VALUES (8,'fr','ln','Photos');
@@ -213,6 +218,7 @@ INSERT INTO collectionname VALUES (8,'af','ln','Prente');
 INSERT INTO collectionname VALUES (8,'gl','ln','Imaxes');
 INSERT INTO collectionname VALUES (8,'ro','ln','Poze');
 INSERT INTO collectionname VALUES (8,'rw','ln','Ifoto');
+INSERT INTO collectionname VALUES (8,'ka','ln','სურათები');
 
 INSERT INTO collectionname VALUES (9,'en','ln','CERN Divisions');
 INSERT INTO collectionname VALUES (9,'fr','ln','Divisions du CERN');
@@ -239,6 +245,7 @@ INSERT INTO collectionname VALUES (9,'af','ln','CERN Afdelings');
 INSERT INTO collectionname VALUES (9,'gl','ln','Divisións do CERN');
 INSERT INTO collectionname VALUES (9,'ro','ln','Divizii CERN');
 INSERT INTO collectionname VALUES (9,'rw','ln','Ishami ya CERN');
+INSERT INTO collectionname VALUES (9,'ka','ln','ცერნის განყოფილებები');
 
 INSERT INTO collectionname VALUES (10,'en','ln','CERN Experiments');
 INSERT INTO collectionname VALUES (10,'fr','ln','Expériences du CERN');
@@ -265,6 +272,7 @@ INSERT INTO collectionname VALUES (10,'af','ln','CERN Experimente');
 INSERT INTO collectionname VALUES (10,'gl','ln','Experimentos do CERN');
 INSERT INTO collectionname VALUES (10,'ro','ln','Experimente CERN');
 INSERT INTO collectionname VALUES (10,'rw','ln','Ubushakashatsi bwa CERN');
+INSERT INTO collectionname VALUES (10,'ka','ln','ცერნის ექსპერემენტები');
 
 INSERT INTO collectionname VALUES (11,'en','ln','Theoretical Physics (TH)');
 INSERT INTO collectionname VALUES (11,'fr','ln','Physique Théorique (TH)');
@@ -291,6 +299,7 @@ INSERT INTO collectionname VALUES (11,'af','ln','Teoretiese Fisika (TH)');
 INSERT INTO collectionname VALUES (11,'gl','ln','Física Teórica (TH)');
 INSERT INTO collectionname VALUES (11,'ro','ln','Fizică Teoretică (TH)');
 INSERT INTO collectionname VALUES (11,'rw','ln','Theoretical Physics (TH)');
+INSERT INTO collectionname VALUES (11,'ka','ln','თეორიული ფიზიკა (თფ)');
 
 INSERT INTO collectionname VALUES (12,'en','ln','Experimental Physics (EP)');
 INSERT INTO collectionname VALUES (12,'fr','ln','Physique Expérimentale (EP)');
@@ -317,6 +326,7 @@ INSERT INTO collectionname VALUES (12,'af','ln','Eksperimentele Fisika (EP)');
 INSERT INTO collectionname VALUES (12,'gl','ln','Física Experimental (EP)');
 INSERT INTO collectionname VALUES (12,'ro','ln','Fizică Experimentală (EP)');
 INSERT INTO collectionname VALUES (12,'rw','ln','Experimental Physics (EP)');
+INSERT INTO collectionname VALUES (12,'ka','ln','ექსპერიმენტული ფიზიკა (ეფ)');
 
 INSERT INTO collectionname VALUES (13,'en','ln','ISOLDE');
 INSERT INTO collectionname VALUES (13,'fr','ln','ISOLDE');
@@ -343,6 +353,7 @@ INSERT INTO collectionname VALUES (13,'af','ln','ISOLDE');
 INSERT INTO collectionname VALUES (13,'gl','ln','ISOLDE');
 INSERT INTO collectionname VALUES (13,'ro','ln','ISOLDE');
 INSERT INTO collectionname VALUES (13,'rw','ln','ISOLDE');
+INSERT INTO collectionname VALUES (13,'ka','ln','ISOLDE');
 
 INSERT INTO collectionname VALUES (14,'en','ln','ALEPH');
 INSERT INTO collectionname VALUES (14,'fr','ln','ALEPH');
@@ -369,6 +380,7 @@ INSERT INTO collectionname VALUES (14,'af','ln','ALEPH');
 INSERT INTO collectionname VALUES (14,'gl','ln','ALEPH');
 INSERT INTO collectionname VALUES (14,'ro','ln','ALEPH');
 INSERT INTO collectionname VALUES (14,'rw','ln','ALEPH');
+INSERT INTO collectionname VALUES (14,'ka','ln','ALEPH');
 
 INSERT INTO collectionname VALUES (15,'en','ln','Articles & Preprints');
 INSERT INTO collectionname VALUES (15,'fr','ln','Articles et Prétirages');
@@ -395,6 +407,7 @@ INSERT INTO collectionname VALUES (15,'af','ln','Artikels & Pre-drukke');
 INSERT INTO collectionname VALUES (15,'gl','ln','Artigos e Preprints');
 INSERT INTO collectionname VALUES (15,'ro','ln','Articole şi Preprinturi');
 INSERT INTO collectionname VALUES (15,'rw','ln','Ibinyamakuru');
+INSERT INTO collectionname VALUES (15,'ka','ln','სტატიები და პრეპრინტები');
 
 INSERT INTO collectionname VALUES (16,'en','ln','Books & Reports');
 INSERT INTO collectionname VALUES (16,'fr','ln','Livres et Rapports');
@@ -421,6 +434,7 @@ INSERT INTO collectionname VALUES (16,'af','ln','Boeke & Verslae');
 INSERT INTO collectionname VALUES (16,'gl','ln','Libros e Informes');
 INSERT INTO collectionname VALUES (16,'ro','ln','Cărţi şi Rapoarte');
 INSERT INTO collectionname VALUES (16,'rw','ln','Ibitabo & Raporo');
+INSERT INTO collectionname VALUES (16,'ka','ln','წიგნები და მოხსენებები');
 
 INSERT INTO collectionname VALUES (17,'en','ln','Multimedia & Arts');
 INSERT INTO collectionname VALUES (17,'fr','ln','Multimédia et Arts');
@@ -447,6 +461,7 @@ INSERT INTO collectionname VALUES (17,'af','ln','Multimedia & Kunste');
 INSERT INTO collectionname VALUES (17,'gl','ln','Multimedia e Arte');
 INSERT INTO collectionname VALUES (17,'ro','ln','Multimedia şi Arte');
 INSERT INTO collectionname VALUES (17,'rw','ln','Multimedia & Arts');
+INSERT INTO collectionname VALUES (17,'ka','ln','მულტიმედია და ხელოვნება');
 
 INSERT INTO collectionname VALUES (18,'en','ln','Poetry');
 INSERT INTO collectionname VALUES (18,'fr','ln','Poésie');
@@ -473,6 +488,7 @@ INSERT INTO collectionname VALUES (18,'af','ln','Poësie');
 INSERT INTO collectionname VALUES (18,'gl','ln','Poesía');
 INSERT INTO collectionname VALUES (18,'ro','ln','Poezie');
 INSERT INTO collectionname VALUES (18,'rw','ln','Umuvugo');
+INSERT INTO collectionname VALUES (18,'ka','ln','პოეზია');
 
 INSERT INTO collectionname VALUES (19,'en','ln','Atlantis Times News');
 INSERT INTO collectionname VALUES (19,'fr','ln','Atlantis Times Actualités');
@@ -815,6 +831,8 @@ INSERT INTO collection_portalbox (id_collection,id_portalbox,ln,position,score) 
 INSERT INTO collection_portalbox (id_collection,id_portalbox,ln,position,score) VALUES (1,80,'ro','rt',90);
 INSERT INTO collection_portalbox (id_collection,id_portalbox,ln,position,score) VALUES (1,81,'rw','rt',100);
 INSERT INTO collection_portalbox (id_collection,id_portalbox,ln,position,score) VALUES (1,82,'rw','rt',90);
+INSERT INTO collection_portalbox (id_collection,id_portalbox,ln,position,score) VALUES (1,83,'ka','rt',100);
+INSERT INTO collection_portalbox (id_collection,id_portalbox,ln,position,score) VALUES (1,84,'ka','rt',90);
 
 INSERT INTO example VALUES (1,'author search','author:"Ellis, J"');
 INSERT INTO example VALUES (2,'word search','quantum');
@@ -950,6 +968,8 @@ INSERT INTO portalbox VALUES (79,'DESPRE ACEST SITE', 'Bine aţi venit pe site-u
 INSERT INTO portalbox VALUES (80,'ALTE RESURSE','<a href=\"http://cdsware.cern.ch/\">CDS Invenio</a><br /><a href=\"http://www.cern.ch/\">CERN</a>');
 INSERT INTO portalbox VALUES (81,'IBYEREKERANYE N\'IYI WEB', 'Murakzaneza kuri web ya CDS Invenio, iyi ni koranabuhanga y\'ubuntu ya kozwe na CERN. Bitimuntu afite uburenganzira bwo kuyigerageza no kuyikoresha.');
 INSERT INTO portalbox VALUES (82,'REBA N\'IBI','<a href=\"http://cdsware.cern.ch/\">CDS Invenio</a><br /><a href=\"http://www.cern.ch/\">CERN</a>'); -- '
+INSERT INTO portalbox VALUES (83,'საიტის შესახებ', 'კეთილი იყოს თქვენი მობრძანება CDS Invenio -ის სადემონსტრაციო საიტზე, თავისუფალი დოკუმენტების სერვერი CERN -ისაგან. გთხოვთ სრულად შეისწავლოთ სადემონსტრაციო საიტის შესაძლებლობები.');
+INSERT INTO portalbox VALUES (84,'ასევე იხილეთ','<a href=\"http://cdsware.cern.ch/\">CDS Invenio</a><br /><a href=\"http://www.cern.ch/\">CERN</a>'); -- '
 
 INSERT INTO sbmCOLLECTION VALUES (36,'Document Types');
 
@@ -986,7 +1006,7 @@ INSERT INTO sbmFIELD VALUES ('SBIDEMOPIC',1,4,'DEMOPIC_KW','<br /><br />Keywords
 INSERT INTO sbmFIELD VALUES ('SBIDEMOPIC',1,5,'DEMOPIC_DESCR','<br /><br />Picture Description:<br />','O','Picture Description','','2007-09-13','2007-09-13',NULL,NULL);
 INSERT INTO sbmFIELD VALUES ('SBIDEMOPIC',1,6,'DEMOPIC_ADD_RN','<br /><br />Your picture will be given a reference number automatically.<br /> However, if the picture has other reference numbers, please enter them here:<br /><i>(one per line)</i><br />','O','Additional Reference Numbers','','2007-09-13','2007-09-13',NULL,NULL);
 INSERT INTO sbmFIELD VALUES ('SBIDEMOPIC',1,7,'DEMOPIC_NOTE','<br /><br />Additional Comments or Notes about the Picture:<br />','O','Picture Notes or Comments','','2007-09-13','2007-09-13',NULL,NULL);
-INSERT INTO sbmFIELD VALUES ('SBIDEMOPIC',1,8,'DEMOPIC_FILE','<br /><br /><span style=\"color: red;\">*</span>Enter the full path to the source picture-file to upload:<br />','M','Picture File','','2007-09-13','2007-09-13',NULL,NULL);
+INSERT INTO sbmFIELD VALUES ('SBIDEMOPIC',1,8,'Upload_Photos','<br /><br />Select the photo(s) to upload:<br />','O','Picture File','','2007-09-13','2007-09-13',NULL,NULL);
 INSERT INTO sbmFIELD VALUES ('SBIDEMOPIC',1,9,'DEMOPIC_FINISH','<br /><br /></td></tr></table>','O','','','2007-09-13','2007-09-13',NULL,NULL);
 INSERT INTO sbmFIELD VALUES ('MBIDEMOPIC',1,1,'DEMOPIC_RN','<table width=\"100%\" bgcolor=\"#D3E3E2\" align=\"center\" cellspacing=\"2\" cellpadding=\"2\" border=\"1\"><tr><td align=\"left\"><br /><b>Modify a picture\'s bibliographic information:</b><br /><br /><span style=\'color: red;\'>*</span>Picture Reference Number:&nbsp;&nbsp;','M','Reference Number','','2007-10-04','2007-10-04',NULL,NULL);
 INSERT INTO sbmFIELD VALUES ('MBIDEMOPIC',1,2,'DEMOPIC_CHANGE','<br /><br /><span style=\"color: red;\">*</span>Choose the fields to be modified:<br />','M','Fields to Modify','','2007-10-04','2007-10-04',NULL,NULL);
@@ -1079,7 +1099,7 @@ INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_ADD_RN',NULL,'088__a','T',NULL,4,30,NU
 INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_NOTE',NULL,'500__a','T',NULL,6,60,NULL,NULL,NULL,'2007-09-13','2007-09-13','<br /><br />Additional Comments or Notes about the Picture:<br />',NULL,0);
 INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_FILE',NULL,'','F',40,NULL,NULL,NULL,NULL,NULL,'2007-09-13','2007-09-13',NULL,NULL,0);
 INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_FINISH',NULL,'','D',NULL,NULL,NULL,NULL,NULL,'<div align=\"center\">\r\n<input type=\"button\" class=\"adminbutton\" width=\"400\" height=\"50\" name=\"endS\" value=\"finish submission\" onclick=\"finish();\" />\r\n</div>','2007-09-13','2007-09-13',NULL,NULL,0);
-INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_CHANGE',NULL,'','S',NULL,NULL,NULL,NULL,NULL,'<select name=\"DEMOPIC_CHANGE[]\" size=\"8\" multiple>\r\n <option value=\"Select:\">Select:</option>\r\n <option value=\"DEMOPIC_TITLE\">Title</option>\r\n <option value=\"DEMOPIC_PHOTOG\">Photographer(s)</option>\r\n <option value=\"DEMOPIC_DATE\">Picture Date</option>\r\n <option value=\"DEMOPIC_KW\">Keywords</option>\r\n <option value=\"DEMOPIC_DESCR\">Picture Description</option>\r\n <option value=\"DEMOPIC_ADD_RN\">Picture Reference Numbers</option>\r\n <option value=\"DEMOPIC_NOTE\">Notes or Comments</option>\r\n</select>','2007-10-04','2007-10-04',NULL,NULL,0);
+INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_CHANGE',NULL,'','S',NULL,NULL,NULL,NULL,NULL,'<select name=\"DEMOPIC_CHANGE[]\" size=\"8\" multiple>\r\n <option value=\"Select:\">Select:</option>\r\n <option value=\"DEMOPIC_TITLE\">Title</option>\r\n <option value=\"DEMOPIC_PHOTOG\">Photographer(s)</option>\r\n <option value=\"DEMOPIC_DATE\">Picture Date</option>\r\n <option value=\"DEMOPIC_KW\">Keywords</option>\r\n <option value=\"DEMOPIC_DESCR\">Picture Description</option>\r\n <option value=\"DEMOPIC_ADD_RN\">Picture Reference Numbers</option>\r\n <option value=\"DEMOPIC_NOTE\">Notes or Comments</option>\r\n <option value=\"Upload_Photos\">Pictures</option>\r\n</select>','2007-10-04','2007-10-04',NULL,NULL,0);
 INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_RN',NULL,'037__a','I',30,NULL,NULL,NULL,'DEMO-PICTURE-<COMBO>-<YYYY>-???',NULL,'2007-10-04','2007-10-04',NULL,NULL,0);
 INSERT INTO sbmFIELDDESC VALUES ('DEMOPIC_CONT',NULL,'','D',NULL,NULL,NULL,NULL,NULL,'<div align=\"center\">\r\n<input type=\"button\" class=\"adminbutton\" width=\"400\" height=\"50\" name=\"endS\" value=\"Continue\" onclick=\"finish();\" />\r\n</div>','2007-10-04','2007-10-04',NULL,NULL,0);
 INSERT INTO sbmFIELDDESC VALUES ('DEMOTHE_REP',NULL,'088__a','T',NULL,4,30,NULL,NULL,NULL,'2008-03-02','2008-03-02','<br />Other Report Numbers (one per line):',NULL,0);
@@ -1160,9 +1180,9 @@ INSERT INTO sbmFIELDDESC VALUES ('DEMOJRN_CATEG',NULL,'','R',NULL,NULL,NULL,NULL
 
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Mail_Submitter',70,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Print_Success',60,1);
-INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Insert_Record',50,1);
-INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Make_Record',40,1);
-INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Move_Files_to_Storage',30,1);
+INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Move_Photos_to_Storage',50,1);
+INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Insert_Record',40,1);
+INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Make_Record',30,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Report_Number_Generation',20,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Move_to_Done',80,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOPIC','Create_Recid',10,1);
@@ -1175,18 +1195,20 @@ INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Get_Recid',20,2);
 INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Is_Original_Submitter',30,2);
 INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Make_Modify_Record',40,2);
 INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Insert_Modify_Record',50,2);
-INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Print_Success_MBI',60,2);
-INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Send_Modify_Mail',70,2);
-INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Move_to_Done',80,2);
+INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Move_Photos_to_Storage',60,2);
+INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Print_Success_MBI',70,2);
+INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Send_Modify_Mail',80,2);
+INSERT INTO sbmFUNCTIONS VALUES ('MBI','DEMOPIC','Move_to_Done',90,2);
 INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Create_Upload_Files_Interface',40,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Is_Original_Submitter',30,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Get_Recid',20,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Get_Report_Number',10,1);
-INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Move_to_Done',50,2);
-INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Print_Success',40,2);
-INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Mail_Submitter',30,2);
-INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Move_Uploaded_Files_to_Storage',20,2);
-INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Is_Original_Submitter',10,2);
+INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Move_to_Done',60,2);
+INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Print_Success',50,2);
+INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Mail_Submitter',40,2);
+INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Move_Uploaded_Files_to_Storage',30,2);
+INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Is_Original_Submitter',20,2);
+INSERT INTO sbmFUNCTIONS VALUES ('SRV','DEMOPIC','Get_Recid',10,2);
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOTHE','Move_to_Done',90,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOTHE','Mail_Submitter',80,1);
 INSERT INTO sbmFUNCTIONS VALUES ('SBI','DEMOTHE','Make_Record',50,1);
@@ -1333,7 +1355,7 @@ INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','documenttype','picture');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','edsrn','DEMOPIC_RN');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','emailFile','SuE');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','fieldnameMBI','DEMOPIC_CHANGE');
-INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','iconsize','180');
+INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','iconsize','180>,700>');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','modifyTemplate','DEMOPICmodify.tpl');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','newrnin','NEWRN');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOPIC','paths_and_suffixes','{\"DEMOPIC_FILE\":\"\"}');
@@ -1368,11 +1390,11 @@ INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','rnin','comboDEMOTHE');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','files_to_be_stamped','DEMOTHE_FILE');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','latex_template','demo-stamp-left.tex');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','stamp','first');
-INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','latex_template_vars','{\'REPORTNUMBER\':\'DEMOTHE_RN\',\'DATE\':\'DEMOTHE_DATE\'}');
+INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','latex_template_vars','{\'REPORTNUMBER\':\'FILE:DEMOTHE_RN\',\'DATE\':\'FILE:DEMOTHE_DATE\'}');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','createTemplate','DEMOTHEcreate.tpl');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','sourceTemplate','DEMOTHE.tpl');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','documenttype','fulltext');
-INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','iconsize','180');
+INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','iconsize','180>,700>');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','paths_and_suffixes','{\"DEMOTHE_FILE\":\"\"}');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','rename','<PA>file:DEMOTHE_RN</PA>');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOTHE','newrnin','');
@@ -1432,7 +1454,7 @@ INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','categformatAPP','');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','addressesAPP','');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','createTemplate','DEMOBOOcreate.tpl');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','documenttype','fulltext');
-INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','iconsize','180');
+INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','iconsize','180>,700>');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','paths_and_suffixes','{\"DEMOBOO_FILE\":\"\"}');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','rename','<PA>file:DEMOBOO_RN</PA>');
 INSERT INTO sbmPARAMETERS VALUES ('DEMOBOO','dummyrec_source_tpl','DEMOBOO.tpl');
@@ -1485,7 +1507,16 @@ INSERT INTO rnkMETHOD (id,name,last_updated) VALUES (2,'demo_jif','0000-00-00 00
 INSERT INTO collection_rnkMETHOD (id_collection,id_rnkMETHOD,score) VALUES (15,2,90);
 
 INSERT INTO rnkMETHOD (id,name,last_updated) VALUES (3,'citation','0000-00-00 00:00:00');
-INSERT INTO collection_rnkMETHOD (id_collection,id_rnkMETHOD,score) VALUES (15,3,90);
+INSERT INTO collection_rnkMETHOD (id_collection,id_rnkMETHOD,score) VALUES (15,3,80);
+
+INSERT INTO rnkMETHOD (id,name,last_updated) VALUES (4,'citerank_citation_t','0000-00-00 00:00:00');
+INSERT INTO collection_rnkMETHOD (id_collection,id_rnkMETHOD,score) VALUES (15,4,70);
+
+INSERT INTO rnkMETHOD (id,name,last_updated) VALUES (5,'citerank_pagerank_c','0000-00-00 00:00:00');
+INSERT INTO collection_rnkMETHOD (id_collection,id_rnkMETHOD,score) VALUES (15,5,60);
+
+INSERT INTO rnkMETHOD (id,name,last_updated) VALUES (6,'citerank_pagerank_t','0000-00-00 00:00:00');
+INSERT INTO collection_rnkMETHOD (id_collection,id_rnkMETHOD,score) VALUES (15,6,50);
 
 INSERT INTO externalcollection (id, name) VALUES (1, 'Amazon');
 INSERT INTO externalcollection (id, name) VALUES (2, 'CERN EDMS');

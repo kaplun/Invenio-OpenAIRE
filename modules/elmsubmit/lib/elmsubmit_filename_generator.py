@@ -25,8 +25,6 @@ import os.path
 _this_module = sys.modules[__name__]
 _this_module_dir = os.path.abspath(os.path.dirname(_this_module.__file__))
 
-import random
-import tempfile
 import re
 import os
 import mimetypes
@@ -34,6 +32,8 @@ import zlib
 
 try:
     import magic
+    if not hasattr(magic, "open"):
+        raise ImportError
     _got_magic = True
 except ImportError:
     _got_magic = False

@@ -18,10 +18,14 @@
 
 __revision__ = "$Id$"
 
-from invenio.bibdocfile import BibRecDocs, decompose_file, InvenioWebSubmitFileError
+from invenio.bibdocfile import \
+     BibRecDocs, \
+     decompose_file, \
+     InvenioWebSubmitFileError, \
+     CFG_WEBSUBMIT_DEFAULT_ICON_SUBFORMAT
 import os
 import re
-from invenio.websubmit_icon_creator import create_icon, InvenioWebSubmitIconCreatorError
+from invenio.websubmit_icon_creator import create_icon
 from invenio.websubmit_config import InvenioWebSubmitFunctionWarning
 from invenio.websubmit_functions.Shared_Functions import get_dictionary_from_string, \
      createRelatedFormats
@@ -32,53 +36,85 @@ from invenio.shellutils import run_shell_command
 
 def Move_Files_to_Storage(parameters, curdir, form, user_info=None):
     """
-    The function moves files received from the standard submission's form through
-    file input element(s).
-    Websubmit_engine built the following file organization in the directory curdir/files
+    The function moves files received from the standard submission's
+    form through file input element(s). The document are assigned a
+    'doctype' (or category) corresponding to the file input element
+    (eg. a file uploaded throught 'DEMOPIC_FILE' will go to
+    'DEMOPIC_FILE' doctype/category).
+
+    Websubmit engine builds the following file organization in the
+    directory curdir/files:
 
                   curdir/files
                         |
-      _______________________________________________________________________________
+      _____________________________________________________________________
             |                                   |                          |
       ./file input 1 element's name      ./file input 2 element's name    ....
+         (for eg. 'DEMOART_MAILFILE')       (for eg. 'DEMOART_APPENDIX')
          |                                     |
       test1.pdf                             test2.pdf
 
 
     There is only one instance of all possible extension(pdf, gz...) in each part
-    otherwise we may encount problems when renaming files.
-    +parameters['rename']: if given, all the files in curdir/files are renamed.
-     parameters['rename'] is of the form: <PA>elemfilename[re]</PA>* where re is
-     an regexp to select(using re.sub) what part of the elem file has
-     to be selected.e.g <PA>file:TEST_FILE_RN</PA>
-    +parameters['documenttype']: if given, other formats are created.
-     It has 2 possible values: - if "picture" icon in gif format is created
-                               - if "fulltext" ps, gz .... formats are created
-    +parameters['paths_and_suffixes']: directories to look into and corresponding
-    suffix to add to every file inside. It must have the same structure as a
-     python dictionnary of the following form
-     {'FrenchAbstract':'french', 'EnglishAbstract':''}
-     The keys are the file input element name from the form <=> directories in curdir/files
-     The values associated are the suffixes which will be added to all the files
-     in e.g. curdir/files/FrenchAbstract
-    +parameters['iconsize'] need only if "icon" is selected in parameters['documenttype']
+    otherwise we may encounter problems when renaming files.
+
+    + parameters['rename']: if given, all the files in curdir/files
+      are renamed.  parameters['rename'] is of the form:
+      <PA>elemfilename[re]</PA>* where re is an regexp to select(using
+      re.sub) what part of the elem file has to be selected.
+      e.g: <PA>file:TEST_FILE_RN</PA>
+
+    + parameters['documenttype']: if given, other formats are created.
+      It has 2 possible values: - if "picture" icon in gif format is created
+                                - if "fulltext" ps, gz .... formats are created
+
+    + parameters['paths_and_suffixes']: directories to look into and
+      corresponding suffix to add to every file inside. It must have
+      the same structure as a Python dictionnary of the following form
+      {'FrenchAbstract':'french', 'EnglishAbstract':''}
+
+      The keys are the file input element name from the form <=>
+      directories in curdir/files The values associated are the
+      suffixes which will be added to all the files in
+      e.g. curdir/files/FrenchAbstract
+
+    + parameters['iconsize'] need only if 'icon' is selected in
+      parameters['documenttype']
+
+    + parameters['paths_and_restrictions']: the restrictions to apply
+      to each uploaded file. The parameter must have the same
+      structure as a Python dictionnary of the following form:
+      {'DEMOART_APPENDIX':'restricted'}
+      Files not specified in this parameter are not restricted.
+      The specified restrictions can include a variable that can be
+      replaced at runtime, for eg:
+      {'DEMOART_APPENDIX':'restricted to <PA>file:SuE</PA>'}
     """
     global sysno
     paths_and_suffixes = parameters['paths_and_suffixes']
+    paths_and_restrictions = parameters['paths_and_restrictions']
     rename = parameters['rename']
     documenttype = parameters['documenttype']
-    iconsize = parameters['iconsize']
+    iconsizes = parameters['iconsize'].split(',')
 
     ## Create an instance of BibRecDocs for the current recid(sysno)
     bibrecdocs = BibRecDocs(sysno)
 
     paths_and_suffixes = get_dictionary_from_string(paths_and_suffixes)
 
-    ## Go through all the directory specified in the keys
+    paths_and_restrictions = get_dictionary_from_string(paths_and_restrictions)
+
+    ## Go through all the directories specified in the keys
     ## of parameters['paths_and_suffixes']
     for path in paths_and_suffixes.keys():
         ## Check if there is a directory for the current path
         if os.path.exists("%s/files/%s" % (curdir, path)):
+            ## Retrieve the restriction to apply to files in this
+            ## directory
+            restriction = paths_and_restrictions.get(path, '')
+            restriction = re.sub('<PA>(?P<content>[^<]*)</PA>',
+                                 get_pa_tag_content,
+                                 restriction)
             ## Go through all the files in curdir/files/path
             for current_file in os.listdir("%s/files/%s" % (curdir, path)):
                 ## retrieve filename and extension
@@ -115,7 +151,8 @@ def Move_Files_to_Storage(parameters, curdir, form, user_info=None):
                 fullpath = "%s/files/%s/%s%s" % (curdir, path, filename, extension)
                 ## Check if there is any existing similar file
                 if not bibrecdocs.check_file_exists(fullpath):
-                    bibrecdocs.add_new_file(fullpath, doctype=path, never_fail=True)
+                    bibdoc = bibrecdocs.add_new_file(fullpath, doctype=path, never_fail=True)
+                    bibdoc.set_status(restriction)
                     ## Fulltext
                     if documenttype == "fulltext":
                         additionalformats = createRelatedFormats(fullpath)
@@ -127,39 +164,53 @@ def Move_Files_to_Storage(parameters, curdir, form, user_info=None):
                                     pass
                     ## Icon
                     elif documenttype == "picture":
-                        try:
-                            iconpath, iconname = create_icon({
-                                'input-file' : fullpath,
-                                'icon-scale' : iconsize,
-                                'icon-name' : None,
-                                'icon-file-format' : None,
-                                'multipage-icon' : False,
-                                'multipage-icon-delay' : 100,
-                                'verbosity' : 0,
-                            })
-                        except Exception, e:
-                            register_exception(prefix='Impossible to create icon for %s (record %s)' % (fullpath, sysno), alert_admin=True)
-                            continue
-                        iconpath = os.path.join(iconpath, iconname)
-                        docname = decompose_file(fullpath)[1]
-                        try:
-                            mybibdoc = bibrecdocs.get_bibdoc(docname)
-                        except InvenioWebSubmitFileError:
-                            mybibdoc = None
-                        if iconpath is not None and mybibdoc is not None:
-                            mybibdoc.add_icon(iconpath)
-                            ## Save the new icon filename in a text file in curdir so that
-                            ## it can be used by templates to created the recmysl
+                        has_added_default_icon_subformat_p = False
+                        for iconsize in iconsizes:
                             try:
-                                fd = open("%s/%s_ICON" % (curdir, path), "w")
-                                fd.write(os.path.basename(iconpath))
-                                fd.close()
-                            except OSError, err:
-                                msg = "Cannot store icon filename.[%s]"
-                                msg %= str(err)
-                                raise InvenioWebSubmitFunctionWarning(msg)
-                        elif mybibdoc is not None:
-                            mybibdoc.delete_icon()
+                                iconpath, iconname = create_icon({
+                                    'input-file' : fullpath,
+                                    'icon-scale' : iconsize,
+                                    'icon-name' : None,
+                                    'icon-file-format' : None,
+                                    'multipage-icon' : False,
+                                    'multipage-icon-delay' : 100,
+                                    'verbosity' : 0,
+                                })
+                            except Exception, e:
+                                register_exception(prefix='Impossible to create icon for %s (record %s)' % (fullpath, sysno), alert_admin=True)
+                                continue
+                            iconpath = os.path.join(iconpath, iconname)
+                            docname = decompose_file(fullpath)[1]
+                            try:
+                                mybibdoc = bibrecdocs.get_bibdoc(docname)
+                            except InvenioWebSubmitFileError:
+                                mybibdoc = None
+                            if iconpath is not None and mybibdoc is not None:
+                                try:
+                                    icon_suffix = iconsize.replace('>', '').replace('<', '').replace('^', '').replace('!', '')
+                                    if not has_added_default_icon_subformat_p:
+                                        mybibdoc.add_icon(iconpath)
+                                        has_added_default_icon_subformat_p = True
+                                    else:
+                                        mybibdoc.add_icon(iconpath, subformat=CFG_WEBSUBMIT_DEFAULT_ICON_SUBFORMAT + "-" + icon_suffix)
+                                    ## Save the new icon filename in a text file in curdir so that
+                                    ## it can be used by templates to created the recmysl
+                                    try:
+                                        if not has_added_default_icon_subformat_p:
+                                            fd = open("%s/%s_ICON" % (curdir, path), "w")
+                                        else:
+                                            fd = open("%s/%s_ICON_%s" % (curdir, path, iconsize + '_' + icon_suffix), "w")
+                                        fd.write(os.path.basename(iconpath))
+                                        fd.close()
+                                    except OSError, err:
+                                        msg = "Cannot store icon filename.[%s]"
+                                        msg %= str(err)
+                                        raise InvenioWebSubmitFunctionWarning(msg)
+                                except InvenioWebSubmitFileError, e:
+                                    # Most probably icon already existed.
+                                    pass
+                            elif mybibdoc is not None:
+                                mybibdoc.delete_icon()
 
     # Update the MARC
     bibdocfile_bin = os.path.join(CFG_BINDIR, 'bibdocfile --yes-i-know')

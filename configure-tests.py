@@ -24,6 +24,7 @@ running from configure.ac.
 
 ## minimally recommended/required versions:
 cfg_min_python_version = "2.4"
+cfg_max_python_version = "2.9.9999"
 cfg_min_mysqldb_version = "1.2.1_p2"
 
 ## 0) import modules needed for this testing:
@@ -46,9 +47,9 @@ def wait_for_user(msg):
 if sys.version < cfg_min_python_version:
     print """
     *******************************************************
-    ** ERROR: OLD PYTHON DETECTED: %s
+    ** ERROR: TOO OLD PYTHON DETECTED: %s
     *******************************************************
-    ** You seem to be using an old version of Python.    **
+    ** You seem to be using a too old version of Python. **
     ** You must use at least Python %s.                 **
     **                                                   **
     ** Note that if you have more than one Python        **
@@ -59,6 +60,23 @@ if sys.version < cfg_min_python_version:
     ** Please upgrade your Python before continuing.     **
     *******************************************************
     """ % (string.replace(sys.version, "\n", ""), cfg_min_python_version)
+    sys.exit(1)
+if sys.version > cfg_max_python_version:
+    print """
+    *******************************************************
+    ** ERROR: TOO NEW PYTHON DETECTED: %s
+    *******************************************************
+    ** You seem to be using a too new version of Python. **
+    ** You must use at most Python %s.             **
+    **                                                   **
+    ** Perhaps you have downloaded and are installing an **
+    ** old Invenio version?  Please look for more recent **
+    ** Invenio version or please contact the development **
+    ** team at <cds.support@cern.ch> about this problem. **
+    **                                                   **
+    ** Installation aborted.                             **
+    *******************************************************
+    """ % (string.replace(sys.version, "\n", ""), cfg_max_python_version)
     sys.exit(1)
 
 ## 2) check for required modules:
@@ -221,6 +239,8 @@ except ImportError, msg:
 
 try:
     import magic
+    if not hasattr(magic, "open"):
+        raise StandardError
 except ImportError, msg:
     print """
     *****************************************************
@@ -236,6 +256,40 @@ except ImportError, msg:
     ** into production.)                               **
     *****************************************************
     """ % msg
+except StandardError:
+    print """
+    *****************************************************
+    ** IMPORT WARNING python-magic
+    *****************************************************
+    ** The python-magic package you installed is not   **
+    ** the one supported by Invenio. Please refer to   **
+    ** the INSTALL file for more details.              **
+    **                                                 **
+    ** You can safely continue installing CDS Invenio  **
+    ** now, and add this module anytime later.  (I.e.  **
+    ** even after your CDS Invenio installation is put **
+    ** into production.)                               **
+    *****************************************************
+    """
+
+try:
+    import reportlab
+except ImportError, msg:
+    print """
+    *****************************************************
+    ** IMPORT WARNING %s
+    *****************************************************
+    ** Note that reportlab module is not really        **
+    ** required, but we recommend it you want to       **
+    ** enrich PDF with OCR information.                **
+    **                                                 **
+    ** You can safely continue installing CDS Invenio  **
+    ** now, and add this module anytime later.  (I.e.  **
+    ** even after your CDS Invenio installation is put **
+    ** into production.)                               **
+    *****************************************************
+    """ % msg
+    wait_for_user("Press ENTER to continue the installation...")
 
 ## 4) check for versions of some important modules:
 if MySQLdb.__version__ < cfg_min_mysqldb_version:

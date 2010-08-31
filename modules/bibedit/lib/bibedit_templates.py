@@ -15,15 +15,14 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0103
+# pylint: disable=C0103
 
 """BibEdit Templates."""
 
 __revision__ = "$Id$"
 
-from invenio.config import CFG_SITE_URL, CFG_SITE_LANG
+from invenio.config import CFG_SITE_URL
 from invenio.messages import gettext_set_language
-from urllib import quote
 
 class Template:
 
@@ -75,6 +74,10 @@ class Template:
             '            <td>%(imgDeleteRecord)s</td>\n' \
             '            <td colspan="3">%(btnDeleteRecord)s</td>\n' \
             '          </tr>\n' \
+            '          <tr class="bibEditmenuMore">\n' \
+            '            <td>Switch to:</td>\n' \
+            '            <td colspan="3">%(btnSwitchReadOnly)s</td>\n' \
+            '          </tr>' \
             '        </table>' % {
             'imgCompressMenuSection': imgCompressMenuSection,
             'imgNewRecord': img('/img/table.png', 'bibEditImgCtrlEnabled',
@@ -98,7 +101,9 @@ class Template:
                                 disabled='disabled'),
             'imgDeleteRecord': img('/img/table_delete.png'),
             'btnDeleteRecord': button('button', 'Delete',
-                id='btnDeleteRecord', disabled='disabled')
+                id='btnDeleteRecord', disabled='disabled'),
+            'btnSwitchReadOnly' : button('button', 'Read-only',
+                                         id='btnSwitchReadOnly')
             }
 
         fieldmenu = '<div class="bibEditMenuSectionHeader">\n' \
@@ -111,6 +116,7 @@ class Template:
             '            <td>%(imgAddField)s</td>\n' \
             '            <td>%(btnAddField)s</td>\n' \
             '          </tr>\n' \
+            '          <tr>\n' \
             '            <td>%(imgDeleteSelected)s</td>\n' \
             '            <td>%(btnDeleteSelected)s</td>\n' \
             '          </tr>\n' \
@@ -140,6 +146,40 @@ class Template:
             'btnTagNames': button('button', 'Human', id='btnHumanTags',
                                   disabled='disabled')
             }
+
+        historymenu = '<div class="bibEditMenuSectionHeader">\n' \
+            '          %(imgCompressMenuSection)sHistory\n' \
+            '        </div>\n' \
+            '        <div class="bibEditRevHistoryMenuSection">\n' \
+            '          <table>\n' \
+            '            <col width="136px">\n' \
+            '            <tr class="bibEditMenuMore">\n' \
+            '              <td id="bibEditRevisionsHistory"></td>'\
+            '            </tr>\n' \
+            '          </table>\n' \
+            '        </div>\n'% {
+            'imgCompressMenuSection': imgCompressMenuSection,
+            }
+
+        undoredosection =  '<div class="bibEditMenuSectionHeader">\n' \
+            '            %(imgCompressMenuSection)sUndo/Redo\n' \
+            '          </div>\n<table>' \
+            '          <tr class="bibEditMenuMore"><td>' \
+            '          <div class="bibEditURMenuSection">\n' \
+            '             <div class="bibEditURDetailsSection" id="bibEditURUndoListLayer">\n' \
+            '                 <div class="bibEditURButtonLayer"><button id="btnUndo">&lt;</button></div>\n' \
+            '                 <div id="undoOperationVisualisationField" class="bibEditHiddenElement bibEditURPreviewBox">\n' \
+            '                     <div id="undoOperationVisualisationFieldContent"></div>\n' \
+            '                 </div>\n' \
+            '             </div>' \
+            '             <div class="bibEditURDetailsSection" id="bibEditURRedoListLayer">\n' \
+            '                 <div class="bibEditURButtonLayer"><button id="btnRedo">&gt;</button></div>' \
+            '                 <div id="redoOperationVisualisationField" class="bibEditHiddenElement bibEditURPreviewBox">\n' \
+            '                     <div id="redoOperationVisualisationFieldContent"></div>' \
+            '                 </div>\n' \
+            '             </div>\n' \
+            '          </div></td></tr></table>\n' % { \
+            'imgCompressMenuSection': imgCompressMenuSection }
 
         statusarea = '<table>\n' \
             '          <tr>\n' \
@@ -180,6 +220,12 @@ class Template:
             '         %(holdingpenpanel)s\n'\
             '      </div>'\
             '      <div class="bibEditMenuSection">\n' \
+            '        %(undoredosection)s\n' \
+            '      </div>\n' \
+            '      <div class="bibEditMenuSection">\n' \
+            '        %(historymenu)s\n' \
+            '      </div>\n' \
+            '      <div id="bibEditMenuSection">\n' \
             '        %(statusarea)s\n' \
             '      </div>\n' \
             '      <div class="bibEditMenuSection" align="right">\n' \
@@ -191,8 +237,41 @@ class Template:
                 'fieldmenu': fieldmenu,
                 'statusarea': statusarea,
                 'lnkhelp': lnkhelp,
-                'holdingpenpanel': holdingpenpanel
+                'holdingpenpanel': holdingpenpanel,
+                'historymenu': historymenu,
+                'undoredosection': undoredosection
                 }
+
+    def history_comparebox(self, ln, revdate, revdate_cmp, comparison):
+        """ Display the bibedit history comparison box. """
+        _ = gettext_set_language(ln)
+        title = '<b>%(comp)s</b><br />%(rev)s %(revdate)s<br />%(rev)s %(revdate_cmp)s' % {
+            'comp': _('Comparison of:'),
+            'rev': _('Revision'),
+            'revdate': revdate,
+            'revdate_cmp': revdate_cmp}
+        return '''
+       <div class="bibEditHistCompare">
+         <p>%s</p>
+         <p>
+           %s
+         </p>
+       </div>''' % (title, comparison)
+
+    def clean_value(self, value, format):
+        """ This function clean value for HTML interface and inverse. """
+
+        if format != "html":
+            value = value.replace('"', '&quot;')
+            value = value.replace('<', '&lt;')
+            value = value.replace('>', '&gt;')
+
+        else:
+            value = value.replace('&quot;', '"')
+            value = value.replace('&lt;', '<')
+            value = value.replace('&gt;', '>')
+
+        return value
 
 def img(src, _class='', **kargs):
     """Create an HTML <img> element."""

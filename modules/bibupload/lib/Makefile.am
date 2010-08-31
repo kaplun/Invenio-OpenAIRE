@@ -9,7 +9,7 @@
 ## CDS Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-## General Public License for more details.  
+## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
@@ -19,7 +19,11 @@ pylibdir = $(libdir)/python/invenio
 
 pylib_DATA = bibupload_config.py \
              bibupload.py \
-             bibupload_regression_tests.py
+             bibupload_regression_tests.py \
+             batchuploader_webinterface.py \
+             batchuploader_engine.py \
+             batchuploader_templates.py \
+             batchuploader.py
 
 EXTRA_DIST = $(pylib_DATA)
 

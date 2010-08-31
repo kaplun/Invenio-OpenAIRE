@@ -20,15 +20,19 @@
 """
 __revision__ = "$Id$"
 
+from invenio.urlutils import create_html_link
+from invenio.messages import gettext_set_language
+from invenio.config import CFG_SITE_URL
+from invenio.access_control_engine import acc_authorize_action
+from invenio.search_engine import guess_primary_collection_of_a_record
+
 def format(bfo, style):
     """
     Prints a link to BibEdit, if authorization is granted
 
     @param style: the CSS style to be applied to the link.
     """
-    from invenio.config import CFG_SITE_URL
-    from invenio.access_control_engine import acc_authorize_action
-    from invenio.search_engine import guess_primary_collection_of_a_record
+    _ = gettext_set_language(bfo.lang)
 
     out = ""
 
@@ -38,12 +42,15 @@ def format(bfo, style):
                                                      'runbibedit',
                                                      collection=collection)
     if auth_code == 0:
-        print_style = ''
+        linkattrd = {}
         if style != '':
-            print_style = 'style="' + style + '"'
+            linkattrd['style'] = style
 
-        out += '<a href="' + CFG_SITE_URL + '/record/' + str(bfo.recID) + \
-            '/edit/" ' + print_style + '>Edit This Record</a>'
+        out += create_html_link(CFG_SITE_URL +
+               '/record/edit/?#state=edit&recid=%s&ln=%s' % (str(bfo.recID), bfo.lang,),
+               {},
+               link_label=_("Edit This Record"),
+               linkattrd=linkattrd)
 
     return out
 

@@ -15,27 +15,13 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-   ## Description:   function Send_Approval_Request
-   ##                This function sends an email to the referee asking him/her
-   ##             to approve/reject a document
-   ## Author:         T.Baron
-   ## PARAMETERS:    directory: parameter to the link manager program
-   ##                addressesDAM: address of the referee(s)
-   ##             categformatDAM: variable needed to extract the category
-   ##                        of the document and use it to derive the
-   ##                address.
-   ##             authorfile: name of the file containing the author list
-   ##             titleFile: name of the file containing the title
 
 import os
 import re
 
-from invenio.config import \
-     CFG_SITE_ADMIN_EMAIL, \
-     CFG_SITE_NAME, \
+from invenio.config import CFG_SITE_NAME, \
      CFG_SITE_URL, \
      CFG_SITE_SUPPORT_EMAIL
-from invenio.dbquery import run_sql
 from invenio.access_control_admin import acc_get_role_users,acc_get_role_id
 from invenio.websubmit_config import CFG_WEBSUBMIT_COPY_MAILS_TO_ADMIN
 from invenio.mailutils import send_email

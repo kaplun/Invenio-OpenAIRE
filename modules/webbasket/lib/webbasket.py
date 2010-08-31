@@ -21,10 +21,11 @@ __revision__ = "$Id$"
 
 import sys
 
+
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 import cgi
 from httplib import urlsplit, HTTPConnection
@@ -384,6 +385,7 @@ def perform_request_write_public_note(uid,
     else:
         if cmtid and db.note_belongs_to_item_in_basket_p(cmtid, recid, bskid):
             optional_params["Add note"] = db.get_note(cmtid)
+            optional_params["Reply to"] = cmtid
         elif cmtid:
             optional_params["Add note"] = ()
             optional_params["Warnings"] = ('WRN_WEBBASKET_QUOTE_INVALID_NOTE',)
@@ -409,7 +411,8 @@ def perform_request_save_public_note(uid,
                                      note_title="",
                                      note_body="",
                                      editor_type='textarea',
-                                     ln=CFG_SITE_LANG):
+                                     ln=CFG_SITE_LANG,
+                                     reply_to=None):
     """ Save a given comment if able to.
     @param uid: user id (int)
     @param bskid: basket id (int)
@@ -417,8 +420,9 @@ def perform_request_save_public_note(uid,
     @param title: title of comment (string)
     @param text: comment's body (string)
     @param ln: language (string)
-    @param editor_type: the kind of editor/input used for the comment: 'textarea', 'fckeditor'"""
-
+    @param editor_type: the kind of editor/input used for the comment: 'textarea', 'fckeditor'
+    @param reply_to: the id of the comment we are replying to
+    """
     optional_params = {}
     warnings_rights = []
     warnings_html = ""
@@ -427,7 +431,7 @@ def perform_request_save_public_note(uid,
         warnings_rights = ['WRN_WEBBASKET_RESTRICTED_WRITE_NOTES']
         warnings_html += webbasket_templates.tmpl_warnings(warnings_rights, ln)
     else:
-        if not note_title or not note_body:
+        if not note_title or not note_body: # FIXME: improve check when fckeditor
             optional_params["Incomplete note"] = (note_title, note_body)
             optional_params["Warnings"] = ('WRN_WEBBASKET_INCOMPLETE_NOTE',)
         else:
@@ -439,7 +443,7 @@ def perform_request_save_public_note(uid,
                 # reply to a comment is made with a browser that does not
                 # support FCKeditor.
                 note_body = note_body.replace('\n', '').replace('\r', '').replace('<br />', '\n')
-            if not(db.save_note(uid, bskid, recid, note_title, note_body)):
+            if not(db.save_note(uid, bskid, recid, note_title, note_body, reply_to)):
                 # TODO: The note could not be saved. DB problem?
                 pass
             else:
@@ -462,7 +466,6 @@ def perform_request_save_public_note(uid,
 #################################
 ### Display baskets and notes ###
 #################################
-
 def perform_request_display(uid,
                             selected_category=CFG_WEBBASKET_CATEGORIES['PRIVATE'],
                             selected_topic="",
@@ -669,7 +672,7 @@ def perform_request_display(uid,
         else:
             selected_category = CFG_WEBBASKET_CATEGORIES['GROUP']
 
-    if of != 'xm':
+    if not of.startswith('x'):
         directory_box = webbasket_templates.tmpl_create_directory_box(selected_category,
                                                                       selected_topic,
                                                                       (selected_group_id, selected_group_name),
@@ -705,6 +708,7 @@ def perform_request_display(uid,
                 nb_subscribers = db.count_public_basket_subscribers(bskid)
             else:
                 nb_subscribers = None
+
             (content, bsk_warnings) = __display_basket(bskid,
                                                        basket_name,
                                                        last_update,
@@ -717,11 +721,12 @@ def perform_request_display(uid,
                                                        selected_group_id,
                                                        of,
                                                        ln)
-        warnings.extend(bsk_warnings)
-        if of != 'xm':
+            warnings.extend(bsk_warnings)
+
+        if not of.startswith('x'):
             warnings_html += webbasket_templates.tmpl_warnings(bsk_warnings, ln)
     else:
-        if of!= 'xm':
+        if not of.startswith('x'):
             search_box = __create_search_box(uid=uid,
                                              category=selected_category,
                                              topic=selected_topic,
@@ -730,13 +735,13 @@ def perform_request_display(uid,
                                              n=0,
                                              ln=ln)
 
-    if of != 'xm':
+    if not of.startswith('x'):
         body = webbasket_templates.tmpl_display(directory_box, content, search_box)
         body = warnings_html + body
     else:
         body = content
 
-    if of != 'xm':
+    if not of.startswith('x'):
         navtrail = create_webbasket_navtrail(uid,
                                              category=selected_category,
                                              topic=selected_topic,
@@ -744,7 +749,7 @@ def perform_request_display(uid,
                                              bskid=selected_bskid,
                                              ln=ln)
 
-    if of != 'xm':
+    if not of.startswith('x'):
         return (body, warnings, navtrail)
     else:
         return (body, None, None)
@@ -821,25 +826,31 @@ def __display_basket(bskid,
     if notes_dates:
         last_note = convert_datestruct_to_dategui(max(notes_dates), ln)
 
-    body = webbasket_templates.tmpl_basket(bskid,
-                                           basket_name,
-                                           last_update,
-                                           nb_items,
-                                           nb_subscribers,
-                                           (check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READITM']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['MANAGE']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READCMT']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['ADDCMT']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['ADDITM']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['DELITM'])),
-                                           nb_total_notes,
-                                           share_level,
-                                           selected_category,
-                                           selected_topic,
-                                           selected_group_id,
-                                           records,
-                                           of,
-                                           ln)
+    if of == 'hb' or of.startswith('x'):
+
+        body = webbasket_templates.tmpl_basket(bskid,
+                                               basket_name,
+                                               last_update,
+                                               nb_items,
+                                               nb_subscribers,
+                                               (check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READITM']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['MANAGE']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READCMT']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['ADDCMT']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['ADDITM']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['DELITM'])),
+                                               nb_total_notes,
+                                               share_level,
+                                               selected_category,
+                                               selected_topic,
+                                               selected_group_id,
+                                               records,
+                                               of,
+                                               ln)
+    else:
+        body = ""
+        for rec in records:
+            body +=  rec[4]
     return (body, warnings)
 
 def __display_basket_single_item(bskid,
@@ -925,20 +936,20 @@ def __display_basket_single_item(bskid,
         last_note = convert_datestruct_to_dategui(max(notes_dates), ln)
 
     body = webbasket_templates.tmpl_basket_single_item(bskid,
-                                           basket_name,
-                                           nb_items,
-                                           (check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READITM']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READCMT']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['ADDCMT']),
-                                            check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['DELCMT'])),
-                                           selected_category,
-                                           selected_topic,
-                                           selected_group_id,
-                                           item, comments,
-                                           previous_item_recid, next_item_recid, item_index,
-                                           optional_params,
-                                           of,
-                                           ln)
+                                               basket_name,
+                                               nb_items,
+                                               (check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READITM']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['READCMT']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['ADDCMT']),
+                                                check_sufficient_rights(share_rights, CFG_WEBBASKET_SHARE_LEVELS['DELCMT'])),
+                                               selected_category,
+                                               selected_topic,
+                                               selected_group_id,
+                                               item, comments,
+                                               previous_item_recid, next_item_recid, item_index,
+                                               optional_params,
+                                               of,
+                                               ln)
     return (body, warnings)
 
 def perform_request_search(uid,
@@ -1317,6 +1328,7 @@ def perform_request_write_note(uid,
     else:
         if cmtid and db.note_belongs_to_item_in_basket_p(cmtid, recid, bskid):
             optional_params["Add note"] = db.get_note(cmtid)
+            optional_params["Reply to"] = cmtid
         elif cmtid:
             optional_params["Add note"] = ()
             optional_params["Warnings"] = ('WRN_WEBBASKET_QUOTE_INVALID_NOTE',)
@@ -1348,7 +1360,8 @@ def perform_request_save_note(uid,
                               note_title="",
                               note_body="",
                               editor_type='textarea',
-                              ln=CFG_SITE_LANG):
+                              ln=CFG_SITE_LANG,
+                              reply_to=None):
     """ Save a given comment if able to.
     @param uid: user id (int)
     @param bskid: basket id (int)
@@ -1356,8 +1369,9 @@ def perform_request_save_note(uid,
     @param title: title of comment (string)
     @param text: comment's body (string)
     @param ln: language (string)
-    @param editor_type: the kind of editor/input used for the comment: 'textarea', 'fckeditor'"""
-
+    @param editor_type: the kind of editor/input used for the comment: 'textarea', 'fckeditor'
+    @param reply_to: the id of the comment we are replying to
+    """
     optional_params = {}
     warnings_rights = []
     warnings_html = ""
@@ -1366,7 +1380,9 @@ def perform_request_save_note(uid,
         warnings_rights = ['WRN_WEBBASKET_RESTRICTED_WRITE_NOTES']
         warnings_html += webbasket_templates.tmpl_warnings(warnings_rights, ln)
     else:
-        if not note_title or not note_body:
+        if not note_title or \
+           ((not note_body and editor_type != 'fckeditor') or \
+            (not remove_html_markup(note_body, '').replace('\n', '').replace('\r', '').strip() and editor_type == 'fckeditor')):
             optional_params["Incomplete note"] = (note_title, note_body)
             optional_params["Warnings"] = ('WRN_WEBBASKET_INCOMPLETE_NOTE',)
         else:
@@ -1378,7 +1394,7 @@ def perform_request_save_note(uid,
                 # reply to a comment is made with a browser that does not
                 # support FCKeditor.
                 note_body = note_body.replace('\n', '').replace('\r', '').replace('<br />', '\n')
-            if not(db.save_note(uid, bskid, recid, note_title, note_body)):
+            if not(db.save_note(uid, bskid, recid, note_title, note_body, reply_to)):
                 # TODO: The note could not be saved. DB problem?
                 pass
             else:
@@ -1591,7 +1607,9 @@ def perform_request_add(uid,
                     es_desc = nl2br(es_desc)
                 added_items = db.add_to_basket(uid, validated_recids, colid, bskid, es_title, es_desc, es_url)
                 if added_items:
-                    if note_body:
+                    if (note_body and editor_type != 'fckeditor') or \
+                           (editor_type == 'fckeditor' and \
+                            remove_html_markup(note_body, '').replace('\n', '').replace('\r', '').strip()):
                         if editor_type == 'fckeditor':
                             # Here we remove the line feeds introduced by FCKeditor (they
                             # have no meaning for the user) and replace the HTML line
@@ -1604,7 +1622,7 @@ def perform_request_add(uid,
                         else:
                             note_title = ''
                         for recid in added_items:
-                            if not(db.save_note(uid, bskid, recid, note_title, note_body)):
+                            if not(db.save_note(uid, bskid, recid, note_title, note_body, reply_to=None)):
                                 # TODO: The note could not be saved. DB problem?
                                 pass
                     if colid > 0:
@@ -2179,14 +2197,16 @@ def account_list_baskets(uid, ln=CFG_SITE_LANG):
 def page_start(req, of='xm'):
     """Set the content type and send the headers for the page."""
 
-    if of == 'xm':
+    if of.startswith('x'):
         req.content_type = "text/xml"
         req.send_http_header()
         req.write("""<?xml version="1.0" encoding="UTF-8"?>\n""")
+    else: # assuming HTML by default
+        req.content_type = "text/html"
+        req.send_http_header()
 
 def perform_request_export_xml(body):
     """Export an xml representation of the selected baskets/items."""
-
     return webbasket_templates.tmpl_export_xml(body)
 
 ################################
@@ -2223,8 +2243,10 @@ def format_external_records(recids, of='hb'):
             if xml_record_colid > 0:
                 htmlbrief_record = format_record(None, of, xml_record=xml_record)
             formatted_records.append((xml_record_id, htmlbrief_record))
-        elif of == "xm":
-            formatted_records.append((xml_record_id, xml_record))
+        elif of != "hb":
+            #formatted_records.append((xml_record_id, xml_record))
+            formatted_records.append((xml_record_id, format_record([], of, xml_record=xml_record, on_the_fly=True)))
+#            formatted_records.append((xml_record_id, repr(xml_record)))
 
     if formatted_records and of == "hb":
         db.store_external_records(formatted_records, of)
@@ -2402,7 +2424,7 @@ def wash_bskid(uid, category, bskid):
 def wash_of(of):
     """Wash the output format"""
 
-    list_of_accepted_formats = ['hb', 'xm']
+    list_of_accepted_formats = ['hb', 'xm', 'hx', 'xd', 'xe', 'xn', 'xw']
 
     if of in list_of_accepted_formats:
         return (of, None)

@@ -133,11 +133,24 @@ function createRow(tag, ind1, ind2, subfieldCode, subfieldValue, fieldID,
   cellContentClass = 'bibEditCellContentProtected',
   cellContentTitle='',
   cellContentOnClick = '';
+  var autosuggestkeypress = "";
+  var autosuggest = false;
+  var autocomplete = false;
+  var autokeyword = false;
+  for (var i=0;i<gAUTOSUGGEST_TAGS.length;i++) { if (MARC == gAUTOSUGGEST_TAGS[i]) { autosuggest = true; }}
+  for (var i=0;i<gAUTOCOMPLETE_TAGS.length;i++) { if (MARC == gAUTOCOMPLETE_TAGS[i]) { autocomplete = true; }}
+  if (MARC == gKEYWORD_TAG) { autokeyword = true; }
   if (!protectedField){
     // Enable features for unprotected fields.
     if (!protectedSubfield){
       cellContentClass = 'bibEditCellContent';
       cellContentTitle = 'title="Click to edit" ';
+      if (autosuggest || autokeyword) {
+          cellContentTitle = 'title="Click to edit (suggest values: ctrl-shift-a or ctrl-9) " ';
+      }
+      if (autocomplete) {
+          cellContentTitle = 'title="Click to edit (complete values: ctrl-shift-a or ctrl-9) " ';
+      }
       cellContentOnClick = 'onclick="onContentClick(this)" ';
     }
   }
@@ -164,7 +177,7 @@ function createRow(tag, ind1, ind2, subfieldCode, subfieldValue, fieldID,
       btnAddSubfield = img('/img/add.png', 'btnAddSubfield_' + fieldID, '',
       {title: 'Add subfield', onclick: 'onAddSubfieldsClick(this)'});
   }
-  return '' +
+  myelement = '' +
     '<tr id="row_' + subfieldID + '">' +
       '<td class="bibEditCellField">' + boxField + '</td>' +
       '<td ' + cellFieldTagAttrs  + '>' + fieldTagToPrint + '</td>' +
@@ -173,12 +186,18 @@ function createRow(tag, ind1, ind2, subfieldCode, subfieldValue, fieldID,
   '" class="bibEditCellSubfieldTag">' +
   subfieldTagToPrint +
       '</td>' +
-      '<td id="content_' + subfieldID + '" class="' + cellContentClass + cellContentAdditionalClass+ '" ' +
-        cellContentTitle + cellContentOnClick + 'tabindex="0">' +
-        subfieldValue +
+      '<td id="content_' + subfieldID + '" class="' + cellContentClass + cellContentAdditionalClass+  '" ' +
+	cellContentTitle + autosuggestkeypress + cellContentOnClick + 'tabindex="0">' +
+	subfieldValue +
       '</td>' +
       '<td class="bibEditCellAddSubfields">' + btnAddSubfield + '</td>' +
-    '</tr>';
+      '</tr>';
+  /*add a place where the autosuggest box goes, if needed*/
+  if (autosuggest || autokeyword) {
+    myelement = myelement +
+    '<tr><td></td><td></td><td></td><td></td><td tabindex="0" id="autosuggest_' + subfieldID + '">' + '<td></td></td></tr>';
+  }
+  return myelement;
 }
 
 function redrawFields(tag, skipAddFileds){
@@ -186,6 +205,10 @@ function redrawFields(tag, skipAddFileds){
    * Redraw all fields for a given tag.
    * skipAddFileds - forces to skip drawing the controls corresponding to the
    * change of adding a field
+   *
+   * WARNING: if we have added two (or more) fields with completely new tags a, b
+   * where a > b in the lexicographical order, redrawFields(b) has to be executed before
+   * redrawFields(a)
    */
   var rowGroup = $('#rowGroup_' + tag + '_0'), prevRowGroup;
   if (rowGroup.length){
@@ -196,7 +219,8 @@ function redrawFields(tag, skipAddFileds){
   else{
     // New tag. Determine previous sibling.
     var prevTag = getPreviousTag(tag);
-    prevRowGroup = $('#rowGroup_' + prevTag + '_0');
+    var lastIndex = gRecord[prevTag].length - 1;
+    prevRowGroup = $('#rowGroup_' + prevTag + '_' + lastIndex);
   }
 
   // Redraw all fields and append to table.
@@ -226,6 +250,12 @@ function redrawFields(tag, skipAddFileds){
 
 /// rendering the field content
 function removeAddFieldControl(changeNo){
+  /** A function removing the interface element associated with the Add Field
+      Holding Pen change
+
+      Arguments:
+        changeNo: a number of the change, the control is associated with
+   */
   $("#changeBox_" + changeNo).remove();
 }
 
@@ -371,10 +401,20 @@ function addFieldAddedControl(changeNo){
   $('#bibEditContent').append(content);
 }
 
+function removeAllChangeControls(){
+  /** Removing all the change controls from the interface
+   */
+  $(".bibeditHPCorrection").remove();
+}
+
 function addChangeControl(changeNum, skipAddedField){
-  // creates a web controls responsible for applying a particular change
-  // changeNum is the number of the change - it is the same as the index in gHoldingPenChanges
-  //    global array
+  /** creates a web controls responsible for applying a particular change
+      changeNum is the number of the change - it is the same as the index
+      in gHoldingPenChanges global array */
+
+  if (gHoldingPenChanges[changeNum].applied_change === true){
+    return;
+  }
   changeType = gHoldingPenChanges[changeNum]["change_type"];
   if ( changeType == "field_added" && skipAddedField != true){
     addFieldAddedControl(changeNum);
@@ -396,14 +436,13 @@ function addChangeControl(changeNum, skipAddedField){
   }
 }
 
-
 /// the functions for creating the previews
 
 function createFieldPreviewCore(tag, indicators, subfields){
-  /** A function creating a viewable preview of the records*/
+  /** A function creating a HTML preview of the record part */
 
   headerData = tag + indicators + "&nbsp;&nbsp;&nbsp;";
-  result = "";
+  var result = "";
 
   for (subfield in subfields){
     result += "<tr><td>"
@@ -419,7 +458,7 @@ function createFieldPreviewCore(tag, indicators, subfields){
 }
 
 function createFieldPreview(tag, indicators, subfields){
-  /*Creating a preview of a single field*/
+  /** Creating a preview of a single field*/
   return "<table>" + createFieldPreviewCore(tag, indicators, subfields) + "</table>";
 }
 
@@ -536,7 +575,7 @@ function createHoldingPenPanelEntry(changesetNumber, changesetDatetime){
 
 function createGeneralControlsPanel(){
   /** Generating a panel that allows to perform global operations on the previewed changes*/
-  result = "<div id=\"bibeditHoldinPenGC\">";
+  result = "<div id=\"bibeditHoldingPenGC\">";
   result += "<button onClick=\"onAcceptAllChanges();\">Apply all the changes</button>";
   result += "<button onClick=\"onRejectAllChanges();\"> Reject all the changes</button>";
   result += "</div>";
@@ -645,12 +684,12 @@ function createAddFieldRow(fieldTmpNo, subfieldTmpNo, defaultCode, defaultValue)
     '</tr>';
 }
 
-function createAddSubfieldsForm(fieldID){
+function createAddSubfieldsForm(fieldID, defSubCode, defValue){
   /*
    * Create an 'Add subfields' form.
    */
   return '' +
-    createAddSubfieldsRow(fieldID, 0) +
+      createAddSubfieldsRow(fieldID, 0, defSubCode, defValue) +
     '<tr id="rowAddSubfieldsControls_' + fieldID + '">' +
       '<td></td>' +
       '<td></td>' +
@@ -662,7 +701,7 @@ function createAddSubfieldsForm(fieldID){
     '</tr>';
 }
 
-function createAddSubfieldsRow(fieldID, subfieldTmpNo){
+function createAddSubfieldsRow(fieldID, subfieldTmpNo, defSubCode, defValue){
   /*
    * Create a row in the 'Add subfields' form.
    */
@@ -675,11 +714,11 @@ function createAddSubfieldsRow(fieldID, subfieldTmpNo){
       '<td></td>' +
       '<td></td>' +
       '<td class="bibEditCellAddSubfieldCode">' +
-  input('text', 'txtAddSubfieldsCode_' + subfieldID,
-        'bibEditTxtSubfieldCode', {maxlength: 1}) +
+	input('text', 'txtAddSubfieldsCode_' + subfieldID,
+	      'bibEditTxtSubfieldCode', {maxlength: 1},  defSubCode) +
       '</td>' +
       '<td>' +
-  input('text', 'txtAddSubfieldsValue_' + subfieldID, 'bibEditTxtValue') +
+      input('text', 'txtAddSubfieldsValue_' + subfieldID, 'bibEditTxtValue', {}, defValue) +
       '</td>' +
       '<td>' + btnRemove + '</td>' +
     '</tr>';
@@ -748,6 +787,9 @@ function displayMessage(msgCode, keepContent, args){
       msg = 'The record contains invalid content. Remove the invalid content ' +
   'and resubmit the record.<br />' +
   'Errors: <b>' + args[0] + '</b><br /><br />';
+      break;
+    case 111:
+      msg = 'Internal error. Cache file format is incorrect. Try to open the record again';
       break;
     default:
       msg = 'Result code: <b>' + msgCode + '</b>';
@@ -843,6 +885,10 @@ function displayAlert(msgType, args){
       msg = 'Submit your changes to this record?\n\n';
       popUpType = 'confirm';
       break;
+    case 'confirmRevert':
+      msg = 'Are you sure, you want to revert to this record revision?\n\n';
+      popUpType = 'confirm';
+      break;
     case 'confirmCancel':
       msg = 'You have unsubmitted changes to this record.\n\n' +
   'Discard your changes?';
@@ -929,7 +975,7 @@ function img(src, id, _class, attrs){
   return '<img ' + src + id + _class + strAttrs + '/>';
 }
 
-function input(type, id, _class, attrs){
+function input(type, id, _class, attrs, defvalue){
   /*
    * Create an input tag with specified attributes.
    */
@@ -940,7 +986,9 @@ function input(type, id, _class, attrs){
   for (var attr in attrs){
     strAttrs += attr + '="' + attrs[attr] + '" ';
   }
-  return '<input ' + type + id + _class + strAttrs + '/>';
+  myval = '';
+  if ((defvalue != null) && (defvalue != ""))  { myval = ' value="'+defvalue+'" '; }
+  return '<input ' + type + id + _class + strAttrs + myval + '/>';
 }
 
 function select(id, options, selectedOption){
@@ -964,6 +1012,67 @@ function select(id, options, selectedOption){
   return "<select id=\"" + id + "\">" + optionsHTML + "</select>";
 
 }
+
+function getRevisionDate(revisionTs){
+  var result = {};
+  result.year = revisionTs.substr(0,4);
+  result.month = revisionTs.substr(4,2);
+  result.day = revisionTs.substr(6,2);
+  result.hour = revisionTs.substr(8,2);
+  result.minute = revisionTs.substr(10,2);
+  result.second = revisionTs.substr(12,2);
+  return result;
+}
+
+function formatDateTime(dt){
+  return dt.year + '.' + dt.month + '.' + dt.day +
+    ' ' + dt.hour + ':' + dt.minute + ':' + dt.second;
+}
+
+function displayRevisionHistoryEntry(recId, revisionId){
+  var entryClass = (revisionId == gRecRev) ?
+    "bibEditRevHistorySelectedEntry" : "bibEditRevHistoryEntry";
+  var timeString = formatDateTime(getRevisionDate(revisionId));
+
+/*  var additionalAttrs = {};
+  if (revisionId == gRecRev){
+    additionalAttrs.disabled = "disabled"
+  }
+  additionalAttrs.title = "Merge with the newest revision";
+  */
+
+  compareButtonId = 'btnCompareRevision_' + revisionId;
+
+  mergeImgId = 'imgMergeWithNewest_' + revisionId;
+  compareImgId = 'imgCompareWithCurrent_' + revisionId;
+  revertImgId = 'imgRevert_' + revisionId;
+
+  var mergeUrl = '/record/merge#recid1=' + recId + '&recid2=' + recId + '.' + revisionId;
+  var mergeWithNewestControl = '<a href="' + mergeUrl +
+    '" title="Merge with the newest revision" class="bibEditRevHistoryLink">' +
+    img('/img/merge-small.png', mergeImgId, 'bibEditRevHistoryLinkImg') + '</a>';
+
+  var compareWithCurrentControl =
+    '<a href="#" title="Compare with currently viewed version" class="bibEditRevHistoryLink">' +
+    img('/img/compare.png', compareImgId, 'bibEditRevHistoryLinkImg') + '</a>';
+
+  var revertToRevisionControl = '<a href="#" title="Revert to this revision" class="bibEditRevHistoryLink">' +
+    img('/img/replace.png', revertImgId, 'bibEditRevHistoryLinkImg') +
+    '</a>';
+
+  var resultHTML = '<div class="' + entryClass + '">\n' +
+    '<div class="bibEditRevHistoryEntryContent" id="bibEditRevHistoryEntry_' +
+    revisionId+ '">' + timeString +
+    '</div><div class="bibEditRevHistoryEntryControls"><div style="display:table-row;">' +
+    mergeWithNewestControl + compareWithCurrentControl + revertToRevisionControl + "</div></div></div>\n";
+
+  return {
+    "HTML" : resultHTML,
+    "compareImgId" : compareImgId,
+    "revertImgId" : revertImgId
+  };
+}
+
 
 function escapeHTML(value){
   /*

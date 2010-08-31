@@ -18,28 +18,19 @@
 __revision__ = "$Id$"
 
 import urllib
-import time
 import cgi
-import gettext
-import string
-import locale
 import re
 import operator
-import os
 
-from invenio.config import \
-     CFG_SITE_URL, \
-     CFG_VERSION, \
-     CFG_SITE_URL, \
+from invenio.config import CFG_SITE_URL, \
      CFG_SITE_LANG
 from invenio.messages import gettext_set_language
-from invenio.dateutils import convert_datetext_to_dategui
+from invenio.dateutils import convert_datetext_to_dategui, convert_datestruct_to_dategui
 from invenio.urlutils import create_html_link
 from invenio.webmessage_mailutils import email_quoted_txt2html
 from invenio.htmlutils import escape_html
 from websubmit_config import \
      CFG_WEBSUBMIT_CHECK_USER_LEAVES_SUBMISSION
-import invenio.template
 
 class Template:
 
@@ -48,7 +39,8 @@ class Template:
         'version': (str, ""), # version "" means "latest"
         'docname': (str, ""), # the docname (optional)
         'format' : (str, ""), # the format
-        'verbose' : (int, 0) # the verbosity
+        'verbose' : (int, 0), # the verbosity
+        'subformat' : (str, ""), # the subformat
         }
 
 
@@ -334,10 +326,10 @@ class Template:
                          'doctype' : doctype,
                          'shortname' : snameCateg[i],
                        }
-            out += "</td>"
+            out += "</td><td>"
         else:
-            out += "<script>checked=1;</script>"
-        out += """<td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+            out += '<td><script type="text/javascript">checked=1;</script>'
+        out += """&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
                   <td>
                     <table><tr><td>
                """
@@ -843,7 +835,7 @@ class Template:
         out += """</script>"""
         return out
 
-    def tmpl_page_do_not_leave_submission_js(self, ln):
+    def tmpl_page_do_not_leave_submission_js(self, ln, enabled=CFG_WEBSUBMIT_CHECK_USER_LEAVES_SUBMISSION):
         """
         Code to ask user confirmation when leaving the page, so that the
         submission is not interrupted by mistake.
@@ -854,6 +846,7 @@ class Template:
 
         Parameters:
         - 'ln' *string* - The language to display the interface in
+        - 'enabled' *bool* - If the check applies or not
         """
 
         # load the right message language
@@ -870,7 +863,7 @@ class Template:
             }
 
         </script>
-        ''' % (CFG_WEBSUBMIT_CHECK_USER_LEAVES_SUBMISSION and 'true' or 'false',
+        ''' % (enabled and 'true' or 'false',
                _('Your modifications will not be saved.').replace('"', '\\"'))
 
         return out
@@ -1259,7 +1252,7 @@ class Template:
         out += "</table>"
         return out
 
-    def tmpl_bibdocfile_filelist(self, ln, recid, name, version, format, size, description):
+    def tmpl_bibdocfile_filelist(self, ln, recid, name, version, md, superformat, subformat, nice_size, description):
         """
         Displays a file in the file list.
 
@@ -1273,9 +1266,13 @@ class Template:
 
           - 'version' *string* - The version
 
-          - 'format' *string* - The display format
+          - 'md' *datetime* - the modification date
 
-          - 'size' *string* - The size of the file
+          - 'superformat' *string* - The display superformat
+
+          - 'subformat' *string* - The display subformat
+
+          - 'nice_size' *string* - The nice_size of the file
 
           - 'description' *string* - The description that might have been associated
           to the particular file
@@ -1284,26 +1281,34 @@ class Template:
         # load the right message language
         _ = gettext_set_language(ln)
 
+        urlbase = '%s/record/%s/files/%s' % (
+            CFG_SITE_URL,
+            recid,
+            '%s%s' % (name, superformat))
+
+        urlargd = {'version' : version}
+        if subformat:
+            urlargd['subformat'] = subformat
+
+        link_label = '%s%s' % (name, superformat)
+        if subformat:
+            link_label += ' (%s)' % subformat
+
+        link = create_html_link(urlbase, urlargd, cgi.escape(link_label))
+
         return """<tr>
                     <td valign="top">
-                      <small><a href="%(siteurl)s/record/%(recid)s/files/%(quoted_name)s%(quoted_format)s?version=%(version)s">
-                        %(name)s%(format)s
-                      </a></small>
+                      <small>%(link)s</small>
                     </td>
                     <td valign="top">
-                      <font size="-2" color="green">[%(size)s&nbsp;B]</font>
+                      <font size="-2" color="green">[%(nice_size)s]</font>
+                      <font size="-2"><em>%(md)s</em>
                     </td>
                     <td valign="top"><em>%(description)s</em></td>
                     </tr>""" % {
-                      'siteurl' : CFG_SITE_URL,
-                      'recid' : recid,
-                      'quoted_name' : urllib.quote(name),
-                      'name' : cgi.escape(name),
-                      'version' : version,
-                      'name' : cgi.escape(name),
-                      'quoted_format' : urllib.quote(format),
-                      'format' : cgi.escape(format),
-                      'size' : size,
+                      'link' : link,
+                      'nice_size' : nice_size,
+                      'md' : convert_datestruct_to_dategui(md.timetuple(), ln),
                       'description' : cgi.escape(description),
                     }
 

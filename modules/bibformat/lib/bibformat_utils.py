@@ -23,10 +23,6 @@ Utilities for special formatting of records.
 API functions: highlight, get_contextual_content, encode_for_xml
 
 Used mainly by BibFormat elements.
-
-Depends on search_engine.py for record_exists()
-
-FIXME: currently copies record_exists() code from search engine.  Refactor later.
 """
 
 __revision__ = "$Id$"
@@ -35,10 +31,13 @@ import re
 import zlib
 
 from invenio.config import \
-     CFG_OAI_ID_FIELD
+     CFG_OAI_ID_FIELD, \
+     CFG_WEBSEARCH_FULLTEXT_SNIPPETS, \
+     CFG_WEBSEARCH_FULLTEXT_SNIPPETS_WORDS
 from invenio.dbquery import run_sql
 from invenio.urlutils import string_to_numeric_char_reference
 from invenio.textutils import encode_for_xml
+from invenio.shellutils import run_shell_command
 
 def highlight(text, keywords=None, prefix_tag='<strong>', suffix_tag="</strong>"):
     """
@@ -146,6 +145,8 @@ def record_get_xml(recID, format='xm', decompress=zlib.decompress,
         - 'xd' for XML Dublin Core
 
     If record does not exist, returns empty string.
+    If the record is deleted, returns an empty MARCXML (with recid
+    controlfield, OAI ID fields and 980__c=DELETED)
 
     @param recID: the id of the record to retrieve
     @param on_the_fly: if False, try to fetch precreated one in database
@@ -548,3 +549,155 @@ def latex_to_html(text):
     text = re_generic_end_latex.sub('', text)
 
     return text
+
+def get_pdf_snippets(recID, patterns,
+                     nb_words_around=CFG_WEBSEARCH_FULLTEXT_SNIPPETS_WORDS,
+                     max_snippets=CFG_WEBSEARCH_FULLTEXT_SNIPPETS):
+
+    """
+    Extract text snippets around 'patterns' from the newest PDF file of 'recID'
+    The search is case-insensitive.
+    The snippets are meant to look like in the results of the popular search
+    engine: using " ... " between snippets.
+    For empty patterns it returns ""
+    """
+    from invenio.bibdocfile import BibRecDocs
+
+    text_path = ""
+    text_path_courtesy = ""
+    for bd in BibRecDocs(recID).list_bibdocs():
+        if bd.get_text():
+            text_path = bd.get_text_path()
+            text_path_courtesy = bd.get_status()
+            break # stop at the first good PDF textable file
+
+    if text_path:
+        out = get_text_snippets(text_path, patterns, nb_words_around, max_snippets)
+        if not out:
+            # no hit, so check stemmed versions:
+            from invenio.bibindex_engine_stemmer import stem
+            stemmed_patterns = [stem(p, 'en') for p in patterns]
+            print stemmed_patterns
+            out = get_text_snippets(text_path, stemmed_patterns, nb_words_around, max_snippets)
+        if out:
+            out_courtesy = ""
+            if text_path_courtesy:
+                out_courtesy = '<strong>Snippets courtesy of ' + text_path_courtesy + '</strong><br>'
+            return """<div class="snippetbox">%s%s</div>""" % (out_courtesy, out)
+        else:
+            return ""
+    else:
+        return ""
+
+def get_text_snippets(textfile_path, patterns, nb_words_around, max_snippets):
+    """
+    Extract text snippets around 'patterns' from file found at 'textfile_path'
+    The snippets are meant to look like in the results of the popular search
+    engine: using " ... " between snippets.
+    For empty patterns it returns ""
+    The idea is to first produce big snippets with grep and narrow them
+    TODO: - distinguish the beginning of sentences and try to make the snippets
+          start there
+    """
+
+    if len(patterns) == 0:
+        return ""
+
+    # the max number of words that can still be added to the snippet
+    words_left = max_snippets * (nb_words_around * 2 + 1)
+    # Assuming that there will be at least one word per line we can produce the
+    # big snippets like this
+    cmd = "grep -i -A%s -B%s -m%s"
+    cmdargs = [str(nb_words_around), str(nb_words_around), str(max_snippets)]
+    for p in patterns:
+        cmd += " -e %s"
+        cmdargs.append(p)
+    cmd += " %s"
+    cmdargs.append(textfile_path)
+    (dummy1, output, dummy2) = run_shell_command(cmd, cmdargs)
+
+    result = []
+    big_snippets = output.split("--")
+
+    # cut the snippets to match the nb_words_around parameter precisely:
+    for s in big_snippets:
+        small_snippet = cut_out_snippet(s, patterns, nb_words_around, words_left)
+        #count words
+        words_left -= len(small_snippet.split())
+        #if words_left <= 0:
+            #print "Error: snippet too long"
+        result.append(small_snippet)
+
+    # combine snippets
+    out = ""
+    for snippet in result:
+        if snippet:
+            if out:
+                out += "<br>"
+            out += "..." + highlight(snippet, patterns) + "..."
+    return out
+
+def cut_out_snippet(text, patterns, nb_words_around, max_words):
+    # the snippet can include many occurances of the patterns if they are not
+    # further appart than 2 * nb_words_around
+
+    def starts_with_any(word, patterns):
+        # Check whether the word's beginning matches any of the patterns.
+        # The second argument is an array of patterns to match.
+
+        ret = False
+        lower_case = word.lower()
+        for p in patterns:
+            if lower_case.startswith(str(p).lower()):
+                ret = True
+                break
+        return ret
+
+    # make the nb_words_around smaller if required by max_words
+    # to make sure that at least one pattern is included
+    while nb_words_around * 2 + 1 > max_words:
+        nb_words_around -= 1
+    if nb_words_around < 1:
+        return ""
+
+    snippet = ""
+    words = text.split()
+
+    last_written_word = -1
+    i = 0
+    while i < len(words):
+        if starts_with_any(words[i], patterns):
+            # add part before first or following occurance of a word
+            j = max(last_written_word + 1, i - nb_words_around)
+            while j < i:
+                snippet += (" " + words[j])
+                j += 1
+            # write the pattern
+            snippet += (" " + words[i])
+            last_written_word = i
+
+            # write the suffix. If pattern found, break
+            j = 1
+            while j <= nb_words_around and i + j < len(words):
+                if starts_with_any(words[i+j], patterns):
+                    break
+                else:
+                    snippet += (" " + words[i+j])
+                    last_written_word = i + j
+                    j += 1
+            i += j
+        else:
+            i += 1
+
+    # apply max_words param if needed
+    snippet_words = snippet.split()
+    length = len(snippet_words)
+    if (length > max_words):
+        j = 0
+        shorter_snippet = ""
+        while j < max_words:
+            shorter_snippet += " " + snippet_words[j]
+            j += 1
+        return shorter_snippet
+    else:
+        return snippet

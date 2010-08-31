@@ -38,6 +38,7 @@ pylib_DATA = __init__.py \
              htmlutils_tests.py \
              testutils.py \
              testutils_regression_tests.py \
+             invenio_connector.py \
              urlutils.py \
              urlutils_tests.py \
              w3c_validator.py \
@@ -46,7 +47,8 @@ pylib_DATA = __init__.py \
              shellutils.py \
              shellutils_tests.py \
              pluginutils.py \
-             pluginutils_tests.py
+             pluginutils_tests.py \
+             asyncproc.py
 
 noinst_DATA = testimport.py \
               kwalitee.py \

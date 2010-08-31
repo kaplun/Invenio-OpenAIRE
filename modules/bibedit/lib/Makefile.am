@@ -22,17 +22,14 @@ pylib_DATA = bibrecord_config.py \
              bibrecord_tests.py \
              refextract_config.py \
              refextract.py \
-             xmlmarc2textmarclib.py \
+             xmlmarc2textmarc.py \
+             textmarc2xmlmarc.py \
              bibedit_config.py \
-             bibeditold_dblayer.py \
              bibedit_dblayer.py \
-             bibeditold_engine.py \
              bibedit_engine.py \
              bibedit_regression_tests.py \
-             bibeditold_templates.py \
              bibedit_templates.py \
              bibeditcli.py \
-             bibeditold_utils.py \
              bibedit_utils.py \
              bibedit_webinterface.py \
              bibeditmulti_templates.py \
@@ -46,7 +43,9 @@ js_DATA = bibedit_display.js \
           bibedit_keys.js \
           bibedit_menu.js \
           bibeditmulti.js \
-          bibedit_holdingpen.js
+          bibedit_holdingpen.js \
+	  marcxml.js \
+	  bibedit_clipboard.js
 
 EXTRA_DIST = $(pylib_DATA) \
              $(js_DATA)

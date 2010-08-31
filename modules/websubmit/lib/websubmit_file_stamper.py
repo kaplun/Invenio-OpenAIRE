@@ -29,6 +29,7 @@
               --latex-template-var='REPORTNUMBER=TEST-THESIS-2008-019' \\
               --latex-template-var='DATE=27/02/2008' \\
               --stamp='first' \\
+              --layer='background' \\
               --output-file=testfile_stamped.pdf \\
               testfile.pdf
 """
@@ -37,7 +38,7 @@ __revision__ = "$Id$"
 
 
 import getopt, sys, re, os, time, shutil, tempfile
-from invenio.config import CFG_PATH_DISTILLER, CFG_PATH_GFILE
+from invenio.config import CFG_PATH_PS2PDF, CFG_PATH_GFILE
 from invenio.errorlib import register_exception
 from invenio.config import CFG_TMPDIR
 from invenio.config import CFG_ETCDIR
@@ -51,6 +52,7 @@ from invenio.websubmit_config import InvenioWebSubmitFileStamperError
 
 
 ## ***** Functions related to the creation of the PDF Stamp file: *****
+re_latex_includegraphics = re.compile('\\includegraphics\[.*?\]\{(?P<image>.*?)\}')
 def copy_template_files_to_stampdir(path_workingdir, latex_template):
     """In order to stamp a PDF fulltext file, LaTeX is used to create a
        "stamp" page that is then merged with the fulltext PDF.
@@ -151,23 +153,11 @@ def copy_template_files_to_stampdir(path_workingdir, latex_template):
     ## Now that the LaTeX template file has been copied locally, extract
     ## the names of graphics files to be included in the resulting
     ## document and attempt to copy them to the working "stamp" directory:
-    cmd_findgraphics = \
-       """grep includegraphic %s | """ \
-       """sed -n 's/^[^{]*{\\([^}]\\{1,\\}\\)}.*$/\\1/p'""" \
-       % escape_shell_arg("%s/%s" % (path_workingdir, template_name))
-
-    fh_findgraphics = os.popen(cmd_findgraphics, "r")
-    graphic_names = fh_findgraphics.readlines()
-    findgraphics_errcode = fh_findgraphics.close()
-
-    if findgraphics_errcode is not None:
-        ## There was an error involving the grep/sed command.
-        ## Unable to extract the details of any graphics to
-        ## be included:
-        msg = """Unable to stamp file. There was """ \
-              """a problem when trying to obtain details of images """ \
-              """included by the LaTeX template."""
-        raise InvenioWebSubmitFileStamperError(msg)
+    template_desc = file(os.path.join(path_workingdir, template_name))
+    template_code = template_desc.read()
+    template_desc.close()
+    graphic_names = [match_obj.group('image') for match_obj in \
+                     re_latex_includegraphics.finditer(template_code)]
 
     ## Copy each include-graphic extracted from the template
     ## into the working stamp directory:
@@ -605,7 +595,8 @@ def apply_stamp_cover_page(path_workingdir, \
 def apply_stamp_first_page(path_workingdir, \
                            stamp_file_name, \
                            subject_file, \
-                           output_file):
+                           output_file, \
+                           stamp_layer):
     """Carry out the stamping:
        This function adds a stamp to the first page of the file.
        @param path_workingdir: (string) - the path to the working directory
@@ -616,6 +607,8 @@ def apply_stamp_first_page(path_workingdir, \
        @param subject_file: (string) - the name of the file to be stamped.
        @param output_file: (string) - the name of the final "stamped" file that
         will be written in the working directory after the function has ended.
+       @param stamp_layer: (string) - the layer to consider when stamping
+
     """
     ## Since only the first page of the subject file is to be stamped,
     ## it's safest to separate this into its own temporary file, stamp
@@ -660,7 +653,7 @@ def apply_stamp_first_page(path_workingdir, \
 
     ## Now stamp the first page:
     cmd_stamp_first_page = \
-             "%(pdftk)s %(first-page-path)s background " \
+             "%(pdftk)s %(first-page-path)s %(stamp_layer)s " \
              "%(stamp-file-path)s output " \
              "%(stamped-first-page-path)s 2>/dev/null" \
              % { 'pdftk'                   : CFG_PATH_PDFTK,
@@ -673,6 +666,7 @@ def apply_stamp_first_page(path_workingdir, \
                  'stamped-first-page-path' : escape_shell_arg("%s/%s" % \
                                               (path_workingdir, \
                                                stamped_output_file_first_page)),
+                 'stamp_layer'             : stamp_layer == 'foreground' and 'stamp' or 'background'
                }
     errcode_stamp_first_page = os.system(cmd_stamp_first_page)
     ## Check that the first page was stamped successfully:
@@ -806,7 +800,8 @@ def apply_stamp_first_page(path_workingdir, \
 def apply_stamp_all_pages(path_workingdir, \
                           stamp_file_name, \
                           subject_file, \
-                          output_file):
+                          output_file, \
+                          stamp_layer):
     """Carry out the stamping:
        This function adds a stamp to all pages of the file.
        @param path_workingdir: (string) - the path to the working directory
@@ -817,9 +812,10 @@ def apply_stamp_all_pages(path_workingdir, \
        @param subject_file: (string) - the name of the file to be stamped.
        @param output_file: (string) - the name of the final "stamped" file that
         will be written in the working directory after the function has ended.
+       @param stamp_layer: (string) - the layer to consider when stamping
     """
     cmd_stamp_all_pages = \
-             "%(pdftk)s %(file-to-stamp-path)s background " \
+             "%(pdftk)s %(file-to-stamp-path)s %(stamp_layer)s " \
              "%(stamp-file-path)s output " \
              "%(stamped-file-all-pages-path)s 2>/dev/null" \
              % { 'pdftk'                       : CFG_PATH_PDFTK,
@@ -832,6 +828,8 @@ def apply_stamp_all_pages(path_workingdir, \
                  'stamped-file-all-pages-path' : escape_shell_arg("%s/%s" % \
                                                   (path_workingdir, \
                                                    output_file)),
+                 'stamp_layer'             : stamp_layer == 'foreground' and 'stamp' or 'background'
+
                }
     errcode_stamp_all_pages = os.system(cmd_stamp_all_pages)
     if errcode_stamp_all_pages or \
@@ -846,7 +844,8 @@ def apply_stamp_to_file(path_workingdir,
                         stamp_type,
                         stamp_file_name,
                         subject_file,
-                        output_file):
+                        output_file,
+                        stamp_layer):
     """Given a stamp-file, the details of the type of stamp to apply, and the
        details of the file to be stamped, coordinate the process of having
        that stamp applied to the file.
@@ -860,6 +859,7 @@ def apply_stamp_to_file(path_workingdir,
        @param subject_file: (string) - the name of the file to be stamped.
        @param output_file: (string) - the name of the final "stamped" file that
         will be written in the working directory after the function has ended.
+       @param stamp_layer: (string) - the layer to consider when stamping the file.
        @return: (string) - the name of the stamped file that has been created.
         It will be found in the stamping working directory.
     """
@@ -935,7 +935,7 @@ def apply_stamp_to_file(path_workingdir,
         ## Build the distilling command:
         cmd_distill = """%(distiller)s %(ps-file-path)s """ \
                       """%(pdf-file-path)s 2>/dev/null""" % \
-                      { 'distiller'     : CFG_PATH_DISTILLER,
+                      { 'distiller'     : CFG_PATH_PS2PDF,
                         'ps-file-path'  : escape_shell_arg("%s/%s" % \
                                                           (path_workingdir, \
                                                            subject_file)),
@@ -994,14 +994,16 @@ def apply_stamp_to_file(path_workingdir,
         apply_stamp_first_page(path_workingdir, \
                                stamp_file_name, \
                                subject_file, \
-                               output_file)
+                               output_file, \
+                               stamp_layer)
     elif stamp_type == 'all':
         ## The stamp to be applied to the document is a simple that that should
         ## be applied to ALL pages of the document (i.e. merged onto each page.)
         apply_stamp_all_pages(path_workingdir, \
                               stamp_file_name, \
                               subject_file, \
-                              output_file)
+                              output_file, \
+                              stamp_layer)
     else:
         ## Unexpcted stamping mode.
         msg = """Error: Unexpected stamping mode [%s]. Stamping has failed.""" \
@@ -1178,11 +1180,23 @@ def usage(wmsg="", err_code=0):
                               + "coverpage" - add a cover page to the
                                 document;
                              The default value is "first";
+   -l, --layer=LAYER
+                             The position of the stamp. Should be one of:
+                              + "background" (invisible if original file has
+                                a white -not transparent- background layer)
+                              + "foreground" (on top of the stamped file.
+                                If the stamp does not have a transparent
+                                background, will hide all of the document
+                                layers)
+                             The default value is "background"
    -o, --output-file=XYZ
                              The optional name to be given to the finished
-                             (stamped) file. If this is omitted, the stamped
-                             file will be given the same name as the input
-                             file, but will be prefixed by "stamped-";
+                             (stamped) file IN THE WORKING DIRECTORY
+                             (Specify a file name, including
+                             extension, not a path). If this is
+                             omitted, the stamped file will be given
+                             the same name as the input file, but will
+                             be prefixed by"stamped-";
 
   Example:
     python ~invenio/lib/python/invenio/websubmit_file_stamper.py \\
@@ -1190,6 +1204,7 @@ def usage(wmsg="", err_code=0):
               --latex-template-var='REPORTNUMBER=TEST-THESIS-2008-019' \\
               --latex-template-var='DATE=27/02/2008' \\
               --stamp='first' \\
+              --layer='background' \\
               --output-file=testfile_stamped.pdf \\
               testfile.pdf
 """
@@ -1229,11 +1244,24 @@ def get_cli_options():
                                         + "coverpage" - add a cover page to the
                                           document;
                                        The default value is "first";
+         -l, --layer=               -> The position of the stamp. Should be one
+                                       of:
+                                        + "background" (invisible if original
+                                          file has a white -not transparent-
+                                          background layer)
+                                        + "foreground" (on top of the stamped
+                                          file. If the stamp does not have a
+                                          transparent background, will hide all
+                                          of the document layers).
+                                        The default value is "background"
          -o, --output-file=         -> The optional name to be given to the
-                                       finished (stamped) file. If this is
-                                       omitted, the stamped file will be
-                                       given the same name as the input file,
-                                       but will be prefixed by "stamped-";
+                                       finished (stamped) file IN THE
+                                       WORKING DIRECTORY (Specify a
+                                       name, not a path). If this is
+                                       omitted, the stamped file will
+                                       be given the same name as the
+                                       input file, but will be
+                                       prefixed by"stamped-";
 
        @return: (dictionary) of input options and flags, set as
         appropriate. The dictionary has the following structure:
@@ -1253,6 +1281,10 @@ def get_cli_options():
                     - "first": Stamp only the first page of the document;
                     - "all": Apply the stamp to all pages of the document;
                     - "coverpage": Add a "cover page" to the document;
+           + layer: (string) - the position of the stamp in the layers of the
+              file. Will be one of the following values:
+                    - "background": stamp applied to the background layer;
+                    - "foreground": stamp applied to the foreground layer;
            + verbosity: (integer) - the verbosity level under which the program
               is to run;
         So, an example of the returned dictionary would be something like:
@@ -1263,6 +1295,7 @@ def get_cli_options():
                 'input-file'          : "test-doc.pdf",
                 'output-file'         : "",
                 'stamp'               : "first",
+                'layer'               : "background",
                 'verbosity'           : 0,
               }
     """
@@ -1272,18 +1305,20 @@ def get_cli_options():
                 'input-file'         : "",
                 'output-file'        : "",
                 'stamp'              : "first",
+                'layer'              : "background",
                 'verbosity'          : 0,
               }
 
     ## Get the options and arguments provided by the user via the CLI:
     try:
-        myoptions, myargs = getopt.getopt(sys.argv[1:], "hVv:t:c:s:o:", \
+        myoptions, myargs = getopt.getopt(sys.argv[1:], "hVv:t:c:s:l:o:", \
                                           ["help",
                                            "version",
                                            "verbosity=",
                                            "latex-template=",
                                            "latex-template-var=",
                                            "stamp=",
+                                           "layer=",
                                            "output-file="])
     except getopt.GetoptError, err:
         ## Invalid option provided - usage message
@@ -1316,6 +1351,11 @@ def get_cli_options():
             ## Get the name of the "output file" that is to be created after
             ## stamping (i.e. the "stamped file"):
             options["output-file"] = opt[1]
+            if '/' in options["output-file"]:
+                # probably user specified a file path, which is not
+                # supported
+                print "Warning: you seem to have specifed a path for option '--output-file'."
+                print "Only a file name can be specified. Stamping might fail."
         elif opt[0] in ("-t", "--latex-template"):
             ## Get the path to the latex template to be used for the creation
             ## of the stamp file:
@@ -1328,7 +1368,15 @@ def get_cli_options():
                 options["stamp"] = str(opt[1]).lower()
             else:
                 ## Invalid stamp type. Print usage message and quit.
-                usage()
+                usage(wmsg="Chosen stamp type '%s' is not valid" % opt[1])
+        elif opt[0] in ("-l", "--layer"):
+            ## The layer to consider for the stamp
+            if str(opt[1].lower()) in ("background", "foreground"):
+                ## Valid layer type, accept it;
+                options["layer"] = str(opt[1]).lower()
+            else:
+                ## Invalid layer type. Print usage message and quit.
+                usage(wmsg="Chosen layer type '%s' is not valid" % opt[1])
         elif opt[0] in ("-c", "--latex-template-var"):
             ## This is a variable to be replaced in the LaTeX template.
             ## It should take the following form:
@@ -1374,14 +1422,20 @@ def stamp_file(options):
                     { "TITLE" : "An Introduction to CDS Invenio" }
            + input-file: (string) - the path to the input file (i.e. that
               which is to be stamped;
-           + output-file: (string) - the name of the stamped file that should
-              be created by the program. This is optional - if not provided,
-              a default name will be applied to a file instead;
+           + output-file: (string) - the name of the stamped file that
+              should be created by the program IN THE WORKING
+              DIRECTORY (Specify a name, not a path).
+              This is optional - if not provided, a default name will
+              be applied to a file instead;
            + stamp: (string) - the type of stamp that is to be applied to the
               input file. It must take one of 3 values:
                     - "first": Stamp only the first page of the document;
                     - "all": Apply the stamp to all pages of the document;
                     - "coverpage": Add a "cover page" to the document;
+           + layer: (string) - the layer to consider to stamp the file. Can be
+              one of the following values:
+                    - "background": stamp the background layer;
+                    - "foreground": stamp the foreground layer;
            + verbosity: (integer) - the verbosity level under which the program
               is to run;
         So, an example of the returned dictionary would be something like:
@@ -1392,6 +1446,7 @@ def stamp_file(options):
                 'input-file'          : "test-doc.pdf",
                 'output-file'         : "",
                 'stamp'               : "first",
+                'layer'               : "background"
                 'verbosity'           : 0,
               }
 
@@ -1404,24 +1459,36 @@ def stamp_file(options):
         fails for one reason or another.
     """
     ## SANITY CHECKS:
-    ## Does the options dictionary contain all expected keys?
+    ## Does the options dictionary contain all mandatory keys?
     ##
     ## A list of the names of the expected options:
-    expected_option_names = ["latex-template", \
-                             "latex-template-var", \
-                             "input-file", \
-                             "output-file", \
-                             "stamp", \
-                             "verbosity"]
-    expected_option_names.sort()
-    ## A list of the option names that have been received:
-    received_option_names = options.keys()
-    received_option_names.sort()
+    mandatory_option_names = ["latex-template", \
+                              "latex-template-var", \
+                              "input-file", \
+                              "output-file"]
+    optional_option_names_and_defaults = {"layer": "background", \
+                                          "verbosity": 0,
+                                          "stamp": "first"}
 
-    if expected_option_names != received_option_names:
-        ## Error: he dictionary of options had an illegal structure:
-        msg = """Error: Unexpected value received for "options" parameter."""
-        raise TypeError(msg)
+    ## Are we missing some mandatory parameters?
+    received_option_names = options.keys()
+    for mandatory_option_name in mandatory_option_names:
+        if not mandatory_option_name in received_option_names:
+            msg = """Error: Mandatory parameter %s is missing""" % mandatory_option_name
+            raise InvenioWebSubmitFileStamperError(msg)
+
+    ## Are we getting some unknown option?
+    for received_option_name in received_option_names:
+        if not received_option_name in mandatory_option_names and \
+           not received_option_name in optional_option_names_and_defaults.keys():
+            ## Error: the dictionary of options had an illegal structure:
+            msg = """Error: Option %s is not a recognized parameter""" % received_option_name
+            raise InvenioWebSubmitFileStamperError(msg)
+
+    ## Set default options when not specified
+    for opt, value in optional_option_names_and_defaults.iteritems():
+        if not options.has_key(opt):
+            options[opt] = value
 
     ## Do we have an input file to work on?
     if options["input-file"] in (None, ""):
@@ -1465,7 +1532,8 @@ def stamp_file(options):
                                             options["stamp"], \
                                             pdf_stamp_name, \
                                             basename_input_file, \
-                                            options["output-file"])
+                                            options["output-file"], \
+                                            options["layer"])
 
     ## Return a tuple containing the working directory and the name of the
     ## stamped file to the caller:

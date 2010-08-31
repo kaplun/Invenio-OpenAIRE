@@ -20,12 +20,10 @@
 __revision__ = \
     "$Id$"
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 from invenio.config import CFG_SITE_NAME, CFG_SITE_URL, CFG_SITE_LANG, \
      CFG_SITE_SECURE_URL, CFG_SITE_SUPPORT_EMAIL, CFG_CERN_SITE
-import cPickle
-from zlib import compress
 from invenio.messages import gettext_set_language
 
 
@@ -124,7 +122,8 @@ DEF_DEMO_ROLES = (('photocurator', 'Photo collection curator', 'deny any'),
                   ('basketusers', 'Users who can use baskets', 'deny email "hyde@cds.cern.ch"\nallow any'),
                   ('submit_DEMOJRN_*', 'Users who can submit (and modify) "Atlantis Times" articles', 'deny all'),
                   ('atlantiseditor', 'Users who can configure "Atlantis Times" journal', 'deny all'),
-                  ('commentmoderator', 'Users who can moderate comments', 'deny all'))
+                  ('commentmoderator', 'Users who can moderate comments', 'deny all'),
+                  ('poetrycommentreader', 'Users who can view comments in Poetry collection', 'deny all'))
 
 DEF_DEMO_USER_ROLES = (('jekyll@cds.cern.ch', 'thesesviewer'),
                        ('dorian.gray@cds.cern.ch', 'referee_DEMOBOO_*'),
@@ -135,7 +134,8 @@ DEF_DEMO_USER_ROLES = (('jekyll@cds.cern.ch', 'thesesviewer'),
                        ('juliet.capulet@cds.cern.ch', 'photocurator'),
                        ('romeo.montague@cds.cern.ch', 'submit_DEMOJRN_*'),
                        ('juliet.capulet@cds.cern.ch', 'submit_DEMOJRN_*'),
-                       ('balthasar.montague@cds.cern.ch', 'atlantiseditor'))
+                       ('balthasar.montague@cds.cern.ch', 'atlantiseditor'),
+                       ('romeo.montague@cds.cern.ch', 'poetrycommentreader'))
 
 # users
 # list of e-mail addresses
@@ -153,6 +153,7 @@ DEF_ACTIONS = (
                ('cfgoaiharvest', 'configure OAI Harvest', '', 'no'),
                ('cfgoairepository', 'configure OAI Repository', '', 'no'),
                ('cfgbibindex', 'configure BibIndex', '', 'no'),
+               ('cfgbibexport', 'configure BibExport', '', 'no'),
                ('runbibindex', 'run BibIndex', '', 'no'),
                ('runbibupload', 'run BibUpload', '', 'no'),
                ('runwebcoll', 'run webcoll', 'collection', 'yes'),
@@ -164,12 +165,15 @@ DEF_ACTIONS = (
                ('runoairepository', 'run oairepositoryupdater task', '', 'no'),
                ('runbibedit', 'run Record Editor', 'collection', 'yes'),
                ('runbibeditmulti', 'run Multi-Record Editor', '', 'no'),
+               ('runbibdocfile', 'run Document File Manager', '', 'no'),
                ('runbibmerge', 'run Record Merger', '', 'no'),
                ('runwebstatadmin', 'run WebStadAdmin', '', 'no'),
                ('runinveniogc', 'run InvenioGC', '', 'no'),
+               ('runbibexport', 'run BibExport', '', 'no'),
                ('referee', 'referee document type doctype/category categ', 'doctype,categ',    'yes'),
                ('submit', 'use webSubmit', 'doctype,act,categ', 'yes'),
                ('viewrestrdoc', 'view restricted document', 'status', 'no'),
+               ('viewrestrcomment', 'view restricted comment', 'status', 'no'),
                (WEBACCESSACTION, 'configure WebAccess', '', 'no'),
                (DELEGATEADDUSERROLE, 'delegate subroles inside WebAccess', 'role',          'no'),
                (VIEWRESTRCOLL, 'view restricted collection', 'collection', 'no'),
@@ -180,7 +184,6 @@ DEF_ACTIONS = (
                ('attachsubmissionfile', 'upload files to drop box during submission', '', 'no'),
                ('cfgbibexport', 'configure BibExport', '', 'no'),
                ('runbibexport', 'run BibExport', '', 'no'),
-               ('fulltext', 'administrate Fulltext', '', 'no'),
                ('usebaskets', 'use baskets', '', 'no'),
                ('useloans', 'use loans', '', 'no'),
                ('usegroups', 'use groups', '', 'no'),
@@ -189,7 +192,8 @@ DEF_ACTIONS = (
                ('viewholdings', 'view holdings', 'collection', 'yes'),
                ('viewstatistics', 'view statistics', 'collection', 'yes'),
                ('runbibcirculation', 'run BibCirculation', '', 'no'),
-               ('moderatecomments', 'moderate comments', 'collection', 'no')
+               ('moderatecomments', 'moderate comments', 'collection', 'no'),
+               ('runbatchuploader', 'run batchuploader', 'collection', 'yes')
               )
 
 # Default authorizations
@@ -220,7 +224,9 @@ DEF_DEMO_AUTHS = (
              ('submit_DEMOJRN_*', 'submit', {'doctype': 'DEMOJRN', 'act': 'SBI', 'categ': '*'}),
              ('submit_DEMOJRN_*', 'submit', {'doctype': 'DEMOJRN', 'act': 'MBI', 'categ': '*'}),
              ('submit_DEMOJRN_*', 'cfgwebjournal', {'name': 'AtlantisTimes', 'with_editor_rights': 'no'}),
-             ('atlantiseditor', 'cfgwebjournal', {'name': 'AtlantisTimes', 'with_editor_rights': 'yes'})
+             ('atlantiseditor', 'cfgwebjournal', {'name': 'AtlantisTimes', 'with_editor_rights': 'yes'}),
+             ('referee_DEMOBOO_*', 'runbatchuploader', {'collection': 'Books'}),
+             ('poetrycommentreader', 'viewcomment', {'collection': 'Poetry'})
             )
 
 _ = gettext_set_language(CFG_SITE_LANG)
@@ -229,8 +235,9 @@ _ = gettext_set_language(CFG_SITE_LANG)
 CFG_ACC_ACTIVITIES_URLS = {
     'runbibedit' : (_("Run Record Editor"), "%s/record/edit/?ln=%%s" % CFG_SITE_URL),
     'runbibeditmulti' : (_("Run Multi-Record Editor"), "%s/record/multiedit/?ln=%%s" % CFG_SITE_URL),
-    'runbibmerge' : (_("Run Multi-Record Editor"), "%s/record/multiedit/?ln=%%s" % CFG_SITE_URL),
-    'cfgbibknowledge' : (_("Configure Bibknowledge"), "%s/kb?ln=%%s" % CFG_SITE_URL),
+    'runbibdocfile' : (_("Run Document File Manager"), "%s/submit/managedocfiles?ln=%%s" % CFG_SITE_URL),
+    'runbibmerge' : (_("Run Record Merger"), "%s/record/merge/?ln=%%s" % CFG_SITE_URL),
+    'cfgbibknowledge' : (_("Configure BibKnowledge"), "%s/kb?ln=%%s" % CFG_SITE_URL),
     'cfgbibformat' : (_("Configure BibFormat"), "%s/admin/bibformat/bibformatadmin.py?ln=%%s" % CFG_SITE_URL),
     'cfgoaiharvest' : (_("Configure OAI Harvest"), "%s/admin/bibharvest/oaiharvestadmin.py?ln=%%s" % CFG_SITE_URL),
     'cfgoairepository' : (_("Configure OAI Repository"), "%s/admin/bibharvest/oairepositoryadmin.py?ln=%%s" % CFG_SITE_URL),
@@ -240,7 +247,9 @@ CFG_ACC_ACTIVITIES_URLS = {
     'cfgwebcomment' : (_("Configure WebComment"), "%s/admin/webcomment/webcommentadmin.py?ln=%%s" % CFG_SITE_URL),
     'cfgwebsearch' : (_("Configure WebSearch"), "%s/admin/websearch/websearchadmin.py?ln=%%s" % CFG_SITE_URL),
     'cfgwebsubmit' : (_("Configure WebSubmit"), "%s/admin/websubmit/websubmitadmin.py?ln=%%s" % CFG_SITE_URL),
-    'runbibcirculation' : (_("Run BibCirculation"), "%s/admin/bibcirculation/bibcirculationadmin.py?ln=%%s" % CFG_SITE_URL)
+    'cfgwebjournal' : (_("Configure WebJournal"), "%s/admin/webjournal/webjournaladmin.py?ln=%%s" % CFG_SITE_URL),
+    'runbibcirculation' : (_("Run BibCirculation"), "%s/admin/bibcirculation/bibcirculationadmin.py?ln=%%s" % CFG_SITE_URL),
+    'runbatchuploader' : (_("Run Batch Uploader"), "%s/batchuploader/metadata?ln=%%s" % CFG_SITE_URL)
 }
 
 CFG_WEBACCESS_MSGS = {
@@ -257,25 +266,25 @@ CFG_WEBACCESS_MSGS = {
 
 CFG_WEBACCESS_WARNING_MSGS = {
                                 0: 'Authorization granted',
-                                1: 'Error(1): You are not authorized to perform this action.',
-                                2: 'Error(2): You are not authorized to perform any action.',
-                                3: 'Error(3): The action %s does not exist.',
-                                4: 'Error(4): Unexpected error occurred.',
-                                5: 'Error(5): Missing mandatory keyword argument(s) for this action.',
-                                6: 'Error(6): Guest accounts are not authorized to perform this action.',
-                                7: 'Error(7): Not enough arguments, user ID and action name required.',
-                                8: 'Error(8): Incorrect keyword argument(s) for this action.',
-                                9: """Error(9): Account '%s' is not yet activated.""",
-                               10: """Error(10): You were not authorized by the authentication method '%s'.""",
-                               11: """Error(11): The selected login method '%s' is not the default method for this account, please try another one.""",
-                               12: """Error(12): Selected login method '%s' does not exist.""",
-                               13: """Error(13): Could not register '%s' account.""",
-                               14: """Error(14): Could not login using '%s', because this user is unknown.""",
-                               15: """Error(15): Could not login using your '%s' account, because you have introduced a wrong password.""",
-                               16: """Error(16): External authentication troubles using '%s' (maybe temporary network problems).""",
-                               17: """Error(17): You have not yet confirmed the email address for the '%s' authentication method.""",
-                               18: """Error(18): The administrator has not yet activated your account for the '%s' authentication method.""",
-                               19: """Error(19): The site is having troubles in sending you an email for confirming your email address. The error has been logged and will be taken care of as soon as possible.""",
-                               20: """Error(20): No roles are authorized to perform action %s with the given parameters."""
+                                1: 'You are not authorized to perform this action.',
+                                2: 'You are not authorized to perform any action.',
+                                3: 'The action %s does not exist.',
+                                4: 'Unexpected error occurred.',
+                                5: 'Missing mandatory keyword argument(s) for this action.',
+                                6: 'Guest accounts are not authorized to perform this action.',
+                                7: 'Not enough arguments, user ID and action name required.',
+                                8: 'Incorrect keyword argument(s) for this action.',
+                                9: """Account '%s' is not yet activated.""",
+                               10: """You were not authorized by the authentication method '%s'.""",
+                               11: """The selected login method '%s' is not the default method for this account, please try another one.""",
+                               12: """Selected login method '%s' does not exist.""",
+                               13: """Could not register '%s' account.""",
+                               14: """Could not login using '%s', because this user is unknown.""",
+                               15: """Could not login using your '%s' account, because you have introduced a wrong password.""",
+                               16: """External authentication troubles using '%s' (maybe temporary network problems).""",
+                               17: """You have not yet confirmed the email address for the '%s' authentication method.""",
+                               18: """The administrator has not yet activated your account for the '%s' authentication method.""",
+                               19: """The site is having troubles in sending you an email for confirming your email address. The error has been logged and will be taken care of as soon as possible.""",
+                               20: """No roles are authorized to perform action %s with the given parameters."""
         }
 

@@ -17,7 +17,7 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 """CDS Invenio Search Engine in mod_python."""
 
@@ -39,9 +39,9 @@ import zlib
 import sys
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 ## import CDS Invenio stuff:
 from invenio.config import \
@@ -57,6 +57,7 @@ from invenio.config import \
      CFG_WEBSEARCH_USE_JSMATH_FOR_FORMATS, \
      CFG_WEBSEARCH_USE_ALEPH_SYSNOS, \
      CFG_WEBSEARCH_DEF_RECORDS_IN_GROUPS, \
+     CFG_WEBSEARCH_FULLTEXT_SNIPPETS, \
      CFG_BIBUPLOAD_SERIALIZE_RECORD_STRUCTURE, \
      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG, \
      CFG_BIBRANK_SHOW_DOWNLOAD_GRAPHS, \
@@ -82,7 +83,7 @@ from invenio.access_control_config import VIEWRESTRCOLL, \
     CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS
 from invenio.websearchadminlib import get_detailed_page_tabs
 from invenio.intbitset import intbitset as HitSet
-from invenio.dbquery import DatabaseError
+from invenio.dbquery import DatabaseError, deserialize_via_marshal
 from invenio.access_control_engine import acc_authorize_action
 from invenio.errorlib import register_exception
 from invenio.textutils import encode_for_xml
@@ -95,14 +96,14 @@ from invenio.bibrank_citation_searcher import get_cited_by_count, calculate_cite
     calculate_co_cited_with_list, get_records_with_num_cites, get_self_cited_by
 from invenio.bibrank_citation_grapher import create_citation_history_graph_and_box
 
-from invenio.dbquery import run_sql, run_sql_cached, get_table_update_time, Error
+from invenio.dbquery import run_sql, run_sql_cached, get_table_update_time
 from invenio.webuser import getUid, collect_user_info
 from invenio.webpage import pageheaderonly, pagefooteronly, create_error_box
 from invenio.messages import gettext_set_language
 from invenio.search_engine_query_parser import SearchQueryParenthesisedParser, \
 InvenioWebSearchQueryParserException, SpiresToInvenioSyntaxConverter
 
-from invenio import webinterface_handler_wsgi_utils as apache
+from invenio import webinterface_handler_config as apache
 
 try:
     import invenio.template
@@ -114,6 +115,8 @@ from invenio.websearch_external_collections import calculate_hosted_collections_
 from invenio.websearch_external_collections_config import CFG_HOSTED_COLLECTION_TIMEOUT_ANTE_SEARCH
 from invenio.websearch_external_collections_config import CFG_HOSTED_COLLECTION_TIMEOUT_POST_SEARCH
 from invenio.websearch_external_collections_config import CFG_EXTERNAL_COLLECTION_MAXRESULTS
+
+VIEWRESTRCOLL_ID = acc_get_action_id(VIEWRESTRCOLL)
 
 ## global vars:
 cfg_nb_browse_seen_records = 100 # limit of the number of records to check when browsing certain collection
@@ -178,10 +181,9 @@ class RestrictedCollectionDataCacher(DataCacher):
         def cache_filler():
             ret = []
             try:
-                viewcollid = acc_get_action_id(VIEWRESTRCOLL)
                 res = run_sql("""SELECT DISTINCT ar.value
                     FROM accROLE_accACTION_accARGUMENT raa JOIN accARGUMENT ar ON raa.id_accARGUMENT = ar.id
-                    WHERE ar.keyword = 'collection' AND raa.id_accACTION = %s""", (viewcollid,))
+                    WHERE ar.keyword = 'collection' AND raa.id_accACTION = %s""", (VIEWRESTRCOLL_ID,))
             except Exception:
                 # database problems, return empty cache
                 return []
@@ -212,6 +214,14 @@ def get_permitted_restricted_collections(user_info):
         if acc_authorize_action(user_info, 'viewrestrcoll', collection=collection)[0] == 0:
             ret.append(collection)
     return ret
+
+def get_restricted_collections_for_recid(recid):
+    """
+    Return the list of restricted collection names to which recid belongs.
+    """
+    restricted_collections = run_sql("""SELECT c.name, c.reclist FROM accROLE_accACTION_accARGUMENT raa JOIN accARGUMENT ar ON raa.id_accARGUMENT = ar.id JOIN collection c ON ar.value=c.name WHERE ar.keyword = 'collection' AND raa.id_accACTION = %s""", (VIEWRESTRCOLL_ID,))
+    return [row[0] for row in restricted_collections if recid in HitSet(row[1])]
+
 
 def is_user_owner_of_record(user_info, recid):
     """
@@ -251,15 +261,16 @@ def check_user_can_view_record(user_info, recid):
     authorization is not granted
     @rtype: (int, string)
     """
-    record_primary_collection = guess_primary_collection_of_a_record(recid)
-    if collection_restricted_p(record_primary_collection):
-        (auth_code, auth_msg) = acc_authorize_action(user_info, VIEWRESTRCOLL, collection=record_primary_collection)
-        if auth_code == 0 or is_user_owner_of_record(user_info, recid):
-            return (0, '')
+    restricted_collections = get_restricted_collections_for_recid(recid)
+    if not restricted_collections or is_user_owner_of_record(user_info, recid):
+        return (0, '')
+    for collection in restricted_collections:
+        (auth_code, auth_msg) = acc_authorize_action(user_info, VIEWRESTRCOLL, collection=collection)
+        if auth_code == 0:
+            continue
         else:
             return (auth_code, auth_msg)
-    else:
-        return (0, '')
+    return (0, '')
 
 class IndexStemmingDataCacher(DataCacher):
     """
@@ -1803,7 +1814,7 @@ def search_pattern(req=None, p=None, f=None, m=None, ap=0, of="id", verbose=0, l
                     if of.startswith('h') and display_nearest_terms_box:
                         if req:
                             if bsu_f == "recid":
-                                print_warning(req, "Requested record does not seem to exist.")
+                                print_warning(req, _("Requested record does not seem to exist."))
                             else:
                                 print_warning(req, create_nearest_terms_box(req.argd, bsu_p, bsu_f, bsu_m, ln=ln))
                     return hitset_empty
@@ -1812,7 +1823,7 @@ def search_pattern(req=None, p=None, f=None, m=None, ap=0, of="id", verbose=0, l
                 if of.startswith('h') and display_nearest_terms_box:
                     if req:
                         if bsu_f == "recid":
-                            print_warning(req, "Requested record does not seem to exist.")
+                            print_warning(req, _("Requested record does not seem to exist."))
                         else:
                             print_warning(req, create_nearest_terms_box(req.argd, bsu_p, bsu_f, bsu_m, ln=ln))
                 return hitset_empty
@@ -3333,6 +3344,9 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
             elif format.startswith("hd"):
                 # HTML detailed format:
                 for irec in range(irec_max, irec_min, -1):
+                    if record_exists(recIDs[irec]) == -1:
+                        print_warning(req, _("The record has been deleted."))
+                        continue
                     unordered_tabs = get_detailed_page_tabs(get_colID(guess_primary_collection_of_a_record(recIDs[irec])),
                                                             recIDs[irec], ln=ln)
                     ordered_tabs_id = [(tab_id, values['order']) for (tab_id, values) in unordered_tabs.iteritems()]
@@ -3342,20 +3356,27 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
 
                     if ln != CFG_SITE_LANG:
                         link_ln = '?ln=%s' % ln
+
+                    recid = recIDs[irec]
+                    recid_to_display = recid  # Record ID used to build the URL.
                     if CFG_WEBSEARCH_USE_ALEPH_SYSNOS:
-                        recid_to_display = get_fieldvalues(recIDs[irec], CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG)[0]
-                    else:
-                        recid_to_display = recIDs[irec]
+                        try:
+                            recid_to_display = get_fieldvalues(recid,
+                                    CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG)[0]
+                        except IndexError:
+                            # No external sysno is available, keep using
+                            # internal recid.
+                            pass
 
                     citedbynum = 0 #num of citations, to be shown in the cit tab
                     references = -1 #num of references
 
-                    citedbynum = get_cited_by_count(recid_to_display)
+                    citedbynum = get_cited_by_count(recid)
                     reftag = ""
                     reftags = get_field_tags("reference")
                     if reftags:
                         reftag = reftags[0]
-                    tmprec = get_record(recid_to_display)
+                    tmprec = get_record(recid)
                     if reftag and len(reftag) > 4:
                         references = len(record_get_field_instances(tmprec, reftag[0:3], reftag[3], reftag[4]))
 
@@ -3445,7 +3466,7 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
                                                                                       tabs,
                                                                                       ln))
                     elif tab == 'keywords':
-                        from bibclassify_webinterface import \
+                        from invenio.bibclassify_webinterface import \
                             record_get_keywords, get_sorting_options, \
                             generate_keywords, get_keywords_body
                         from invenio.webinterface_handler import wash_urlargd
@@ -3582,13 +3603,11 @@ def print_records_epilogue(req, format):
 
 def get_record(recid):
     """Directly the record object corresponding to the recid."""
-    from marshal import loads, dumps
-    from zlib import compress, decompress
     if CFG_BIBUPLOAD_SERIALIZE_RECORD_STRUCTURE:
-        value = run_sql('SELECT value FROM bibfmt WHERE id_bibrec=%s AND FORMAT=\'recstruct\'',  (recid, ))
+        value = run_sql("SELECT value FROM bibfmt WHERE id_bibrec=%s AND FORMAT='recstruct'",  (recid, ))
         if value:
             try:
-                return loads(decompress(value[0][0]))
+                return deserialize_via_marshal(value[0][0])
             except:
                 ### In case of corruption, let's rebuild it!
                 pass
@@ -3596,7 +3615,7 @@ def get_record(recid):
 
 def print_record(recID, format='hb', ot='', ln=CFG_SITE_LANG, decompress=zlib.decompress,
                  search_pattern=None, user_info=None, verbose=0):
-    """Prints record 'recID' formatted accoding to 'format'."""
+    """Prints record 'recID' formatted according to 'format'."""
     if format == 'recstruct':
         return get_record(recID)
 
@@ -3937,17 +3956,30 @@ def call_bibformat(recID, format="HD", ln=CFG_SITE_LANG, search_pattern=None, us
     BibFormat will decide by itself if old or new BibFormat must be used.
     """
 
+    from invenio.bibformat_utils import get_pdf_snippets
+
     keywords = []
     if search_pattern is not None:
         units = create_basic_search_units(None, str(search_pattern), None)
         keywords = [unit[1] for unit in units if unit[0] != '-']
 
-    return format_record(recID,
+    out = format_record(recID,
                          of=format,
                          ln=ln,
                          search_pattern=keywords,
                          user_info=user_info,
                          verbose=verbose)
+
+    if CFG_WEBSEARCH_FULLTEXT_SNIPPETS and user_info and \
+           'fulltext' in user_info['uri']:
+        # check snippets only if URL contains fulltext
+        # FIXME: make it work for CLI too, via new function arg
+        if keywords:
+            snippets = get_pdf_snippets(recID, keywords)
+            if snippets:
+                out += snippets
+
+    return out
 
 def log_query(hostname, query_args, uid=-1):
     """
@@ -4318,7 +4350,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
                 if req.header_only:
                     raise apache.SERVER_RETURN, apache.HTTP_NOT_FOUND
                 else:
-                    print_warning(req, "Requested record does not seem to exist.")
+                    print_warning(req, _("Requested record does not seem to exist."))
             if of == "id":
                 return []
             elif of.startswith("x"):
@@ -4369,7 +4401,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
         if record_exists(recID) != 1:
             # record does not exist
             if of.startswith("h"):
-                print_warning(req, "Requested record does not seem to exist.")
+                print_warning(req, _("Requested record does not seem to exist."))
             if of == "id":
                 return []
             elif of.startswith("x"):

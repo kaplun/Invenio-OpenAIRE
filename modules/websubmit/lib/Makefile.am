@@ -19,7 +19,7 @@ SUBDIRS = functions
 
 pylibdir = $(libdir)/python/invenio
 
-pylib_DATA = websubmit_config.py websubmit_engine.py file.py	\
+pylib_DATA = websubmit_config.py websubmit_engine.py file.py \
              websubmit_dblayer.py \
              websubmit_webinterface.py \
              websubmit_templates.py \
@@ -31,12 +31,23 @@ pylib_DATA = websubmit_config.py websubmit_engine.py file.py	\
              websubmitadmin_regression_tests.py \
              websubmit_file_stamper.py \
              websubmit_icon_creator.py \
+             websubmit_file_converter.py \
+             unoconv.py \
+             websubmit_managedocfiles.py \
              bibdocfile.py \
              bibdocfilecli.py \
-             bibdocfile_regression_tests.py
+             bibdocfile_regression_tests.py \
+             hocrlib.py \
+             websubmit_file_metadata.py
 
-noinst_DATA = fulltext_files_migration_kit.py
+metadataplugindir = $(libdir)/python/invenio/websubmit_file_metadata_plugins
+metadataplugin_DATA = __init__.py \
+                      wsm_extractor_plugin.py \
+                      wsm_pyexiv2_plugin.py \
+                      wsm_pdftk_plugin.py
 
-EXTRA_DIST = $(pylib_DATA) $(noinst_DATA)
+noinst_DATA = fulltext_files_migration_kit.py icon_migration_kit.py
+
+EXTRA_DIST = $(pylib_DATA) $(metadataplugin_DATA) $(noinst_DATA)
 
 CLEANFILES = *~ *.tmp *.pyc

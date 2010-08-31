@@ -15,12 +15,13 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0103
+# pylint: disable=C0103
 """BibEdit Database Layer."""
 
 __revision__ = "$Id$"
 
 from invenio.dbquery import run_sql
+from datetime import datetime
 
 def get_name_tags_all():
     """Return a dictionary of all MARC tag's textual names."""
@@ -37,8 +38,8 @@ def get_bibupload_task_opts(task_ids):
     """Return a list with all set options for list of task IDs TASK_IDS."""
     res = []
     for task_id in task_ids:
-        res.append(run_sql("SELECT arguments FROM schTASK WHERE id=%s" %
-                           task_id))
+        res.append(run_sql("SELECT arguments FROM schTASK WHERE id=%s",
+                           (task_id, )))
     return res
 
 def get_marcxml_of_record_revision(recid, job_date):
@@ -50,16 +51,24 @@ def get_marcxml_of_record_revision(recid, job_date):
                    (recid, job_date))
 
 def get_record_revisions(recid):
-    """Return dates for all known revisions of record RECID."""
+    """Return dates for all known revisions of record RECID.
+      returns a list of tuples (record_id, revision_date)
+    """
     return run_sql("""SELECT id_bibrec,
                              DATE_FORMAT(job_date, '%%Y%%m%%d%%H%%i%%s')
                         FROM hstRECORD WHERE id_bibrec=%s
-                    ORDER BY job_date DESC""" % recid)
+                    ORDER BY job_date DESC""", (recid, ))
 
 def get_record_last_modification_date(recid):
     """Return last modification date, as timetuple, of record RECID."""
-    return run_sql('SELECT modification_date FROM bibrec WHERE id=%s' %
-                   recid)[0][0].timetuple()
+    sql_res = run_sql('SELECT max(job_date) FROM  hstRECORD WHERE id_bibrec=%s',
+                      (recid, ))
+    if sql_res[0][0] == None:
+        return datetime.now().timetuple() # in the case of missing last
+                                          # modification datetime, use
+                                          # current
+    else:
+        return sql_res[0][0].timetuple()
 
 def reserve_record_id():
     """Reserve a new record ID in the bibrec table."""
@@ -71,10 +80,43 @@ def get_related_hp_changesets(recId):
         A function returning the changesets saved in the Holding Pen, related
         to the given record.
     """
-    return run_sql("""SELECT changeset_id, changeset_date FROM bibHOLDINGPEN WHERE id_bibrec='%(identifier)s' ORDER BY changeset_date""" % {"identifier" : recId})
+    return run_sql("""SELECT changeset_id, changeset_date FROM bibHOLDINGPEN
+                      WHERE id_bibrec=%s ORDER BY changeset_date""", (recId, ))
 
 def get_hp_update_xml(changeId):
-    return run_sql("""SELECT  changeset_xml, id_bibrec from bibHOLDINGPEN where changeset_id=%s""", (str(changeId),))[0]
+    """
+    Get the MARC XML of the Holding Pen update
+    """
+    return run_sql("""SELECT  changeset_xml, id_bibrec from bibHOLDINGPEN WHERE
+                      changeset_id=%s""", (str(changeId),))[0]
 
 def delete_hp_change(changeId):
-    return run_sql("""delete from bibHOLDINGPEN where changeset_id=%i""" % (changeId, ))
+    """
+    Delete a change of a given number
+    """
+    return run_sql("""DELETE from bibHOLDINGPEN where changeset_id=%s""",
+                   (str(changeId), ))
+
+def delete_related_holdingpen_changes(recId):
+    """
+    A function removing all the Holding Pen changes related to a given record
+    """
+    return run_sql("""DELETE FROM bibHOLDINGPEN WHERE id_bibrec=%s""",
+                   (recId, ))
+
+def get_record_revision_author(recid, td):
+    """
+    Returns the author of a specific record revision
+    """
+    # obtaining job date from the recvision identifier
+
+    datestring = "%04i-%02i-%02i %02i:%02i:%02i" % (td.tm_year, td.tm_mon,
+                                                    td.tm_mday, td.tm_hour,
+                                                    td.tm_min, td.tm_sec)
+
+    result = run_sql("""SELECT job_person from hstRECORD where id_bibrec=%s
+                        AND job_date=%s""", (recid, datestring))
+    if result != ():
+        return result[0]
+    else:
+        return ""

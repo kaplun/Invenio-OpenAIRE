@@ -24,7 +24,6 @@ __revision__ = "$Id$"
 __lastupdated__ = """$Date$"""
 
 import cgi
-import os
 from datetime import timedelta
 
 from invenio.config import \
@@ -49,7 +48,6 @@ from invenio.access_control_engine import make_apache_message, make_list_apache_
 from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio import webgroup
-from invenio import bibcatalog_system
 from invenio import webgroup_dblayer
 from invenio.messages import gettext_set_language, wash_language
 from invenio.mailutils import send_email
@@ -148,10 +146,17 @@ class WebInterfaceYourAccountPages(WebInterfaceDirectory):
 
         _ = gettext_set_language(args['ln'])
 
-        email = mail_cookie_check_pw_reset(args['k'])
+        title = _('Reset password')
         reset_key = args['k']
 
-        title = _('Reset password')
+        try:
+            email = mail_cookie_check_pw_reset(reset_key)
+        except InvenioWebAccessMailCookieDeletedError:
+            return page(title=title, req=req, body=_("This request for resetting a password has already been used."), uid=webuser.getUid(req), navmenuid='youraccount', language=args['ln'])
+        except InvenioWebAccessMailCookieError:
+            return webuser.page_not_authorized(req, "../youraccount/access",
+                text=_("This request for resetting a password is not valid or"
+                " is expired."), navmenuid='youraccount')
 
         if email is None or CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS >= 3:
             return webuser.page_not_authorized(req, "../youraccount/resetpassword",
@@ -1082,7 +1087,7 @@ class WebInterfaceYourGroupsPages(WebInterfaceDirectory):
         @return: the compose page Leave group
         """
 
-        argd = wash_urlargd(form, {'grpID':(str, ""),
+        argd = wash_urlargd(form, {'grpID':(int, 0),
                                    'group_name':(str, ""),
                                    'leave_button':(str, ""),
                                    'cancel':(str, ""),
@@ -1138,7 +1143,7 @@ class WebInterfaceYourGroupsPages(WebInterfaceDirectory):
         @param ln: language
         @return: the main page displaying all the groups
         """
-        argd = wash_urlargd(form, {'grpID': (str, ""),
+        argd = wash_urlargd(form, {'grpID': (int, 0),
                                    'update': (str, ""),
                                    'cancel': (str, ""),
                                    'delete': (str, ""),

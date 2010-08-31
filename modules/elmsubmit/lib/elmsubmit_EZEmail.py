@@ -97,7 +97,7 @@ import time
 import datetime
 import os
 
-import StringIO
+from StringIO import StringIO
 import quopri
 import uu
 import base64

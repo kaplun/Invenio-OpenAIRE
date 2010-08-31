@@ -15,7 +15,7 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 """CDS Invenio WebSearch Administrator Interface."""
 
@@ -27,9 +27,9 @@ import time
 import sys
 
 if sys.hexversion < 0x2040000:
-    # pylint: disable-msg=W0622
+    # pylint: disable=W0622
     from sets import Set as set
-    # pylint: enable-msg=W0622
+    # pylint: enable=W0622
 
 from invenio.config import \
      CFG_CACHEDIR, \
@@ -2207,8 +2207,8 @@ def perform_deletecollection(colID, ln, confirm=-1, callback='yes'):
     if colID != 1 and colID and col_dict.has_key(int(colID)):
         colID = int(colID)
         subtitle = """<a name="4">4. Delete collection '%s'</a>&nbsp;&nbsp;&nbsp;<small>[<a title="See guide" href="%s/help/admin/websearch-admin-guide#3.4">?</a>]</small>""" % (col_dict[colID], CFG_SITE_URL)
-        res = run_sql("SELECT * from collection_collection WHERE id_dad=%s", (colID, ))
-        res2 = run_sql("SELECT * from collection_collection WHERE id_son=%s", (colID, ))
+        res = run_sql("SELECT id_dad,id_son,type,score from collection_collection WHERE id_dad=%s", (colID, ))
+        res2 = run_sql("SELECT id_dad,id_son,type,score from collection_collection WHERE id_son=%s", (colID, ))
 
         if not res and not res2:
             if confirm in ["-1", -1]:
@@ -2877,13 +2877,13 @@ def remove_col_subcol(id_son, id_dad, type):
     try:
         if id_son != id_dad:
             tree = get_col_tree(id_son)
-            res = run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s", (id_son, id_dad))
+            run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s", (id_son, id_dad))
         else:
             tree = get_col_tree(id_son, type)
-            res = run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s and type=%s", (id_son, id_dad, type))
-        if not run_sql("SELECT * from collection_collection WHERE id_son=%s and type=%s", (id_son, type)):
+            run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s and type=%s", (id_son, id_dad, type))
+        if not run_sql("SELECT id_dad,id_son,type,score from collection_collection WHERE id_son=%s and type=%s", (id_son, type)):
             for (id, up, down, dad, rtype) in tree:
-                res = run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s", (id, dad))
+                run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s", (id, dad))
         return (1, "")
     except StandardError, e:
         return (0, e)
@@ -3220,14 +3220,14 @@ def add_col_fld(colID, fldID, type, fldvID=''):
                 else:
                     score = 1
 
-            res = run_sql("SELECT * FROM collection_field_fieldvalue where id_field=%s and id_collection=%s and type=%s and id_fieldvalue=%s", (fldID, colID, type, fldvID))
+            res = run_sql("SELECT id_collection,id_field,id_fieldvalue,type,score,score_fieldvalue FROM collection_field_fieldvalue where id_field=%s and id_collection=%s and type=%s and id_fieldvalue=%s", (fldID, colID, type, fldvID))
             if not res:
                 run_sql("UPDATE collection_field_fieldvalue SET score_fieldvalue=score_fieldvalue+1 WHERE id_field=%s AND id_collection=%s and type=%s", (fldID, colID, type))
                 res = run_sql("INSERT INTO collection_field_fieldvalue(id_field, id_fieldvalue, id_collection, type, score, score_fieldvalue) values (%s,%s,%s,%s,%s,%s)", (fldID, fldvID, colID, type, score, 1))
             else:
                 return (0, (1, "Already exists"))
         else:
-            res = run_sql("SELECT * FROM collection_field_fieldvalue WHERE id_collection=%s AND type=%s and id_field=%s and id_fieldvalue is NULL", (colID, type, fldID))
+            res = run_sql("SELECT id_collection,id_field,id_fieldvalue,type,score,score_fieldvalue FROM collection_field_fieldvalue WHERE id_collection=%s AND type=%s and id_field=%s and id_fieldvalue is NULL", (colID, type, fldID))
             if res:
                 return (0, (1, "Already exists"))
             else:

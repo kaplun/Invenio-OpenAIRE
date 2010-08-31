@@ -17,13 +17,12 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-# pylint: disable-msg=C0301
+# pylint: disable=C0301
 
 __revision__ = "$Id$"
 
 import time
 import cgi
-import gettext
 import string
 import re
 import locale
@@ -44,7 +43,6 @@ from invenio.config import \
      CFG_BIBRANK_SHOW_CITATION_LINKS, \
      CFG_BIBRANK_SHOW_CITATION_STATS, \
      CFG_BIBRANK_SHOW_CITATION_GRAPHS, \
-     CFG_WEBSEARCH_INSTANT_BROWSE_RSS, \
      CFG_WEBSEARCH_RSS_TTL, \
      CFG_SITE_LANG, \
      CFG_SITE_NAME, \
@@ -113,6 +111,7 @@ class Template:
         'pt': 'pt_BR',
         'fr': 'fr_FR',
         'it': 'it_IT',
+        'ka': 'ka_GE',
         'ro': 'ro_RO',
         'ru': 'ru_RU',
         'rw': 'rw_RW',
@@ -462,7 +461,7 @@ class Template:
 <Developer>Powered by CDS Invenio</Developer>
 <Url type="text/html" indexOffset="1" rel="results" template="%(html_search_syntax)s" />
 <Url type="application/rss+xml" indexOffset="1" rel="results" template="%(rss_search_syntax)s" />
-<Url type="application/opensearchdescription+xml" rel="self" template="%(CFG_SITE_URL)s/search/opensearchdescription" />
+<Url type="application/opensearchdescription+xml" rel="self" template="%(CFG_SITE_URL)s/opensearchdescription" />
 <moz:SearchForm>%(CFG_SITE_URL)s</moz:SearchForm>
 </OpenSearchDescription>""" % \
   {'CFG_SITE_URL': CFG_SITE_URL,
@@ -3387,14 +3386,13 @@ class Template:
         <category></category>
         <generator>CDS Invenio %(version)s</generator>
         <webMaster>%(sitesupportemail)s</webMaster>
-        <ttl>%(timetolive)s</ttl>%(previous_link)s%(next_link)s%(current_link)s%(total_results)s%(start_index)s%(total_results)s
+        <ttl>%(timetolive)s</ttl>%(previous_link)s%(next_link)s%(current_link)s%(total_results)s%(start_index)s%(items_per_page)s
         <image>
             <url>%(siteurl)s/img/cds.png</url>
             <title>%(sitename)s</title>
             <link>%(siteurl)s</link>
         </image>
-         <url type="application/rss+xml" indexOffset="1" rel="results" template="%(search_syntax)s" />
-         <atom:link rel="search" href="%(siteurl)s/search/opensearchdescription" type="application/opensearchdescription+xml" title="Content Search" />
+         <atom:link rel="search" href="%(siteurl)s/opensearchdescription" type="application/opensearchdescription+xml" title="Content Search" />
 
         <textInput>
           <title>Search </title>
@@ -3424,7 +3422,7 @@ class Template:
                              '\n<opensearch:totalResults>%i</opensearch:totalResults>' % nb_found) or '',
                'start_index': (jrec and \
                              '\n<opensearch:startIndex>%i</opensearch:startIndex>' % jrec) or '',
-               'total_results': (rg and \
+               'items_per_page': (rg and \
                              '\n<opensearch:itemsPerPage>%i</opensearch:itemsPerPage>' % rg) or '',
         }
         return out
@@ -3982,7 +3980,7 @@ class Template:
                         p = searchfield + ':' + searchpattern
                 link_url += quote(p)
             if colldef:
-                link_url += ' ' + quote(colldef)
+                link_url += '%20AND%20' + quote(colldef)
             link_url += '&amp;rm=citation';
             link_text = self.tmpl_nice_number(d_total_recs[coll], ln)
             out += '<td align="right"><a href="%s">%s</a></td>' % (link_url, link_text)
@@ -4020,9 +4018,9 @@ class Template:
                         p = searchfield + ':"' + searchpattern + '"'
                     else:
                         p = searchfield + ':' + searchpattern
-                link_url += quote(p) + ' '
+                link_url += quote(p) + '%20AND%20'
             if colldef:
-                link_url += quote(colldef) + ' '
+                link_url += quote(colldef) + '%20AND%20'
             if low == 0 and high == 0:
                 link_url += quote('cited:0')
             else:

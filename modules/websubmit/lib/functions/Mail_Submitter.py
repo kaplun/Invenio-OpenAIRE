@@ -39,16 +39,42 @@ __revision__ = "$Id$"
 import os
 import re
 
-from invenio.config import \
-     CFG_SITE_ADMIN_EMAIL, \
-     CFG_SITE_NAME, \
+from invenio.config import CFG_SITE_NAME, \
      CFG_SITE_URL, \
      CFG_SITE_SUPPORT_EMAIL
 
 from invenio.websubmit_config import CFG_WEBSUBMIT_COPY_MAILS_TO_ADMIN
 from invenio.mailutils import send_email
+from invenio.websubmit_functions.Shared_Functions import get_nice_bibsched_related_message
 
-def Mail_Submitter (parameters, curdir, form, user_info=None):
+def Mail_Submitter(parameters, curdir, form, user_info=None):
+    """
+    This function send an email to the submitter to warn him the
+    document he has just submitted has been correctly received.
+
+    Parameters:
+
+      * authorfile: Name of the file containing the authors of the
+                    document
+
+      * titleFile: Name of the file containing the title of the
+                   document
+
+      * emailFile: Name of the file containing the email of the
+                   submitter of the document
+
+      * status: Depending on the value of this parameter, the function
+                adds an additional text to the email.  This parameter
+                can be one of: ADDED: The file has been integrated in
+                the database.  APPROVAL: The file has been sent for
+                approval to a referee.  or can stay empty.
+
+      * edsrn: Name of the file containing the reference of the
+               document
+
+      * newrnin: Name of the file containing the 2nd reference of the
+                 document (if any)
+    """
     FROMADDR = '%s Submission Engine <%s>' % (CFG_SITE_NAME,CFG_SITE_SUPPORT_EMAIL)
     # retrieve report number
     edsrn = parameters['edsrn']
@@ -94,7 +120,9 @@ def Mail_Submitter (parameters, curdir, form, user_info=None):
         email_txt =  email_txt + "An email has been sent to the referee. You will be warned by email as soon as the referee takes his/her decision regarding your document.\n\n"
     elif parameters['status'] == "ADDED":
         email_txt = email_txt + "It will be soon added to our Document Server.\n\nOnce inserted, you will be able to check the  bibliographic information and the quality of the electronic documents at this URL:\n<%s/record/%s>\nIf you detect an error please let us know by sending an email to %s. \n\n" % (CFG_SITE_URL,sysno,CFG_SITE_SUPPORT_EMAIL)
+    email_txt += get_nice_bibsched_related_message(curdir)
     email_txt = email_txt + "Thank you for using %s Submission Interface.\n" % CFG_SITE_NAME
+
 
     # send the mail
     send_email(FROMADDR, m_recipient.strip(), "%s: Document Received" % fullrn, email_txt, copy_to_admin=CFG_WEBSUBMIT_COPY_MAILS_TO_ADMIN)

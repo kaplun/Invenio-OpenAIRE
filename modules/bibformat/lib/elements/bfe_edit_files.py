@@ -16,27 +16,39 @@
 ## You should have received a copy of the GNU General Public License
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
-"""BibFormat element - Prints HTML picture and links to resources
+"""BibFormat element - Prints a link to BibDocFile
 """
 __revision__ = "$Id$"
 
-def format(bfo):
-    """
-    Prints html image and link to photo resources.
-    """
+from invenio.urlutils import create_html_link
+from invenio.messages import gettext_set_language
+from invenio.config import CFG_SITE_URL
+from invenio.access_control_engine import acc_authorize_action
 
-    resources = bfo.fields("8564_", escape=1)
+def format(bfo, style):
+    """
+    Prints a link to simple file management interface (BibDocFile), if
+    authorization is granted.
+
+    @param style: the CSS style to be applied to the link.
+    """
+    _ = gettext_set_language(bfo.lang)
+
     out = ""
-    for resource in resources:
 
-        if resource.get("x", "") == "icon" and resource.get("u", "") == "":
-            out += '<br /><br /><img src="' + resource.get("q", "").replace(" ","") + '" alt="" />'
+    user_info = bfo.user_info
+    (auth_code, auth_message) = acc_authorize_action(user_info,
+                                                     'runbibdocfile')
+    if auth_code == 0:
+        linkattrd = {}
+        if style != '':
+            linkattrd['style'] = style
 
-        if resource.get("x", "") == "1":
-            out += '<br />High resolution: <a href="'+resource.get("q", "") +'">'+ resource.get("q", "") +"</a>"
-
-    out += '<br /><font size="-2"><b>© CERN Geneva</b></font>'
-    out += '<br /> <a href="'+bfo.field("8564_u")+'">'+ bfo.field("8564_z") + "</a>"
+        out += create_html_link(CFG_SITE_URL + '/submit/managedocfiles',
+                         urlargd={'ln': bfo.lang,
+                                  'recid': str(bfo.recID)},
+                         link_label=_("Manage Files of This Record"),
+                         linkattrd=linkattrd)
     return out
 
 def escape_values(bfo):

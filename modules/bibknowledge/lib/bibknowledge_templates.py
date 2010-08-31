@@ -188,14 +188,14 @@ class Template:
         else:
             out += _("Please upload the RDF file for taxonomy")+" "+kb_name
         out += """
-             <br/>
-             <form enctype="multipart/form-data" method="post"
-                   action="kb/upload">
-             <input type="file" name="file"/>
-             <input type="hidden", name="kb", value="%(kb_id)s"/>
-             <input type="submit" name="submit" value="Upload"/>
-             </form>
-             """ % { 'kb_id': kb_id }
+          <br/>
+          <!-- enctype="multipart/form-data"-->
+          <form method="post" action="kb/upload" name="upload" enctype="multipart/form-data">
+          <input style="display:none;" name="kb", value="%(kb_id)s"/>
+          <input type="file" name="file"/>
+          <input type="submit" name="submit" value="Upload"/>
+          </form>
+          """ % { 'kb_id': kb_id }
         return out
 
 
@@ -706,13 +706,13 @@ sortby=%(sortby)s&amp;forcetype=no&amp;kb_type=%(kb_type)s"
         formadd = '''<form action="kb?action=add_mapping&amp;ln=%(ln)s&amp;kb=%(kb_id)s&amp;forcetype=curr" method="post">
                     <input type="hidden" name="mapFrom" value="%(left)s"/>
                     <input type="hidden" name="mapTo" value="%(right)s"/>
-	            <input class="adminbutton"
+                    <input class="adminbutton"
                      type="submit" value="%(opt)s"/></form>''' % { 'opt':optadd, 'ln':ln,
                                                                     'kb_id':kbid,
                                                                     'left':left, 'right':right }
         formcancel = '''<form action="kb?ln=%(ln)s&amp;kb=%(kb_id)s">
                     <input type="hidden" name="kb" value="%(kb_id)s">
-	            <input  class="adminbutton"
+                    <input  class="adminbutton"
                      type="submit" value="%(opt)s"/></form>''' % { 'ln': ln, 'kb_id':kbid, 'opt':optcancel }
 
         if dontdoit:

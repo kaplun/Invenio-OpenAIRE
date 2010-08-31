@@ -27,32 +27,69 @@ from invenio.websubmit_config import InvenioWebSubmitFunctionWarning, \
 import os.path, shutil, re
 
 def Stamp_Uploaded_Files(parameters, curdir, form, user_info=None):
-    """Stamp certain files that have been uploaded during a submission.
-       @param parameters: (dictionary) - must contain:
+    """
+    Stamp certain files that have been uploaded during a submission.
+
+    @param parameters: (dictionary) - must contain:
+
          + latex_template: (string) - the name of the LaTeX template that
             should be used for the creation of the stamp.
-         + latex_template_vars: (string) - a string-ified dictionary of
-            variables to be replaced in the LaTeX template and the values
-            (or names of files in curdir containing the values) with which to
-            replace them.
+
+         + latex_template_vars: (string) - a string-ified dictionary
+            of variables to be replaced in the LaTeX template and the
+            values (or names of files in curdir containing the values)
+            with which to replace them. Use prefix 'FILE:' to specify
+            that the stamped value must be read from a file in
+            submission directory instead of being a fixed value to
+            stamp.
             E.G.:
-               { 'TITLE' : 'DEMOTHESIS_TITLE',
-                 'DATE'  : 'DEMOTHESIS_DATE'
+               { 'TITLE' : 'FILE:DEMOTHESIS_TITLE',
+                 'DATE'  : 'FILE:DEMOTHESIS_DATE'
                }
+
          + files_to_be_stamped: (string) - The directories in which files
             should be stamped: This is a comma-separated list of directory
             names. E.g.:
                DEMOTHESIS_MAIN,DEMOTHESIS_ADDITIONAL
+
+            (If you use Create_Upload_Files_Interface function, you
+            should know that uploaded files goes under a subdirectory
+            'updated/' of the /files/ folder in submission directory:
+            in this case you have to specify this component in the
+            parameter. For eg:
+            updated/DEMOTHESIS_MAIN,updated/DEMOTHESIS_ADDITIONAL)
+
          + stamp: (string) - the type of stamp to be applied to the files.
             should be one of:
               + first (only the first page is stamped);
               + all (all pages are stamped);
               + coverpage (a separate cover-page is added to the file as a
                  first page);
-       If all goes according to plan, for each directory in which files are to
-       be stamped, the original, unstamped files should be found in a
-       directory 'files_before_stamping/DIRNAME', and the stamped versions
-       should be found under 'files/DIRNAME'. E.g., for DEMOTHESIS_Main:
+
+         + layer: (string) - the position of the stamp. Should be one of:
+              + background (invisible if original file has a white -
+                            not transparent- background layer)
+              + foreground (on top of the stamped file. If the stamp
+                            does not have a transparent background,
+                            will hide all of the document layers)
+
+         + switch_file: (string) - when this value is set, specifies
+            the name of a file that will swith on/off the
+            stamping. The 'switch_file' must contain the names defined
+            in 'files_to_be_stamped' (comma-separated values). Stamp
+            will be applied only to files referenced in the
+            switch_file. No stamp is applied if the switch_file is
+            missing from the submission directory.
+            However if the no switch_file is defined in this variable
+            (parameter is left empty), stamps are applied according
+            the variable 'files_to_be_stamped'.
+            Useful for eg. if you want to let your users control the
+            stamping with a checkbox on your submission page.
+
+    If all goes according to plan, for each directory in which files are to
+    be stamped, the original, unstamped files should be found in a
+    directory 'files_before_stamping/DIRNAME', and the stamped versions
+    should be found under 'files/DIRNAME'. E.g., for DEMOTHESIS_Main:
          - Unstamped: files_before_stamping/DEMOTHESIS_Main
          - Stamped:   files/DEMOTHESIS_Main
     """
@@ -63,6 +100,7 @@ def Stamp_Uploaded_Files(parameters, curdir, form, user_info=None):
     ##    'input-file'          : "", ## INPUT FILE
     ##    'output-file'         : "", ## OUTPUT FILE
     ##    'stamp'               : "", ## STAMP TYPE
+    ##    'layer'               : "", ## LAYER TO STAMP
     ##    'verbosity'           : 0,  ## VERBOSITY (we don't care about it)
     ##  }
     file_stamper_options = { 'latex-template'      : "",
@@ -70,6 +108,7 @@ def Stamp_Uploaded_Files(parameters, curdir, form, user_info=None):
                              'input-file'          : "",
                              'output-file'         : "",
                              'stamp'               : "",
+                             'layer'               : "",
                              'verbosity'           : 0,
                            }
     ## A dictionary of arguments to be passed to visit_for_stamping:
@@ -91,6 +130,13 @@ def Stamp_Uploaded_Files(parameters, curdir, form, user_info=None):
     ## The type of stamp to be applied to the file(s):
     stamp = "%s" % ((type(parameters['stamp']) is str and \
                      parameters['stamp'].lower()) or "")
+    ## The layer to use for stamping:
+    try:
+        layer = parameters['layer']
+    except KeyError:
+        layer = "background"
+    if not layer in ('background', 'foreground'):
+        layer = "background"
     ## The directories in which files should be stamped:
     ## This is a comma-separated list of directory names. E.g.:
     ## DEMOTHESIS_MAIN,DEMOTHESIS_ADDITIONAL
@@ -102,6 +148,26 @@ def Stamp_Uploaded_Files(parameters, curdir, form, user_info=None):
         stamping_locations = stamp_content_of.split(",")
     else:
         stamping_locations = []
+
+    ## Check if stamping is enabled
+    switch_file = parameters.get('switch_file', '')
+    if switch_file:
+        # Good, a "switch file" was specified. Check if it exists, and
+        # it its value is not empty.
+        switch_file_content = ''
+        try:
+            fd = file(os.path.join(curdir, switch_file))
+            switch_file_content = fd.read().split(',')
+            fd.close()
+        except:
+            switch_file_content = ''
+        if not switch_file_content:
+            # File does not exist, or is emtpy. Silently abort
+            # stamping.
+            return ""
+        else:
+            stamping_locations = [location for location in stamping_locations \
+                                  if location in switch_file_content]
 
     if len(stamping_locations) == 0:
         ## If there are no items to be stamped, don't continue:
@@ -188,6 +254,7 @@ def Stamp_Uploaded_Files(parameters, curdir, form, user_info=None):
     file_stamper_options['latex-template'] = latex_template
     file_stamper_options['latex-template-var'] = latex_template_vars
     file_stamper_options['stamp'] = stamp
+    file_stamper_options['layer'] = layer
 
     for stampdir in stamping_locations:
         ## Create the full path to the stamp directory - it is considered

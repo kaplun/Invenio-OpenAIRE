@@ -20,21 +20,22 @@
 
 __revision__ = "$Id$"
 
+import os
 import sys
 import time
-import marshal
 import ConfigParser
 
 from invenio.config import \
      CFG_SITE_LANG, \
-     CFG_ETCDIR
+     CFG_ETCDIR, \
+     CFG_PREFIX
 from invenio.search_engine import perform_request_search, HitSet
 from invenio.bibrank_citation_indexer import get_citation_weight, print_missing, get_cit_dict, insert_into_cit_db
 from invenio.bibrank_downloads_indexer import *
 from invenio.dbquery import run_sql, serialize_via_marshal, deserialize_via_marshal
 from invenio.errorlib import register_exception
 from invenio.bibtask import task_get_option, write_message, task_sleep_now_if_required
-
+from invenio.bibindex_engine import create_range_list
 
 options = {}
 
@@ -44,7 +45,7 @@ def remove_auto_cites(dic):
         new_list = dic.fromkeys(dic[key]).keys()
         try:
             new_list.remove(key)
-        except ValueError, e:
+        except ValueError:
             pass
         dic[key] = new_list
     return dic
@@ -85,13 +86,16 @@ def single_tag_rank_method_repair_exec():
 def citation_exec(rank_method_code, name, config):
     """Rank method for citation analysis"""
     #first check if this is a specific task
+    begin_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     if task_get_option("cmd") == "print-missing":
         num = task_get_option("num")
         print_missing(num)
-    dict = get_citation_weight(rank_method_code, config)
-    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    if dict: intoDB(dict, date, rank_method_code)
-    else: write_message("no need to update the indexes for citations")
+    else:
+        dict = get_citation_weight(rank_method_code, config)
+        if dict:
+            intoDB(dict, begin_date, rank_method_code)
+        else:
+            write_message("no need to update the indexes for citations")
 
 def download_weight_filtering_user(run):
     return bibrank_engine(run)
@@ -106,53 +110,52 @@ def download_weight_filtering_user_exec (rank_method_code, name, config):
     """Ranking by number of downloads per User.
     Only one full Text Download is taken in account for one
     specific userIP address"""
+    begin_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     time1 = time.time()
     dic = fromDB(rank_method_code)
     last_updated = get_lastupdated(rank_method_code)
     keys = new_downloads_to_index(last_updated)
     filter_downloads_per_hour(keys, last_updated)
     dic = get_download_weight_filtering_user(dic, keys)
-    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    intoDB(dic, date, rank_method_code)
+    intoDB(dic, begin_date, rank_method_code)
     time2 = time.time()
     return {"time":time2-time1}
 
 def download_weight_total_exec(rank_method_code, name, config):
     """rankink by total number of downloads without check the user ip
     if users downloads 3 time the same full text document it has to be count as 3 downloads"""
+    begin_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     time1 = time.time()
     dic = fromDB(rank_method_code)
     last_updated = get_lastupdated(rank_method_code)
     keys = new_downloads_to_index(last_updated)
     filter_downloads_per_hour(keys, last_updated)
     dic = get_download_weight_total(dic, keys)
-    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    intoDB(dic, date, rank_method_code)
+    intoDB(dic, begin_date, rank_method_code)
     time2 = time.time()
     return {"time":time2-time1}
 
 def file_similarity_by_times_downloaded_exec(rank_method_code, name, config):
     """update dictionnary {recid:[(recid, nb page similarity), ()..]}"""
+    begin_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     time1 = time.time()
     dic = fromDB(rank_method_code)
     last_updated = get_lastupdated(rank_method_code)
     keys = new_downloads_to_index(last_updated)
     filter_downloads_per_hour(keys, last_updated)
     dic = get_file_similarity_by_times_downloaded(dic, keys)
-    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    intoDB(dic, date, rank_method_code)
+    intoDB(dic, begin_date, rank_method_code)
     time2 = time.time()
     return {"time":time2-time1}
 
 def single_tag_rank_method_exec(rank_method_code, name, config):
     """Creating the rank method data"""
-    startCreate = time.time()
+    begin_date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     rnkset = {}
     rnkset_old = fromDB(rank_method_code)
-    date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     rnkset_new = single_tag_rank(config)
     rnkset = union_dicts(rnkset_old, rnkset_new)
-    intoDB(rnkset, date, rank_method_code)
+    intoDB(rnkset, begin_date, rank_method_code)
 
 def single_tag_rank(config):
     """Connect the given tag with the data from the kb file given"""
@@ -222,6 +225,18 @@ def intoDB(dict, date, rank_method_code):
     run_sql("INSERT INTO rnkMETHODDATA(id_rnkMETHOD, relevance_data) VALUES (%s,%s)", (midstr, serdata,))
     run_sql("UPDATE rnkMETHOD SET last_updated=%s WHERE name=%s", (date, rank_method_code))
 
+    # FIXME: the following is a workaround for the citation indexer
+    # memory troubles, when Apache WSGI daemon processes may end up
+    # doubling the memory after citation dictionary is updated;
+    # therefore let us restart the WSGI daemon application after the
+    # citation indexer finished, which relieves this problem.  The
+    # restart is done via touching invenio.wsgi file.  The proper fix
+    # for this problem would be strict separation between citation
+    # indexer updating dicts and citation searcher loading dicts.
+    if rank_method_code == 'citation':
+        os.system('touch ' + os.path.join(CFG_PREFIX, 'var', 'www-wsgi',
+                                          'invenio.wsgi'))
+
 def fromDB(rank_method_code):
     """Get the data for a rank method"""
     id = run_sql("SELECT id from rnkMETHOD where name=%s", (rank_method_code, ))
@@ -234,12 +249,12 @@ def fromDB(rank_method_code):
 def del_rank_method_codeDATA(rank_method_code):
     """Delete the data for a rank method"""
     id = run_sql("SELECT id from rnkMETHOD where name=%s", (rank_method_code, ))
-    res = run_sql("DELETE FROM rnkMETHODDATA WHERE id_rnkMETHOD=%s", (id[0][0], ))
+    run_sql("DELETE FROM rnkMETHODDATA WHERE id_rnkMETHOD=%s", (id[0][0], ))
 
 def del_recids(rank_method_code, range_rec):
     """Delete some records from the rank method"""
     id = run_sql("SELECT id from rnkMETHOD where name=%s", (rank_method_code, ))
-    res = run_sql("SELECT relevance_data FROM rnkMETHODDATA WHERE id_rnkMETHOD=%s", (id[0][0] ))
+    res = run_sql("SELECT relevance_data FROM rnkMETHODDATA WHERE id_rnkMETHOD=%s", (id[0][0], ))
     if res:
         rec_dict = deserialize_via_marshal(res[0][0])
         write_message("Old size: %s" % len(rec_dict))
@@ -248,8 +263,7 @@ def del_recids(rank_method_code, range_rec):
                 if rec_dict.has_key(i):
                     del rec_dict[i]
         write_message("New size: %s" % len(rec_dict))
-        date = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-        intoDB(rec_dict, date, rank_method_code)
+        intoDB(rec_dict, begin_date, rank_method_code)
     else:
         write_message("Create before deleting!")
 
@@ -327,7 +341,6 @@ def bibrank_engine(run):
         pass
 
     startCreate = time.time()
-    sets = {}
     try:
         options["run"] = []
         options["run"].append(run)
@@ -423,7 +436,7 @@ def add_recIDs_by_date(rank_method_code, dates=""):
     if not dates:
         try:
             dates = (get_lastupdated(rank_method_code), '')
-        except Exception, e:
+        except Exception:
             dates = ("0000-00-00 00:00:00", '')
     if dates[0] is None:
         dates = ("0000-00-00 00:00:00", '')
@@ -435,10 +448,10 @@ def add_recIDs_by_date(rank_method_code, dates=""):
         res = run_sql(query, (dates[0], dates[1]))
     else:
         res = run_sql(query, (dates[0], ))
-    list = create_range_list(res)
-    if not list:
+    alist = create_range_list([row[0] for row in res])
+    if not alist:
         write_message("No new records added since last time method was run")
-    return list
+    return alist
 
 def getName(rank_method_code, ln=CFG_SITE_LANG, type='ln'):
     """Returns the name of the method if it exists"""
@@ -455,27 +468,9 @@ def getName(rank_method_code, ln=CFG_SITE_LANG, type='ln'):
             return res[0][0]
         else:
             raise Exception
-    except Exception, e:
+    except Exception:
         write_message("Cannot run rank method, either given code for method is wrong, or it has not been added using the webinterface.")
         raise Exception
-
-def create_range_list(res):
-    """Creates a range list from a recID select query result contained
-    in res. The result is expected to have ascending numerical order."""
-    if not res:
-        return []
-    row = res[0]
-    if not row:
-        return []
-    else:
-        range_list = [[row[0], row[0]]]
-    for row in res[1:]:
-        id = row[0]
-        if id == range_list[-1][1] + 1:
-            range_list[-1][1] = id
-        else:
-            range_list.append([id, id])
-    return range_list
 
 def single_tag_rank_method(run):
     return bibrank_engine(run)

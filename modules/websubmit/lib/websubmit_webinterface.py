@@ -23,6 +23,7 @@ import os
 import time
 import cgi
 import sys
+import shutil
 
 from urllib import urlencode
 
@@ -30,12 +31,13 @@ from invenio.config import \
      CFG_ACCESS_CONTROL_LEVEL_SITE, \
      CFG_SITE_LANG, \
      CFG_SITE_NAME, \
+     CFG_TMPDIR, \
      CFG_SITE_NAME_INTL, \
      CFG_SITE_URL, \
      CFG_SITE_SECURE_URL, \
      CFG_WEBSUBMIT_STORAGEDIR, \
      CFG_PREFIX
-from invenio import webinterface_handler_wsgi_utils as apache
+from invenio import webinterface_handler_config as apache
 from invenio.dbquery import run_sql
 from invenio.access_control_config import VIEWRESTRCOLL
 from invenio.access_control_mailcookie import mail_cookie_create_authorize_action
@@ -43,7 +45,7 @@ from invenio.access_control_engine import acc_authorize_action
 from invenio.access_control_admin import acc_is_role
 from invenio.webpage import page, create_error_box, pageheaderonly, \
     pagefooteronly
-from invenio.webuser import getUid, page_not_authorized, collect_user_info, isGuestUser
+from invenio.webuser import getUid, page_not_authorized, collect_user_info, isGuestUser, isUserSuperAdmin
 from invenio.websubmit_config import *
 from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 from invenio.urlutils import make_canonical_urlargd, redirect_to_url
@@ -53,7 +55,7 @@ from invenio.search_engine import \
      create_navtrail_links, check_user_can_view_record, record_empty
 from invenio.bibdocfile import BibRecDocs, normalize_format, file_strip_ext, \
     stream_restricted_icon, BibDoc, InvenioWebSubmitFileError, stream_file, \
-    decompose_file, propose_next_docname
+    decompose_file, propose_next_docname, get_subformat_from_format
 from invenio.errorlib import register_exception
 from invenio.websubmit_icon_creator import create_icon, InvenioWebSubmitIconCreatorError
 import invenio.template
@@ -68,6 +70,12 @@ try:
     fckeditor_available = True
 except ImportError, e:
     fckeditor_available = False
+
+from invenio.websubmit_managedocfiles import \
+     create_file_upload_interface, \
+     get_upload_file_interface_javascript, \
+     get_upload_file_interface_css, \
+     move_uploaded_files_to_storage
 
 class WebInterfaceFilesPages(WebInterfaceDirectory):
 
@@ -89,7 +97,7 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
             user_info = collect_user_info(req)
 
             verbose = args['verbose']
-            if verbose >= 1 and acc_authorize_action(user_info, 'fulltext')[0] != 0:
+            if verbose >= 1 and not isUserSuperAdmin(user_info):
                 # Only SuperUser can see all the details!
                 verbose = 0
 
@@ -105,16 +113,16 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                 msg = "<p>%s</p>" % _("Requested record does not seem to have been integrated.")
                 return warningMsg(msg, req, CFG_SITE_NAME, ln)
 
-            (auth_code, auth_msg) = check_user_can_view_record(user_info, self.recid)
+            (auth_code, auth_message) = check_user_can_view_record(user_info, self.recid)
             if auth_code and user_info['email'] == 'guest' and not user_info['apache_user']:
                 cookie = mail_cookie_create_authorize_action(VIEWRESTRCOLL, {'collection' : guess_primary_collection_of_a_record(self.recid)})
                 target = '/youraccount/login' + \
                     make_canonical_urlargd({'action': cookie, 'ln' : ln, 'referer' : \
                     CFG_SITE_URL + user_info['uri']}, {})
-                return redirect_to_url(req, target)
+                return redirect_to_url(req, target, norobot=True)
             elif auth_code:
                 return page_not_authorized(req, "../", \
-                    text = auth_msg)
+                    text = auth_message)
 
 
             readonly = CFG_ACCESS_CONTROL_LEVEL_SITE == 1
@@ -132,9 +140,13 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                     _("The error has been logged and will be taken in consideration as soon as possible."))
                 return warningMsg(msg, req, CFG_SITE_NAME, ln)
 
+            if bibarchive.deleted_p():
+                return print_warning(req, _("Requested record does not seem to exist."))
+
             docname = ''
             format = ''
             version = ''
+            warn = ''
 
             if filename:
                 # We know the complete file name, guess which docid it
@@ -145,11 +157,15 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                 format = filename[len(docname):]
                 if format and format[0] != '.':
                     format = '.' + format
+                if args['subformat']:
+                    format += ';%s' % args['subformat']
             else:
                 docname = args['docname']
 
             if not format:
                 format = args['format']
+                if args['subformat']:
+                    format += ';%s' % args['subformat']
 
             if not version:
                 version = args['version']
@@ -161,7 +177,7 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                 if version != 'all':
                     version = ''
 
-            display_hidden = acc_authorize_action(user_info, 'fulltext')[0] == 0
+            display_hidden = isUserSuperAdmin(user_info)
 
             if version != 'all':
                 # search this filename in the complete list of files
@@ -169,69 +185,41 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                     if docname == doc.get_docname():
                         try:
                             docfile = doc.get_file(format, version)
-                        except InvenioWebSubmitFileError, msg:
-                            register_exception(req=req, alert_admin=True)
-
-                        if docfile.get_status() == '':
-                            # The file is not resticted, let's check for
-                            # collection restriction then.
-                            (auth_code, auth_message) = check_user_can_view_record(user_info, self.recid)
-                            if auth_code:
-                                return warningMsg(_("The collection to which this file belong is restricted: ") + auth_message, req, CFG_SITE_NAME, ln)
-                        else:
-                            # The file is probably restricted on its own.
-                            # Let's check for proper authorization then
                             (auth_code, auth_message) = docfile.is_restricted(req)
                             if auth_code != 0:
-                                return warningMsg(_("This file is restricted: ") + auth_message, req, CFG_SITE_NAME, ln)
+                                if CFG_WEBSUBMIT_ICON_SUBFORMAT_RE.match(get_subformat_from_format(format)):
+                                    return stream_restricted_icon(req)
+                                if user_info['email'] == 'guest' and not user_info['apache_user']:
+                                    cookie = mail_cookie_create_authorize_action('viewrestrdoc', {'status' : docfile.get_status()})
+                                    target = '/youraccount/login' + \
+                                    make_canonical_urlargd({'action': cookie, 'ln' : ln, 'referer' : \
+                                        CFG_SITE_URL + user_info['uri']}, {})
+                                    redirect_to_url(req, target)
+                                else:
+                                    req.status = apache.HTTP_UNAUTHORIZED
+                                    warn += print_warning(_("This file is restricted: ") + auth_message)
+                                    break
 
-                        if display_hidden or not docfile.hidden_p():
-                            if not readonly:
-                                ip = str(req.remote_ip)
-                                res = doc.register_download(ip, version, format, uid)
-                            try:
-                                return docfile.stream(req)
-                            except InvenioWebSubmitFileError, msg:
-                                register_exception(req=req, alert_admin=True)
-                                return warningMsg(_("An error has happened in trying to stream the request file."), req, CFG_SITE_NAME, ln)
-                        else:
-                            warn = print_warning(_("The requested file is hidden and you don't have the proper rights to access it."))
+                            if display_hidden or not docfile.hidden_p():
+                                if not readonly:
+                                    ip = str(req.remote_ip)
+                                    res = doc.register_download(ip, version, format, uid)
+                                try:
+                                    return docfile.stream(req)
+                                except InvenioWebSubmitFileError, msg:
+                                    register_exception(req=req, alert_admin=True)
+                                    req.status = apache.HTTP_INTERNAL_SERVER_ERROR
+                                    return warningMsg(_("An error has happened in trying to stream the request file."), req, CFG_SITE_NAME, ln)
+                            else:
+                                req.status = apache.HTTP_UNAUTHORIZED
+                                warn = print_warning(_("The requested file is hidden and you don't have the proper rights to access it."))
 
-                    elif doc.get_icon() is not None and doc.get_icon().docname == file_strip_ext(filename):
-                        icon = doc.get_icon()
-                        try:
-                            iconfile = icon.get_file(format, version)
                         except InvenioWebSubmitFileError, msg:
                             register_exception(req=req, alert_admin=True)
-                            return warningMsg(_("An error has happened in trying to retrieve the corresponding icon."), req, CFG_SITE_NAME, ln)
 
-                        if iconfile.get_status() == '':
-                            # The file is not resticted, let's check for
-                            # collection restriction then.
-                            (auth_code, auth_message) = check_user_can_view_record(user_info, self.recid)
-                            if auth_code:
-                                return stream_restricted_icon(req)
-                        else:
-                            # The file is probably restricted on its own.
-                            # Let's check for proper authorization then
-                            (auth_code, auth_message) = iconfile.is_restricted(req)
-                            if auth_code != 0:
-                                return stream_restricted_icon(req)
-
-                        if not readonly:
-                            ip = str(req.remote_ip)
-                            res = doc.register_download(ip, version, format, uid)
-                        try:
-                            return iconfile.stream(req)
-                        except InvenioWebSubmitFileError, msg:
-                            register_exception(req=req, alert_admin=True)
-                            return warningMsg(_("An error has happened in trying to stream the corresponding icon."), req, CFG_SITE_NAME, ln)
-
-            if docname and format and display_hidden:
+            if docname and format and not warn:
                 req.status = apache.HTTP_NOT_FOUND
-                warn = print_warning(_("Requested file does not seem to exist."))
-            else:
-                warn = ''
+                warn += print_warning(_("Requested file does not seem to exist."))
             filelist = bibarchive.display("", version, ln=ln, verbose=verbose, display_hidden=display_hidden)
 
             t = warn + websubmit_templates.tmpl_filelist(
@@ -339,7 +327,223 @@ from invenio.websubmit_engine import home, action, interface, endaction
 
 class WebInterfaceSubmitPages(WebInterfaceDirectory):
 
-    _exports = ['summary', 'sub', 'direct', '', 'attachfile', 'uploadfile', 'getuploadedfile']
+    _exports = ['summary', 'sub', 'direct', '', 'attachfile', 'uploadfile', \
+                'getuploadedfile', 'managedocfiles', 'managedocfilesasync']
+
+    def managedocfiles(self, req, form):
+        """
+        Display admin interface to manage files of a record
+        """
+        argd = wash_urlargd(form, {
+            'ln': (str, ''),
+            'access': (str, ''),
+            'recid': (int, None),
+            'do': (int, 0),
+            'cancel': (str, None),
+            })
+
+        _ = gettext_set_language(argd['ln'])
+        uid = getUid(req)
+        user_info = collect_user_info(req)
+        # Check authorization
+        (auth_code, auth_msg) = acc_authorize_action(req,
+                                                     'runbibdocfile')
+        if auth_code and user_info['email'] == 'guest' and \
+               not user_info['apache_user']:
+            # Ask to login
+            target = '/youraccount/login' + \
+                     make_canonical_urlargd({'ln' : argd['ln'],
+                                             'referer' : CFG_SITE_URL + user_info['uri']}, {})
+            return redirect_to_url(req, target)
+        elif auth_code:
+            return page_not_authorized(req, referer="/submit/managedocfiles",
+                                       uid=uid, text=auth_msg,
+                                       ln=argd['ln'],
+                                       navmenuid="admin")
+
+        # Prepare navtrail
+        navtrail = '''<a class="navtrail" href="%(CFG_SITE_URL)s/help/admin">Admin Area</a> &gt; %(manage_files)s''' \
+        % {'CFG_SITE_URL': CFG_SITE_URL,
+           'manage_files': _("Manage Document Files")}
+
+        body = ''
+        if argd['do'] != 0 and not argd['cancel']:
+            # Apply modifications
+            working_dir = os.path.join(CFG_TMPDIR,
+                                       'websubmit_upload_interface_config_' + str(uid),
+                                       argd['access'])
+            move_uploaded_files_to_storage(working_dir=working_dir,
+                                           recid=argd['recid'],
+                                           icon_sizes=['180>','700>'],
+                                           create_icon_doctypes=['*'],
+                                           force_file_revision=False)
+            # Clean temporary directory
+            shutil.rmtree(working_dir)
+
+            # Confirm modifications
+            body += '<p style="color:#0f0">%s</p>' % \
+                    (_('Your modifications to record #%i have been submitted') % argd['recid'])
+        elif argd['cancel']:
+            # Clean temporary directory
+            working_dir = os.path.join(CFG_TMPDIR,
+                                       'websubmit_upload_interface_config_' + str(uid),
+                                       argd['access'])
+            shutil.rmtree(working_dir)
+            body += '<p style="color:#c00">%s</p>' % \
+                    (_('Your modifications to record #%i have been cancelled') % argd['recid'])
+
+        if not argd['recid'] or argd['do'] != 0:
+            body += '''
+        <form method="post" action="%(CFG_SITE_URL)s/submit/managedocfiles">
+        <label for="recid">%(edit_record)s:</label>
+        <input type="text" name="recid" id="recid" />
+        <input type="submit" value="%(edit)s" class="adminbutton" />
+        </form>
+        ''' % {'edit': _('Edit'),
+               'edit_record': _('Edit record'),
+               'CFG_SITE_URL': CFG_SITE_URL}
+
+        access = time.strftime('%Y%m%d_%H%M%S')
+        if argd['recid'] and argd['do'] == 0:
+            # Displaying interface to manage files
+            # Prepare navtrail
+            title, description, keywords = websearch_templates.tmpl_record_page_header_content(req, argd['recid'],
+                                                                                               argd['ln'])
+            navtrail = '''<a class="navtrail" href="%(CFG_SITE_URL)s/help/admin">Admin Area</a> &gt;
+        <a class="navtrail" href="%(CFG_SITE_URL)s/submit/managedocfiles">%(manage_files)s</a> &gt;
+        %(record)s: %(title)s
+        ''' \
+            % {'CFG_SITE_URL': CFG_SITE_URL,
+               'title': title,
+               'manage_files': _("Document File Manager"),
+               'record': _("Record #%i") % argd['recid']}
+
+            # FIXME: add parameters to `runbibdocfile' in order to
+            # configure the file editor based on role, or at least
+            # move configuration below to some config file.
+            body += create_file_upload_interface(\
+                recid=argd['recid'],
+                ln=argd['ln'],
+                doctypes_and_desc=[('main', 'Main document'),
+                                   ('latex', 'LaTeX'),
+                                   ('source', 'Source'),
+                                   ('additional', 'Additional File'),
+                                   ('audio', 'Audio file'),
+                                   ('video', 'Video file'),
+                                   ('script', 'Script'),
+                                   ('data', 'Data'),
+                                   ('figure', 'Figure'),
+                                   ('schema', 'Schema'),
+                                   ('graph', 'Graph'),
+                                   ('image', 'Image'),
+                                   ('drawing', 'Drawing'),
+                                   ('slides', 'Slides')],
+                can_revise_doctypes=['*'],
+                can_comment_doctypes=['*'],
+                can_describe_doctypes=['*'],
+                can_delete_doctypes=['*'],
+                can_keep_doctypes=['*'],
+                can_rename_doctypes=['*'],
+                can_add_format_to_doctypes=['*'],
+                can_restrict_doctypes=['*'],
+                restrictions_and_desc=[('', 'Public'),
+                                       ('restricted', 'Restricted')],
+                uid=uid,
+                sbm_access=access)[1]
+
+            body += '''<br />
+            <form method="post" action="%(CFG_SITE_URL)s/submit/managedocfiles">
+            <input type="hidden" name="recid" value="%(recid)s" />
+            <input type="hidden" name="do" value="1" />
+            <input type="hidden" name="access" value="%(access)s" />
+            <input type="hidden" name="ln" value="%(ln)s" />
+            <div style="font-size:small">
+    <input type="submit" name="cancel" value="%(cancel_changes)s" />
+    <input type="submit" onclick="user_must_confirm_before_leaving_page=false;return true;" class="adminbutton" name="submit" id="applyChanges" value="%(apply_changes)s" />
+    </div></form>''' % \
+    {'apply_changes': _("Apply changes"),
+     'cancel_changes': _("Cancel all changes"),
+     'recid': argd['recid'],
+     'access': access,
+     'ln': argd['ln'],
+     'CFG_SITE_URL': CFG_SITE_URL}
+
+            body += websubmit_templates.tmpl_page_do_not_leave_submission_js(argd['ln'], enabled=True)
+
+        return page(title = _("Document File Manager") + (argd['recid'] and (': ' + _("Record #%i") % argd['recid']) or ''),
+                    navtrail=navtrail,
+                    navtrail_append_title_p=0,
+                    metaheaderadd = get_upload_file_interface_javascript(form_url_params='?access='+access) + \
+                                    get_upload_file_interface_css(),
+                    body = body,
+                    uid = uid,
+                    language=argd['ln'],
+                    req=req,
+                    navmenuid='admin')
+
+    def managedocfilesasync(self, req, form):
+        "Upload file and returns upload interface"
+
+        argd = wash_urlargd(form, {
+            'ln': (str, ''),
+            'recid': (int, 1),
+            'doctype': (str, ''),
+            'access': (str, ''),
+            'indir': (str, ''),
+            })
+
+        user_info = collect_user_info(req)
+        include_headers = False
+        # User submitted either through WebSubmit, or admin interface.
+        if form.has_key('doctype') and form.has_key('indir') \
+               and form.has_key('access'):
+            # Submitted through WebSubmit. Check rights
+            include_headers = True
+            working_dir = os.path.join(CFG_WEBSUBMIT_STORAGEDIR,
+                                  argd['indir'], argd['doctype'],
+                                  argd['access'])
+            try:
+                assert(working_dir == os.path.abspath(working_dir))
+            except AssertionError:
+                return apache.HTTP_UNAUTHORIZED
+            try:
+                # Retrieve recid from working_dir, safer.
+                recid_fd = file(os.path.join(working_dir, 'SN'))
+                recid = int(recid_fd.read())
+                recid_fd.close()
+            except:
+                recid = ""
+            try:
+                act_fd = file(os.path.join(working_dir, 'act'))
+                action = act_fd.read()
+                act_fd.close()
+            except:
+                action = ""
+
+            # Is user authorized to perform this action?
+            (auth_code, auth_msg) = acc_authorize_action(user_info,
+                                                         "submit",
+                                                         doctype=argd['doctype'],
+                                                         act=action)
+        else:
+            # User must be allowed to attach files
+            (auth_code, auth_msg) = acc_authorize_action(user_info,
+                                                         'runbibdocfile')
+            recid = argd['recid']
+
+        if auth_code:
+            return apache.HTTP_UNAUTHORIZED
+
+        return create_file_upload_interface(recid=recid,
+                                            ln=argd['ln'],
+                                            print_outside_form_tag=False,
+                                            print_envelope=False,
+                                            form=form,
+                                            include_headers=include_headers,
+                                            sbm_indir=argd['indir'],
+                                            sbm_access=argd['access'],
+                                            sbm_doctype=argd['doctype'],
+                                            uid=user_info['uid'])[1]
 
     def uploadfile(self, req, form):
         """
@@ -415,7 +619,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
                     act = ""
 
         # Is user authorized to perform this action?
-        (auth_code, auth_msg) = acc_authorize_action(uid, "submit",
+        (auth_code, auth_message) = acc_authorize_action(uid, "submit",
                                                      verbose=0,
                                                      doctype=argd['doctype'],
                                                      act=action)
@@ -596,7 +800,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
                                          user_files_absolute_path = user_files_absolute_path)
 
         user_info = collect_user_info(req)
-        (auth_code, auth_msg) = acc_authorize_action(user_info, 'attachsubmissionfile')
+        (auth_code, auth_message) = acc_authorize_action(user_info, 'attachsubmissionfile')
         if user_info['email'] == 'guest' and not user_info['apache_user']:
             # User is guest: must login prior to upload
             data = conn.sendUploadResults(1, '', '', 'Please login before uploading file.')
@@ -817,7 +1021,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
             assert(curdir == os.path.abspath(curdir))
         except AssertionError:
             register_exception(req=req, alert_admin=True, prefix='Possible cracking tentative: indir="%s", doctype="%s", access="%s"' % (args['indir'], args['doctype'], args['access']))
-            return warningMsg("Invalid parameters")
+            return warningMsg("Invalid parameters", req)
 
         subname = "%s%s" % (args['act'], args['doctype'])
 
@@ -880,7 +1084,7 @@ class WebInterfaceSubmitPages(WebInterfaceDirectory):
                 return redirect_to_url(req, "%s/youraccount/login%s" % (
                     CFG_SITE_SECURE_URL,
                         make_canonical_urlargd({
-                    'referer' : CFG_SITE_URL + req.unparsed_uri, 'ln' : args['ln']}, {})))
+                    'referer' : CFG_SITE_URL + req.unparsed_uri, 'ln' : args['ln']}, {})), norobot=True)
 
             if uid == -1 or CFG_ACCESS_CONTROL_LEVEL_SITE >= 1:
                 return page_not_authorized(req, "../submit",
@@ -908,7 +1112,7 @@ def errorMsg(title, req, c=None, ln=CFG_SITE_LANG):
         c = CFG_SITE_NAME_INTL.get(ln, CFG_SITE_NAME)
 
     return page(title = _("Error"),
-                body = create_error_box(req, title=title, verbose=0, ln=ln),
+                body = create_error_box(req, title=str(title), verbose=0, ln=ln),
                 description="%s - Internal Error" % c,
                 keywords="%s, Internal Error" % c,
                 uid = getUid(req),

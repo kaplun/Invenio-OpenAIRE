@@ -29,8 +29,7 @@ from invenio.bibformat_engine import BibFormatObject
 from invenio.config import \
      CFG_SITE_URL, \
      CFG_CACHEDIR, \
-     CFG_ACCESS_CONTROL_LEVEL_SITE, \
-     CFG_CERN_SITE
+     CFG_ACCESS_CONTROL_LEVEL_SITE
 from invenio.webjournal_utils import \
      parse_url_string, \
      make_journal_url, \
@@ -112,6 +111,7 @@ def format(bfo, latest_issue_only='yes', newest_articles_only='yes',
         html_articles_in_category = u""
         # Generate the list of articles in this category
         order_numbers = articles_in_category.keys()
+        order_numbers.sort()
         for order in order_numbers:
             articles = articles_in_category[order]
             for recid in articles:
@@ -219,7 +219,7 @@ def _get_whatsNew_from_cache(journal_name, issue, ln):
     """
     Try to get the "whats new" box from cache.
     """
-    cache_path = os.path.realpath('%s/webjournal/%s/%s_whatsNew_%s.html' % \
+    cache_path = os.path.abspath('%s/webjournal/%s/%s_whatsNew_%s.html' % \
                                   (CFG_CACHEDIR,
                                    journal_name,
                                    issue.replace('/','_'),
@@ -259,7 +259,7 @@ def cache_whatsNew(html, journal_name, issue, ln):
     caches the whats new box for 30 minutes.
     """
     if not CFG_ACCESS_CONTROL_LEVEL_SITE == 2:
-        cache_path = os.path.realpath('%s/webjournal/%s/%s_whatsNew_%s.html' % \
+        cache_path = os.path.abspath('%s/webjournal/%s/%s_whatsNew_%s.html' % \
                                       (CFG_CACHEDIR,
                                        journal_name,
                                        issue.replace('/','_'),

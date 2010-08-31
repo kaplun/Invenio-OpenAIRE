@@ -135,6 +135,7 @@ function initHotkeys(){
 	event.preventDefault();
       }
   });
+
   // Toggle 'selection mode'.
   $(document).bind('keydown', {combi: 's', disableInInput: true}, onKeyS);
   // Edit focused subfield.
@@ -143,6 +144,11 @@ function initHotkeys(){
   // Save content and jump to next content field.
   $(document).bind('keydown', {combi: 'tab'},
 		   onKeyTab);
+
+  // Lauch autosuggest
+  $(document).bind('keydown', {combi: 'ctrl+shift+a'}, function (event)  { onAutosuggest(event); } );
+  $(document).bind('keydown', {combi: 'ctrl+9'}, function (event)  { onAutosuggest(event); } );
+
   // Save content and jump to previous content field.
   $(document).bind('keydown', {combi: 'shift+tab'},
 		   onKeyTab);
@@ -172,6 +178,10 @@ function initHotkeys(){
   $(document).bind('keydown', {combi: 'ctrl+shift+e'}, onKeyCtrlShiftE);
   // Remove subfield from form.
   $(document).bind('keydown', {combi: 'ctrl+shift+d'}, onKeyCtrlShiftD);
+  // Binding the undo/redo operations
+
+  $(document).bind('keydown', {combi: 'ctrl+shift+z'}, onUndo);
+  $(document).bind('keydown', {combi: 'ctrl+shift+y'}, onRedo);
 }
 
 function onKeyS(event){
@@ -224,7 +234,8 @@ function onKeyTab(event){
   if (event.target.nodeName == 'TEXTAREA'){
     var contentCells = $('.bibEditCellContent');
     var cell = $(event.target).parent().parent();
-    $(event.target).parent().submit();
+    var foo = $(event.target).parent();
+    foo.submit();
     if (!event.shiftKey)
       $(contentCells).eq($(contentCells).index(cell)+1).trigger('click');
     else

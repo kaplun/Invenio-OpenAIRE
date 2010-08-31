@@ -28,8 +28,12 @@ from invenio.bibtask import task_low_level_submission
 
 def Insert_Modify_Record(parameters, curdir, form, user_info=None):
     """
-    Modify existing record using curdir/recmysql and BibUpload correct
-    mode.
+    Modify existing record using 'curdir/recmysql' and BibUpload correct
+    mode. The file must therefore already have been created prior to this
+    execution of this function, for eg. using "Make_Modify_Record".
+
+    This function gets the output of BibConvert and uploads it into
+    the MySQL bibliographical database.
     """
     global rn
     if os.path.exists(os.path.join(curdir, "recmysqlfmt")):
@@ -43,5 +47,6 @@ def Insert_Modify_Record(parameters, curdir, form, user_info=None):
                               (rn.replace('/', '_'),
                                time.strftime("%Y-%m-%d_%H:%M:%S")))
     shutil.copy(initial_file, final_file)
-    task_low_level_submission('bibupload', 'websubmit.Insert_Modify_Record', '-c', final_file, '-P', '3')
+    bibupload_id = task_low_level_submission('bibupload', 'websubmit.Insert_Modify_Record', '-c', final_file, '-P', '3')
+    open(os.path.join(curdir, 'bibupload_id'), 'w').write(str(bibupload_id))
     return ""

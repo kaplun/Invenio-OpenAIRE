@@ -27,9 +27,13 @@ __revision__ = "$Id$"
 
 import string
 
-from invenio.search_engine import search_pattern, perform_request_search, print_record
+from invenio.search_engine import print_record
 
 def Get_Field(fieldname,bibrec):
+    """
+    This function returns the value of the specified field
+    from the specified document
+    """
     value = string.strip(print_record(int(bibrec),'tm',[fieldname]))
     return value
 

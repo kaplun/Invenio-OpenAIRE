@@ -29,19 +29,42 @@ __revision__ = "$Id$"
    ##             noteFile: name of the file containing a note from the user
 
 import os
-import re
 
-from invenio.config import \
-     CFG_SITE_URL, \
-     CFG_SITE_ADMIN_EMAIL, \
+from invenio.config import CFG_SITE_URL, \
      CFG_SITE_NAME, \
-     CFG_SITE_SUPPORT_EMAIL, \
-     CFG_SITE_URL
+     CFG_SITE_SUPPORT_EMAIL
 from invenio.websubmit_config import CFG_WEBSUBMIT_COPY_MAILS_TO_ADMIN
 from invenio.mailutils import send_email
 from invenio.websubmit_functions.Retrieve_Data import Get_Field
 
 def Send_SRV_Mail(parameters, curdir, form, user_info=None):
+    """
+    This function sends an email to warn people a revision has been
+    carried out.
+
+    Parameters:
+
+       * notefile: name of the file in which the note can be found
+
+       * emailfile: name of the file containing the submitter's email
+
+       * addressesSRV: email addresses of the people who will receive
+                       this email (comma separated list). this
+                       parameter may contain the <CATEG> string. In
+                       which case the variable computed from the
+                       [categformatDAM] parameter replaces this
+                       string.
+                       eg.:"<CATEG>-email@cern.ch"
+
+       * categformatDAM: contains a regular expression used to compute
+                         the category of the document given the
+                         reference of the document.
+
+                         eg.: if [categformatAFP]="TEST-<CATEG>-.*"
+                         and the reference of the document is
+                         "TEST-CATEGORY1-2001-001", then the computed
+                         category equals "CATEGORY1"
+    """
     global rn,doctype,sysno
     # variables declaration
     FROMADDR = '%s Submission Engine <%s>' % (CFG_SITE_NAME,CFG_SITE_SUPPORT_EMAIL)

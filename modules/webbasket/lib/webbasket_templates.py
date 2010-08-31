@@ -79,15 +79,14 @@ class Template:
             return X
 
         if not personal_info and not group_info and not public_info:
-            create_basket_link = """<a href="%s/yourbaskets/create_basket?ln=%s">%s</a>""" % \
-                                 (CFG_SITE_URL, ln, _('creating a new basket'))
             return """
-    %(no_baskets_label)s.
+    %(no_baskets_label)s
     <br /><br />
-    %(create_basket_label)s %(create_basket_link)s.""" % \
-    {'no_baskets_label': _('You have no personal or group baskets or are subscribed to any public baskets'),
-     'create_basket_label': _('You may want to start by'),
-     'create_basket_link': create_basket_link}
+    %(create_basket_label)s""" % \
+    {'no_baskets_label': _('You have no personal or group baskets or are subscribed to any public baskets.'),
+     'create_basket_label': _('You may want to start by %(x_url_open)screating a new basket%(x_url_close)s.') % \
+                             {'x_url_open': '<a href="%s/yourbaskets/create_basket?ln=%s">' % (CFG_SITE_URL, ln),
+                              'x_url_close': '</a>'}}
 
         ## Firstly, create the tabs area.
         if personal_info:
@@ -592,51 +591,46 @@ class Template:
                 out += """
       <tr>
         <td style="border-top: 1px #fc0 solid; border-bottom: 1px #fc0 dotted; background-color: #ffc">
-        <strong>%(results_overview_label)s:</strong> %(no_search_results)i %(items_found_label)s
+        <strong>%(results_overview_label)s:</strong> %(items_found_label)s
         </td>
       </tr>""" % {'results_overview_label': _('Results overview'),
-                  'no_search_results': total_no_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_search_results}
                 if total_no_personal_search_results:
                     out += """
       <tr>
         <td>
-        <a href="#%(personal_baskets_name)s">%(personal_baskets_label)s</a>: %(no_personal_search_results)i %(items_found_label)s
+        <a href="#%(personal_baskets_name)s">%(personal_baskets_label)s</a>: %(items_found_label)s
         </td>
       </tr>""" % {'personal_baskets_label': _('Personal baskets'),
                   'personal_baskets_name': "P",
-                  'no_personal_search_results': total_no_personal_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_personal_search_results}
                 if total_no_group_search_results:
                     out += """
       <tr>
         <td>
-        <a href="#%(group_baskets_name)s">%(group_baskets_label)s<a/>: %(no_group_search_results)i %(items_found_label)s
+        <a href="#%(group_baskets_name)s">%(group_baskets_label)s<a/>: %(items_found_label)s
         </td>
       </tr>""" % {'group_baskets_label': _('Group baskets'),
                   'group_baskets_name': "G",
-                  'no_group_search_results': total_no_group_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_group_search_results}
                 if total_no_public_search_results:
                     out += """
       <tr>
         <td>
-        <a href="#%(public_baskets_name)s">%(public_baskets_label)s</a>: %(no_public_search_results)i %(items_found_label)s
+        <a href="#%(public_baskets_name)s">%(public_baskets_label)s</a>: %(items_found_label)s
         </td>
       </tr>""" % {'public_baskets_label': _('Public baskets'),
                   'public_baskets_name': "E",
-                  'no_public_search_results': total_no_public_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_public_search_results}
                 if total_no_all_public_search_results:
                     out += """
       <tr>
         <td>
-        <a href="#%(all_public_baskets_name)s">%(all_public_baskets_label)s</a>: %(no_all_public_search_results)i %(items_found_label)s
+        <a href="#%(all_public_baskets_name)s">%(all_public_baskets_label)s</a>: %(items_found_label)s
         </td>
       </tr>""" % {'all_public_baskets_label': _('All public baskets'),
                   'all_public_baskets_name': "A",
-                  'no_all_public_search_results': total_no_all_public_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_all_public_search_results}
                 out += """
       <tr>
         <td>
@@ -657,12 +651,11 @@ class Template:
             out += """
       <tr>
         <td style="border-top: 1px #fc0 solid; border-bottom: 1px #fc0 dotted; background-color: #ffc">
-        <a name="%(personal_baskets_name)s"></a><strong>%(personal_baskets_label)s:</strong> %(no_personal_search_results)i %(items_found_label)s
+        <a name="%(personal_baskets_name)s"></a><strong>%(personal_baskets_label)s:</strong> %(items_found_label)s
         </td>
       </tr>""" % {'personal_baskets_label': _('Personal baskets'),
                   'personal_baskets_name': "P",
-                  'no_personal_search_results': total_no_personal_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_personal_search_results}
 
             for personal_search_result in personal_search_results.iteritems():
                 basket_link = """<a href="%(url)s/yourbaskets/display?category=%(category)s&amp;topic=%(topic)s&amp;bskid=%(bskid)i&amp;ln=%(ln)s" title="%(title_name)s">%(basket_name)s</a>""" % \
@@ -676,12 +669,11 @@ class Template:
                 out += """
       <tr>
         <td>
-        %(in_basket_label)s %(basket_link)s: %(no_items_found)s %(items_found)s
+        %(in_basket_label)s: %(items_found)s
         </td>
-      </tr>""" % {'in_basket_label': _('In'),
-                  'basket_link': basket_link,
-                  'no_items_found': personal_search_result[1][2],
-                  'items_found': _('items found')}
+      </tr>""" % {'in_basket_label': _('In %(x_linked_basket_name)s') % \
+                                     {'x_linked_basket_name': basket_link},
+                  'items_found': _('%i items found') % personal_search_result[1][2]}
             out += """
       <tr>
         <td>
@@ -693,12 +685,11 @@ class Template:
             out += """
       <tr>
         <td style="border-top: 1px #fc0 solid; border-bottom: 1px #fc0 dotted; background-color: #ffc">
-        <a name="%(group_baskets_name)s"></a><strong>%(group_baskets_label)s:</strong> %(no_group_search_results)i %(items_found_label)s
+        <a name="%(group_baskets_name)s"></a><strong>%(group_baskets_label)s:</strong> %(items_found_label)s
         </td>
       </tr>""" % {'group_baskets_label': _('Group baskets'),
                   'group_baskets_name': "G",
-                  'no_group_search_results': total_no_group_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_group_search_results}
 
             for group_search_result in group_search_results.iteritems():
                 basket_link = """<a href="%(url)s/yourbaskets/display?category=%(category)s&amp;group=%(group)i&amp;bskid=%(bskid)i&amp;ln=%(ln)s" title="%(title_name)s">%(basket_name)s</a>""" % \
@@ -712,12 +703,11 @@ class Template:
                 out += """
       <tr>
         <td>
-        %(in_basket_label)s %(basket_link)s: %(no_items_found)s %(items_found)s
+        %(in_basket_label)s: %(items_found)s
         </td>
-      </tr>""" % {'in_basket_label': _('In'),
-                  'basket_link': basket_link,
-                  'no_items_found': group_search_result[1][3],
-                  'items_found': _('items found')}
+      </tr>""" % {'in_basket_label': _('In %(x_linked_basket_name)s') % \
+                                     {'x_linked_basket_name': basket_link},
+                  'items_found': _('%i items found') % group_search_result[1][3]}
             out += """
       <tr>
         <td>
@@ -729,12 +719,11 @@ class Template:
             out += """
       <tr>
         <td style="border-top: 1px #fc0 solid; border-bottom: 1px #fc0 dotted; background-color: #ffc">
-        <a name="%(public_baskets_name)s"></a><strong>%(public_baskets_label)s:</strong> %(no_public_search_results)i %(items_found_label)s
+        <a name="%(public_baskets_name)s"></a><strong>%(public_baskets_label)s:</strong> %(items_found_label)s
         </td>
       </tr>""" % {'public_baskets_label': _('Public baskets'),
                   'public_baskets_name': "E",
-                  'no_public_search_results': total_no_public_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_public_search_results}
 
             for public_search_result in public_search_results.iteritems():
                 basket_link = """<a href="%(url)s/yourbaskets/display?category=%(category)s&amp;bskid=%(bskid)i&amp;ln=%(ln)s" title="%(title_name)s">%(basket_name)s</a>""" % \
@@ -747,12 +736,11 @@ class Template:
                 out += """
       <tr>
         <td>
-        %(in_basket_label)s %(basket_link)s: %(no_items_found)s %(items_found)s
+        %(in_basket_label)s: %(items_found)s
         </td>
-      </tr>""" % {'in_basket_label': _('In'),
-                  'basket_link': basket_link,
-                  'no_items_found': public_search_result[1][1],
-                  'items_found': _('items found')}
+      </tr>""" % {'in_basket_label': _('In %(x_linked_basket_name)s') % \
+                                     {'x_linked_basket_name': basket_link},
+                  'items_found': _('%i items found') % public_search_result[1][1]}
             out += """
       <tr>
         <td>
@@ -764,12 +752,11 @@ class Template:
             out += """
       <tr>
         <td style="border-top: 1px #fc0 solid; border-bottom: 1px #fc0 dotted; background-color: #ffc">
-        <a name="%(all_public_baskets_name)s"></a><strong>%(all_public_baskets_label)s:</strong> %(no_all_public_search_results)i %(items_found_label)s
+        <a name="%(all_public_baskets_name)s"></a><strong>%(all_public_baskets_label)s:</strong> %(items_found_label)s
         </td>
       </tr>""" % {'all_public_baskets_label': _('All public baskets'),
                   'all_public_baskets_name': "A",
-                  'no_all_public_search_results': total_no_all_public_search_results,
-                  'items_found_label': _('items found')}
+                  'items_found_label': _('%i items found') % total_no_all_public_search_results}
 
             for all_public_search_result in all_public_search_results.iteritems():
                 basket_link = """<a href="%(url)s/yourbaskets/display_public?bskid=%(bskid)i&amp;ln=%(ln)s" title="%(title_name)s">%(basket_name)s</a>""" % \
@@ -781,12 +768,11 @@ class Template:
                 out += """
       <tr>
         <td>
-        %(in_basket_label)s %(basket_link)s: %(no_items_found)s %(items_found)s
+        %(in_basket_label)s: %(items_found)s
         </td>
-      </tr>""" % {'in_basket_label': _('In'),
-                  'basket_link': basket_link,
-                  'no_items_found': all_public_search_result[1][1],
-                  'items_found': _('items found')}
+      </tr>""" % {'in_basket_label': _('In %(x_linked_basket_name)s') % \
+                                     {'x_linked_basket_name': basket_link},
+                  'items_found': _('%i items found') % personal_search_result[1][2]}
             out += """
       <tr>
         <td>
@@ -887,39 +873,39 @@ class Template:
 
         if sort == "name":
             if asc:
-                basket_name_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-asc.gif" />"""
+                basket_name_sort_img = """<img src="%s/img/wb-sort-asc.gif" />""" % (CFG_SITE_URL,)
             else:
-                basket_name_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-desc.gif" />"""
+                basket_name_sort_img = """<img src="%s/img/wb-sort-desc.gif" />""" % (CFG_SITE_URL,)
         else:
-            basket_name_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-none.gif" />"""
+            basket_name_sort_img = """<img src="%s/img/wb-sort-none.gif" />""" % (CFG_SITE_URL,)
         if sort == "owner":
             if asc:
-                owner_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-asc.gif" />"""
+                owner_sort_img = """<img src="%s/img/wb-sort-asc.gif" />""" % (CFG_SITE_URL,)
             else:
-                owner_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-desc.gif" />"""
+                owner_sort_img = """<img src="%s/img/wb-sort-desc.gif" />""" % (CFG_SITE_URL,)
         else:
-            owner_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-none.gif" />"""
+            owner_sort_img = """<img src="%s/img/wb-sort-none.gif" />""" % (CFG_SITE_URL,)
         if sort == "date":
             if asc:
-                date_modification_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-asc.gif" />"""
+                date_modification_sort_img = """<img src="%s/img/wb-sort-asc.gif" />""" % (CFG_SITE_URL,)
             else:
-                date_modification_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-desc.gif" />"""
+                date_modification_sort_img = """<img src="%s/img/wb-sort-desc.gif" />""" % (CFG_SITE_URL,)
         else:
-            date_modification_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-none.gif" />"""
+            date_modification_sort_img = """<img src="%s/img/wb-sort-none.gif" />""" % (CFG_SITE_URL,)
         if sort == "items":
             if asc:
-                nb_items_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-asc.gif" />"""
+                nb_items_sort_img = """<img src="%s/img/wb-sort-asc.gif" />""" % (CFG_SITE_URL,)
             else:
-                nb_items_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-desc.gif" />"""
+                nb_items_sort_img = """<img src="%s/img/wb-sort-desc.gif" />""" % (CFG_SITE_URL,)
         else:
-            nb_items_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-none.gif" />"""
+            nb_items_sort_img = """<img src="%s/img/wb-sort-none.gif" />""" % (CFG_SITE_URL,)
         if sort == "views":
             if asc:
-                nb_views_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-asc.gif" />"""
+                nb_views_sort_img = """<img src="%s/img/wb-sort-asc.gif" />""" % (CFG_SITE_URL,)
             else:
-                nb_views_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-desc.gif" />"""
+                nb_views_sort_img = """<img src="%s/img/wb-sort-desc.gif" />""" % (CFG_SITE_URL,)
         else:
-            nb_views_sort_img = """<img src="http://pcuds36.cern.ch/img/wb-sort-none.gif" />"""
+            nb_views_sort_img = """<img src="%s/img/wb-sort-none.gif" />""" % (CFG_SITE_URL,)
 
         basket_name_sort = """<a href="%s/yourbaskets/list_public_baskets?limit=%i&amp;sort=name&amp;asc=%i&amp;ln=%s">%s</a>""" % \
                            (CFG_SITE_URL, limit, not(asc), ln, basket_name_sort_img)
@@ -987,8 +973,8 @@ class Template:
         display_to = limit + CFG_WEBBASKET_MAX_NUMBER_OF_DISPLAYED_BASKETS > number_of_all_public_baskets \
                      and number_of_all_public_baskets \
                      or limit + CFG_WEBBASKET_MAX_NUMBER_OF_DISPLAYED_BASKETS
-        footer += _('Displaying public baskets %s - %s out of %s public baskets in total.') % \
-               (display_from, display_to, number_of_all_public_baskets)
+        footer += _('Displaying public baskets %(x_from)i - %(x_to)i out of %(x_total_public_basket)i public baskets in total.') % \
+               {'x_from': display_from, 'x_to': display_to, 'x_total_public_basket': number_of_all_public_baskets}
 
         if limit < number_of_all_public_baskets - CFG_WEBBASKET_MAX_NUMBER_OF_DISPLAYED_BASKETS:
             limit_next = limit + CFG_WEBBASKET_MAX_NUMBER_OF_DISPLAYED_BASKETS + 1
@@ -1054,9 +1040,10 @@ class Template:
             nickname = get_user_info(uid)[2]
 
         if title:
-            msg = title + ', ' + _("by") + ' ' + nickname + ' ' + _("on") + ' ' + date
+            msg = _("%(x_title)s, by %(x_name)s on %(x_date)s:") % \
+                  {'x_title': title, 'x_name': nickname, 'x_date': date}
         else:
-            msg = _("%(x_name)s wrote on %(x_date)s:")% {'x_name': nickname, 'x_date': date}
+            msg = _("%(x_name)s wrote on %(x_date)s:") % {'x_name': nickname, 'x_date': date}
 
         msg += '\n\n'
         msg += body
@@ -1077,9 +1064,10 @@ class Template:
             nickname = get_user_info(uid)[2]
 
         if title:
-            msg = title + ', ' + _("by") + ' ' + nickname + ' ' + _("on") + ' ' + date
+            msg = _("%(x_title)s, by %(x_name)s on %(x_date)s:") % \
+                  {'x_title': title, 'x_name': nickname, 'x_date': date}
         else:
-            msg = _("%(x_name)s wrote on %(x_date)s:")% {'x_name': nickname, 'x_date': date}
+            msg = _("%(x_name)s wrote on %(x_date)s:") % {'x_name': nickname, 'x_date': date}
 
         msg += '<br/><br/>'
         msg += body
@@ -1153,7 +1141,7 @@ class Template:
   </td>
 </tr>""" % (topics_html != '' and _("Choose topic") or '', topics_html,
             topics_html != '' and _("or create a new one") or _("Create new topic"), new_topic_name,
-            _("Basket's name"), new_basket_name,)
+            _("Basket name"), new_basket_name,)
         return self.__tmpl_basket_box(img=CFG_SITE_URL + '/img/webbasket_create.png',
                                       title=_("Create a new basket"),
                                       body=create_html)
@@ -1285,40 +1273,65 @@ class Template:
         _ = gettext_set_language(ln)
 
         if successful_add:
-            basket_link = """<a href="%s/yourbaskets/display?category=%s&amp;bskid=%i&amp;ln=%s">%s</a>""" % \
-                          (CFG_SITE_URL, category, bskid, ln, _('basket'))
             out = """
-%(number_of_items)i %(success_label)s.
+%(success_label)s.
 <br /><br />
-%(proceed_label)s %(basket_link)s""" % {'number_of_items': colid == -1 and 1 or len(recids),
-                                     'success_label': _('items have been successfully added to your basket'),
-                                     'proceed_label': _('Proceed to the'),
-                                     'basket_link': basket_link}
+%(proceed_label)s""" % {'success_label': _('%i items have been successfully added to your basket') % (colid == -1 and 1 or len(recids)),
+                        'proceed_label': _('Proceed to the %(x_url_open)sbasket%(x_url_close)s') % \
+                                         {'x_url_open': '<a href="%s/yourbaskets/display?category=%s&amp;bskid=%i&amp;ln=%s">' % (CFG_SITE_URL, category, bskid, ln),
+                                         'x_url_close': "</a>"}}
             if referer:
                 if copy:
-                    previous_basket_link = """<a href="%s">%s</a>""" % (referer, _('previous basket'))
-                    out += """ %(return_label)s %(search_link)s.""" % {'return_label': _('or return to your'),
-                                                                       'search_link': previous_basket_link}
+                    out +=  _(' or return to your %(x_url_open)sprevious basket%(x_url_close)s') % \
+                            {'x_url_open': '<a href="%s">' % referer,
+                             'x_url_close': '</a>'}
                 else:
-                    search_link = """<a href="%s">%s</a>""" % (referer, _('search'))
-                    out += """ %(return_label)s %(search_link)s.""" % {'return_label': _('or return to your'),
-                                                                       'search_link': search_link}
+                    out +=  _(' or return to your %(x_url_open)ssearch%(x_url_close)s') % \
+                            {'x_url_open': '<a href="%s">' % referer,
+                             'x_url_close': '</a>'}
             else:
                 out += "."
 
             return out
 
+        #If no recids were specified the page is asking which external item to add, so we remind to the user to use the search engine for internal items
+        out=""
+        if len(recids) == 0:
+            out += """
+    <table class="bskbasket">
+      <thead class="bskbasketheader">
+        <tr>
+          <td class="bskactions">
+            <img src="%(logo)s" alt="%(label)s" />
+          </td>
+          <td class="bsktitle">
+            <b>Adding items to your basket</b><br />
+          </td>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="2">
+            <table>
+            To add internal items to your basket please select them through the  <a href="%(search_link)s">search page</a>
+            and use the "Add to basket" functionality. For any external resource please use the
+            "External item" form below.
+            </table>
+          </td>
+        </tr>
+      </tbody>
+    </table>"""
+            out %= {'logo': "%s/img/tick.gif"% (CFG_SITE_URL,),
+                  'label':"tick",
+                  'search_link':"%s"%(CFG_SITE_URL,) }
+
         note_editor = get_html_text_editor(name="note_body",
                                            content=note_body,
                                            textual_content=note_body,
-                                           width="480px",
-                                           height="75px",
+                                           width="600px",
+                                           height="110px",
                                            enabled=CFG_WEBBASKET_USE_RICH_TEXT_EDITOR,
                                            toolbar_set="WebComment")
-
-        create_new_basket = """<a href="%s/yourbaskets/create_basket">%s</a>""" % \
-                            (CFG_SITE_URL,
-                             _('create a new one'))
 
         select_options = create_add_box_select_options(category,
                                                        bskid,
@@ -1333,7 +1346,7 @@ class Template:
 
         action = "%s/yourbaskets/add" % (CFG_SITE_URL,)
 
-        out = """
+        out += """
 <form name="add_to_basket" action="%(action)s" method="post">""" % {'action': action}
 
         if colid == -1:
@@ -1348,7 +1361,7 @@ class Template:
           <tr>
             <td class="bskbasketheadertitle">
               <strong>
-              %(header_label_part1)s %(number_of_items)i %(header_label_part2)s
+              %(header_label)s
               </strong>
             </td>
         </table>
@@ -1358,12 +1371,7 @@ class Template:
   <tbody>
     <tr>
       <td style="padding: 10px;">
-        %(basket_selection_label)s:
-        &nbsp;
-        <select name="b">%(select_options)s
-        </select>
-        <br />
-        <small>(%(create_new_basket_label_part1)s %(create_new_basket)s %(create_new_basket_label_part2)s)</small>
+      %(create_new_basket)s
         <br />
       </td>
     </tr>
@@ -1387,14 +1395,13 @@ class Template:
       </td>
     </tr>
   </tbody>
-</table>""" % {'header_label_part1': _('Adding'),
-               'number_of_items': colid == -1 and 1 or len(recids),
-               'header_label_part2': _('items to your baskets'),
-               'basket_selection_label': _('Please choose a basket'),
-               'create_new_basket_label_part1': _('or'),
-               'create_new_basket': create_new_basket,
-               'create_new_basket_label_part2': _('first'),
-               'select_options': select_options,
+</table>""" % {'header_label': _("Adding %i items to your baskets") % (colid == -1 and 1 or len(recids)),
+               'create_new_basket': _("Please choose a basket: %(x_basket_selection_box)s %(x_fmt_open)s(or %(x_url_open)screate a new one%(x_url_close)s first)%(x_fmt_close)s") % \
+                                    {'x_basket_selection_box': '&nbsp;<select name="b">%s</select>' % select_options,
+                                     'x_url_open': '<a href="%s/yourbaskets/create_basket">' % CFG_SITE_URL,
+                                     'x_url_close': '</a>',
+                                     'x_fmt_open': '<br /><small>',
+                                     'x_fmt_close': '</small>'},
                'note_label': len(recids) > 1 and _('Optionally, add a note to each one of these items') \
                or _('Optionally, add a note to this item'),
                'note_editor': note_editor,
@@ -1490,7 +1497,7 @@ class Template:
 <tr>
   <td class="bskcontentcol">%s</td>
   <td class="bskcontentcol"><input type="text" name="new_name" value="%s"/></td>
-</tr>""" % (_("Basket's name"), cgi.escape(bsk_name, 1))
+</tr>""" % (_("Basket name"), cgi.escape(bsk_name, 1))
             #topics_selection = zip(range(len(topics)), topics)
             topics_selection = zip(topics, topics)
             topics_selection.insert(0, (-1, _("Choose topic")))
@@ -1568,7 +1575,8 @@ class Template:
     </tr>
   </table>
 
-</form>""" % {'label': _('Editing basket') + ' ' + cgi.escape(bsk_name),
+</form>""" % {'label': _('Editing basket %(x_basket_name)s') % \
+              {'x_basket_name': cgi.escape(bsk_name)},
               'action': CFG_SITE_URL + '/yourbaskets/edit',
               'ln': ln,
               'topic': topic,
@@ -1597,7 +1605,7 @@ class Template:
 <tr>
   <td>%s</td>
   <td><input type="text" name="new_name" value="%s"/></td>
-</tr>""" % (_("Topic's name"), cgi.escape(topic, True))
+</tr>""" % (_("Topic name"), cgi.escape(topic, True))
   #<td class="bskcontentcol">%s</td>
   #<td class="bskcontentcol"><input type="text" name="new_name" value="%s"/></td>
 
@@ -1626,7 +1634,7 @@ class Template:
     </tr>
   </table>
 
-</form>""" % {'label': _('Editing topic') + ': ' + cgi.escape(topic, True),
+</form>""" % {'label': _('Editing topic: %(x_topic_name)s') % {'x_topic_name': cgi.escape(topic, True)},
               'action': CFG_SITE_URL + '/yourbaskets/edit_topic',
               'ln': ln,
               'topic': cgi.escape(topic, True),
@@ -1866,13 +1874,13 @@ class Template:
                     ln=CFG_SITE_LANG):
         """Template for basket display."""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out = """
 <table class="bskbasket" width="100%">"""
         else:
             out = ""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += self.tmpl_basket_header(bskid,
                                            name,
                                            nb_items,
@@ -1887,7 +1895,7 @@ class Template:
                                            share_level,
                                            ln)
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += self.tmpl_basket_footer(bskid,
                                            nb_items,
                                            (user_can_view_content,
@@ -1910,18 +1918,17 @@ class Template:
                                         of,
                                         ln)
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += """
 </table>"""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             out += self.tmpl_create_export_as_list(selected_category,
                                                    selected_topic,
                                                    selected_group,
                                                    bskid,
                                                    None,
                                                    False)
-
         return out
 
     def tmpl_basket_header(self,
@@ -1943,19 +1950,22 @@ class Template:
         _ = gettext_set_language(ln)
 
         optional_colspan = nb_items and user_can_view_content and ' colspan="3"' or ''
-        records_field = '<br />' + str(nb_items) + ' ' + _('items')
-        comments_field = user_can_view_notes and (nb_comments and ', ' + str(nb_comments) + ' ' + _('notes') or ', ' + _('no notes yet')) or ''
+        records_field = '<br />' + _('%i items') % nb_items
+        comments_field = user_can_view_notes and (nb_comments and (', ' + _('%i notes') % nb_comments) or ', ' + _('no notes yet')) or ''
         subscribers_field = selected_category == CFG_WEBBASKET_CATEGORIES['PRIVATE'] and \
                             share_level == 0 and \
-                            ', ' + str(nb_subscribers) + ' ' + _('subscribers') or \
+                            ', ' + (_('%i subscribers') % nb_subscribers) or \
                             ''
         last_update_field = '<br />' + _('last update') + ': ' + date_modification
         if user_can_edit_basket:
+            add_ext_resource_url = """%s/yourbaskets/add?category=%s&bskid=%i""" % (CFG_SITE_URL,selected_category,bskid,)
+            add_ext_resource_logo = """<img src="%s/img/wb-create-basket.png" />""" % (CFG_SITE_URL,)
+            add_ext_resource = """<a href="%s">%s%s</a>""" % (add_ext_resource_url, add_ext_resource_logo, _("Add item"))
             edit_basket_url = """%s/yourbaskets/edit?bskid=%i&amp;topic=%s&amp;ln=%s""" % (CFG_SITE_URL, bskid, cgi.escape(selected_topic, True), ln)
-            edit_basket_logo = """<img src="http://pcuds36.cern.ch/img/wb-edit-basket.png" />"""
+            edit_basket_logo = """<img src="%s/img/wb-edit-basket.png" />""" % (CFG_SITE_URL,)
             edit_basket = """<a href="%s">%s%s</a>""" % (edit_basket_url, edit_basket_logo, _("Edit basket"))
             delete_basket_url = """%s/yourbaskets/edit?bskid=%i&amp;topic=%s&amp;delete=1&amp;ln=%s""" % (CFG_SITE_URL, bskid, cgi.escape(selected_topic, True), ln)
-            delete_basket_logo = """<img src="http://pcuds36.cern.ch/img/wb-delete-basket.png" />"""
+            delete_basket_logo = """<img src="%s/img/wb-delete-basket.png" />""" % (CFG_SITE_URL,)
             delete_basket = """<a href="%s">%s%s</a>""" % (delete_basket_url, delete_basket_logo, _("Delete basket"))
         else:
             #edit_basket = """<small>%s</small>""" % (_("You cannot edit this basket"),)
@@ -1964,7 +1974,7 @@ class Template:
             delete_basket = ""
         if selected_category==CFG_WEBBASKET_CATEGORIES['EXTERNAL']:
             unsubscribe_url = """%s/yourbaskets/unsubscribe?bskid=%i&amp;ln=%s""" % (CFG_SITE_URL, bskid, ln)
-            unsubscribe_logo = """<img src="http://pcuds36.cern.ch/img/wb-unsubscribe.png" />"""
+            unsubscribe_logo = """<img src="%s/img/wb-unsubscribe.png" />""" % (CFG_SITE_URL,)
             unsubscribe = """&nbsp;&nbsp;\n<a href="%s">%s%s</a>""" % (unsubscribe_url, unsubscribe_logo, _("Unsubscribe from basket"))
         else:
             unsubscribe = ""
@@ -1984,6 +1994,8 @@ class Template:
               </small>
             </td>
             <td class="bskbasketheaderoptions">
+              %(add_ext_resource)s
+              &nbsp;&nbsp;
               %(edit_basket)s
               &nbsp;&nbsp;
               %(delete_basket)s
@@ -2001,6 +2013,7 @@ class Template:
                 'comments_field': comments_field,
                 'subscribers_field': subscribers_field,
                 'last_update_field': last_update_field,
+                'add_ext_resource': add_ext_resource,
                 'edit_basket': edit_basket,
                 'delete_basket': delete_basket,
                 'unsubscribe': unsubscribe,
@@ -2023,18 +2036,21 @@ class Template:
 
         optional_colspan = nb_items and user_can_view_content and ' colspan="3"' or ''
         if user_can_edit_basket:
+            add_ext_resource_url = """%s/yourbaskets/add?category=%s&bskid=%i""" % (CFG_SITE_URL,selected_category,bskid,)
+            add_ext_resource_logo = """<img src="%s/img/wb-create-basket.png" />""" % (CFG_SITE_URL,)
+            add_ext_resource = """<a href="%s">%s%s</a>""" % (add_ext_resource_url, add_ext_resource_logo, _("Add item"))
             edit_basket_url = """%s/yourbaskets/edit?bskid=%i&amp;topic=%s&amp;ln=%s""" % (CFG_SITE_URL, bskid, selected_topic, ln)
-            edit_basket_logo = """<img src="http://pcuds36.cern.ch/img/wb-edit-basket.png" />"""
+            edit_basket_logo = """<img src="%s/img/wb-edit-basket.png" />""" % (CFG_SITE_URL,)
             edit_basket = """<a href="%s">%s%s</a>""" % (edit_basket_url, edit_basket_logo, _("Edit basket"))
             delete_basket_url = """%s/yourbaskets/edit?bskid=%i&amp;topic=%s&amp;delete=1&amp;ln=%s""" % (CFG_SITE_URL, bskid, selected_topic, ln)
-            delete_basket_logo = """<img src="http://pcuds36.cern.ch/img/wb-delete-basket.png" />"""
+            delete_basket_logo = """<img src="%s/img/wb-delete-basket.png" />""" % (CFG_SITE_URL,)
             delete_basket = """<a href="%s">%s%s</a>""" % (delete_basket_url, delete_basket_logo, _("Delete basket"))
         else:
             edit_basket = ""
             delete_basket = ""
         if selected_category==CFG_WEBBASKET_CATEGORIES['EXTERNAL']:
             unsubscribe_url = """%s/yourbaskets/unsubscribe?bskid=%i&amp;ln=%s""" % (CFG_SITE_URL, bskid, ln)
-            unsubscribe_logo = """<img src="http://pcuds36.cern.ch/img/wb-unsubscribe.png" />"""
+            unsubscribe_logo = """<img src="%s/img/wb-unsubscribe.png" />""" % (CFG_SITE_URL,)
             unsubscribe = """&nbsp;&nbsp;\n<a href="%s">%s%s</a>""" % (unsubscribe_url, unsubscribe_logo, _("Unsubscribe from basket"))
         else:
             unsubscribe = ""
@@ -2056,6 +2072,8 @@ class Template:
               </small>
             </td>
             <td class="bskbasketfooteroptions">
+              %(add_ext_resource)s
+              &nbsp;&nbsp;
               %(edit_basket)s
               &nbsp;&nbsp;
               %(delete_basket)s
@@ -2069,6 +2087,7 @@ class Template:
 
         out %= {'optional_colspan': optional_colspan,
                 'display_public': display_public,
+                'add_ext_resource': add_ext_resource,
                 'edit_basket': edit_basket,
                 'delete_basket': delete_basket,
                 'unsubscribe': unsubscribe}
@@ -2090,7 +2109,7 @@ class Template:
                             ln=CFG_SITE_LANG):
         """Template for basket content display."""
 
-        if of != 'xm':
+        if not of.startswith('x'):
             _ = gettext_set_language(ln)
             items_html = """
   <tbody>"""
@@ -2144,6 +2163,7 @@ class Template:
             for item in items:
                 items_xml += item[4] + "\n"
             return items_xml
+
 
     def __tmpl_basket_item(self,
                            count,
@@ -2417,7 +2437,8 @@ class Template:
 
         _ = gettext_set_language(ln)
 
-        records_field = '<br />' + _('Item ') + str(item_index) + _(' of ') + str(nb_items)
+        records_field = '<br />' + _('Item %(x_item_index)i of %(x_item_total)i') % \
+                        {'x_item_index': item_index, 'x_item_total': nb_items}
 
         if previous_item_recid:
             previous_item_url = """%s/yourbaskets/display?category=%s&amp;topic=%s&amp;group=%i&amp;bskid=%i&amp;recid=%s&amp;ln=%s""" % \
@@ -2428,10 +2449,10 @@ class Template:
                                  bskid,
                                  previous_item_recid,
                                  ln)
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item.png" />""" % (CFG_SITE_URL,)
             previous_item = """<a href="%s">%s%s</a>""" % (previous_item_url, previous_item_logo, _("Previous item"))
         else:
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item-disabled.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item-disabled.png" />""" % (CFG_SITE_URL,)
             previous_item = """%s%s""" % (previous_item_logo, _("Previous item"))
 
         if next_item_recid:
@@ -2443,10 +2464,10 @@ class Template:
                              bskid,
                              next_item_recid,
                              ln)
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item.png" />""" % (CFG_SITE_URL,)
             next_item = """<a href="%s">%s%s</a>""" % (next_item_url, next_item_logo, _("Next item"))
         else:
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item-disabled.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item-disabled.png" />""" % (CFG_SITE_URL,)
             next_item = """%s%s""" % (next_item_logo, _("Next item"))
 
         go_back_url = """%s/yourbaskets/display?category=%s&amp;topic=%s&amp;group=%i&amp;bskid=%i&amp;ln=%s""" % \
@@ -2456,7 +2477,7 @@ class Template:
                        selected_group,
                        bskid,
                        ln)
-        go_back_logo = """<img src="http://pcuds36.cern.ch/img/wb-go-back.png" />"""
+        go_back_logo = """<img src="%s/img/wb-go-back.png" />""" % (CFG_SITE_URL,)
         go_back = """<a href="%s">%s%s</a>""" % (go_back_url, go_back_logo, _("Return to basket"))
 
         out = """
@@ -2515,10 +2536,10 @@ class Template:
                                  bskid,
                                  previous_item_recid,
                                  ln)
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item.png" />""" % (CFG_SITE_URL,)
             previous_item = """<a href="%s">%s%s</a>""" % (previous_item_url, previous_item_logo, _("Previous item"))
         else:
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item-disabled.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item-disabled.png" />""" % (CFG_SITE_URL,)
             previous_item = """%s%s""" % (previous_item_logo, _("Previous item"))
 
         if next_item_recid:
@@ -2530,10 +2551,10 @@ class Template:
                              bskid,
                              next_item_recid,
                              ln)
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item.png" />""" % (CFG_SITE_URL,)
             next_item = """<a href="%s">%s%s</a>""" % (next_item_url, next_item_logo, _("Next item"))
         else:
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item-disabled.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item-disabled.png" />""" % (CFG_SITE_URL,)
             next_item = """%s%s""" % (next_item_logo, _("Next item"))
 
         go_back_url = """%s/yourbaskets/display?category=%s&amp;topic=%s&amp;group=%i&amp;bskid=%i&amp;ln=%s""" % \
@@ -2543,7 +2564,7 @@ class Template:
                        selected_group,
                        bskid,
                        ln)
-        go_back_logo = """<img src="http://pcuds36.cern.ch/img/wb-go-back.png" />"""
+        go_back_logo = """<img src="%s/img/wb-go-back.png" />""" % (CFG_SITE_URL,)
         go_back = """<a href="%s">%s%s</a>""" % (go_back_url, go_back_logo, _("Return to basket"))
 
         out = """
@@ -2745,7 +2766,7 @@ class Template:
                                           content=note_body_html,
                                           textual_content=note_body_textual,
                                           width="99%",
-                                          height="100px",
+                                          height="160px",
                                           enabled=CFG_WEBBASKET_USE_RICH_TEXT_EDITOR,
                                           file_upload_url=file_upload_url,
                                           toolbar_set="WebComment")
@@ -2766,6 +2787,7 @@ class Template:
                             <br />
                             %(editor)s
                             </p>
+                            <input type="hidden" name="reply_to" value="%(reply_to)s" />
                             <p align="left">
                             <input type="submit" class="formbutton" value="%(submit_label)s" />
                             <input type="button" class="nonsubmitbutton" value="%(cancel_label)s" onClick="window.location='%(cancel)s'" />
@@ -2780,14 +2802,15 @@ class Template:
                                    'note_title': note_title,
                                    'editor': editor,
                                    'add_a_note_label': _('Add a note'),
-                                   'submit_label': _('Add note')}
+                                   'submit_label': _('Add note'),
+                                   'reply_to': optional_params.get("Reply to")}
 
         notes_icon = '<img src="%s/img/wb-notes.png" style="vertical-align: top;" />&nbsp;' % (CFG_SITE_URL,)
 
         if user_can_add_notes and not add_note_p:
             add_note_url = """%s/yourbaskets/write_note?category=%s&amp;topic=%s&amp;group=%i&amp;bskid=%i&amp;recid=%i&amp;ln=%s%s""" % \
                            (CFG_SITE_URL, selected_category, selected_topic, selected_group, bskid, recid, ln, '#note')
-            add_note_logo = """<img src="http://pcuds36.cern.ch/img/wb-add-note.png" />"""
+            add_note_logo = """<img src="%s/img/wb-add-note.png" />""" % (CFG_SITE_URL,)
             add_note = """<a href="%s">%s%s</a>""" % (add_note_url, add_note_logo, _("Add a note"))
         else:
             add_note = ""
@@ -2813,7 +2836,16 @@ class Template:
             notes_html += """
                 <tr>
                   <td colspan="2" class="bsknotescontent">"""
-            for (cmt_uid, cmt_nickname, cmt_title, cmt_body, cmt_date, dummy, cmtid) in notes:
+            thread_history = [0]
+            for (cmt_uid, cmt_nickname, cmt_title, cmt_body, cmt_date, dummy, cmtid, reply_to) in notes:
+                if reply_to not in thread_history:
+                    # Going one level down in the thread
+                    thread_history.append(reply_to)
+                    depth = thread_history.index(reply_to)
+                else:
+                    depth = thread_history.index(reply_to)
+                    thread_history = thread_history[:depth + 1]
+                notes_html += '<div style="margin-left:%spx">' % (depth*20)
                 if user_can_add_notes:
                     reply_to_note = """<a href="%s/yourbaskets/write_note?category=%s&amp;topic=%s&amp;group=%i&amp;bskid=%i&amp;recid=%i&amp;cmtid=%i&amp;ln=%s%s">%s</a>""" % \
                                     (CFG_SITE_URL, selected_category, cgi.escape(selected_topic, True), selected_group, bskid, recid, cmtid, ln, '#note', _('Reply'))
@@ -2828,7 +2860,7 @@ class Template:
                     <table cellspacing="0" cellpadding="0" class="bsknotescontentnote">
                       <tr>
                         <td class="bsknotescontenttitle">
-                        %(inline_anchor)s<img src="%(url)s/img/user-icon-1-24x24.gif" /><strong>%(title)s</strong>, %(label_author)s <a href="%(url)s/yourmessages/write?msg_to=%(user)s">%(user_display)s</a> %(label_date)s <em>%(date)s</em>
+                        %(inline_anchor)s<img src="%(CFG_SITE_URL)s/img/user-icon-1-24x24.gif" />%(authorship)s
                         </td>
                       </tr>
                       <tr>
@@ -2845,16 +2877,19 @@ class Template:
                       </tr>
                     </table>
                     <br />""" % {'inline_anchor': (not add_note_p and notes[-1][-1]==cmtid) and '<a name="note"></a>' or '',
-                                 'url': CFG_SITE_URL,
-                                 'title': cmt_title and cgi.escape(cmt_title, True) or _('Note'),
-                                 'label_author': _("by"),
-                                 'label_date': _("on"),
-                                 'user': cmt_nickname or cmt_uid,
-                                 'user_display': cmt_nickname or get_user_info(cmt_uid)[2],
-                                 'date': convert_datetext_to_dategui(cmt_date),
+                                 'CFG_SITE_URL': CFG_SITE_URL,
+                                 'authorship': _("%(x_title)s, by %(x_name)s on %(x_date)s") % \
+                                               {'x_title': '<strong>' + (cmt_title and cgi.escape(cmt_title, True) \
+                                                                         or _('Note')) + '</strong>',
+                                                'x_name': '<a href="%(CFG_SITE_URL)s/yourmessages/write?msg_to=%(user)s">%(user_display)s</a>' % \
+                                                          {'CFG_SITE_URL': CFG_SITE_URL,
+                                                           'user': cmt_nickname or cmt_uid,
+                                                           'user_display': cmt_nickname or get_user_info(cmt_uid)[2]},
+                                                'x_date': '<em>' + convert_datetext_to_dategui(cmt_date) + '</em>'},
                                  'body': email_quoted_txt2html(escape_email_quoted_text(cmt_body)),
                                  'reply_to_note': reply_to_note,
                                  'delete_note': delete_note}
+                notes_html += '</div>'
             if add_note_p:
                 notes_html += add_note_html
             notes_html += """
@@ -2946,16 +2981,18 @@ class Template:
         _ = gettext_set_language(ln)
 
         optional_colspan = nb_items and ' colspan="3"' or ''
-        records_field = '<br />' + str(nb_items) + ' ' + _('items')
-        comments_field = user_can_view_comments and (nb_comments and ', ' + str(nb_comments) + ' ' + 'notes' or ', no notes yet') or ''
+        records_field = '<br />' + _('%i items') % nb_items
+        comments_field = user_can_view_comments and \
+                         (nb_comments and ', ' + (_('%i notes') % nb_comments) or _(', no notes yet')) \
+                         or ''
         last_update_field = '<br />' + _('last update') + ': ' + date_modification
 
         if subscription_status:
             subscribe_url = """%s/yourbaskets/subscribe?bskid=%i&amp;ln=%s""" % (CFG_SITE_URL, bskid, ln)
-            subscribe_logo = """<img src="http://pcuds36.cern.ch/img/wb-subscribe.png" />"""
+            subscribe_logo = """<img src="%s/img/wb-subscribe.png" />""" % (CFG_SITE_URL,)
             subscribe = """<a href="%s">%s%s</a>""" % (subscribe_url, subscribe_logo, _("Subscribe to basket"))
             unsubscribe_url = """%s/yourbaskets/unsubscribe?bskid=%i&amp;ln=%s""" % (CFG_SITE_URL, bskid, ln)
-            unsubscribe_logo = """<img src="http://pcuds36.cern.ch/img/wb-unsubscribe.png" />"""
+            unsubscribe_logo = """<img src="%s/img/wb-unsubscribe.png" />""" % (CFG_SITE_URL,)
             unsubscribe = """<a href="%s">%s%s</a>""" % (unsubscribe_url, unsubscribe_logo, _("Unsubscribe from basket"))
 
         out = """
@@ -3005,10 +3042,10 @@ class Template:
 
         if subscription_status:
             subscribe_url = """%s/yourbaskets/subscribe?bskid=%i&amp;ln=%s""" % (CFG_SITE_URL, bskid, ln)
-            subscribe_logo = """<img src="http://pcuds36.cern.ch/img/wb-subscribe.png" />"""
+            subscribe_logo = """<img src="%s/img/wb-subscribe.png" />""" % (CFG_SITE_URL,)
             subscribe = """<a href="%s">%s%s</a>""" % (subscribe_url, subscribe_logo, _("Subscribe to basket"))
             unsubscribe_url = """%s/yourbaskets/unsubscribe?bskid=%i&amp;ln=%s""" % (CFG_SITE_URL, bskid, ln)
-            unsubscribe_logo = """<img src="http://pcuds36.cern.ch/img/wb-unsubscribe.png" />"""
+            unsubscribe_logo = """<img src="%s/img/wb-unsubscribe.png" />""" % (CFG_SITE_URL,)
             unsubscribe = """<a href="%s">%s%s</a>""" % (unsubscribe_url, unsubscribe_logo, _("Unsubscribe from basket"))
             (uid, nickname, display_name) = get_user_info(id_owner)
             display_owner_url = """%s/yourmessages/write?msg_to=%s""" % (CFG_SITE_URL, nickname or str(uid))
@@ -3251,7 +3288,8 @@ class Template:
 
         _ = gettext_set_language(ln)
 
-        records_field = '<br />' + _('Item ') + str(item_index) + _(' of ') + str(nb_items)
+        records_field = '<br />' + _('Item %(x_item_index)i of %(x_item_total)i') % \
+                        {'x_item_index': item_index, 'x_item_total': nb_items}
 
         if previous_item_recid:
             previous_item_url = """%s/yourbaskets/display_public?bskid=%i&amp;recid=%s&amp;ln=%s""" % \
@@ -3259,10 +3297,10 @@ class Template:
                                  bskid,
                                  previous_item_recid,
                                  ln)
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item.png" />""" % (CFG_SITE_URL,)
             previous_item = """<a href="%s">%s%s</a>""" % (previous_item_url, previous_item_logo, _("Previous item"))
         else:
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item-disabled.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item-disabled.png" />""" % (CFG_SITE_URL,)
             previous_item = """%s%s""" % (previous_item_logo, _("Previous item"))
 
         if next_item_recid:
@@ -3271,17 +3309,17 @@ class Template:
                              bskid,
                              next_item_recid,
                              ln)
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item.png" />""" % (CFG_SITE_URL,)
             next_item = """<a href="%s">%s%s</a>""" % (next_item_url, next_item_logo, _("Next item"))
         else:
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item-disabled.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item-disabled.png" />""" % (CFG_SITE_URL,)
             next_item = """%s%s""" % (next_item_logo, _("Next item"))
 
         go_back_url = """%s/yourbaskets/display_public?bskid=%i&amp;ln=%s""" % \
                       (CFG_SITE_URL,
                        bskid,
                        ln)
-        go_back_logo = """<img src="http://pcuds36.cern.ch/img/wb-go-back.png" />"""
+        go_back_logo = """<img src="%s/img/wb-go-back.png" />""" % (CFG_SITE_URL,)
         go_back = """<a href="%s">%s%s</a>""" % (go_back_url, go_back_logo, _("Return to basket"))
 
         out = """
@@ -3334,10 +3372,10 @@ class Template:
                                  bskid,
                                  previous_item_recid,
                                  ln)
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item.png" />""" % (CFG_SITE_URL,)
             previous_item = """<a href="%s">%s%s</a>""" % (previous_item_url, previous_item_logo, _("Previous item"))
         else:
-            previous_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-previous-item-disabled.png" />"""
+            previous_item_logo = """<img src="%s/img/wb-previous-item-disabled.png" />""" % (CFG_SITE_URL,)
             previous_item = """%s%s""" % (previous_item_logo, _("Previous item"))
 
         if next_item_recid:
@@ -3346,17 +3384,17 @@ class Template:
                              bskid,
                              next_item_recid,
                              ln)
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item.png" />""" % (CFG_SITE_URL,)
             next_item = """<a href="%s">%s%s</a>""" % (next_item_url, next_item_logo, _("Next item"))
         else:
-            next_item_logo = """<img src="http://pcuds36.cern.ch/img/wb-next-item-disabled.png" />"""
+            next_item_logo = """<img src="%s/img/wb-next-item-disabled.png" />""" % (CFG_SITE_URL,)
             next_item = """%s%s""" % (next_item_logo, _("Next item"))
 
         go_back_url = """%s/yourbaskets/display_public?bskid=%i&amp;ln=%s""" % \
                       (CFG_SITE_URL,
                        bskid,
                        ln)
-        go_back_logo = """<img src="http://pcuds36.cern.ch/img/wb-go-back.png" />"""
+        go_back_logo = """<img src="%s/img/wb-go-back.png" />""" % (CFG_SITE_URL,)
         go_back = """<a href="%s">%s%s</a>""" % (go_back_url, go_back_logo, _("Return to basket"))
 
         out = """
@@ -3551,6 +3589,7 @@ class Template:
                             <br />
                             %(editor)s
                             </p>
+                            <input type="hidden" name="reply_to" value="%(reply_to)s" />
                             <p align="right">
                             <input type="submit" class="formbutton" value="%(submit_label)s" />
                             <input type="button" class="nonsubmitbutton" value="%(cancel_label)s" onClick="window.location='%(cancel)s'" />
@@ -3565,14 +3604,15 @@ class Template:
                                    'note_title': note_title,
                                    'editor': editor,
                                    'add_a_note_label': _('Add a note'),
-                                   'submit_label': _('Add note')}
+                                   'submit_label': _('Add note'),
+                                   'reply_to': optional_params.get("Reply to")}
 
         notes_icon = '<img src="%s/img/wb-notes.png" style="vertical-align: top;" />&nbsp;' % (CFG_SITE_URL,)
 
         if user_can_add_notes and not add_note_p:
             add_note_url = """%s/yourbaskets/write_public_note?bskid=%i&amp;recid=%i&amp;ln=%s%s""" % \
                            (CFG_SITE_URL, bskid, recid, ln, '#note')
-            add_note_logo = """<img src="http://pcuds36.cern.ch/img/wb-add-note.png" />"""
+            add_note_logo = """<img src="%s/img/wb-add-note.png" />""" % (CFG_SITE_URL,)
             add_note = """<a href="%s">%s%s</a>""" % (add_note_url, add_note_logo, _("Add a note"))
         else:
             add_note = ""
@@ -3598,7 +3638,16 @@ class Template:
             notes_html += """
                 <tr>
                   <td colspan="2" class="bsknotescontent">"""
-            for (cmt_uid, cmt_nickname, cmt_title, cmt_body, cmt_date, dummy, cmtid) in notes:
+            thread_history = [0]
+            for (cmt_uid, cmt_nickname, cmt_title, cmt_body, cmt_date, dummy, cmtid, reply_to) in notes:
+                if reply_to not in thread_history:
+                    # Going one level down in the thread
+                    thread_history.append(reply_to)
+                    depth = thread_history.index(reply_to)
+                else:
+                    depth = thread_history.index(reply_to)
+                    thread_history = thread_history[:depth + 1]
+                notes_html += '<div style="margin-left:%spx">' % (depth*20)
                 if user_can_add_notes:
                     reply_to_note = """<a href="%s/yourbaskets/write_public_note?bskid=%i&amp;recid=%i&amp;cmtid=%i&amp;ln=%s%s">%s</a>""" % \
                                     (CFG_SITE_URL, bskid, recid, cmtid, ln, '#note', _('Reply'))
@@ -3608,7 +3657,7 @@ class Template:
                     <table cellspacing="0" cellpadding="0" class="bsknotescontentnote">
                       <tr>
                         <td class="bsknotescontenttitle">
-                        %(inline_anchor)s<img src="%(url)s/img/user-icon-1-24x24.gif" /><strong>%(title)s</strong>, %(label_author)s <a href="%(url)s/yourmessages/write?msg_to=%(user)s">%(user_display)s</a> %(label_date)s <em>%(date)s</em>
+                        %(inline_anchor)s<img src="%(CFG_SITE_URL)s/img/user-icon-1-24x24.gif" />%(authorship)s
                         </td>
                       </tr>
                       <tr>
@@ -3625,15 +3674,19 @@ class Template:
                       </tr>
                     </table>
                     <br />""" % {'inline_anchor': (not add_note_p and notes[-1][-1]==cmtid) and '<a name="note"></a>' or '',
-                                 'url': CFG_SITE_URL,
-                                 'title': cmt_title and cgi.escape(cmt_title, True) or _('Note'),
-                                 'label_author': _("by"),
-                                 'label_date': _("on"),
-                                 'user': cmt_nickname or cmt_uid,
-                                 'user_display': cmt_nickname or get_user_info(cmt_uid)[2],
-                                 'date': convert_datetext_to_dategui(cmt_date),
+                                 'CFG_SITE_URL': CFG_SITE_URL,
+                                 'authorship': _("%(x_title)s, by %(x_name)s on %(x_date)s") % \
+                                               {'x_title': '<strong>' + (cmt_title and cgi.escape(cmt_title, True) \
+                                                                         or _('Note')) + '</strong>',
+                                                'x_name': '<a href="%(CFG_SITE_URL)s/yourmessages/write?msg_to=%(user)s">%(user_display)s</a>' % \
+                                                          {'CFG_SITE_URL': CFG_SITE_URL,
+                                                           'user': cmt_nickname or cmt_uid,
+                                                           'user_display': cmt_nickname or get_user_info(cmt_uid)[2]},
+                                                'x_date': '<em>' + convert_datetext_to_dategui(cmt_date) + '</em>'},
+
                                  'body': email_quoted_txt2html(escape_email_quoted_text(cmt_body)),
                                  'reply_to_note': reply_to_note}
+                notes_html += '</div>'
             if add_note_p:
                 notes_html += add_note_html
             notes_html += """
@@ -3693,7 +3746,7 @@ class Template:
                                    public=False):
         """Tamplate that creates a bullet list of export as formats for a basket or an item."""
 
-        list_of_export_as_formats = [('MARCXML', 'xm')]
+        list_of_export_as_formats = [('BibTeX','hx'), ('DC','xd'), ('EndNote','xe'), ('MARCXML', 'xm'), ('NLM','xn'), ('RefWorks','xw')]
 
         recid = item and "&recid=" + str(item[0]) or ""
 
@@ -3713,9 +3766,10 @@ class Template:
 
         export_as_html = ""
         for format in list_of_export_as_formats:
-            export_as_html += """<a style="text-decoration:underline;font-weight:normal" href="%s&of=%s">%s</a>""" % \
+            export_as_html += """<a style="text-decoration:underline;font-weight:normal" href="%s&of=%s">%s</a>, """ % \
                               (href, format[1], format[0])
-
+        if export_as_html:
+            export_as_html = export_as_html[:-2]
         out = """
 <div style="float:right; text-align:right;">
   <ul class="bsk_export_as_list">

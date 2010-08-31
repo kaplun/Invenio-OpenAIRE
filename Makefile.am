@@ -46,13 +46,13 @@ kwalitee-check:
 	@$(PYTHON) $(top_srcdir)/modules/miscutil/lib/kwalitee.py --stats $(top_srcdir)
 
 kwalitee-check-errors-only:
-	@find $(top_srcdir) -name '*.py' -exec pylint -e {} \; 2> /dev/null
+	@$(PYTHON) $(top_srcdir)/modules/miscutil/lib/kwalitee.py --check-errors $(top_srcdir)
 
 kwalitee-check-variables:
-	@find $(top_srcdir) -name '*.py' -exec pylint --reports=n --enable-checker=variables {} \; 2> /dev/null
+	@$(PYTHON) $(top_srcdir)/modules/miscutil/lib/kwalitee.py --check-variables $(top_srcdir)
 
 kwalitee-check-indentation:
-	@find $(top_srcdir) -name '*.py' -exec pylint --reports=n --enable-checker=format {} 2> /dev/null \; | grep -E '(^\*|indentation)'
+	@$(PYTHON) $(top_srcdir)/modules/miscutil/lib/kwalitee.py --check-indentation $(top_srcdir)
 
 kwalitee-check-sql-queries:
 	@echo "* Listing potentially dangerous SQL queries:"
@@ -141,7 +141,7 @@ uninstall-jscalendar-plugin:
 	@echo "** The jsCalendar plugin was successfully uninstalled.   **"
 	@echo "***********************************************************"
 
-install-jquery-plugins: uninstall-jquery-plugins
+install-jquery-plugins: install-jquery-plugins
 	@echo "***********************************************************"
 	@echo "** Installing various jQuery plugins, please wait...     **"
 	@echo "***********************************************************"
@@ -151,32 +151,44 @@ install-jquery-plugins: uninstall-jquery-plugins
 	mv jquery-1.3.1.min.js jquery.min.js && \
 	wget http://jquery-ui.googlecode.com/svn/tags/latest/ui/minified/jquery.effects.core.min.js && \
 	wget http://jquery-ui.googlecode.com/svn/tags/latest/ui/minified/jquery.effects.highlight.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/ui/minified/ui.slider.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/ui/minified/ui.sortable.min.js && \
 	wget http://www.appelsiini.net/download/jquery.jeditable.mini.js && \
+	wget http://github.com/malsup/form/raw/master/jquery.form.js && \
+	wget http://jquery-multifile-plugin.googlecode.com/svn/trunk/jquery.MultiFile.pack.js && \
 	wget http://plugins.jquery.com/files/jquery.autogrow-1.2.2.zip && \
 	wget http://tablesorter.com/jquery.tablesorter.zip && \
+	wget http://www.uploadify.com/_files/jquery.uploadify-v2.1.0.zip && \
 	unzip jquery.tablesorter.zip && \
 	rm jquery.tablesorter.zip && \
+	unzip -u jquery.uploadify-v2.1.0.zip -d uploadify && \
+	mv uploadify/swfobject.js ./ && \
+	mv uploadify/cancel.png uploadify/uploadify.css uploadify/uploadify.allglyphs.swf uploadify/uploadify.fla uploadify/uploadify.swf ../img/ && \
+	mv uploadify/jquery.uploadify.v2.1.0.min.js ./jquery.uploadify.min.js && \
+	rm jquery.uploadify-v2.1.0.zip && rm -r uploadify && \
 	unzip jquery.autogrow-1.2.2.zip jquery.autogrow.js && \
 	rm jquery.autogrow-1.2.2.zip && \
 	wget -O json2.js.tmp http://json.org/json2.js && \
 	grep -v 'alert.*IMPORTANT: Remove this line' json2.js.tmp > json2.js && \
 	rm json2.js.tmp && \
-	wget http://jquery-ui.googlecode.com/svn/tags/1.7.2/ui/minified/ui.datepicker.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/ui/minified/ui.datepicker.min.js && \
 	wget -O jquery.hotkeys.min.js http://js-hotkeys.googlecode.com/files/jquery.hotkeys-0.7.8-packed.js && \
 	wget http://plugins.jquery.com/files/jquery.treeview_3.zip && \
 	unzip jquery.treeview_3.zip && \
 	rm jquery.treeview_3.zip && \
 	wget http://plugins.jquery.com/files/jquery.ajaxPager.js_5.txt && \
 	mv jquery.ajaxPager.js_5.txt jquery.ajaxPager.js && \
-	wget http://jqueryui.com/download/jquery-ui-1.7.2.custom.zip && \
-	unzip jquery-ui-1.7.2.custom.zip development-bundle/ui/ui.core.js && \
+	wget http://jqueryui.com/download/jquery-ui-1.7.3.custom.zip && \
+	unzip jquery-ui-1.7.3.custom.zip development-bundle/ui/ui.core.js && \
 	mv development-bundle/ui/ui.core.js ui.core.js && \
-	rm -rf development-bundle)
+	rm -rf development-bundle && \
+	rm jquery-ui-1.7.3.custom.zip)
 	mkdir -p ${prefix}/var/www/img && \
 	(cd ${prefix}/var/www/img && \
-	wget http://jquery-ui.googlecode.com/svn/tags/1.7.2/themes/redmond/jquery-ui.css && \
-	wget http://jquery-ui.googlecode.com/svn/tags/1.7.2/demos/images/calendar.gif && \
-	wget -r -np -nH --cut-dirs=5 -A "png" http://jquery-ui.googlecode.com/svn/tags/1.7.2/themes/redmond/images/)
+	wget -r -np -nH --cut-dirs=4 -A "png,css" -P jquery-ui/themes http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/base/ && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/redmond/jquery-ui.css && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/demos/images/calendar.gif && \
+	wget -r -np -nH --cut-dirs=5 -A "png" http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/redmond/images/)
 	@echo "***********************************************************"
 	@echo "** The jQuery plugins were successfully installed.       **"
 	@echo "***********************************************************"
@@ -186,17 +198,24 @@ uninstall-jquery-plugins:
 	rm -f jquery.min.js && \
 	rm -f jquery.effects.core.min.js && \
 	rm -f jquery.effects.highlight.min.js && \
+	rm -f jquery.MultiFile.pack.js && \
 	rm -f jquery.jeditable.mini.js && \
 	rm -f jquery.tablesorter.js && \
 	rm -f jquery.tablesorter.pager.js && \
 	rm -f ui.datepicker.min.js && \
 	rm -f jquery.autogrow.js && \
 	rm -f json2.js && \
+	rm -f jquery.uploadify.min.js && \
+	rm -f jquery.ui.slider.min.js && \
+	rm -f jquery.ui.sortable.min.js && \
 	rm -rf tablesorter && \
 	rm -f jquery.hotkeys.min.js && \
 	rm -rf jquery-treeview && \
 	rm -f jquery.ajaxPager.js && \
-	rm -f ui.core.js)
+	rm -f jquery.form.js && \
+	rm -f ui.core.js) && \
+	(cd ${prefix}/var/www/img && \
+	rm -f cancel.png uploadify.css uploadify.swf uploadify.allglyphs.swf uploadify.fla)
 	@echo "***********************************************************"
 	@echo "** The jquery plugins were successfully uninstalled.     **"
 	@echo "***********************************************************"
@@ -219,7 +238,7 @@ install-fckeditor-plugin:
 	find ${prefix}/lib/python/invenio/fckeditor -type d -exec touch {}/__init__.py \; && \
 	find ${prefix}/var/www/fckeditor/ -depth -name '_*' -exec rm -rf {} \; && \
 	rm -r ${prefix}/var/www/fckeditor/editor/filemanager/connectors && \
-	find ${prefix}/var/www/fckeditor/fckeditor* -maxdepth 0 -exec rm -r {} \; && \
+	find ${prefix}/var/www/fckeditor/fckeditor* -maxdepth 0 ! -name "fckeditor.js" -exec rm -r {} \; && \
 	rm -fr /tmp/invenio-fckeditor-plugin
 	@echo "* Installing Invenio-specific FCKeditor config..."
 	(cd $(top_srcdir)/modules/webstyle/etc && make install)
@@ -234,6 +253,21 @@ uninstall-fckeditor-plugin:
 	@rm -rvf ${prefix}/lib/python/invenio/fckeditor
 	@echo "***********************************************************"
 	@echo "** The FCKeditor plugin was successfully uninstalled.    **"
+	@echo "***********************************************************"
+
+install-pdfa-helper-files:
+	@echo "***********************************************************"
+	@echo "** Installing PDF/A helper files, please wait...         **"
+	@echo "***********************************************************"
+	wget 'http://cdsware.cern.ch/download/invenio-demo-site-files/ISOCoatedsb.icc' -O ${prefix}/etc/websubmit/file_converter_templates/ISOCoatedsb.icc
+	@echo "***********************************************************"
+	@echo "** The PDF/A helper files were successfully installed.   **"
+	@echo "***********************************************************"
+
+uninstall-pdfa-helper-files:
+	rm -f ${prefix}/etc/websubmit/file_converter_templates/ISOCoatedsb.icc
+	@echo "***********************************************************"
+	@echo "** The PDF/A helper files were successfully uninstalled. **"
 	@echo "***********************************************************"
 
 update-v0.3.0-tables update-v0.3.1-tables:
@@ -384,6 +418,7 @@ update-v0.99.1-tables:
 	echo "INSERT INTO knwKBRVAL (id,m_key,m_value,id_knwKB) SELECT id,m_key,m_value,id_fmtKNOWLEDGEBASES FROM fmtKNOWLEDGEBASEMAPPINGS;" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE sbmPARAMETERS CHANGE name name varchar(40) NOT NULL default '';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE bibdoc CHANGE docname docname varchar(250) COLLATE utf8_bin NOT NULL default 'file';" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE bibdoc ADD COLUMN text_extraction_date datetime NOT NULL default '0000-00-00';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE collection DROP COLUMN restricted;" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE schTASK CHANGE host host varchar(255) NOT NULL default '';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE hstTASK CHANGE host host varchar(255) NOT NULL default '';" | ${prefix}/bin/dbexec
@@ -405,5 +440,66 @@ update-v0.99.1-tables:
 	echo "ALTER TABLE bskEXTREC ADD original_url text;" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE cmtRECORDCOMMENT ADD status char(2) NOT NULL default 'ok';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE cmtRECORDCOMMENT ADD KEY status (status);" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmALLFUNCDESCR VALUES ('Move_Photos_to_Storage','Attach/edit the pictures uploaded with the \"create_photos_manager_interface()\" function');"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFIELDDESC VALUES ('Upload_Photos',NULL,'','R',NULL,NULL,NULL,NULL,NULL,'\"\"\"\r\nThis is an example of element that creates a photos upload interface.\r\nClone it, customize it and integrate it into your submission. Then add function \r\n\'Move_Photos_to_Storage\' to your submission functions list, in order for files \r\nuploaded with this interface to be attached to the record. More information in \r\nthe WebSubmit admin guide.\r\n\"\"\"\r\n\r\nfrom invenio.websubmit_functions.ParamFile import ParamFromFile\r\nfrom invenio.websubmit_functions.Move_Photos_to_Storage import read_param_file, create_photos_manager_interface, get_session_id\r\n\r\n# Retrieve session id\r\ntry:\r\n    # User info is defined only in MBI/MPI actions...\r\n    session_id = get_session_id(None, uid, user_info) \r\nexcept:\r\n    session_id = get_session_id(req, uid, {})\r\n\r\n# Retrieve context\r\nindir = curdir.split(\'/\')[-3]\r\ndoctype = curdir.split(\'/\')[-2]\r\naccess = curdir.split(\'/\')[-1]\r\n\r\n# Get the record ID, if any\r\nsysno = ParamFromFile(\"%s/%s\" % (curdir,\'SN\')).strip()\r\n\r\n\"\"\"\r\nModify below the configuration of the photos manager interface.\r\nNote: \'can_reorder_photos\' parameter is not yet fully taken into consideration\r\n\r\nDocumentation of the function is available by running:\r\necho -e \'from invenio.websubmit_functions.Move_Photos_to_Storage import create_photos_manager_interface as f\\nprint f.__doc__\' | python\r\n\"\"\"\r\ntext += create_photos_manager_interface(sysno, session_id, uid,\r\n                                        doctype, indir, curdir, access,\r\n                                        can_delete_photos=True,\r\n                                        can_reorder_photos=True,\r\n                                        can_upload_photos=True,\r\n                                        editor_width=700,\r\n                                        editor_height=400,\r\n                                        initial_slider_value=100,\r\n                                        max_slider_value=200,\r\n                                        min_slider_value=80)','0000-00-00','0000-00-00',NULL,NULL,0);"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Photos_to_Storage','iconsize');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFIELDDESC VALUES ('Upload_Files',NULL,'','R',NULL,NULL,NULL,NULL,NULL,'\"\"\"\r\nThis is an example of element that creates a file upload interface.\r\nClone it, customize it and integrate it into your submission. Then add function \r\n\'Move_Uploaded_Files_to_Storage\' to your submission functions list, in order for files \r\nuploaded with this interface to be attached to the record. More information in \r\nthe WebSubmit admin guide.\r\n\"\"\"\r\nfrom invenio.websubmit_managedocfiles import create_file_upload_interface\r\nfrom invenio.websubmit_functions.Shared_Functions import ParamFromFile\r\n\r\nindir = ParamFromFile(os.path.join(curdir, \'indir\'))\r\ndoctype = ParamFromFile(os.path.join(curdir, \'doctype\'))\r\naccess = ParamFromFile(os.path.join(curdir, \'access\'))\r\ntry:\r\n    sysno = int(ParamFromFile(os.path.join(curdir, \'SN\')).strip())\r\nexcept:\r\n    sysno = -1\r\nln = ParamFromFile(os.path.join(curdir, \'ln\'))\r\n\r\n\"\"\"\r\nRun the following to get the list of parameters of function \'create_file_upload_interface\':\r\necho -e \'from invenio.websubmit_managedocfiles import create_file_upload_interface as f\\nprint f.__doc__\' | python\r\n\"\"\"\r\ntext = create_file_upload_interface(recid=sysno,\r\n                                 print_outside_form_tag=False,\r\n                                 include_headers=True,\r\n                                 ln=ln,\r\n                                 doctypes_and_desc=[(\'main\',\'Main document\'),\r\n                                                    (\'additional\',\'Figure, schema, etc.\')],\r\n                                 can_revise_doctypes=[\'*\'],\r\n                                 can_describe_doctypes=[\'main\'],\r\n                                 can_delete_doctypes=[\'additional\'],\r\n                                 can_rename_doctypes=[\'main\'],\r\n                                 sbm_indir=indir, sbm_doctype=doctype, sbm_access=access)[1]\r\n','0000-00-00','0000-00-00',NULL,NULL,0);"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Uploaded_Files_to_Storage','forceFileRevision');"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmALLFUNCDESCR VALUES ('Create_Upload_Files_Interface','Display generic interface to add/revise/delete files. To be used before function \"Move_Uploaded_Files_to_Storage\"');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmALLFUNCDESCR VALUES ('Move_Uploaded_Files_to_Storage','Attach files uploaded with \"Create_Upload_Files_Interface\"')" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Revised_Files_to_Storage','elementNameToDoctype');"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Revised_Files_to_Storage','createIconDoctypes');"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Revised_Files_to_Storage','createRelatedFormats');"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Revised_Files_to_Storage','iconsize');"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Revised_Files_to_Storage','keepPreviousVersionDoctypes');"  | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmALLFUNCDESCR VALUES ('Move_Revised_Files_to_Storage','Revise files initially uploaded with \"Move_Files_to_Storage\"')" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','maxsize');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','minsize');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','doctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','restrictions');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canDeleteDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canReviseDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canDescribeDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canCommentDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canKeepDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canAddFormatDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canRestrictDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canRenameDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','canNameNewFiles');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','createRelatedFormats');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','keepDefault');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','showLinks');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','fileLabel');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','filenameLabel');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','descriptionLabel');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','commentLabel');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','restrictionLabel');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','startDoc');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','endDoc');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','defaultFilenameDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Create_Upload_Files_Interface','maxFilesDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Uploaded_Files_to_Storage','iconsize');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Uploaded_Files_to_Storage','createIconDoctypes');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Report_Number_Generation','nblength');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Second_Report_Number_Generation','2nd_nb_length');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmALLFUNCDESCR VALUES ('Move_FCKeditor_Files_to_Storage','Transfer files attached to the record with the FCKeditor');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_FCKeditor_Files_to_Storage','input_fields');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Stamp_Uploaded_Files','layer');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Stamp_Replace_Single_File_Approval','layer');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Stamp_Replace_Single_File_Approval','switch_file');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Stamp_Uploaded_Files','switch_file');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Files_to_Storage','paths_and_restrictions');" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE cmtRECORDCOMMENT ADD round_name varchar(255) NOT NULL default ''" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE cmtRECORDCOMMENT ADD restriction varchar(50) NOT NULL default ''" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE cmtRECORDCOMMENT ADD in_reply_to_id_cmtRECORDCOMMENT int(15) unsigned NOT NULL default '0'" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE cmtRECORDCOMMENT ADD KEY in_reply_to_id_cmtRECORDCOMMENT (in_reply_to_id_cmtRECORDCOMMENT);" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE bskRECORDCOMMENT ADD in_reply_to_id_bskRECORDCOMMENT int(15) unsigned NOT NULL default '0'" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE bskRECORDCOMMENT ADD KEY in_reply_to_id_bskRECORDCOMMENT (in_reply_to_id_bskRECORDCOMMENT);" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE cmtRECORDCOMMENT ADD reply_order_cached_data blob NULL default NULL;" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE bskRECORDCOMMENT ADD reply_order_cached_data blob NULL default NULL;" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE cmtRECORDCOMMENT ADD INDEX (reply_order_cached_data(40));" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE bskRECORDCOMMENT ADD INDEX (reply_order_cached_data(40));" | ${prefix}/bin/dbexec
+	echo -e 'from invenio.webcommentadminlib import migrate_comments_populate_threads_index;\
+	migrate_comments_populate_threads_index()' | $(PYTHON)
 
 CLEANFILES = *~ *.pyc *.tmp

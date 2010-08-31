@@ -22,7 +22,7 @@ import calendar, commands, datetime, time, os, cPickle
 from invenio.config import CFG_TMPDIR, CFG_SITE_URL
 from invenio.urlutils import redirect_to_url
 from invenio.search_engine import perform_request_search
-from invenio.dbquery import run_sql, escape_string
+from invenio.dbquery import run_sql, wash_table_column_name
 
 WEBSTAT_SESSION_LENGTH = 48*60*60 # seconds
 WEBSTAT_GRAPH_TOKENS = '-=#+@$%&XOSKEHBC'
@@ -256,11 +256,11 @@ def get_customevent_trend(args):
             continue
         if col_content:
             if col_bool == "and" or col_bool == "":
-                sql_query.append("AND `%s`" % escape_string(col_title))
+                sql_query.append("AND %s" % wash_table_column_name(col_title))
             elif col_bool == "or":
-                sql_query.append("OR `%s`" % escape_string(col_title))
+                sql_query.append("OR %s" % wash_table_column_name(col_title))
             elif col_bool == "and_not":
-                sql_query.append("AND NOT `%s`" % escape_string(col_title))
+                sql_query.append("AND NOT %s" % wash_table_column_name(col_title))
             else:
                 continue
             sql_query.append(" LIKE %s")
@@ -307,18 +307,18 @@ def get_customevent_dump(args):
         # Get all the event arguments and creation times
         tbl_name = get_customevent_table(id)
         col_names = get_customevent_args(id)
-        sql_query = ["SELECT * FROM %s WHERE creation_time > '%s'" % (tbl_name, lower)]
+        sql_query = ["SELECT * FROM %s WHERE creation_time > '%s'" % (tbl_name, lower)] # Note: SELECT * technique is okay here
         sql_query.append("AND creation_time < '%s'" % upper)
         sql_param = []
         for col_bool, col_title, col_content in args['cols'+i]:
             if not col_title in col_names: continue
             if col_content:
                 if col_bool == "and" or col_bool == "":
-                    sql_query.append("AND `%s`" % escape_string(col_title))
+                    sql_query.append("AND %s" % wash_table_column_name(col_title))
                 elif col_bool == "or":
-                    sql_query.append("OR `%s`" % escape_string(col_title))
+                    sql_query.append("OR %s" % wash_table_column_name(col_title))
                 elif col_bool == "and_not":
-                    sql_query.append("AND NOT `%s`" % escape_string(col_title))
+                    sql_query.append("AND NOT %s" % wash_table_column_name(col_title))
                 else:
                     continue
                 sql_query.append(" LIKE %s")
@@ -642,7 +642,9 @@ def _get_trend_from_actions(action_dates, initial_value, t_start, t_end, granula
         action_dates = action_dates[:-1]
 
     vector = [(None, initial_value)]
+    # pylint: disable=E1101
     old = dt_iter.next()
+    # pylint: enable=E1101
     upcoming_action = action_dates.pop()
 
     for current in dt_iter:

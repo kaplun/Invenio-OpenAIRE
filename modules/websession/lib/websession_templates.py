@@ -1091,6 +1091,8 @@ class Template:
                     tmp_out += """<br />&nbsp;&nbsp;&nbsp; <a href="%s/admin/bibcirculation/bibcirculationadmin.py?ln=%s">%s</a>""" % (CFG_SITE_URL, ln, _("Run BibCirculation"))
                 if action == "runbibmerge":
                     tmp_out += """<br />&nbsp;&nbsp;&nbsp; <a href="%s/record/merge/">%s</a>""" % (CFG_SITE_URL, _("Run Record Merger"))
+                if action == "runbatchuploader":
+                    tmp_out += """<br />&nbsp;&nbsp;&nbsp; <a href="%s/batchuploader/metadata?ln=%s">%s</a>""" % (CFG_SITE_URL, ln, _("Run Batch Uploader"))
                 if action == "cfgbibformat":
                     tmp_out += """<br />&nbsp;&nbsp;&nbsp; <a href="%s/admin/bibformat/bibformatadmin.py?ln=%s">%s</a>""" % (CFG_SITE_URL, ln, _("Configure BibFormat"))
                     tmp_out += """<br />&nbsp;&nbsp;&nbsp; <a href="%s/kb?ln=%s">%s</a>""" % (CFG_SITE_URL, ln, _("Configure BibKnowledge"))
@@ -1186,7 +1188,7 @@ class Template:
                 }
         return out
 
-    def tmpl_create_useractivities_menu(req, ln, selected, url_referer, guest, username, submitter, referee, admin, usebaskets, usemessages, usealerts, usegroups, useloans, usestats):
+    def tmpl_create_useractivities_menu(self, ln, selected, url_referer, guest, username, submitter, referee, admin, usebaskets, usemessages, usealerts, usegroups, useloans, usestats):
         """
         Returns the main navigation menu with actions based on user's
         priviledges
@@ -1291,7 +1293,7 @@ class Template:
         out += '</ul></div>'
         return out
 
-    def tmpl_create_adminactivities_menu(req, ln, selected, url_referer, guest, username, submitter, referee, admin, usebaskets, usemessages, usealerts, usegroups, useloans, usestats, activities):
+    def tmpl_create_adminactivities_menu(self, ln, selected, url_referer, guest, username, submitter, referee, admin, usebaskets, usemessages, usealerts, usegroups, useloans, usestats, activities):
         """
         Returns the main navigation menu with actions based on user's
         priviledges
@@ -1336,7 +1338,7 @@ class Template:
         if activities:
             out += '''<div class="hassubmenu%(on)s">
             <a hreflang="en" class="header%(selected)s" href="%(CFG_SITE_SECURE_URL)s/youraccount/youradminactivities?ln=%(ln)s">%(admin)s</a>
-            <ul class="subsubmenu" style="width: 18em;">''' % {
+            <ul class="subsubmenu" style="width: 19em;">''' % {
             'CFG_SITE_SECURE_URL' : CFG_SITE_SECURE_URL,
             'ln' : ln,
             'admin': _("Administration"),
@@ -1665,7 +1667,7 @@ class Template:
                                       group_description,
                                       join_policy,
                                       act_type="create",
-                                      grpID="",
+                                      grpID=None,
                                       warnings=[],
                                       ln=CFG_SITE_LANG):
         """
@@ -1677,7 +1679,7 @@ class Template:
         - 'group_description' *string* - description of the group
         - 'join_policy' *string* - join policy
         - 'act_type' *string* - info about action : create or edit(update)
-        - 'grpID' *string* - ID of the group(not null in case of group editing)
+        - 'grpID' *int* - ID of the group(not None in case of group editing)
         - 'warnings' *list* - Display warning if values are not correct
 
         """
@@ -1699,7 +1701,7 @@ class Template:
             label = _('Edit group %s') % cgi.escape(group_name)
             delete_text = """<input type="submit" value="%s" class="formbutton" name="%s" />"""
             delete_text %= (_("Delete group"),"delete")
-            if grpID != "":
+            if grpID is not None:
                 hidden_id = """<input type="hidden" name="grpID" value="%s" />"""
                 hidden_id %= grpID
 
@@ -1906,7 +1908,7 @@ class Template:
         Parameters:
 
         - 'ln' *string* - The language to display the interface in
-        - 'grpID *string* - ID of the group
+        - 'grpID *int* - ID of the group
         - 'group_name' *string* - Name of the group
         - 'members' *list* - List of the current members
         - 'pending_members' *list* - List of the waiting members
@@ -2181,6 +2183,7 @@ Best regards.
     def tmpl_confirm_delete(self, grpID, ln=CFG_SITE_LANG):
         """
         display a confirm message when deleting a group
+        @param grpID *int* - ID of the group
         @param ln: language
         @return: html output
         """
@@ -2220,6 +2223,7 @@ Best regards.
     def tmpl_confirm_leave(self, uid, grpID, ln=CFG_SITE_LANG):
         """
         display a confirm message
+        @param grpID *int* - ID of the group
         @param ln: language
         @return: html output
         """
@@ -2346,13 +2350,13 @@ Best regards.
         """
         return message content for joining group
         - 'group_name' *string* - name of the group
-        - 'grpID' *string* - ID of the group
+        - 'grpID' *int* - ID of the group
         - 'ln' *string* - The language to display the interface in
         """
         _ = gettext_set_language(ln)
         subject = _("Group %s: New membership request") % group_name
-        url = CFG_SITE_URL + "/yourgroups/members?grpID=%i&ln=%s"
-        url %= (int(grpID), ln)
+        url = CFG_SITE_URL + "/yourgroups/members?grpID=%s&ln=%s"
+        url %= (grpID, ln)
         # FIXME: which user?  We should show his nickname.
         body = (_("A user wants to join the group %s.") % group_name) + '<br />'
         body += _("Please %(x_url_open)saccept or reject%(x_url_close)s this user's request.") % {'x_url_open': '<a href="' + url + '">',

@@ -31,13 +31,14 @@ Options to finish your installation:
    --create-tables          create DB tables for Invenio
    --load-webstat-conf      load the WebStat configuration
    --drop-tables            drop DB tables of Invenio
+   --check-openoffice-dir   check for correctly set up of openoffice temporary directory
 
 Options to set up and test a demo site:
    --create-demo-site       create demo site
    --load-demo-records      load demo records
    --remove-demo-records    remove demo records, keeping demo site
    --drop-demo-site         drop demo site configurations too
-   --run-unit-tests         run unit test suite (needs deme site)
+   --run-unit-tests         run unit test suite (needs demo site)
    --run-regression-tests   run regression test suite (needs demo site)
    --run-web-tests          run web tests in a browser (needs demo site, Firefox, Selenium IDE)
 
@@ -71,8 +72,6 @@ import re
 import shutil
 import socket
 import sys
-import zlib
-import marshal
 
 def print_usage():
     """Print help."""
@@ -108,17 +107,22 @@ def convert_conf_option(option_name, option_value):
         except ValueError:
             option_value = '"' + option_value + '"'
 
-    ## 3a) special cases: regexps
+    ## 3a) special cases: chars regexps
     if option_name in ['CFG_BIBINDEX_CHARS_ALPHANUMERIC_SEPARATORS',
                        'CFG_BIBINDEX_CHARS_PUNCTUATION']:
         option_value = 'r"[' + option_value[1:-1] + ']"'
+
+    ## 3abis) special cases: real regexps
+    if option_name in ['CFG_BIBINDEX_PERFORM_OCR_ON_DOCNAMES',
+                       'CFG_BIBINDEX_SPLASH_PAGES']:
+        option_value = 'r"' + option_value[1:-1] + '"'
 
     ## 3b) special cases: True, False, None
     if option_value in ['"True"', '"False"', '"None"']:
         option_value = option_value[1:-1]
 
     ## 3c) special cases: dicts
-    if option_name in ['CFG_WEBSEARCH_FIELDS_CONVERT', ]:
+    if option_name in ['CFG_WEBSEARCH_FIELDS_CONVERT', 'CFG_BATCHUPLOADER_WEB_ROBOT_RIGHTS']:
         option_value = option_value[1:-1]
 
     ## 3d) special cases: comma-separated lists
@@ -134,7 +138,9 @@ def convert_conf_option(option_name, option_value):
                        'CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES',
                        'CFG_SITE_EMERGENCY_PHONE_NUMBERS',
                        'CFG_WEBSTYLE_HTTP_STATUS_ALERT_LIST',
-                       'CFG_WEBSEARCH_RSS_I18N_COLLECTIONS']:
+                       'CFG_WEBSEARCH_RSS_I18N_COLLECTIONS',
+                       'CFG_BATCHUPLOADER_FILENAME_MATCHING_POLICY',
+                       'CFG_BATCHUPLOADER_WEB_ROBOT_AGENT']:
         out = "["
         for elem in option_value[1:-1].split(","):
             if elem:
@@ -376,7 +382,7 @@ def cli_cmd_reset_recstruct_cache(conf):
     will adapt the database to either store or not store the recstruct
     format."""
     from invenio.intbitset import intbitset
-    from invenio.dbquery import run_sql
+    from invenio.dbquery import run_sql, serialize_via_marshal
     from invenio.search_engine import get_record
     from invenio.bibsched import server_pid, pidfile
     enable_recstruct_cache = conf.get("Invenio", "CFG_BIBUPLOAD_SERIALIZE_RECORD_STRUCTURE")
@@ -395,7 +401,8 @@ def cli_cmd_reset_recstruct_cache(conf):
         tot = len(recids)
         count = 0
         for recid in recids:
-            value = zlib.compress(marshal.dumps(get_record(recid)))
+            value = serialize_via_marshal(get_record(recid))
+            run_sql("DELETE FROM bibfmt WHERE id_bibrec=%s AND format='recstruct'", (recid, ))
             run_sql("INSERT INTO bibfmt(id_bibrec, format, last_updated, value) VALUES(%s, 'recstruct', NOW(), %s)", (recid, value))
             count += 1
             if count % 1000 == 0:
@@ -469,7 +476,10 @@ def cli_cmd_reset_fieldnames(conf):
         ## ditto for rank methods:
         rankmethod_name_names = {"wrd": _("word similarity"),
                                  "demo_jif": _("journal impact factor"),
-                                 "citation": _("times cited"),}
+                                 "citation": _("times cited"),
+                                 "citerank_citation_t": _("time-decay cite count"),
+                                 "citerank_pagerank_c": _("all-time-best cite rank"),
+                                 "citerank_pagerank_t": _("time-decay cite rank"),}
         for (rankmethod_id, rankmethod_name) in rankmethod_id_name_list:
             try:
                 run_sql("""INSERT INTO rnkMETHODNAME (id_rnkMETHOD,ln,type,value) VALUES
@@ -481,6 +491,58 @@ def cli_cmd_reset_fieldnames(conf):
                         (rankmethod_name_names[rankmethod_name], rankmethod_id, lang, 'ln',))
 
     print ">>> I18N field names reset successfully."
+
+def cli_check_openoffice_dir(conf):
+    """
+    If OpenOffice.org integration is enabled, checks whether the system is
+    properly configured.
+    """
+    from invenio.textutils import wrap_text_in_a_box
+    from invenio.websubmit_file_converter import check_openoffice_tmpdir, \
+        InvenioWebSubmitFileConverterError, CFG_OPENOFFICE_TMPDIR
+    from invenio.config import CFG_OPENOFFICE_USER, \
+        CFG_PATH_OPENOFFICE_PYTHON, \
+        CFG_OPENOFFICE_SERVER_HOST, \
+        CFG_BIBSCHED_PROCESS_USER
+    from invenio.bibtask import guess_apache_process_user, \
+        check_running_process_user
+    check_running_process_user()
+    print ">>> Checking if OpenOffice is correctly integrated...",
+    if CFG_OPENOFFICE_SERVER_HOST:
+        try:
+            check_openoffice_tmpdir()
+        except InvenioWebSubmitFileConverterError, err:
+            print wrap_text_in_a_box("""\
+OpenOffice.org can't properly create files in the OpenOffice.org temporary
+directory %(tmpdir)s, as the user %(nobody)s (as configured in
+CFG_OPENOFFICE_USER invenio(-local).conf variable): %(err)s.
+
+
+In your /etc/sudoers file, you should authorize the %(apache)s user to run
+ %(python)s as %(nobody)s user as in:
+
+
+%(apache)s localhost=(%(nobody)s) NOPASSWD: %(python)s
+
+
+You should then run the following commands:
+
+
+$ sudo mkdir -p %(tmpdir)s
+
+$ sudo chown %(nobody)s %(tmpdir)s
+
+$ sudo chmod 755 %(tmpdir)s""" % {
+            'tmpdir' : CFG_OPENOFFICE_TMPDIR,
+            'nobody' : CFG_OPENOFFICE_USER,
+            'err' : err,
+            'apache' : CFG_BIBSCHED_PROCESS_USER or guess_apache_process_user(),
+            'python' : CFG_PATH_OPENOFFICE_PYTHON
+            })
+            sys.exit(1)
+        print "ok"
+    else:
+        print "OpenOffice.org integration not enabled"
 
 def test_db_connection():
     """
@@ -631,6 +693,8 @@ def cli_cmd_load_demo_records(conf):
     run_sql("TRUNCATE schTASK")
     for cmd in ["%s/bin/bibupload -u admin -i %s/var/tmp/demobibdata.xml" % (CFG_PREFIX, CFG_PREFIX),
                 "%s/bin/bibupload 1" % CFG_PREFIX,
+                "%s/bin/bibdocfile --textify --with-ocr --recid 97" % CFG_PREFIX,
+                "%s/bin/bibdocfile --textify --all" % CFG_PREFIX,
                 "%s/bin/bibindex -u admin" % CFG_PREFIX,
                 "%s/bin/bibindex 2" % CFG_PREFIX,
                 "%s/bin/bibreformat -u admin -o HB" % CFG_PREFIX,
@@ -752,7 +816,7 @@ NameVirtualHost %(vhost_ip_address)s:80
 %(wsgi_socket_directive)s
 %(xsendfile_directive)s
 WSGIRestrictStdout Off
-WSGIImportScript %(wsgidir)s/invenio.wsgi process-group=invenio application-group=%%{GLOBAL}
+#WSGIImportScript %(wsgidir)s/invenio.wsgi process-group=invenio application-group=%%{GLOBAL}
 <Files *.pyc>
    deny from all
 </Files>
@@ -1089,6 +1153,9 @@ def main():
                 done = True
             elif opt == '--drop-tables':
                 cli_cmd_drop_tables(conf)
+                done = True
+            elif opt == '--check-openoffice-dir':
+                cli_check_openoffice_dir(conf)
                 done = True
             elif opt == '--create-demo-site':
                 cli_cmd_create_demo_site(conf)

@@ -30,17 +30,32 @@
 import os
 import re
 
-from invenio.config import \
-     CFG_SITE_ADMIN_EMAIL, \
-     CFG_SITE_NAME, \
+from invenio.config import CFG_SITE_NAME, \
      CFG_SITE_URL, \
      CFG_SITE_SUPPORT_EMAIL
-from invenio.dbquery import run_sql
 from invenio.access_control_admin import acc_get_role_users,acc_get_role_id
 from invenio.websubmit_config import CFG_WEBSUBMIT_COPY_MAILS_TO_ADMIN
 from invenio.mailutils import send_email
 
-def Send_Request_For_Direct_Approval (parameters, curdir, form, user_info=None):
+def Send_Request_For_Direct_Approval(parameters, curdir, form, user_info=None):
+    """
+    This function sends an email to the referee asking him/her to
+    approve/reject a document
+
+    Parameters:
+
+       * directory: parameter to the link manager program
+
+       * addressesDAM: address of the referee(s)
+
+       * categformatDAM: variable needed to extract the category of
+                         the document and use it to derive the
+                         address.
+
+       * authorfile: name of the file containing the author list
+
+       * titleFile: name of the file containing the title
+    """
     global rn,sysno
     # variables declaration
     doctype = re.search(".*/([^/]*)/([^/]*)/[^/]*$",curdir).group(2)
