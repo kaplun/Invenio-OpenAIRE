@@ -9,7 +9,7 @@
   <meta name="author" content="Administrator" />
   <meta name="description" content="OpenAIRE - Open Access Infrastructure Research for Europe" />
   <meta name="generator" content="%(release)s" />
-  <title>OpenAIRE - Under Construction</title>
+  <title>OpenAIRE Orphan Repository - %(title)s</title>
   <link href="/templates/yoo_level/favicon.ico" rel="shortcut icon" type="image/x-icon" />
   <link rel="stylesheet" href="http://www.openaire.eu/plugins/content/attachments.css" type="text/css" />
   <link rel="stylesheet" href="/templates/yoo_level/css/template.css" type="text/css" />
