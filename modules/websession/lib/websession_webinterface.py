@@ -685,6 +685,7 @@ class WebInterfaceYourAccountPages(WebInterfaceDirectory):
 
 
     def robotlogin(self, req, form):
+        from invenio.external_authentication import InvenioWebAccessExternalAuthError
         args = wash_urlargd(form, {
             'login_method': (str, None),
             'remember_me' : (str, ''),
@@ -704,8 +705,10 @@ class WebInterfaceYourAccountPages(WebInterfaceDirectory):
         # load the right message language
         _ = gettext_set_language(args['ln'])
 
-
-        (iden, args['p_un'], args['p_pw'], msgcode) = webuser.loginUser(req, args['p_un'], args['p_pw'], args['login_method'])
+        try:
+            (iden, args['p_un'], args['p_pw'], msgcode) = webuser.loginUser(req, args['p_un'], args['p_pw'], args['login_method'])
+        except InvenioWebAccessExternalAuthError, err:
+            return page("Error", body=str(err))
         if len(iden)>0:
             uid = webuser.update_Uid(req, args['p_un'], args['remember_me'])
             uid2 = webuser.getUid(req)
