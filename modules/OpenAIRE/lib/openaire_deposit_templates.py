@@ -21,6 +21,8 @@ import os
 from cgi import escape
 
 from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_ETCDIR, CFG_VERSION
+from invenio.messages import gettext_set_language
+
 
 CFG_OPENAIRE_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire.tpl')).read()
 
@@ -55,11 +57,11 @@ class Template:
                 'value': escape(default)}
 
     def tmpl_select_a_project(self, default_project='', action=CFG_SITE_URL+"/deposit/uploadfiles", ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
         return """
             <h2>&nbsp;</h2>
-            <h3>Step 1: Select a Project</h3>
-            <p>Start typing the name of the project.<br />
-            <br />
+            <h3>%(select_a_project)s</h3>
+            <p>%(description)s<br />
             <form action="%(action)s" method="get">
             %(menu)s
             <input type="submit" name="ok" id="ok" value="Select" />
@@ -67,8 +69,49 @@ class Template:
             </form>
             <p>&nbsp;</p>
             """ % {
+                'select_a_project': escape(_('Select a Project')),
+                'description': escape(_('Start typing the name of the project.'))
                 'action': escape(action, True),
                 'menu': self.tmpl_dropdown_menu("project_acronym", "Project", 'project', default=default_project)}
+
+    def tmpl_selected_project(self, projectid, ln=CFG_SITE_LANG):
+
+
+
+    def tmpl_add_publication_data_and_submit(self, selected_project, publication_forms, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        return """
+            <h3>%(add_publication_data_and_submit)s</h3>
+            <div class="note">
+                <h5>%(selected_project_title)s</h5>
+                %(selected_project)s (<a href="/deposit/">%(change_project)s</a>)
+                <h5>%(uploaded_publications)s</h5>
+                <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                    <thead>
+                        <tr class="even">
+                            <th width="3%" align="right" valign="bottom" class="even">&nbsp;</th>
+                            <th valign="bottom">%(title_head)s</th>
+                            <th align="center" valign="bottom">%(license_type_head)s</th>
+                            <th align="center" valign="bottom">%(embargo_release_date_head)s</th>
+                            <th align="center" valign="bottom">&nbsp;</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        %(publication_forms)s
+                    </tbody>
+                </table>
+            </div>
+            <p align="center"><input type="submit" name="ok" id="ok" value="Next"></p>""" % {
+                'add_publication_data_and_submit': escape(_('Add Publication Data & Submit')),
+                'selected_project': selected_project,
+                'change_project': escape(_('change project')),
+                'uploaded_publications': escape(_('Uploaded Publications')),
+                'title_head': escape(_('Title')),
+                'license_type_head': escape(_('License Type')),
+                'embargo_release_date_head': escape(_('Embargo%(x_br)sRelease Date')) % ('<br />'),
+                'publication_forms': publication_forms
+            }
+
 
     def tmpl_page(self, title, body, headers, username, logout_key="", ln=CFG_SITE_LANG):
         return CFG_OPENAIRE_TEMPLATE % {

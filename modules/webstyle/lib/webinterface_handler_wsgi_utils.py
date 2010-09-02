@@ -576,7 +576,7 @@ class FieldStorage:
                 if file_callback and callable(file_callback):
                     file = file_callback(disp_options["filename"])
                 else:
-                    file = tempfile.TemporaryFile("w+b")
+                    file = tempfile.NamedTemporaryFile("w+b")
             else:
                 if field_callback and callable(field_callback):
                     file = field_callback()
