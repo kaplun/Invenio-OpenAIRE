@@ -624,6 +624,14 @@ def kb_export(req, kbname="", format="kbr", searchkey="", searchvalue="", search
                 ret.append({'label': label, 'value': value})
             req.content_type = 'application/json'
             return json.dumps(ret)
+        if format == 'jquery2':
+            ret = []
+            for m in mappings:
+                data = {'value': m['key']}
+                data.update(json.loads(m['value']))
+                ret.append(data)
+            req.content_type = 'application/json'
+            return json.dumps(ret, indent=4)
         if not mappings:
             body = "There is no knowledge base named "+kbname+" or it is empty",
             return page(title=_("No such knowledge base"),
