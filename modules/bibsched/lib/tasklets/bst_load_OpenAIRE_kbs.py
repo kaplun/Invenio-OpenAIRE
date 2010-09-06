@@ -6,7 +6,16 @@ from invenio.bibknowledge import add_kb_mapping, kb_exists, update_kb_mapping, a
 from invenio.dnetutils import dnet_run_sql
 from invenio.errorlib import register_exception
 
+import datetime
 import urllib
+import json
+
+class ComplexEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.date):
+            return obj.strftime('%Y-%m-%d')
+        return json.JSONEncoder.default(self, obj)
+
 
 def _init_journals():
     import gzip
@@ -22,6 +31,15 @@ CFG_JOURNAL_KBS = {
 CFG_DNET_KBS = {
     'project_acronym': 'SELECT grant_agreement_number, acronym FROM projects',
     'project_title': 'SELECT grant_agreement_number, title FROM projects',
+    'json_projects': """SELECT grant_agreement_number,*
+        FROM projects
+            LEFT OUTER JOIN projects_projectsubjects ON project=projectid
+            LEFT OUTER JOIN projectsubjects ON project_subject=projectsubjectid
+            LEFT OUTER JOIN projects_contracttypes ON projects_contracttypes.project=projectid
+            LEFT OUTER JOIN contracttypes ON contracttype=contracttypeid
+            LEFT OUTER JOIN participants_projects ON participants_projects.project=projectid
+            LEFT OUTER JOIN participants ON beneficiaryid=participant
+    """
 }
 
 CFG_LANGUAGE_KBS = {
@@ -34,10 +52,31 @@ def load_kbs(cfg, run_sql):
             add_kb(kb)
         write_message("Updating %s KB..." % kb)
         try:
-            mapping = run_sql(query)
+            if kb.startswith('json_'):
+                encoder = ComplexEncoder()
+                mapping, description = run_sql(query, with_desc=True)
+                column_counter = {}
+                new_description = []
+                for column in description[1:]:
+                    column = column[0]
+                    counter = column_counter[column] = column_counter.get(column, 0) + 1
+                    if counter > 1:
+                        new_description.append('%s%d' % (column, counter))
+                    else:
+                        new_description.append(column)
+                description = new_description
+            else:
+                mapping = run_sql(query)
             original_keys = set([key[0] for key in get_kbr_keys(kb)])
-            for i, (key, value) in enumerate(mapping):
+            for i, row in enumerate(mapping):
+                key, value = row[0], row[1:]
+                if kb.startswith('json_'):
+                    value = encoder.encode(dict(zip(description, value)))
+                else:
+                    value = value[0]
                 if value:
+                    if key in original_keys:
+                        original_keys.remove(key)
                     task_update_progress("%s - %s%%" % (kb, i * 100 / len(mapping)))
                     if kb_mapping_exists(kb, key):
                         update_kb_mapping(kb, key, key, value)
@@ -47,6 +86,7 @@ def load_kbs(cfg, run_sql):
             for key in original_keys:
                 remove_kb_mapping(kb, key)
         except:
+            raise
             register_exception(alert_admin=True, prefix="Error when updating KB %s" % kb)
             continue
 

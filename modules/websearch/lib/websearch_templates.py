@@ -63,7 +63,6 @@ from invenio.config import \
 
 from invenio.dbquery import run_sql
 from invenio.messages import gettext_set_language
-#from invenio.search_engine_config import CFG_EXPERIMENTAL_FEATURES
 from invenio.urlutils import make_canonical_urlargd, drop_default_urlargd, create_html_link, create_url
 from invenio.htmlutils import nmtoken_from_string
 from invenio.webinterface_handler import wash_urlargd
@@ -3388,7 +3387,7 @@ class Template:
         <webMaster>%(sitesupportemail)s</webMaster>
         <ttl>%(timetolive)s</ttl>%(previous_link)s%(next_link)s%(current_link)s%(total_results)s%(start_index)s%(items_per_page)s
         <image>
-            <url>%(siteurl)s/img/cds.png</url>
+            <url>%(siteurl)s/img/site_logo_rss.png</url>
             <title>%(sitename)s</title>
             <link>%(siteurl)s</link>
         </image>
@@ -4028,6 +4027,21 @@ class Template:
             link_url += '&amp;rm=citation';
             link_text = self.tmpl_nice_number(d_cites[coll], ln)
             out += '<td align="right"><a href="%s">%s</a></td>' % (link_url, link_text)
+        out += '</tr>'
+        return out
+
+    def tmpl_citesummary_h_index(self, d_h_factors, l_colls, ln=CFG_SITE_LANG):
+        """HTML citesummary format, h factor output. A part of the HCS suite."""
+        _ = gettext_set_language(ln)
+        out = "<tr><td></td></tr><tr><td><strong>%(msg_additional)s</strong> <small><small>[<a href=\"%(help_url)s\">?</a>]</small></small></td></tr>" % \
+              {'msg_additional': _("Additional Citation Metrics"),
+               'help_url': CFG_SITE_URL+'/help/citation-metrics',}
+        out += '<tr><td>h-index <small><small>[<a href="'
+        # use ? help linking in the style of oai_repository_admin.py
+        out += '%s">'% (CFG_SITE_URL+'/help/citation-metrics#citesummary_h-index')
+        out += '?</a>]</small></small></td>'
+        for coll, colldef in l_colls:
+            out += '<td align="right">%s</td>' % self.tmpl_nice_number(d_h_factors[coll], ln)
         out += '</tr>'
         return out
 
