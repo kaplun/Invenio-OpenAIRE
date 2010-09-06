@@ -421,23 +421,69 @@ def create_html_tag(tag, body=None, escape_body=False, escape_attr=True, indent=
 
     if attrs is None:
         attrs = {}
-    attrs.update(other_attrs)
+    for key, value in other_attrs.iteritems():
+        if key.endswith('_'):
+            attrs[key[:-1]] = value
+        else:
+            attrs[key] = value
     out = "<%s" % tag
     for key, value in attrs.iteritems():
         if escape_attr:
             value = escape_html(value, escape_quotes=True)
         out += ' %s="%s"' % (key, value)
-    if body:
+    if body is not None:
+        if callable(body) and body.__name__ == 'handle_body':
+            body = body()
         out += ">\n"
-        if escape_body:
-            body = escape_html(body)
+        if escape_body and not isinstance(body, EscapedString):
+            body = EscapedString(body)
         out += indent_text(body, 1)
         out += "</%s>" % tag
     else:
         out += " />"
     out = indent_text(out, indent)
     out = out[:-1] # Let's remove trailing new line
-    return out
+    return EscapedString(out, escape_nothing=True)
+
+class EscapedString(str):
+    def __new__(cls, original_string, escape_quotes=False, escape_nothing=False):
+        if escape_nothing:
+            escaped_string = original_string
+        else:
+            if not original_string.strip():
+                escaped_string = '&nbsp;'
+            else:
+                escaped_string = cgi.escape(original_string, escape_quotes)
+        obj = str.__new__(cls, escaped_string)
+        obj.original_string = original_string
+        return obj
+
+    def __repr__(self):
+        return 'EscapedString(%s)' % repr(self.original_string)
+
+
+class HClass(object):
+    def __getattr__(self, tag):
+        def html_tag_creator(body=None, escape_body=False, escape_attr=True, indent=0, attrs=None, **other_attrs):
+            if body:
+                return create_html_tag(tag, body=body, escape_body=escape_body, escape_attr=escape_attr, indent=indent, attrs=attrs, **other_attrs)
+            else:
+                def handle_body(*other_bodies):
+                    full_body = None
+                    if other_bodies:
+                        full_body = ""
+                        for body in other_bodies:
+                            if callable(body) and body.__name__ == 'handle_body':
+                                full_body += body()
+                            elif isinstance(body, EscapedString):
+                                full_body += body
+                            else:
+                                full_body += EscapedString(str(body))
+                    return create_html_tag(tag, body=full_body, escape_body=escape_body, escape_attr=escape_attr, indent=indent, attrs=attrs, **other_attrs)
+                return handle_body
+        return html_tag_creator
+
+H = HClass()
 
 def create_html_select(options, name=None, selected=None, disabled=None, multiple=False, attrs=None, **other_attrs):
     """

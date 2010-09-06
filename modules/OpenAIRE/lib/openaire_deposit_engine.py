@@ -18,18 +18,39 @@
 import os
 import shutil
 import tempfile
+import time
 import json
+import re
 
 from datetime import datetime
 
-from invenio.bibedit import json_unicode_to_utf8
+from invenio.bibdocfile import generic_path2bidocfile
+from invenio.bibedit_utils import json_unicode_to_utf8
 from invenio.webpage import page as invenio_page
 from invenio.webinterface_handler import wash_urlargd
 from invenio.webuser import session_param_set, session_param_get, session_param_list, collect_user_info
 from invenio import template
+from invenio.messages import gettext_set_language
 from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_WEBSUBMIT_STORAGEDIR
 
 CFG_OPENAIRE_DEPOSIT_PATH = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, 'OpenAIRE')
+RE_AUTHOR_ROW = re.compile(u'^\w\w+,\s*\w+\s*(:\s*\w+.*)?$')
+RE_PAGES = re.compile('\d+(-\d+)?')
+
+def _(foo):
+    return foo
+
+def CFG_ACCESS_RIGHTS(ln):
+    _ = gettext_set_language(ln)
+    return {
+        'closedAccess': _("Closed access"),
+        'embargoedAccess': _("Embargoed access"),
+        'restrictedAccess': _("Restricted access"),
+        'openAccess': _("Open access")}
+
+CFG_METADATA_FIELDS = ('title', 'othertitle', 'authors', 'abstract',
+    'otherabstract', 'language', 'accessrights', 'embargodate',
+    'publicationdate', 'journaltitle', 'volume', 'pages', 'issue', 'keywords')
 
 openaire_deposit_templates = template.load('openaire_deposit')
 
@@ -103,7 +124,6 @@ def page(title, body, navtrail="", description="", keywords="",
 
 class OpenAIREPublications(dict):
     def __init__(self, uid, projectid):
-        super.__init__(self)
         self.uid = uid
         self.projectid = projectid
         self.path = os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid))
@@ -124,7 +144,7 @@ class OpenAIREPublications(dict):
                 self.warnings.append(publicationid)
 
     def upload_several_files(self, form):
-        for afile in form[files]:
+        for afile in form['files']:
             the_directory = tempfile.mkdtemp(dir=self.path, prefix='')
             publicationid = os.path.basename(the_directory)
             publication = self[publicationid] = OpenAIREPublication(self.uid, self.projectid, publicationid)
@@ -156,7 +176,7 @@ class OpenAIREPublication(object):
 
     def _load(self):
         self._load_metadata()
-        self._load_fulltext_info()
+        self._load_fulltexts()
 
     def _load_metadata(self):
         try:
@@ -171,7 +191,7 @@ class OpenAIREPublication(object):
             self._dump_metadata()
             self._load_metadata()
 
-    def _load_fulltexts():
+    def _load_fulltexts(self):
         for fulltextid in os.listdir(self.fulltext_path):
             if not fulltextid.startswith('.') and os.path.isdir(os.path.join(self.fulltext_path, fulltextid)):
                 for filename in os.listdir(os.path.join(self.fulltext_path, fulltextid)):
@@ -192,7 +212,7 @@ class OpenAIREPublication(object):
     def _dump_metadata(self):
         json.dump(self.metadata, open(os.path.join(self.path, 'metadata'), 'w'), indent=4)
 
-    def merge_form(form):
+    def merge_form(self, form):
         self.metadata['__form__'] = {}
         for key, values in form.iteritems():
             if key.startswith('%s_' % self.publicationid):
@@ -207,6 +227,96 @@ class OpenAIREPublication(object):
                     else:
                         self.metadata['__form__'][key].append(value)
 
+    def check_metadata(metadata, ln=CFG_SITE_LANG):
+        """
+        Given a mapping in metadata.
+        Check that all the required metadata are properly set.
+        """
+        _ = gettext_set_language(ln)
+        def check_title():
+            title = metadata.get('title', '')
+            title = title.strip()
+            if not title:
+                return ('title', 'error', _('The title field of the Publication is mandatory but is currently empty'))
+            else:
+                title = title.encode('UTF8')
+                uppers = 0
+                for c in title:
+                    if c.isupper():
+                        uppers += 1
+                if 1.0 * uppers / len(title) > 0.75:
+                    return ('title', 'warning', _('The title field of the Publication seems to be written all in UPPERCASE'))
+
+        def check_othertitle():
+            title = metadata.get('othertitle')
+            title = title.encode('UTF8')
+            uppers = 0
+            for c in title:
+                if c.isupper():
+                    uppers += 1
+            if 1.0 * uppers / len(title) > 0.75:
+                return ('othertitle', 'warning', _('The original title field of the Publication seems to be written all in UPPERCASE'))
+
+        def check_authors():
+            authors = metadata.get('authors', '')
+            authors = authors.encode('UTF8')
+            if not authors.strip():
+                return ('authors', 'error', _('The authorship of the Publication is a mandatory field but is currently empty'))
+            for row in authors.split('\n'):
+                row = row.strip()
+                if row:
+                    if not RE_AUTHOR_ROW.match(row):
+                        return ('authors', 'error', _('%(row)s is not a well formatted authorship') % row)
+
+        def check_abstract():
+            abstract = metadata.get('abstract', '')
+            if not abstract.strip():
+                return ('abstract', 'error', _('The abstract of the Publication is a mandatory field but is currently empty'))
+
+        def check_language():
+            language = metadata.get('language', '')
+            if not language.strip():
+                return ('language', 'error', _('The language of the Publication is a mandatory field but is currently empty'))
+
+        def check_accessrights():
+            accessrights = metadata.get('accessrights', '')
+            if not accessrights in CFG_ACCESS_RIGHTS(ln):
+                return ('accessrights', 'error', _('The access rights field of the Publication is not set to one of the expected values'))
+
+        def check_embargo():
+            accessrights = metadata.get('accessrights', '')
+            embargodate = metadata.get('embargodate', '')
+            if accessrights == 'embargoedAccess':
+                try:
+                    time.strptime(embargodate, '%Y-%m-%d')
+                except ValueError:
+                    return ('embargodate', 'error', _('The access rights of the Publication is set to Embargo access but a valid embargo end date is not set'))
+
+        def check_pages():
+            pages = metadata.get('pages', '').strip()
+            if not RE_PAGES.match(pages):
+                return ('pages', 'error', _("The pages are not specified correctly"))
+
+        errors = []
+        warnings = []
+        for check in (check_title, check_othertitle, check_authors, check_abstract, check_language, check_accessrights, check_embargo, check_pages):
+            ret = check()
+            if ret:
+                assert(ret[1] in ('error', 'warning'))
+                assert(ret[0]) in CFG_METADATA_FIELDS
+                if ret[1] == 'error':
+                    if ret[0] not in errors:
+                        errors[ret[0]] = [ret[2]]
+                    else:
+                        errors[ret[0]].append(ret[2])
+                elif ret[1] == 'warning':
+                    if ret[0] not in warnings:
+                        warnings[ret[0]] = [ret[2]]
+                    else:
+                        warnings[ret[0]].append(ret[2])
+        return errors, warnings
+
+    check_metadata = staticmethod(check_metadata)
 
 
 

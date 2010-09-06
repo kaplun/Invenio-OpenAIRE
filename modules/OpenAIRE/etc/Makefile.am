@@ -19,7 +19,7 @@ tmpdir = $(prefix)/var/tmp/chomsky
 confdir = $(sysconfdir)
 
 tmp_DATA = names-data.txt names.txt projects.txt template_marcxml.xml
-conf_DATA = openaire.tpl
+conf_DATA = openaire_page.tpl openaire_form.tpl
 
 EXTRA_DIST = $(tmp_DATA) ${conf_DATA}
 
