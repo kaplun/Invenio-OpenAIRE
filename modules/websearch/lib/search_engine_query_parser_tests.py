@@ -299,6 +299,19 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         spi_search = 'find a j ellis and (t report or k "cross section")'
         self._compare_searches(inv_search, spi_search)
 
+    def test_irn_processing(self):
+        """SPIRES search syntax - find irn 1360337 == find irn SPIRES-1360337"""
+        # Added for trac-130
+        from invenio.search_engine import perform_request_search
+        with_spires = "fin irn SPIRES-1360337"
+        with_result = perform_request_search(p=with_spires)
+        without_spires = "fin irn 1360337"
+        without_result = perform_request_search(p=without_spires)
+        # We don't care if results are [], as long as they're the same
+        # Uncovered corner case: parsing could be broken and also happen to
+        # return [] twice.  Unlikely though.
+        self.assertEqual(with_result, without_result)
+
     def test_quotes(self):
         """SPIRES search syntax - find t 'compton scattering' and a mele"""
         inv_search = "title:'compton scattering' and author:mele"
@@ -318,14 +331,32 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         self.assertEqual(fin_result, find_result)
 
     def test_distribution_of_search_terms(self):
-        """ SPIRES search syntax - find t this and not that ->title:this and not title:that"""
-
+        """SPIRES search syntax - find t this and not that ->title:this and not title:that"""
         spi_search = "find t this and not that"
         inv_search = "title:this and not title:that"
         self._compare_searches(inv_search, spi_search)
 
-TEST_SUITE = make_test_suite(TestSearchQueryParenthesisedParser, TestSpiresToInvenioSyntaxConverter)
+    def test_distribution_without_spacing(self):
+        """SPIRES search syntax - find t this and that ->title:this and title:that"""
+        # motivated by trac-187
+        spi_search = "find aff SLAC and Stanford"
+        inv_search = "affiliation:SLAC and affiliation:Stanford"
+        self._compare_searches(inv_search, spi_search)
 
+    def test_keyword_as_kw(self):
+        """SPIRES search syntax - find kw something ->keyword:something"""
+        spi_search = "find kw meson"
+        inv_search = "keyword:meson"
+        self._compare_searches(inv_search, spi_search)
+
+    def test_desy_keyword_translation(self):
+        """SPIRES search syntax - find dk "B --> pi pi" """
+        spi_search = "find dk \"B --> pi pi\""
+        inv_search = "695__a:\"B --> pi pi\""
+        self._compare_searches(inv_search, spi_search)
+
+TEST_SUITE = make_test_suite(TestSearchQueryParenthesisedParser,
+                             TestSpiresToInvenioSyntaxConverter)
 
 if __name__ == "__main__":
     run_test_suite(TEST_SUITE)
