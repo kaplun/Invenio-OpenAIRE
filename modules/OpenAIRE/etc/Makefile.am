@@ -17,10 +17,12 @@
 
 tmpdir = $(prefix)/var/tmp/chomsky
 confdir = $(sysconfdir)
+webdir = $(localstatedir)/www/css
 
 tmp_DATA = names-data.txt names.txt projects.txt template_marcxml.xml
 conf_DATA = openaire_page.tpl openaire_form.tpl
+web_DATA = openaire.css
 
-EXTRA_DIST = $(tmp_DATA) ${conf_DATA}
+EXTRA_DIST = $(tmp_DATA) ${conf_DATA} ${web_DATA}
 
 CLEANFILES = *~ *.tmp *.pyc

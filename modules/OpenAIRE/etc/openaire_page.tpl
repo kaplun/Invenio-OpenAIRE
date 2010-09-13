@@ -10,6 +10,7 @@
   <meta name="description" content="OpenAIRE - Open Access Infrastructure Research for Europe" />
   <meta name="generator" content="%(release)s" />
   <title>OpenAIRE Orphan Repository - %(title)s</title>
+    %(headers)s
   <link href="/templates/yoo_level/favicon.ico" rel="shortcut icon" type="image/x-icon" />
   <link rel="stylesheet" href="http://www.openaire.eu/plugins/content/attachments.css" type="text/css" />
   <link rel="stylesheet" href="/templates/yoo_level/css/template.css" type="text/css" />
@@ -24,21 +25,8 @@
 div.wrapper { width: 900px; }
     -->
   </style>
-<!--  <script type="text/javascript" src="/templates/yoo_level/lib/js/mootools/mootools-release-1.12.js"></script>
-  <script type="text/javascript" src="/includes/js/joomla.javascript.js"></script>
-  <script type="text/javascript" src="/media/system/js/caption.js"></script>
-  <script type="text/javascript" src="http://www.openaire.eu/modules/mod_yoo_search/mod_yoo_search.js"></script>
-  <script type="text/javascript">
-var YtSettings = { tplurl: '/templates/yoo_level', color: 'openaire2', itemColor: '', layout: 'left' };
-  </script>
-  <script type="text/javascript" src="/templates/yoo_level/lib/js/addons/base.js"></script>
-<script type="text/javascript" src="/templates/yoo_level/lib/js/addons/accordionmenu.js"></script>
-<script type="text/javascript" src="/templates/yoo_level/lib/js/addons/fancymenu.js"></script>
-<script type="text/javascript" src="/templates/yoo_level/lib/js/addons/dropdownmenu.js"></script>
-<script type="text/javascript" src="/templates/yoo_level/lib/js/yoo_tools.js"></script> -->
 
 <link rel="apple-touch-icon" href="/templates/yoo_level/apple_touch_icon.png" />
-%(headers)s
 </head>
 
 <body id="page" class="yoopage left   ">

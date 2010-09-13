@@ -1,0 +1,60 @@
+div.OpenAIRE div.index {
+    height: 100%;
+    padding: 2px;
+    float: left;
+    clear: left;
+}
+
+div.OpenAIRE div.metadata {
+    float: left;
+    height: 100%;
+}
+
+div.OpenAIRE {
+    clear: both;
+    float: none;
+    display: block;
+}
+
+div.OpenAIRE div.header {
+    height: 100%;
+}
+
+div.clear {
+    clear: both;
+}
+
+div.OpenAIRE div.metadata div.header div {
+    float: left;
+}
+
+div.OpenAIRE div.left div, div.OpenAIRE dif.right div {
+    float: none;
+}
+
+div.OpenAIRE .error {
+    background-color: #FFC0C0;
+}
+
+div.OpenAIRE .warning {
+    background-color: #FFFFC0;
+}
+
+div.OpenAIRE .ok {
+    background-color: #C0FFC0;
+}
+
+div.OpenAIRE div.left {
+    float: left;
+}
+
+div.OpenAIRE div.right {
+    float: left;
+}
+
+.ui-autocomplete {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+

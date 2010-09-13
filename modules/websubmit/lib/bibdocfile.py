@@ -2552,7 +2552,7 @@ def generic_path2bidocfile(fullpath):
         ## There is no version
         version = 0
         path, name, format = decompose_file(fullpath)
-    md5folder = MD5Folder(path)
+    md5folder = Md5Folder(path)
     checksum = md5folder.get_checksum(os.path.basename(fullpath))
     return BibDocFile(fullpath=fullpath,
         doctype=None,

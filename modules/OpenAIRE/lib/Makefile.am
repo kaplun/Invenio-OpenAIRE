@@ -16,9 +16,12 @@
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
 pylibdir = $(libdir)/python/invenio
+jsdir = $(localstatedir)/www/js
 
 pylib_DATA = chomsky.py openaire_deposit_webinterface.py openaire_deposit_engine.py openaire_deposit_templates.py
 
-EXTRA_DIST = $(pylib_DATA)
+js_DATA = openaire_deposit_engine.js
+
+EXTRA_DIST = $(pylib_DATA) $(jsdir)
 
 CLEANFILES = *~ *.tmp *.pyc

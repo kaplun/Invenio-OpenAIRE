@@ -227,8 +227,9 @@ img_DATA = add-small.png \
            wb-subscribe.png \
            wb-unsubscribe.png \
            white_field.gif \
+           white_arrow_big.png \
            wsignout.gif \
-	   compare.png
+           compare.png
 
 EXTRA_DIST = $(img_DATA)
 

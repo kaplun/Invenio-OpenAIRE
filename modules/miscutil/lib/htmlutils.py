@@ -429,7 +429,7 @@ def create_html_tag(tag, body=None, escape_body=False, escape_attr=True, indent=
     out = "<%s" % tag
     for key, value in attrs.iteritems():
         if escape_attr:
-            value = escape_html(value, escape_quotes=True)
+            value = EscapedString(value, escape_quotes=True)
         out += ' %s="%s"' % (key, value)
     if body is not None:
         if callable(body) and body.__name__ == 'handle_body':
@@ -446,20 +446,25 @@ def create_html_tag(tag, body=None, escape_body=False, escape_attr=True, indent=
     return EscapedString(out, escape_nothing=True)
 
 class EscapedString(str):
-    def __new__(cls, original_string, escape_quotes=False, escape_nothing=False):
-        if escape_nothing:
-            escaped_string = original_string
+    def __new__(cls, original_string='', escape_quotes=False, escape_nothing=False):
+        if escape_nothing or isinstance(original_string, EscapedString):
+            escaped_string = str(original_string)
         else:
-            if not original_string.strip():
+            if original_string and not str(original_string).strip():
                 escaped_string = '&nbsp;'
             else:
-                escaped_string = cgi.escape(original_string, escape_quotes)
+                escaped_string = cgi.escape(str(original_string), escape_quotes)
         obj = str.__new__(cls, escaped_string)
         obj.original_string = original_string
         return obj
 
     def __repr__(self):
         return 'EscapedString(%s)' % repr(self.original_string)
+
+    def __add__(self, rhs):
+        if not isinstance(rhs, EscapedString):
+            rhs = EscapedString(rhs)
+        return EscapedString(str(self) + str(rhs), escape_nothing=True)
 
 
 class HClass(object):

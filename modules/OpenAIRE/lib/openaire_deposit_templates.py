@@ -25,30 +25,57 @@ from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_ETCDIR, CFG_VERSION
 from invenio.messages import gettext_set_language
 from invenio.htmlutils import H
 
-CFG_OPENAIRE_PAGE_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire.tpl')).read()
+CFG_OPENAIRE_PAGE_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_page.tpl')).read()
 CFG_OPENAIRE_FORM_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_form.tpl')).read()
 
 RE_PLACEMARKS = re.compile(r'%\((?P<placemark>\w+)\)s')
-CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS = dict([(placemark, '') for placemark in RE_PLACEMARKS.finditer(CFG_OPENAIRE_FORM_TEMPLATE)])
+CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS = dict((placemark, '') for placemark in RE_PLACEMARKS.findall(CFG_OPENAIRE_FORM_TEMPLATE))
 class Template:
     def tmpl_headers(self):
         return """
+            <script type="text/javascript">
+                var OpenAIREURL = "%(site)s";
+            </script>
             <link type="text/css" href="%(site)s/css/smoothness/jquery-ui-1.8.4.custom.css" rel="Stylesheet" />
+            <link type="text/css" href="%(site)s/css/uploadify.css" rel="Stylesheet" />
+            <link type="text/css" href="%(site)s/css/jquery.tooltip.css" rel="Stylesheet" />
+            <link type="text/css" href="%(site)s/css/openaire.css" rel="Stylesheet" />
             <script type="text/javascript" src="%(site)s/js/jquery-1.4.2.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery-ui-1.8.4.custom.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.uploadify.v2.1.0.js"></script>
             <script type="text/javascript" src="%(site)s/js/swfobject.js"></script>
-            <style type="text/css" src="%(site)s/css/uploadify.css"></style>
-            <style type="text/css">
-            .ui-autocomplete {
-                max-height: 200px;
-                overflow-y: auto;
-            }
-            </style>
+            <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
+            <script type="text/javascript" src="http://cdn.jquerytools.org/1.2.4/all/jquery.tools.min.js"></script>
+            <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
+            <script type="text/javascript" src="%(site)s/js/jquery.form.js"></script>
             """ % {'site': CFG_SITE_URL}
 
-    def tmpl_dropdown_menu(self, kbname, label, name, default=''):
-        return H.script(type="text/javascript")("""
+    def tmpl_choose_project(self, default='', ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        script = """
+            $(document).ready(function() {
+                $("#project").autocomplete({
+                    source: "%(site)s/kb/export?kbname=projects&format=jquery",
+                    focus: function(event, ui) {
+                        $('#projectid').val(ui.item.label);
+                        return false;
+                    },
+                    select: function(event, ui) {
+                        $('#project').val(ui.item.label);
+                        $('#projectid').val(ui.item.value);
+                        return false;
+                    }
+                }).focus();
+            })""" % {'site': CFG_SITE_URL}
+        return H.script(script, escape_body=False, type="text/javascript") + \
+            H.div(class_="ui-widget")(
+                H.label(for_='project')(_("Start typing the project title or the acronym or the grant agreement number")),
+                H.input(id='project', name='project', type="text"),
+                H.input(type='hidden', name='projectid', id='projectid')
+            )
+
+    def tmpl_dropdown_menu(self, kbname, label, name, id, default=''):
+        script = """
             $(document).ready(function() {
                 $("#%(name)s").autocomplete({
                     source: "%(site)s/kb/export?kbname=%(kbname)s&format=jquery"
@@ -58,36 +85,46 @@ class Template:
             'name': name,
             'site': CFG_SITE_URL,
             'kbname': kbname
-        }) + H.div(class_="ui-widget")(
-                H.label(for_=name)(label + ': ') +
-                H.input(size=50, id=name, value=default)
+        }
+        return H.script(script, escape_body=False, type="text/javascript") + H.div(class_="ui-widget")(
+                H.label(for_=name)(label + ': '),
+                H.input(size=50, id=id, name=name, value=default)
             )
 
-    def tmpl_select_a_project(self, default_project='', action=CFG_SITE_URL+"/deposit/uploadfiles", ln=CFG_SITE_LANG):
+    def tmpl_select_a_project(self, default_project='', ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         return H.h3(_('Select a Project')) + \
-            H.p(escape(_('Start typing the name of the project')) + H.br() +
-                H.form(action=action, method='get')(
-                    self.tmpl_dropdown_menu("project_acronym", "Project", 'project', default=default_project) +
-                    H.input(type='submit', name='ok', id='ok', value=_("Select"))()
+            H.p()(
+                _('Start typing the name of the project'),
+                H.br(),
+                H.form(method='get')(
+                    self.tmpl_choose_project(ln=ln),
+                    H.input(type='submit', name='ok', id='ok', value=_("Select"))
                 )
             )
 
-    def tmpl_form(self, projectid, fileinfo, form=None, warnings=None, errors=None, ln=CFG_SITE_LANG):
+    def tmpl_form(self, projectid, publicationid, index, fileinfo, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         values = dict(CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS)
-        values['id'] = projectid
-        for key, value in form.iteritems:
-            if key.endswith('_%d' % projectid):
-                values['%s_value' % key[:-len('_%d' % projectid)]] = escape(value, True)
+        values['id'] = publicationid
+        values['index'] = index
+        values['class'] = index % 2 and 'even' or 'odd'
+        for key, value in form.iteritems():
+            if key.endswith('_%s' % publicationid):
+                values['%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
+        if not values['title_value']:
+            values['title_value'] = _('unknown')
         values['fileinfo'] = fileinfo
+        values['projectid'] = projectid
+        values['site'] = CFG_SITE_URL
         values['language_label'] = escape(_("Document language"))
-        values['title_label'] = escape(_("Document title"))
+        values['title_label'] = escape(_("English title"))
         values['original_title_label'] = escape(_("Original language title"))
-        values['author_label'] = escape(_("Author(s)"))
-        values['abstract_label'] = escape(_("Abstract"))
+        values['authors_label'] = escape(_("Author(s)"))
+        values['abstract_label'] = escape(_("English abstract"))
         values['original_abstract_label'] = escape(_("Original language abstract"))
         values['journal_title_label'] = escape(_("Journal title"))
+        values['publication_date_label'] = escape(_("Publication date"))
         values['volume_label'] = escape(_("Volume"))
         values['issue_label'] = escape(_("Issue"))
         values['pages_label'] = escape(_("Pages"))
@@ -95,44 +132,62 @@ class Template:
         values['status_warning_label'] = escape(_('Metadata have some warnings'))
         values['status_error_label'] = escape(_('Metadata have some errors!'))
         values['status_ok_label'] = escape(_('Metadata are OK!'))
-        value['status_warning'] = ''
-        value['status_error'] = ''
-        value['status_ok'] = 'display: none;'
+        values['submit_label'] = escape(_('Submit this publication'))
+        values['form_status'] = 'error' ## FIXME metadata_status
+        values['access_rights_options'] = self.tmpl_access_rights_options(values.get('access_rights_value', ''), ln=ln)
+        values['language_options'] = self.tmpl_language_options(values.get('language_value', ), ln)
         if warnings:
-            values['form_status'] = 'warning'
-            value['status_warning'] = 'display: none;'
-            value['status_error'] = ''
-            value['status_ok'] = ''
             for key, value in warnings.iteritems():
-                if key.endswith('_%d' % projectid):
-                    values['warning_%s_value' % key[:-len('_%d' % projectid)]] = escape(value, True)
+                if key.endswith('_%s' % publicationid):
+                    values['warning_%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
         if errors:
-            value['status_warning'] = ''
-            value['status_error'] = 'display: none;'
-            value['status_ok'] = ''
-            values['form_status'] = 'error'
             for key, value in errors.iteritems():
-                if key.endswith('_%d' % projectid):
-                    values['error_%s_value' % key[:-len('_%d' % projectid)]] = escape(value, True)
+                if key.endswith('_%s' % publicationid):
+                    values['error_%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
 
         return CFG_OPENAIRE_FORM_TEMPLATE % values
+
+    def tmpl_access_rights_options(self, selected_access_right, ln=CFG_SITE_LANG):
+        from invenio.openaire_deposit_engine import CFG_ACCESS_RIGHTS
+        access_rights = CFG_ACCESS_RIGHTS(ln)
+        _ = gettext_set_language(ln)
+        out = '<option disabled="disabled">%s</option>' % (_("Select one"))
+        for key, value in access_rights.iteritems():
+            if key == selected_access_right:
+                out += H.option(value=key, selected='selected')(value)
+            else:
+                out += H.option(value=key)(value)
+        return out
+
+    def tmpl_language_options(self, selected_language='eng', ln=CFG_SITE_LANG):
+        from invenio.bibknowledge import get_kb_mappings
+        languages = get_kb_mappings('languages')
+        _ = gettext_set_language(ln)
+        out = '<option disabled="disabled">%s</option>' % (_("Select one"))
+        for mapping in languages:
+            key = mapping['key']
+            value = mapping['value']
+            if key == selected_language:
+                out += '<option value="%(key)s" selected="selected">%(value)s</option>' % {
+                    'key': escape(key, True),
+                    'value': escape(value)
+                }
+            else:
+                out += '<option value="%(key)s">%(value)s</option>' % {
+                    'key': escape(key, True),
+                    'value': escape(value)
+                }
+        return out
 
     def tmpl_upload_publications(self, projectid, session, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         return """
             <h3>%(upload_publications)s</h3>
             %(selected_project)s
-            <form action="/httptest/dumpreq" method="POST">
-            <noscript>
-                <label for="file1">%(first_publication)s: <input type="file" id="file1" name="file" />
-                <label for="file2">%(second_publication)s: <input type="file" id="file2" name="file" />
-                <label for="file3">%(third_publication)s: <input type="file" id="file3" name="file" />
-                <input type="hidden" name="projectid" value="%(projectid)s" />
-                <input type="submit" name="Upload" value=%(upload)s" />
-            </noscript>
+            <form action="%(site)s/deposit/editmetadata" method="POST">
             <input id="fileInput" name="file" type="file" />
-            <input type="submit" value="%(begin_upload)s" id="begin_upload"/>
             <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
+            <input type="submit" value="%(begin_upload)s" id="begin_upload"/>
             </form>
             <script type="text/javascript">// <![CDATA[
                 $(document).ready(function() {
@@ -144,9 +199,10 @@ class Template:
                     'folder'    : '/uploads',
                     'multi'     : true,
                     'buttonText': '%(buttontext)s',
+                    'simUploadLimit': '2',
                     'scriptData': {'projectid': '%(projectid)s', 'session': '%(session)s'},
                     'onAllComplete': function(){
-                        window.location="%(site)s/deposit/edit_metadata";
+                        window.location="%(site)s/deposit?projectid=%(projectid)s";
                     }
                     });
                     $('#begin_upload').click(function(){
@@ -161,9 +217,6 @@ class Template:
             // ]]></script>""" % {
                 'upload_publications': escape(_("Upload Publications")),
                 'selected_project': 'bla',
-                'first_publication': escape(_("First publication")),
-                'second_publication': escape(_("Second publication")),
-                'third_publication': escape(_("Third publication")),
                 'site': CFG_SITE_URL,
                 'projectid': projectid,
                 'session': session,
@@ -173,34 +226,36 @@ class Template:
                 'buttontext': _("BROWSE"),
             }
 
-    def tmpl_publication_form(self, index, publicationid, title="", authors="", abstract="", accessrights_type="", embargo="", language="", keyword="", errors=None, warnings=None, ln=CFG_SITE_LANG):
-        _ = gettext_set_language(ln)
-
-
     def tmpl_add_publication_data_and_submit(self, selected_project, publication_forms, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         return """
             <h3>%(add_publication_data_and_submit)s</h3>
+            <form method="POST" id="publication_forms">
             <div class="note">
                 <h5>%(selected_project_title)s</h5>
                 %(selected_project)s (<a href="/deposit/">%(change_project)s</a>)
                 <h5>%(uploaded_publications)s</h5>
-                <table width="100%%" cellspacing="0" cellpadding="0" border="0">
-                    <thead>
-                        <tr class="even">
-                            <th width="3%%" align="right" valign="bottom" class="even">&nbsp;</th>
-                            <th valign="bottom">%(title_head)s</th>
-                            <th align="center" valign="bottom">%(license_type_head)s</th>
-                            <th align="center" valign="bottom">%(embargo_release_date_head)s</th>
-                            <th align="center" valign="bottom">&nbsp;</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        %(publication_forms)s
-                    </tbody>
-                </table>
+                %(publication_forms)s
             </div>
-            <p align="center"><input type="submit" name="ok" id="ok" value="Next"></p>""" % {
+            </form>
+            <script type="text/javascript">
+                jQuery(document).ready(function(){
+                    $('.accordion .head').click(function() {
+                        $(this).next().toggle('slow');
+                        return false;
+                    }).next().hide();
+                    $('input.datepicker').datepicker({dateFormat: 'yy-mm-dd'});
+                    $('textarea').elastic();
+                    // bind 'myForm' and provide a simple callback function
+                    $('#publication_forms').ajaxForm(function() {
+                        alert("Thank you for your comment!");
+                    });
+                    $('a.deletepublication').click(function(){
+                        return confirm("%(confirm_delete_publication)s");
+                    })
+                    });
+            </script>
+            """ % {
                 'add_publication_data_and_submit': escape(_('Add Publication Data & Submit')),
                 'selected_project_title': escape(_("Selected Project")),
                 'selected_project': selected_project,
@@ -208,10 +263,14 @@ class Template:
                 'uploaded_publications': escape(_('Uploaded Publications')),
                 'title_head': escape(_('Title')),
                 'license_type_head': escape(_('License Type')),
-                'embargo_release_date_head': escape(_('Embargo%(x_br)sRelease Date')) % ('<br />'),
-                'publication_forms': publication_forms
+                'embargo_release_date_head': escape(_('Embargo%(x_br)sRelease Date')) % {'x_br': '<br />'},
+                'publication_forms': publication_forms,
+                'confirm_delete_publication': _("Are you sure you want to delete this publication?"),
+                'ln': ln
             }
 
+    def tmpl_file(self, filename, download_url, md5, mimetype, format, size):
+        pass
 
     def tmpl_page(self, title, body, headers, username, logout_key="", ln=CFG_SITE_LANG):
         return CFG_OPENAIRE_PAGE_TEMPLATE % {

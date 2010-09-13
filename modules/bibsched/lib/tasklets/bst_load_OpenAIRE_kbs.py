@@ -29,22 +29,22 @@ CFG_JOURNAL_KBS = {
 }
 
 CFG_DNET_KBS = {
-    'project_acronym': 'SELECT grant_agreement_number, acronym FROM projects',
-    'project_title': 'SELECT grant_agreement_number, title FROM projects',
-    'json_projects': """SELECT grant_agreement_number,*
-        FROM projects
-            LEFT OUTER JOIN projects_projectsubjects ON project=projectid
-            LEFT OUTER JOIN projectsubjects ON project_subject=projectsubjectid
-            LEFT OUTER JOIN projects_contracttypes ON projects_contracttypes.project=projectid
-            LEFT OUTER JOIN contracttypes ON contracttype=contracttypeid
-            LEFT OUTER JOIN participants_projects ON participants_projects.project=projectid
-            LEFT OUTER JOIN participants ON beneficiaryid=participant
-    """
+    #'project_acronym': 'SELECT grant_agreement_number, acronym FROM projects',
+    #'project_title': 'SELECT grant_agreement_number, title FROM projects',
+    #'json_projects': """SELECT grant_agreement_number,*
+        #FROM projects
+            #LEFT OUTER JOIN projects_projectsubjects ON project=projectid
+            #LEFT OUTER JOIN projectsubjects ON project_subject=projectsubjectid
+            #LEFT OUTER JOIN projects_contracttypes ON projects_contracttypes.project=projectid
+            #LEFT OUTER JOIN contracttypes ON contracttype=contracttypeid
+            #LEFT OUTER JOIN participants_projects ON participants_projects.project=projectid
+            #LEFT OUTER JOIN participants ON beneficiaryid=participant
+    #""",
+    'projects': "SELECT grant_agreement_number, acronym || ' - ' || title || ' (' || grant_agreement_number || ')' FROM projects",
+    'project_subjects': "SELECT project, project_subject FROM projects_projectsubjects",
+    'languages': "SELECT languageid, name FROM languages"
 }
 
-CFG_LANGUAGE_KBS = {
-    'languages': None
-}
 
 def load_kbs(cfg, run_sql):
     for kb, query in cfg.iteritems():
@@ -91,22 +91,10 @@ def load_kbs(cfg, run_sql):
             continue
 
 
-def run_sql_like_for_languages(dummy):
-    res = []
-    for language in urllib.urlopen("http://www.loc.gov/standards/iso639-2/ISO-639-2_utf-8.txt"):
-        three, alias, two, english, french = language.split('|')
-        if alias:
-            res.append(('%s/%s' % (three, alias), english))
-        else:
-            res.append((three, english))
-    return tuple(res)
-
-def bst_load_OpenAIRE_kbs(journals=False, languages=False):
+def bst_load_OpenAIRE_kbs(journals=False):
     load_kbs(CFG_DNET_KBS, dnet_run_sql)
     if journals:
         load_kbs(CFG_JOURNAL_KBS, run_sql)
-    if languages:
-        load_kbs(CFG_LANGUAGE_KBS, run_sql_like_for_languages)
 
 if __name__ == '__main__':
     bst_load_OpenAIRE_kbs(journals=True)
