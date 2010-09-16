@@ -18,6 +18,8 @@
                 <div id="error_embargo_date_%(id)s" class="error">%(error_embargo_date_value)s</div>
                 <div id="warning_embargo_date_%(id)s" class="warning">%(warning_embargo_date_value)s</div>
             </div>
+            <div>
+                <a href="%(site)s/deposit?projectid=%(projectid)s&delete=%(id)s" id="remove_%(id)s">%(remove_label)s</a>
             <div class="clear"></div>
         </div>
         <div class="body">
@@ -101,10 +103,24 @@
             </div>
         </div>
     </div>
+    <div><input type="submit" value="%(save_label)s" id="save_%(id)s"/><input type="submit" value="%(submit_label)s" id="submit_%(id)s"/>
 </div>
 <script type="text/javascript">
-$('#access_rights_%(id)s').bind('change', {from_id: '#access_rights_%(id)s', to_id: '#embargo_date_%(id)s'}, update_embargo_date);
-$('#access_rights_%(id)s').trigger('change');
-$('#language_%(id)s').bind('change', {from_id: '#language_%(id)s', to_id: '.original_language_column_%(id)s'}, update_language);
-$('#language_%(id)s').trigger('change');
+$(document).ready(function(){
+    $('#access_rights_%(id)s').bind('change', {from_id: '#access_rights_%(id)s', to_id: '#embargo_date_%(id)s'}, update_embargo_date);
+    $('#access_rights_%(id)s').trigger('change');
+    $('#language_%(id)s').bind('change', {from_id: '#language_%(id)s', to_id: '.original_language_column_%(id)s'}, update_language);
+    $('#language_%(id)s').trigger('change');
+    $('#save_label_%(id)s').click(function(){
+        backgroundsubmit('save');
+        return 0;
+    })
+    $('#submit_label_%(id)s').click(function(){
+        backgroundsubmit('submit');
+        return 0;
+    })
+    $('#remove_%(id)s').click(function(){
+        return confirm("%(remove_confirm)s");
+    })
+});
 </script>

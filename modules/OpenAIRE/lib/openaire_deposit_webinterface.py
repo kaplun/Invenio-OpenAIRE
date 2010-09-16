@@ -24,17 +24,17 @@ from invenio.webuser import collect_user_info
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio.session import get_session
 from invenio.config import CFG_ETCDIR, CFG_VERSION, CFG_SITE_URL, CFG_SITE_SECURE_URL
-from invenio.openaire_deposit_engine import page, OpenAIREPublications, OpenAIREPublication, wash_form
+from invenio.openaire_deposit_engine import page, OpenAIREPublications, OpenAIREPublication, wash_form, get_project_information_from_projectid
 from invenio.access_control_engine import acc_authorize_action
 import invenio.template
 
 openaire_deposit_templates = invenio.template.load('openaire_deposit')
 
 class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
-    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata']
+    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'backgroundsubmit', 'checksinglefield']
 
     def index(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, 0), 'delete': (str, '')})
+        argd = wash_urlargd(form, {'projectid': (str, ''), 'delete': (str, '')})
         _ = gettext_set_language(argd['ln'])
         user_info = collect_user_info(req)
         auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
@@ -59,14 +59,14 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             publications = OpenAIREPublications(uid, projectid)
             if argd['delete']:
                 publications.delete_publication(argd['delete'])
-            project_data = '' ## FIXME
+            project_information_dict = get_project_information_from_projectid(projectid)
+            project_information = openaire_deposit_templates.tmpl_project_information(projectid=projectid, ln=argd['ln'], **project_information_dict)
             fileinfo = '' ## FIXME
-            selected_project = '' ## FIXME openaire_deposit_templates.tmpl_selected_project(projectid, project_data)
             forms = ""
             for index, (publicationid, publication) in enumerate(publications.iteritems()):
                 publication.merge_form(form, check_required_fields=False, ln=argd['ln'])
                 forms += openaire_deposit_templates.tmpl_form(projectid, publicationid, index+1, fileinfo, form=publication.metadata['__form__'], warnings=publication.warnings, errors=publication.errors, ln=argd['ln'])
-            body = openaire_deposit_templates.tmpl_add_publication_data_and_submit(selected_project, forms, ln=argd['ln'])
+            body = openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, project_information, forms, ln=argd['ln'])
             body += openaire_deposit_templates.tmpl_upload_publications(projectid=projectid, session=get_session(req).sid(), ln=argd['ln'])
             title = _('Edit Publications Information')
             return page(body=body, title=title, req=req)
@@ -110,6 +110,33 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         """ % {'site' : CFG_SITE_URL}
         return page(title='sandbox', body=body, req=req)
 
+    def checksinglefield(self, req, form):
+        argd = wash_urlargd(form, {'field': (str, ''), 'publicationid': (str, '')})
+        publicationid = argd['publicationid']
+        field = argd['field']
+        metadata = wash_form(form, publicationid)
+        errors, warnings = OpenAIREPublication.check_metadata(metadata, publicationid, field=field, ln=argd['ln'])
+        return json.dumps({'errors': errors, 'warnings': warnings})
+
+    def backgroundsubmit(self, req, form):
+        argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, '')})
+        user_info = collect_user_info(req)
+        uid = user_info['uid']
+        auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
+        if auth_code == 0:
+            req.content_type = 'application/json'
+            publicationid = argd['publicationid']
+            projectid = argd['projectid']
+            metadata = wash_form(form, publicationid)
+            errors, warnings = OpenAIREPublication.check_metadata(metadata, publicationid, check_required_fields=True, ln=argd['ln'])
+            if errors:
+                return json.dumps({'errors': errors, 'warnings': warnings})
+            else:
+                publication = OpenAIREPublication(uid, projectid, publicationid)
+                publication.merge_form(form)
+                publication.upload_record()
+                return json.dumps({'submittedpublicationid': publicationid, 'newcontent': "This would be the new form"})
+
     def checkmetadata(self, req, form):
         argd = wash_urlargd(form, {'publicationid': (str, ''),
             'check_required_fields': (int, 0)
@@ -119,6 +146,6 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         metadata = wash_form(form, publicationid)
         req.content_type = 'application/json'
         errors, warnings = OpenAIREPublication.check_metadata(metadata, publicationid, check_required_fields=check_required_fields, ln=argd['ln'])
-        return json.dumps({'errors': errors, 'warnings': warnings})
+        return json.dumps({'errors': errors, 'warnings': warnings, 'publicationid': publicationid})
 
     __call__ = index

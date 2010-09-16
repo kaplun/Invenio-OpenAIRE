@@ -1,3 +1,29 @@
+var gTipDefault = {
+    position: {
+        corner: {
+            target: 'bottomMiddle',
+            tooltip: 'topMiddle'
+        },
+    },
+    adjust: {
+        screen: true,
+    },
+    hide: {
+        fixed: true,
+    },
+    border: {
+        width: 7,
+        radius: 5,
+    },
+    style: {
+        width: {
+            max: 500,
+        },
+        name: 'light',
+        tip: 'topMiddle',
+    }
+}
+
 function update_embargo_date(event){
     if ($(event.data.from_id).val() == 'embargoedAccess') {
         $(event.data.to_id).removeAttr("disabled").show('slow');
@@ -14,22 +40,28 @@ function update_language(event){
     }
 }
 
-function elaborate_check_metadata(results, textStatus, XMLHttpRequest){
+function elaborateCheckMetadata(results, textStatus, XMLHttpRequest){
     var errors = results.errors;
     var warnings = results.warnings;
+    var submittedpublicationid = results.submittedpublicationid;
+    var newcontent = results.newcontent;
     var publicationid = results.publicationid;
-    $('#form_' + publicationid + ' .error').hide('slow');
-    $('#form_' + publicationid + ' .warning').hide('slow');
-    $('.warning').hide();
-    for (var error in errors) {
-        $('#error_' + error).html(errors[error][0]).show('slow');
-    }
-    for (var warning in warnings) {
-        $('#warning_' + warning).html(warnings[warning][0]).show('slow');
+    if (submittedpublicationid != undefined && newcontent != undefined) {
+        $('#form_' + submittedpublicationid + ' div.body').hide('slow').html(newcontent).show('slow');
+    } else {
+        $('#form_' + publicationid + ' .error').hide('slow');
+        $('#form_' + publicationid + ' .warning').hide('slow');
+        $('.warning').hide();
+        for (var error in errors) {
+            $('#error_' + error).html(errors[error][0]).show('slow');
+        }
+        for (var warning in warnings) {
+            $('#warning_' + warning).html(warnings[warning][0]).show('slow');
+        }
     }
 }
 
-function get_publication_metadata(publicationid){
+function getPublicationMetadata(publicationid){
     var ret = {};
     $('#form_' + publicationid + ' input').each(function(){
         ret[this.id] = this.value;
@@ -52,36 +84,31 @@ function object_to_str(o){
     return ret;
 }
 
-function submit_form(){
-    var publicationid = this.id.split('_').pop();
-    var data = get_publication_metadata(publicationid);
+function backgroundsubmit(element, action) {
+    var publicationid = element.id.split('_').pop();
+    var data = getPublicationMetadata(publicationid);
     data['publicationid'] = publicationid;
-    data['check_required_fields'] = 1;
+    data['projectid'] = gProjectid;
+    data['action'] = action;
     $.ajax({
         error: onAjaxError,
-        url: OpenAIREURL + '/deposit/checkmetadata',
+        url: gSite + '/deposit/backgroundsubmit',
         data: data,
-        success: elaborate_check_metadata
-    });
-}
-
-function verify_field(){
-    var publicationid = this.id.split('_').pop();
-    var data = get_publication_metadata(publicationid);
-    data['publicationid'] = publicationid;
-    data['check_required_fields'] = 0;
-    $.ajax({
-        error: onAjaxError,
-        url: OpenAIREURL + '/deposit/checkmetadata',
-        data: data,
-        success: elaborate_check_metadata
+        success: elaborateCheckMetadata
     });
 }
 
 $(document).ready(function(){
-    $('div.OpenAIRE input').blur(verify_field);
-    $('div.OpenAIRE textarea').blur(verify_field);
-    $('div.OpenAIRE select').blur(verify_field);
+    $('div.OpenAIRE input').blur(function(){
+        return backgroundsubmit(this, 'verify_field');
+    });
+    $('div.OpenAIRE textarea').blur(function(){
+        return backgroundsubmit(this, 'verify_field');
+    });
+    $('div.OpenAIRE select').blur(function(){
+        return backgroundsubmit(this, 'verify_field');
+    });
+    $('*[title]').qtip(gTipDefault);
 })
 
 function onAjaxError(XHR, textStatus, errorThrown){
@@ -91,4 +118,12 @@ function onAjaxError(XHR, textStatus, errorThrown){
   alert('Request completed with status ' + textStatus +
     '\nResult: ' + XHR.responseText +
     '\nError: ' + errorThrown);
+}
+
+
+/* See: http://oranlooney.com/functional-javascript/ */
+function Clone() { }
+function clone(obj) {
+    Clone.prototype = obj;
+    return new Clone();
 }

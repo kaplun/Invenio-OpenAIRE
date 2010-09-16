@@ -34,7 +34,7 @@ class Template:
     def tmpl_headers(self):
         return """
             <script type="text/javascript">
-                var OpenAIREURL = "%(site)s";
+                var gSite = "%(site)s";
             </script>
             <link type="text/css" href="%(site)s/css/smoothness/jquery-ui-1.8.4.custom.css" rel="Stylesheet" />
             <link type="text/css" href="%(site)s/css/uploadify.css" rel="Stylesheet" />
@@ -44,10 +44,11 @@ class Template:
             <script type="text/javascript" src="%(site)s/js/jquery-ui-1.8.4.custom.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.uploadify.v2.1.0.js"></script>
             <script type="text/javascript" src="%(site)s/js/swfobject.js"></script>
-            <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
             <script type="text/javascript" src="http://cdn.jquerytools.org/1.2.4/all/jquery.tools.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.form.js"></script>
+            <script type="text/javascript" src="%(site)s/js/jquery.qtip-1.0.0-rc3.js"></script>
+            <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
             """ % {'site': CFG_SITE_URL}
 
     def tmpl_choose_project(self, default='', ln=CFG_SITE_LANG):
@@ -129,6 +130,7 @@ class Template:
         values['issue_label'] = escape(_("Issue"))
         values['pages_label'] = escape(_("Pages"))
         values['remove_label'] = escape(_("Remove"))
+        values['remove_confirm'] = escape(_("Are you sure you want to permanently remove this publication?"))
         values['status_warning_label'] = escape(_('Metadata have some warnings'))
         values['status_error_label'] = escape(_('Metadata have some errors!'))
         values['status_ok_label'] = escape(_('Metadata are OK!'))
@@ -136,6 +138,8 @@ class Template:
         values['form_status'] = 'error' ## FIXME metadata_status
         values['access_rights_options'] = self.tmpl_access_rights_options(values.get('access_rights_value', ''), ln=ln)
         values['language_options'] = self.tmpl_language_options(values.get('language_value', ), ln)
+        values['save_label'] = escape(_('Save publication'))
+        values['submit_label'] = escape(_('Submit publication'))
         if warnings:
             for key, value in warnings.iteritems():
                 if key.endswith('_%s' % publicationid):
@@ -183,14 +187,16 @@ class Template:
         _ = gettext_set_language(ln)
         return """
             <h3>%(upload_publications)s</h3>
-            %(selected_project)s
-            <form action="%(site)s/deposit/editmetadata" method="POST">
-            <input id="fileInput" name="file" type="file" />
-            <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
-            <input type="submit" value="%(begin_upload)s" id="begin_upload"/>
+            %(projectid)s
+            <form action="%(site)s/deposit" method="POST">
+                <input id="fileInput" name="file" type="file" />
+                <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
+                <input type="hidden" value="%(projectid)s" name="projectid" />
+                <input type="hidden" value="%(session)s" name="session" />
             </form>
             <script type="text/javascript">// <![CDATA[
                 $(document).ready(function() {
+                    $('#cancel_upload').hide();
                     $('#fileInput').uploadify({
                     'uploader'  : '%(site)s/flash/uploadify.swf',
                     'script'    : '%(site)s/deposit/uploadifybackend',
@@ -203,11 +209,10 @@ class Template:
                     'scriptData': {'projectid': '%(projectid)s', 'session': '%(session)s'},
                     'onAllComplete': function(){
                         window.location="%(site)s/deposit?projectid=%(projectid)s";
+                    },
+                    'onOpen': function(){
+                        $('#cancel_upload').show();
                     }
-                    });
-                    $('#begin_upload').click(function(){
-                        $('#fileInput').uploadifyUpload();
-                        return 0;
                     });
                     $('#cancel_upload').click(function(){
                         $('#fileInput').uploadifyClearQueue();
@@ -216,7 +221,7 @@ class Template:
                 });
             // ]]></script>""" % {
                 'upload_publications': escape(_("Upload Publications")),
-                'selected_project': 'bla',
+                'projectid': 'bla',
                 'site': CFG_SITE_URL,
                 'projectid': projectid,
                 'session': session,
@@ -226,19 +231,53 @@ class Template:
                 'buttontext': _("BROWSE"),
             }
 
-    def tmpl_add_publication_data_and_submit(self, selected_project, publication_forms, ln=CFG_SITE_LANG):
+
+
+    def tmpl_project_information(self, projectid, grant_agreement_number, ec_project_website, acronym, call_identifier, end_date, start_date, title, fundedby, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        return """
+            <div class="note">
+                <h5>%(selected_project_label)s</h5>
+                <div class="selectedproject" id="selectedproject">%(acronym)s</div> (<a href="%(site)s/deposit">%(change_project_label)s</a>)
+            </div>
+            <script type="text/javascript">// <![CDATA[
+                $(document).ready(function(){
+                    var tooltip = clone(gTipDefault);
+                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'}
+                    $('#selectedproject').qtip(tooltip);
+                });
+            // ]]></script>""" % {
+                'selected_project_label': escape(_("Selected Project")),
+                'acronym': escape(acronym, True),
+                'site': escape(CFG_SITE_URL, True),
+                'change_project_label': escape(_("change project")),
+                'acronym_label': escape(_("Acronym"), True),
+                'title_label': escape(_("Title"), True),
+                'title': escape(title, True),
+                'grant_agreement_number_label': escape(_("Grant Agreement Number"), True),
+                'grant_agreement_number': escape(str(grant_agreement_number), True),
+                'ec_project_website_label': escape(_("EC Project Website"), True),
+                'ec_project_website': escape(ec_project_website, True),
+                'start_date_label': escape(_("Start Date"), True),
+                'start_date': escape(start_date, True),
+                'end_date_label': escape(_("End Date"), True),
+                'end_date': escape(end_date, True),
+                'fundedby_label': escape(_("Funded By"), True),
+                'fundedby': escape(fundedby, True),
+                'call_identifier_label': escape(_("Call Identifier"), True),
+                'call_identifier': escape(call_identifier, True)
+            }
+
+    def tmpl_add_publication_data_and_submit(self, projectid, project_information, publication_forms, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         return """
             <h3>%(add_publication_data_and_submit)s</h3>
             <form method="POST" id="publication_forms">
-            <div class="note">
-                <h5>%(selected_project_title)s</h5>
-                %(selected_project)s (<a href="/deposit/">%(change_project)s</a>)
-                <h5>%(uploaded_publications)s</h5>
-                %(publication_forms)s
-            </div>
+            %(project_information)s
+            %(publication_forms)s
             </form>
             <script type="text/javascript">
+                var gProjectid = %(projectid)s;
                 jQuery(document).ready(function(){
                     $('.accordion .head').click(function() {
                         $(this).next().toggle('slow');
@@ -256,9 +295,10 @@ class Template:
                     });
             </script>
             """ % {
+                'project_information': project_information,
                 'add_publication_data_and_submit': escape(_('Add Publication Data & Submit')),
                 'selected_project_title': escape(_("Selected Project")),
-                'selected_project': selected_project,
+                'projectid': projectid,
                 'change_project': escape(_('change project')),
                 'uploaded_publications': escape(_('Uploaded Publications')),
                 'title_head': escape(_('Title')),
@@ -266,7 +306,8 @@ class Template:
                 'embargo_release_date_head': escape(_('Embargo%(x_br)sRelease Date')) % {'x_br': '<br />'},
                 'publication_forms': publication_forms,
                 'confirm_delete_publication': _("Are you sure you want to delete this publication?"),
-                'ln': ln
+                'ln': ln,
+                'projectid': projectid
             }
 
     def tmpl_file(self, filename, download_url, md5, mimetype, format, size):

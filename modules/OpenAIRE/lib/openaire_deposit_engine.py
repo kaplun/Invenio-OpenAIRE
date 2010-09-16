@@ -36,7 +36,10 @@ from invenio.websearch_webcoll import mymkdir
 from invenio.dbquery import run_sql
 from invenio.bibtask import task_low_level_submission
 from invenio.bibrecord import create_field, field_add_subfield, record_add_field, record_xml_output
+from invenio.bibknowledge import get_kb_mapping
+from invenio.search_engine import record_empty
 
+CFG_OPENAIRE_PROJECT_INFORMATION_KB = 'json_projects'
 CFG_OPENAIRE_DEPOSIT_PATH = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, 'OpenAIRE')
 RE_AUTHOR_ROW = re.compile(u'^\w\w+,\s*\w+\s*(:\s*\w+.*)?$')
 RE_PAGES = re.compile('\d+(-\d+)?')
@@ -57,6 +60,7 @@ CFG_METADATA_FIELDS = ('title', 'original_title', 'authors', 'abstract',
     'publication_date', 'journal_title', 'volume', 'pages', 'issue', 'keywords')
 
 CFG_METADATA_STATES = ('ok', 'error', 'warning', 'empty')
+CFG_PUBLICATION_STATES = ('initialized', 'edited', 'submitted', 'pendingapproval', 'approved', 'rejected')
 
 openaire_deposit_templates = template.load('openaire_deposit')
 
@@ -77,6 +81,13 @@ def portal_page(title, body, navtrail="", description="", keywords="",
         username = 'Guest'
         logout_key = ''
     return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, logout_key=logout_key, ln=language)
+
+def get_project_information_from_projectid(projectid):
+    info = get_kb_mapping(CFG_OPENAIRE_PROJECT_INFORMATION_KB, str(projectid))
+    if info:
+        return json_unicode_to_utf8(json.loads(info['value']))
+    else:
+        return {}
 
 def page(title, body, navtrail="", description="", keywords="",
          metaheaderadd="", uid=None,
@@ -179,23 +190,31 @@ def simple_metadata2namespaced_metadata(simple_metadata, publicationid):
 
 class OpenAIREPublication(object):
     def __init__(self, uid, projectid, publicationid=None):
-        self.uid = uid
-        self.projectid = projectid
+        self._metadata = {}
+        self._metadata['__uid__'] = uid
+        self._metadata['__projectid__'] = projectid
+        self._metadata['__publicationid__'] = publicationid
         if publicationid is None:
-            self.path = tempfile.mkdtemp(dir=os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid)), prefix='')
-            self.publicationid = os.path.basename(self.path)
+            self.status = 'initialized'
+            while True:
+                self.path = tempfile.mkdtemp(dir=os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid)), prefix='')
+                self._metadata['__publicationid__'] = os.path.basename(self.path)
+                if '_' not in self.publicationid:
+                    ## We don't want '_' at all in publicationid!
+                    break
+                os.rmdir(self.path)
+            self._metadata['__cd__'] = self._metadata['__md__'] = time.time()
         else:
-            self.publicationid = publicationid
             self.path = os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid), str(publicationid))
             if not os.path.exists(self.path):
                 raise ValueError("publicationid %s for projectid %s does not exist for user %s" % (publicationid, projectid, uid))
+            self._load()
         self.fulltext_path = os.path.join(self.path, 'files')
         self.metadata_path = os.path.join(self.path, 'metadata')
         self._initialize_storage()
         self.fulltexts = {}
         self.warnings = []
         self.errors = []
-        self._load()
         self.deleted = False
 
     def __del__(self):
@@ -215,14 +234,9 @@ class OpenAIREPublication(object):
 
     def _load_metadata(self):
         try:
-            self.metadata = json_unicode_to_utf8(json.load(open(os.path.join(self.path, 'metadata'))))
-            self.md = datetime.fromtimestamp(os.path.getmtime(os.path.join(self.path, 'metadata')))
-            try:
-                self.cd = datetime.fromtimestamp(os.path.getctime(os.path.join(self.path, 'metadata')))
-            except OSError:
-                self.cd = self.md
+            self._metadata.update(son_unicode_to_utf8(json.load(open(os.path.join(self.path, 'metadata')))))
         except:
-            self.metadata = {}
+            self._metadata = {}
             self._dump_metadata()
             self._load_metadata()
 
@@ -245,12 +259,17 @@ class OpenAIREPublication(object):
         self._dump_metadata()
 
     def _dump_metadata(self):
-        json.dump(self.metadata, open(os.path.join(self.path, 'metadata'), 'w'), indent=4)
+        json.dump(self._metadata, open(os.path.join(self.path, 'metadata'), 'w'), indent=4)
 
     def merge_form(self, form, check_required_fields=True, ln=CFG_SITE_LANG):
-        self.metadata['__form__'] = wash_form(form, self.publicationid)
-        self.metadata.update(namespaced_metadata2simple_metadata(self.metadata['__form__'], self.publicationid))
-        self.errors, self.warnings = self.check_metadata(self.metadata, check_required_fields=check_required_fields, ln=ln)
+        self.status = 'edited'
+        self.touch()
+        self._metadata['__form__'] = wash_form(form, self.publicationid)
+        self._metadata.update(namespaced_metadata2simple_metadata(self._metadata['__form__'], self.publicationid))
+        self.errors, self.warnings = self.check_metadata(self._metadata, check_required_fields=check_required_fields, ln=ln)
+
+    def touch(self):
+        self._metadata['__md__'] = time.time()
 
     def get_metadata_status(self):
         if self.errors:
@@ -258,74 +277,68 @@ class OpenAIREPublication(object):
         if self.warnings:
             return 'warning'
         for field in CFG_METADATA_FIELDS:
-            if self.metadata['field']:
+            if self._metadata['field']:
                 ## There is at least one field filled. Since there are no
                 ## warnings or errors, that means it's OK :-)
                 return 'ok'
         return 'empty'
 
     def upload_record(self):
-        def allocate_recid():
-            return run_sql("INSERT INTO bibrec(creation_date, modification_date) values(NOW(), NOW())")
-
-        def create_marcxml():
-            recid = allocate_recid()
-            self.metadata['recid'] = recid
-            rec = {}
-            record_add_field(rec, '001', controlfield_value=str(recid))
-            authors = [author.strip() for author in self.metadata['authors'].split('\n') if author.strip()]
-            if authors:
-                if ':' in authors[0]:
-                    name, affil = authors[0].split(':', 1)
+        rec = {}
+        record_add_field(rec, '001', controlfield_value=str(self.recid))
+        authors = [author.strip() for author in self._metadata['authors'].split('\n') if author.strip()]
+        if authors:
+            if ':' in authors[0]:
+                name, affil = authors[0].split(':', 1)
+                name = name.strip()
+                affil = affil.strip()
+                record_add_field(rec, '100', subfields=[('a', name), ('u', affil)])
+            else:
+                name = name.strip()
+                record_add_field(rec, '100', subfields=[('a', name)])
+            for author in authors[1:]:
+                if ':' in author:
+                    name, affil = author.split(':', 1)
                     name = name.strip()
                     affil = affil.strip()
-                    record_add_field(rec, '100', subfields=[('a', name), ('u', affil)])
+                    record_add_field(rec, '700', subfields=[('a', name), ('u', affil)])
                 else:
                     name = name.strip()
-                    record_add_field(rec, '100', subfields=[('a', name)])
-                for author in authors[1:]:
-                    if ':' in author:
-                        name, affil = author.split(':', 1)
-                        name = name.strip()
-                        affil = affil.strip()
-                        record_add_field(rec, '700', subfields=[('a', name), ('u', affil)])
-                    else:
-                        name = name.strip()
-                        record_add_field(rec, '700', subfields=[('a', name)])
-            record_add_field(rec, '041', subfields=[('a', self.metadata['language'])])
-            record_add_field(rec, '245', subfields=[('a', self.metadata['title'])])
-            if self.metadata['original_title']:
-                record_add_field(rec, '246', subfields=[('a', self.metadata['original_title'])])
-            record_add_field(rec, '520', subfields=[('a', self.metadata['abstract'])])
-            if self.metadata['original_abstract']:
-                record_add_field(rec, '560', subfields=[('a', self.metadata['original_abstract'])])
-            if self.metadata['note']:
-                record_add_field(rec, '500', subfields=[('a', self.metadata['note'])])
-            record_add_field(rec, '980', subfields=[('a', 'OPENAIRE')])
-            if self.metadata['publication_date']:
-                record_add_field(rec, '260', subfields=[('c', self.metadata['publication_date'])])
-            record_add_field(rec, '536', subfields=[('c', str(self.projectid))])
-            record_add_field(rec, '856', ind1='0', subfields=[('f', get_email(self.uid))])
-            if self.metadata['embargo_date']:
-                record_add_field(rec, '942', subfields=[('a', self.metadata['embargo_date'])])
-            for key, fulltext in self.fulltexts.iteritems():
-                record_add_field(rec, 'FFT', subfields=[('a', fulltext.fullpath)])
-            subfields = []
-            if self.metadata['journal_title']:
-                subfields.append(('p', self.metadata['journal_title']))
-            if self.metadata['publication_date']:
-                year = self.metadata['publication_date'][:4]
-                subfields.append(('y', year))
-            if self.metadata['issue']:
-                subfields.append(('n', self.metadata['issue']))
-            if self.metadata['pages']:
-                subfields.append(('c', self.metadata['pages']))
-            if subfields:
-                record_add_field(rec, '909', 'C', '4', subfields=subfields)
-            output = record_xml_output(rec)
-            marcxml_path = os.path.join(self.path, 'marcxml')
-            open(marcxml_path, 'w').write(output)
-            task_low_level_submission('bibupload', 'openaire', '-r', marcxml_path, '-P5')
+                    record_add_field(rec, '700', subfields=[('a', name)])
+        record_add_field(rec, '041', subfields=[('a', self._metadata['language'])])
+        record_add_field(rec, '245', subfields=[('a', self._metadata['title'])])
+        if self._metadata['original_title']:
+            record_add_field(rec, '246', subfields=[('a', self._metadata['original_title'])])
+        record_add_field(rec, '520', subfields=[('a', self._metadata['abstract'])])
+        if self._metadata['original_abstract']:
+            record_add_field(rec, '560', subfields=[('a', self._metadata['original_abstract'])])
+        if self._metadata['note']:
+            record_add_field(rec, '500', subfields=[('a', self._metadata['note'])])
+        record_add_field(rec, '980', subfields=[('a', 'OPENAIRE')])
+        if self._metadata['publication_date']:
+            record_add_field(rec, '260', subfields=[('c', self._metadata['publication_date'])])
+        record_add_field(rec, '536', subfields=[('c', str(self.projectid))])
+        record_add_field(rec, '856', ind1='0', subfields=[('f', get_email(self.uid))])
+        if self._metadata['embargo_date']:
+            record_add_field(rec, '942', subfields=[('a', self._metadata['embargo_date'])])
+        for key, fulltext in self.fulltexts.iteritems():
+            record_add_field(rec, 'FFT', subfields=[('a', fulltext.fullpath)])
+        subfields = []
+        if self._metadata['journal_title']:
+            subfields.append(('p', self._metadata['journal_title']))
+        if self._metadata['publication_date']:
+            year = self._metadata['publication_date'][:4]
+            subfields.append(('y', year))
+        if self._metadata['issue']:
+            subfields.append(('n', self._metadata['issue']))
+        if self._metadata['pages']:
+            subfields.append(('c', self._metadata['pages']))
+        if subfields:
+            record_add_field(rec, '909', 'C', '4', subfields=subfields)
+        output = record_xml_output(rec)
+        marcxml_path = os.path.join(self.path, 'marcxml')
+        open(marcxml_path, 'w').write(output)
+        task_low_level_submission('bibupload', 'openaire', '-r', marcxml_path, '-P5')
 
 
     def check_metadata(metadata, publicationid=None, check_required_fields=True, ln=CFG_SITE_LANG):
@@ -426,3 +439,42 @@ class OpenAIREPublication(object):
             warnings = simple_metadata2namespaced_metadata(warnings, publicationid)
         return errors, warnings
     check_metadata = staticmethod(check_metadata)
+
+    def get_html(self, index, ln=CFG_SITE_LANG):
+        """Return the HTML representation of the publication, based on the status."""
+        if self.status in ('initialized', 'edited'):
+            return openaire_deposit_templates.tmpl_form(self.projectid, self.publicationid, index+1, fileinfo, form=self.form, warnings=self.warnings, errors=self.errors, ln=ln)
+
+    def get_status(self):
+        if self._metadata['__status__'] == 'submitted':
+            ## The record has been submitted into Invenio. Let's poll to see if it's actually there:
+            if not record_empty(self.recid):
+                ## FIXME: change this to pendingapproval once
+                ## approval workflow is implemented.
+                self._metadata['__status__'] = 'approved'
+        return self._metadata['__status__']
+    def set_status(self, new_status):
+        assert(new_status in CFG_PUBLICATION_STATES)
+        self._metadata['__status__'] = new_status
+    def get_md(self):
+        return self._metadata['__md__']
+    def get_cd(self):
+        return self._metadata['__cd__']
+    def get_uid(self):
+        return self._metadata['__uid__']
+    def get_projectid(self):
+        return self._metadata['__projectid__']
+    def get_publicationid(self):
+        return self._metadata['__publicationid__']
+    def get_recid(self):
+        if '__recid__' not in self._metadata:
+            self._metadata['__recid__'] = run_sql("INSERT INTO bibrec(creation_date, modification_date) values(NOW(), NOW())")
+        return self._metadata['__recid__']
+
+    status = property(get_status, set_status)
+    md = property(get_md)
+    cd = property(get_cd)
+    uid = property(get_uid)
+    projectid = property(get_projectid)
+    publicationid = property(get_publicationid)
+    recid = property(get_recid)

@@ -40,6 +40,7 @@ CFG_DNET_KBS = {
             #LEFT OUTER JOIN participants_projects ON participants_projects.project=projectid
             #LEFT OUTER JOIN participants ON beneficiaryid=participant
     #""",
+    'json_projects': """SELECT projectid,grant_agreement_number,ec_project_website,acronym,call_identifier,end_date,start_date,title,fundedby FROM projects""",
     'projects': "SELECT grant_agreement_number, acronym || ' - ' || title || ' (' || grant_agreement_number || ')' FROM projects",
     'project_subjects': "SELECT project, project_subject FROM projects_projectsubjects",
     'languages': "SELECT languageid, name FROM languages"
@@ -70,10 +71,12 @@ def load_kbs(cfg, run_sql):
             original_keys = set([key[0] for key in get_kbr_keys(kb)])
             for i, row in enumerate(mapping):
                 key, value = row[0], row[1:]
+                print key, value
                 if kb.startswith('json_'):
                     value = encoder.encode(dict(zip(description, value)))
                 else:
                     value = value[0]
+                print value
                 if value:
                     if key in original_keys:
                         original_keys.remove(key)
