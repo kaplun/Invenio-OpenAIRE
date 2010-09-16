@@ -1416,7 +1416,7 @@ class WebSearchSummarizerTest(unittest.TestCase):
         self.assertEqual([],
                          test_web_page_content(CFG_SITE_URL + '/search?p=ellis&of=hcs',
                                                expected_text="Less known papers (1-9)",
-                                               expected_link_target=CFG_SITE_URL+"/search?p=ellis%20cited%3A1-%3E9&rm=citation",
+                                               expected_link_target=CFG_SITE_URL+"/search?p=ellis%20AND%20cited%3A1-%3E9&rm=citation",
                                                expected_link_label='1'))
 
 class WebSearchRecordCollectionGuessTest(unittest.TestCase):
@@ -1546,6 +1546,96 @@ class WebSearchAlertTeaserTest(unittest.TestCase):
                                                password='h123yde'))
 
 
+class WebSearchSpanQueryTest(unittest.TestCase):
+    """Test of span queries."""
+
+    def test_span_in_word_index(self):
+        """websearch - span query in a word index"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=year%3A1992-%3E1996&of=id&ap=0',
+                                               expected_text='[17, 66, 69, 71]'))
+
+    def test_span_in_phrase_index(self):
+        """websearch - span query in a phrase index"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=year%3A%221992%22-%3E%221996%22&of=id&ap=0',
+                                               expected_text='[17, 66, 69, 71]'))
+
+    def test_span_in_bibxxx(self):
+        """websearch - span query in MARC tables"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=909C0y%3A%221992%22-%3E%221996%22&of=id&ap=0',
+                                               expected_text='[17, 66, 69, 71]'))
+
+    def test_span_with_spaces(self):
+        """websearch - no span query when a space is around"""
+        # useful for reaction search
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=title%3A%27mu%20--%3E%20e%27&of=id&ap=0',
+                                               expected_text='[67]'))
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=245%3A%27mu%20--%3E%20e%27&of=id&ap=0',
+                                               expected_text='[67]'))
+
+    def test_span_in_author(self):
+        """websearch - span query in special author index"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=author%3A%22Ellis,%20K%22-%3E%22Ellis,%20RZ%22&of=id&ap=0',
+                                               expected_text='[8, 11, 13, 17, 47]'))
+
+
+class WebSearchReferstoCitedbyTest(unittest.TestCase):
+    """Test of refersto/citedby search operators."""
+
+    def test_refersto_recid(self):
+        'websearch - refersto:recid:84'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=refersto%3Arecid%3A84&of=id&ap=0',
+                                               expected_text='[85, 88, 91]'))
+
+    def test_refersto_repno(self):
+        'websearch - refersto:reportnumber:hep-th/0205061'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=refersto%3Areportnumber%3Ahep-th/0205061&of=id&ap=0',
+                                               expected_text='[91]'))
+
+    def test_refersto_author_word(self):
+        'websearch - refersto:author:klebanov'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=refersto%3Aauthor%3Aklebanov&of=id&ap=0',
+                                               expected_text='[85, 86, 88, 91]'))
+
+    def test_refersto_author_phrase(self):
+        'websearch - refersto:author:"Klebanov, I"'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=refersto%3Aauthor%3A%22Klebanov,%20I%22&of=id&ap=0',
+                                               expected_text='[85, 86, 88, 91]'))
+
+    def test_citedby_recid(self):
+        'websearch - citedby:recid:92'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=citedby%3Arecid%3A92&of=id&ap=0',
+                                               expected_text='[74, 91]'))
+
+    def test_citedby_repno(self):
+        'websearch - citedby:reportnumber:hep-th/0205061'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=citedby%3Areportnumber%3Ahep-th/0205061&of=id&ap=0',
+                                               expected_text='[78]'))
+
+    def test_citedby_author_word(self):
+        'websearch - citedby:author:klebanov'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=citedby%3Aauthor%3Aklebanov&of=id&ap=0',
+                                               expected_text='[95]'))
+
+    def test_citedby_author_phrase(self):
+        'websearch - citedby:author:"Klebanov, I"'
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=citedby%3Aauthor%3A%22Klebanov,%20I%22&of=id&ap=0',
+                                               expected_text='[95]'))
+
+
 TEST_SUITE = make_test_suite(WebSearchWebPagesAvailabilityTest,
                              WebSearchTestSearch,
                              WebSearchTestBrowse,
@@ -1576,7 +1666,9 @@ TEST_SUITE = make_test_suite(WebSearchWebPagesAvailabilityTest,
                              WebSearchRecordCollectionGuessTest,
                              WebSearchGetFieldValuesTest,
                              WebSearchAddToBasketTest,
-                             WebSearchAlertTeaserTest)
+                             WebSearchAlertTeaserTest,
+                             WebSearchSpanQueryTest,
+                             WebSearchReferstoCitedbyTest)
 
 if __name__ == "__main__":
     run_test_suite(TEST_SUITE, warn_user=True)

@@ -93,7 +93,8 @@ webstyle_templates = invenio.template.load('webstyle')
 webcomment_templates = invenio.template.load('webcomment')
 
 from invenio.bibrank_citation_searcher import get_cited_by_count, calculate_cited_by_list, \
-    calculate_co_cited_with_list, get_records_with_num_cites, get_self_cited_by
+    calculate_co_cited_with_list, get_records_with_num_cites, get_self_cited_by, \
+    get_refersto_hitset, get_citedby_hitset
 from invenio.bibrank_citation_grapher import create_citation_history_graph_and_box
 
 from invenio.dbquery import run_sql, run_sql_cached, get_table_update_time
@@ -101,7 +102,7 @@ from invenio.webuser import getUid, collect_user_info
 from invenio.webpage import pageheaderonly, pagefooteronly, create_error_box
 from invenio.messages import gettext_set_language
 from invenio.search_engine_query_parser import SearchQueryParenthesisedParser, \
-InvenioWebSearchQueryParserException, SpiresToInvenioSyntaxConverter
+InvenioWebSearchMismatchedParensError, SpiresToInvenioSyntaxConverter
 
 from invenio import webinterface_handler_config as apache
 
@@ -1808,7 +1809,7 @@ def search_pattern(req=None, p=None, f=None, m=None, ap=0, of="id", verbose=0, l
             basic_search_units_hitsets.append(basic_search_unit_hitset)
         else:
             # stage 2-2: no hits found for this search unit, try to replace non-alphanumeric chars inside pattern:
-            if re.search(r'[^a-zA-Z0-9\s\:]', bsu_p):
+            if re.search(r'[^a-zA-Z0-9\s\:]', bsu_p) and bsu_f != 'refersto' and bsu_f != 'citedby':
                 if bsu_p.startswith('"') and bsu_p.endswith('"'): # is it ACC query?
                     bsu_pn = re.sub(r'[^a-zA-Z0-9\s\:]+', "*", bsu_p)
                 else: # it is WRD query
@@ -1946,12 +1947,12 @@ def search_pattern_parenthesised(req=None, p=None, f=None, m=None, ap=0, of="id"
         return result_hitset
 
     # If searching with parenteses fails, perform search ignoring parentheses
-    except InvenioWebSearchQueryParserException:
+    except SyntaxError:
 
-        print_warning(req, _("Nested or mismatched parentheses detected. Ignoring all parentheses in the query..."))
+        print_warning(req, _("Search syntax misunderstood. Ignoring all parentheses in the query. If this doesn't help, please check your search and try again."))
 
         # remove the parentheses in the query. Current implementation removes all the parentheses,
-        # but it could be improved to romove only these that are not insede quotes
+        # but it could be improved to romove only these that are not inside quotes
         p = p.replace('(', ' ')
         p = p.replace(')', ' ')
 
@@ -1977,6 +1978,12 @@ def search_unit(p, f=None, m=None):
         set = search_unit_in_bibrec(p, p, 'c')
     elif f == 'datemodified':
         set = search_unit_in_bibrec(p, p, 'm')
+    elif f == 'refersto':
+        # we are doing search by the citation count
+        set = search_unit_refersto(p)
+    elif f == 'citedby':
+        # we are doing search by the citation count
+        set = search_unit_citedby(p)
     elif m == 'a' or m == 'r':
         # we are doing either phrase search or regexp search
         index_id = get_index_id_from_field(f)
@@ -2056,9 +2063,6 @@ def search_unit_in_idxphrases(p, f, type):
     The search type is defined by 'type' (e.g. equals to 'r' for a regexp search)."""
     set = HitSet() # will hold output result set
     set_used = 0 # not-yet-used flag, to be able to circumvent set operations
-    # special washing for fuzzy author index:
-    if f == 'author' or f == 'exactauthor':
-        p = wash_author_name(p)
     # deduce in which idxPHRASE table we will search:
     idxphraseX = "idxPHRASE%02dF" % get_index_id_from_field("anyfield")
     if f:
@@ -2075,17 +2079,23 @@ def search_unit_in_idxphrases(p, f, type):
     else:
         p = string.replace(p, '*', '%') # we now use '*' as the truncation character
         ps = string.split(p, "->", 1) # check for span query:
-        if len(ps) == 2:
+        if len(ps) == 2 and not (ps[0].endswith(' ') or ps[1].startswith(' ')):
             query_addons = "BETWEEN %s AND %s"
             query_params = (ps[0], ps[1])
         else:
             if string.find(p, '%') > -1:
                 query_addons = "LIKE %s"
-                query_params = (ps[0],)
+                query_params = (p,)
             else:
                 query_addons = "= %s"
-                query_params = (ps[0],)
+                query_params = (p,)
 
+    # special washing for fuzzy author index:
+    if f == 'author' or f == 'exactauthor':
+        query_params_washed = ()
+        for query_param in query_params:
+            query_params_washed += (wash_author_name(query_param),)
+        query_params = query_params_washed
     # perform search:
     res = run_sql("SELECT term,hitlist FROM %s WHERE term %s" % (idxphraseX, query_addons),
                   query_params)
@@ -2120,16 +2130,16 @@ def search_unit_in_bibxxx(p, f, type):
     else:
         p = string.replace(p, '*', '%') # we now use '*' as the truncation character
         ps = string.split(p, "->", 1) # check for span query:
-        if len(ps) == 2:
+        if len(ps) == 2 and not (ps[0].endswith(' ') or ps[1].startswith(' ')):
             query_addons = "BETWEEN %s AND %s"
             query_params = (ps[0], ps[1])
         else:
             if string.find(p, '%') > -1:
                 query_addons = "LIKE %s"
-                query_params = (ps[0],)
+                query_params = (p,)
             else:
                 query_addons = "= %s"
-                query_params = (ps[0],)
+                query_params = (p,)
     # construct 'tl' which defines the tag list (MARC tags) to search in:
     tl = []
     if str(f[0]).isdigit() and str(f[1]).isdigit():
@@ -2213,6 +2223,34 @@ def search_unit_by_times_cited(p):
        p.startswith("0->") or p.endswith("->0"):
         allrecs = HitSet(run_sql_cached("SELECT id FROM bibrec", affected_tables=['bibrec']))
     return get_records_with_num_cites(numstr, allrecs)
+
+def search_unit_refersto(query):
+    """
+    Search for records satisfying the query (e.g. author:ellis) and
+    return list of records referred to by these records.
+    """
+    if query:
+        ahitset = search_pattern(p=query)
+        if ahitset:
+            return get_refersto_hitset(ahitset)
+        else:
+            return HitSet([])
+    else:
+        return HitSet([])
+
+def search_unit_citedby(query):
+    """
+    Search for records satisfying the query (e.g. author:ellis) and
+    return list of records cited by these records.
+    """
+    if query:
+        ahitset = search_pattern(p=query)
+        if ahitset:
+            return get_citedby_hitset(ahitset)
+        else:
+            return HitSet([])
+    else:
+        return HitSet([])
 
 def intersect_results_with_collrecs(req, hitset_in_any_collection, colls, ap=0, of="hb", verbose=0, ln=CFG_SITE_LANG, display_nearest_terms_box=True):
     """Return dict of hitsets given by intersection of hitset with the collection universes."""
@@ -2352,6 +2390,11 @@ def create_nearest_terms_box(urlargd, p, f, t='w', n=5, ln=CFG_SITE_LANG, intro_
     if not p: # sanity check
         p = "."
     index_id = get_index_id_from_field(f)
+    # special indexes:
+    if f == 'refersto':
+        return _("There are no records referring to %s.") % cgi.escape(p)
+    if f == 'citedby':
+        return _("There are no records cited by %s.") % cgi.escape(p)
     # look for nearest terms:
     if t == 'w':
         nearest_terms = get_nearest_terms_in_bibwords(p, f, n, n)
@@ -3227,7 +3270,7 @@ def sort_records(req, recIDs, sort_field='', sort_order='d', sort_pattern='', ve
         # good, no sort needed
         return recIDs
 
-def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LANG, relevances=[], relevances_prologue="(", relevances_epilogue="%%)", decompress=zlib.decompress, search_pattern='', print_records_prologue_p=True, print_records_epilogue_p=True, verbose=0, tab=''):
+def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LANG, relevances=[], relevances_prologue="(", relevances_epilogue="%%)", decompress=zlib.decompress, search_pattern='', print_records_prologue_p=True, print_records_epilogue_p=True, verbose=0, tab='', sf='', so='d', sp='', rm=''):
 
     """
     Prints list of records 'recIDs' formatted according to 'format' in
@@ -3244,6 +3287,11 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
     Print prologue and/or epilogue specific to 'format' if
     'print_records_prologue_p' and/or print_records_epilogue_p' are
     True.
+
+    'sf' is sort field and 'rm' is ranking method that are passed here
+    only for proper linking purposes: e.g. when a certain ranking
+    method or a certain sort field was selected, keep it selected in
+    any dynamic search links that may be printed.
     """
 
     # load the right message language
@@ -3305,7 +3353,7 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
             # we are doing plain text output:
             for irec in range(irec_max, irec_min, -1):
                 x = print_record(recIDs[irec], format, ot, ln, search_pattern=search_pattern,
-                                 user_info=user_info, verbose=verbose)
+                                 user_info=user_info, verbose=verbose, sf=sf, so=so, sp=sp, rm=rm)
                 req.write(x)
                 if x:
                     req.write('\n')
@@ -3318,7 +3366,7 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
                 # portfolio and on-the-fly formats:
                 for irec in range(irec_max, irec_min, -1):
                     req.write(print_record(recIDs[irec], format, ot, ln, search_pattern=search_pattern,
-                                           user_info=user_info, verbose=verbose))
+                                           user_info=user_info, verbose=verbose, sf=sf, so=so, sp=sp, rm=rm))
             elif format.startswith("hb"):
                 # HTML brief format:
 
@@ -3340,7 +3388,7 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
                     else:
                         relevance = ''
                     record = print_record(recIDs[irec], format, ot, ln, search_pattern=search_pattern,
-                                                  user_info=user_info, verbose=verbose)
+                                                  user_info=user_info, verbose=verbose, sf=sf, so=so, sp=sp, rm=rm)
 
                     req.write(websearch_templates.tmpl_record_format_htmlbrief_body(
                         ln = ln,
@@ -3442,8 +3490,12 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
                         # Citing
                         citinglist = calculate_cited_by_list(recid)
                         req.write(websearch_templates.tmpl_detailed_record_citations_citing_list(recid,
-                                                                                       ln,
-                                                                                       citinglist=citinglist))
+                                                                                                 ln,
+                                                                                                 citinglist,
+                                                                                                 sf=sf,
+                                                                                                 so=so,
+                                                                                                 sp=sp,
+                                                                                                 rm=rm))
                         # Self-cited
                         selfcited = get_self_cited_by(recid)
                         req.write(websearch_templates.tmpl_detailed_record_citations_self_cited(recid,
@@ -3531,7 +3583,8 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
 
                         content = print_record(recIDs[irec], format, ot, ln,
                                                search_pattern=search_pattern,
-                                               user_info=user_info, verbose=verbose)
+                                               user_info=user_info, verbose=verbose,
+                                               sf=sf, so=so, sp=sp, rm=rm)
                         content = websearch_templates.tmpl_detailed_record_metadata(
                             recID = recIDs[irec],
                             ln = ln,
@@ -3568,7 +3621,8 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
                 for irec in range(irec_max, irec_min, -1):
                     req.write(print_record(recIDs[irec], format, ot, ln,
                                            search_pattern=search_pattern,
-                                           user_info=user_info, verbose=verbose))
+                                           user_info=user_info, verbose=verbose,
+                                           sf=sf, so=so, sp=sp, rm=rm))
 
     else:
         print_warning(req, _("Use different search terms."))
@@ -3630,8 +3684,15 @@ def get_record(recid):
     return create_record(print_record(recid, 'xm'))[0]
 
 def print_record(recID, format='hb', ot='', ln=CFG_SITE_LANG, decompress=zlib.decompress,
-                 search_pattern=None, user_info=None, verbose=0):
-    """Prints record 'recID' formatted according to 'format'."""
+                 search_pattern=None, user_info=None, verbose=0, sf='', so='d', sp='', rm=''):
+    """
+    Prints record 'recID' formatted according to 'format'.
+
+    'sf' is sort field and 'rm' is ranking method that are passed here
+    only for proper linking purposes: e.g. when a certain ranking
+    method or a certain sort field was selected, keep it selected in
+    any dynamic search links that may be printed.
+    """
     if format == 'recstruct':
         return get_record(recID)
 
@@ -3673,10 +3734,12 @@ def print_record(recID, format='hb', ot='', ln=CFG_SITE_LANG, decompress=zlib.de
             # at the end of HTML brief mode, print the "Detailed record" functionality:
             if format.lower().startswith('hb') and \
                    format.lower() != 'hb_p':
-                out += websearch_templates.tmpl_print_record_brief_links(
-                    ln = ln,
-                    recID = recID,
-                    )
+                out += websearch_templates.tmpl_print_record_brief_links(ln=ln,
+                                                                         recID=recID,
+                                                                         sf=sf,
+                                                                         so=so,
+                                                                         sp=sp,
+                                                                         rm=rm)
         return out
 
     # Old PHP BibFormat procedure for formatting
@@ -3953,10 +4016,12 @@ def print_record(recID, format='hb', ot='', ln=CFG_SITE_LANG, decompress=zlib.de
             if format == 'hp' or format.startswith("hb_") or format.startswith("hd_"):
                 pass # do nothing for portfolio and on-the-fly formats
             else:
-                out += websearch_templates.tmpl_print_record_brief_links(
-                         ln = ln,
-                         recID = recID,
-                       )
+                out += websearch_templates.tmpl_print_record_brief_links(ln=ln,
+                                                                         recID=recID,
+                                                                         sf=sf,
+                                                                         so=so,
+                                                                         sp=sp,
+                                                                         rm=rm)
 
     # print record closing tags, if needed:
     if format == "marcxml" or format == "oai_dc":
@@ -4313,7 +4378,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
             if of == "id":
                 return [recidx for recidx in range(recid, recidb) if record_exists(recidx)]
             else:
-                print_records(req, range(recid, recidb), -1, -9999, of, ot, ln, search_pattern=p, verbose=verbose, tab=tab)
+                print_records(req, range(recid, recidb), -1, -9999, of, ot, ln, search_pattern=p, verbose=verbose, tab=tab, sf=sf, so=so, sp=sp, rm=rm)
             if req and of.startswith("h"): # register detailed record page view event
                 client_ip_address = str(req.remote_ip)
                 register_page_view_event(recid, uid, client_ip_address)
@@ -4354,7 +4419,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
             return page_end(req, of, ln)
 
     elif rm and p.startswith("recid:"):
-        ## 3-ter - similarity search or citation search needed
+        ## 3-ter - similarity search (or old-style citation search) needed
         if req and not req.header_only:
             page_start(req, of, cc, aas, ln, uid, _("Search Results"), p=create_page_title_search_pattern_info(p, p1, p2, p3))
         if of.startswith("h"):
@@ -4388,12 +4453,12 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
                                                 d1y, d1m, d1d, d2y, d2m, d2d, dt, cpu_time))
                     print_warning(req, results_similar_comments)
                     print_records(req, results_similar_recIDs, jrec, rg, of, ot, ln,
-                                  results_similar_relevances, results_similar_relevances_prologue, results_similar_relevances_epilogue, search_pattern=p, verbose=verbose)
+                                  results_similar_relevances, results_similar_relevances_prologue, results_similar_relevances_epilogue, search_pattern=p, verbose=verbose, sf=sf, so=so, sp=sp, rm=rm)
                 elif of=="id":
                     return results_similar_recIDs
                 elif of.startswith("x"):
                     print_records(req, results_similar_recIDs, jrec, rg, of, ot, ln,
-                                  results_similar_relevances, results_similar_relevances_prologue, results_similar_relevances_epilogue, search_pattern=p, verbose=verbose)
+                                  results_similar_relevances, results_similar_relevances_prologue, results_similar_relevances_epilogue, search_pattern=p, verbose=verbose, sf=sf, so=so, sp=sp, rm=rm)
             else:
                 # rank_records failed and returned some error message to display:
                 if of.startswith("h"):
@@ -4436,11 +4501,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
                                                 jrec, rg, aas, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
                                                 sc, pl_in_url,
                                                 d1y, d1m, d1d, d2y, d2m, d2d, dt, cpu_time))
-                    print_records(req, results_cocited_recIDs, jrec, rg, of, ot, ln, search_pattern=p, verbose=verbose)
+                    print_records(req, results_cocited_recIDs, jrec, rg, of, ot, ln, search_pattern=p, verbose=verbose, sf=sf, so=so, sp=sp, rm=rm)
                 elif of=="id":
                     return results_cocited_recIDs
                 elif of.startswith("x"):
-                    print_records(req, results_cocited_recIDs, jrec, rg, of, ot, ln, search_pattern=p, verbose=verbose)
+                    print_records(req, results_cocited_recIDs, jrec, rg, of, ot, ln, search_pattern=p, verbose=verbose, sf=sf, so=so, sp=sp, rm=rm)
 
             else:
                 # cited rank_records failed and returned some error message to display:
@@ -4802,7 +4867,11 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
                                       search_pattern=p,
                                       print_records_prologue_p=False,
                                       print_records_epilogue_p=False,
-                                      verbose=verbose)
+                                      verbose=verbose,
+                                      sf=sf,
+                                      so=so,
+                                      sp=sp,
+                                      rm=rm)
                         if of.startswith("h"):
                             req.write(print_search_info(p, f, sf, so, sp, rm, of, ot, coll, results_final_nb[coll],
                                                         jrec, rg, aas, ln, p1, p2, p3, f1, f2, f3, m1, m2, m3, op1, op2,
