@@ -19,7 +19,7 @@
 
 import os
 from invenio.messages import gettext_set_language
-from invenio.config import CFG_SITE_SUPPORT_EMAIL
+from invenio.config import CFG_SITE_SUPPORT_EMAIL, CFG_SITE_URL
 from invenio.htmlutils import create_html_tag
 from invenio.oai_harvest_getter import magic_harvest_a_record, guess_oai_pmh_handler, guess_oai_pmh_id
 from invenio.bibformat import format_record
@@ -120,7 +120,7 @@ def autocomplete_input_field(curdir, field_name, kbname):
     });
     </script>
     <div class="ui-widget"><input id="%(field_name)s" name="%(field_name)s" value="%(value)s"/></div>""" % {
-        'site': CFG_SITE_URL
+        'site': CFG_SITE_URL,
         'kb': kbname,
         'field_name': field_name,
         'value': field_value,

@@ -21,6 +21,7 @@ import tempfile
 import time
 import json
 import re
+import copy
 
 from datetime import datetime
 
@@ -208,13 +209,13 @@ class OpenAIREPublication(object):
             self.path = os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid), str(publicationid))
             if not os.path.exists(self.path):
                 raise ValueError("publicationid %s for projectid %s does not exist for user %s" % (publicationid, projectid, uid))
-            self._load()
         self.fulltext_path = os.path.join(self.path, 'files')
         self.metadata_path = os.path.join(self.path, 'metadata')
-        self._initialize_storage()
         self.fulltexts = {}
         self.warnings = []
         self.errors = []
+        self._initialize_storage()
+        self._load()
         self.deleted = False
 
     def __del__(self):
@@ -234,7 +235,7 @@ class OpenAIREPublication(object):
 
     def _load_metadata(self):
         try:
-            self._metadata.update(son_unicode_to_utf8(json.load(open(os.path.join(self.path, 'metadata')))))
+            self._metadata.update(json_unicode_to_utf8(json.load(open(os.path.join(self.path, 'metadata')))))
         except:
             self._metadata = {}
             self._dump_metadata()
@@ -442,8 +443,10 @@ class OpenAIREPublication(object):
 
     def get_html(self, index, ln=CFG_SITE_LANG):
         """Return the HTML representation of the publication, based on the status."""
+        return
         if self.status in ('initialized', 'edited'):
             return openaire_deposit_templates.tmpl_form(self.projectid, self.publicationid, index+1, fileinfo, form=self.form, warnings=self.warnings, errors=self.errors, ln=ln)
+
 
     def get_status(self):
         if self._metadata['__status__'] == 'submitted':
@@ -470,6 +473,8 @@ class OpenAIREPublication(object):
         if '__recid__' not in self._metadata:
             self._metadata['__recid__'] = run_sql("INSERT INTO bibrec(creation_date, modification_date) values(NOW(), NOW())")
         return self._metadata['__recid__']
+    def get_metadata(self):
+        return copy.deepcopy(self._metadata)
 
     status = property(get_status, set_status)
     md = property(get_md)
@@ -478,3 +483,4 @@ class OpenAIREPublication(object):
     projectid = property(get_projectid)
     publicationid = property(get_publicationid)
     recid = property(get_recid)
+    metadata = property(get_metadata)

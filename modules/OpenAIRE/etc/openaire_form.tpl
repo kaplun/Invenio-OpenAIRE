@@ -1,11 +1,11 @@
 <div class="OpenAIRE" id="form_%(id)s">
-    <div class="index %(form_status)s">%(index)s</div>
+    <div class="index %(form_status)s">15</div>
     <div class="metadata">
         <div class="header">
             <div>
-                <div id="tooltip_%(id)s" style="display: inline;">%(title_value)s</div>
+                <div id="tooltip_%(id)s" style="display: inline;">%(title_value)s
                 <br />
-                <em id="tooltip_file_%(id)s">file: %(filename)s</em>
+                %(fileinfo)s
                 <br />
             </div>
             <div>
@@ -19,7 +19,7 @@
                 <div id="warning_embargo_date_%(id)s" class="warning">%(warning_embargo_date_value)s</div>
             </div>
             <div>
-                <a href="%(site)s/deposit?projectid=%(projectid)s&delete=%(id)s" id="remove_%(id)s">%(remove_label)s</a>
+                <a href="%(site)s/deposit?projectid=%(projectid)s&amp;delete=%(id)s" id="remove_%(id)s">%(remove_label)s</a>
             <div class="clear"></div>
         </div>
         <div class="body">
@@ -47,6 +47,7 @@
                     <textarea name="abstract_%(id)s" id="abstract_%(id)s" cols="28" rows="5" class="abstract">%(abstract)s</textarea>
                 </div>
                 <div>
+                    <img title="%(authors_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
                     <label for="authors_%(id)s">%(authors_label)s
                         <div id="error_authors_%(id)s" class="error">%(error_authors_value)s</div>
                         <div id="warning_authors_%(id)s" class="warning">%(warning_authors_value)s</div>
@@ -103,6 +104,7 @@
             </div>
         </div>
     </div>
+    <div class="clear"></div>
     <div><input type="submit" value="%(save_label)s" id="save_%(id)s"/><input type="submit" value="%(submit_label)s" id="submit_%(id)s"/>
 </div>
 <script type="text/javascript">
@@ -114,13 +116,13 @@ $(document).ready(function(){
     $('#save_label_%(id)s').click(function(){
         backgroundsubmit('save');
         return 0;
-    })
+    });
     $('#submit_label_%(id)s').click(function(){
         backgroundsubmit('submit');
         return 0;
-    })
+    });
     $('#remove_%(id)s').click(function(){
         return confirm("%(remove_confirm)s");
-    })
+    });
 });
 </script>

@@ -36,4 +36,4 @@ tmp_DATA = Test1.bft Test3.bft Test_2.bft Test_no_template.test
 
 EXTRA_DIST = $(etc_DATA) $(tmp_DATA)
 
-CLEANFILES = *.tmp
+CLEANFILES = *.tmp *~

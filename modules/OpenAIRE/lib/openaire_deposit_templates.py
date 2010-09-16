@@ -24,6 +24,7 @@ from cgi import escape
 from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_ETCDIR, CFG_VERSION
 from invenio.messages import gettext_set_language
 from invenio.htmlutils import H
+from invenio.textutils import nice_size
 
 CFG_OPENAIRE_PAGE_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_page.tpl')).read()
 CFG_OPENAIRE_FORM_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_form.tpl')).read()
@@ -122,6 +123,7 @@ class Template:
         values['title_label'] = escape(_("English title"))
         values['original_title_label'] = escape(_("Original language title"))
         values['authors_label'] = escape(_("Author(s)"))
+        values['authors_tooltip'] = escape(_("<p>Please enter one author per line in the form: <pre>Surname, First Names: Institution</pre> Note that the <em>institution</em> is optional although recommended.</p><p>Example of valid entries are:<ul><li>John, Doe: Example institution</li><li>Jane Doe</li></ul></p>"), True)
         values['abstract_label'] = escape(_("English abstract"))
         values['original_abstract_label'] = escape(_("Original language abstract"))
         values['journal_title_label'] = escape(_("Journal title"))
@@ -276,7 +278,7 @@ class Template:
             %(project_information)s
             %(publication_forms)s
             </form>
-            <script type="text/javascript">
+            <script type="text/javascript">//<![CDATA[
                 var gProjectid = %(projectid)s;
                 jQuery(document).ready(function(){
                     $('.accordion .head').click(function() {
@@ -293,7 +295,7 @@ class Template:
                         return confirm("%(confirm_delete_publication)s");
                     })
                     });
-            </script>
+            //]]></script>
             """ % {
                 'project_information': project_information,
                 'add_publication_data_and_submit': escape(_('Add Publication Data & Submit')),
@@ -310,8 +312,32 @@ class Template:
                 'projectid': projectid
             }
 
-    def tmpl_file(self, filename, download_url, md5, mimetype, format, size):
-        pass
+
+    def tmpl_file(self, filename, publicationid, download_url, md5, mimetype, format, size, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        return """
+            %(file_label)s: <div class="file" id="file_%(id)s"><em>%(filename)s</em></div>
+            <script type="text/javascript">//<![CDATA[
+                $(document).ready(function(){
+                    var tooltip = clone(gTipDefault);
+                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(filename_label)s:<strong></td><td align="left"><a href="%(download_url)s" target="_blank" type="%(mimetype)s">%(filename)s</a></td></tr><tr><td align="right"><strong>%(checksum_label)s:<strong></td><td align="left">%(md5)s</td></tr><tr><td align="right"><strong>%(mimetype_label)s:<strong></td><td align="left">%(mimetype)s</td></tr><tr><td align="right"><strong>%(format_label)s:<strong></td><td align="left">%(format)s</td></tr><tr><td align="right"><strong>%(size_label)s:<strong></td><td align="left">%(size)s</td></tr><tbody></table>'}
+                    $('#file_%(id)s').qtip(tooltip);
+                });
+            //]]></script>""" % {
+                'file_label': escape(_('file')),
+                'id': escape(publicationid, True),
+                'filename': escape(filename),
+                'filename_label': escape(_("Name")),
+                'download_url': escape(download_url, True),
+                'mimetype': escape(mimetype, True),
+                'mimetype_label': escape(_("Mimetype")),
+                'format': escape(format),
+                'format_label': escape(_("Format")),
+                'size_label': escape(_("Size")),
+                'size': escape(nice_size(size)),
+                'checksum_label': escape(_("MD5 Checksum")),
+                'md5': escape(md5),
+            }
 
     def tmpl_page(self, title, body, headers, username, logout_key="", ln=CFG_SITE_LANG):
         return CFG_OPENAIRE_PAGE_TEMPLATE % {
@@ -320,4 +346,5 @@ class Template:
             'body': body,
             'username': username,
             'logout_key': logout_key,
+            'site': CFG_SITE_URL,
             'release': "Invenio %s" % CFG_VERSION}

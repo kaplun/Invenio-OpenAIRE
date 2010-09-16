@@ -342,9 +342,14 @@ div.wrapper { width: 900px; }
 				<div id="footer">
 					<div class="footer-1">
 						<div class="footer-2">
-							<a class="anchor" href="#page"></a>
-							<p>Copyright © 2010, OpenAIRE Consortium.</p>
-
+                            <div style="float: left; clear: none;">
+                                <em>Powered by</em>
+                                <a href="http://invenio-software.org/" alt="Invenio" target="_blank"><img src="%(site)s/img/invenio.png" alt="Invenio" /></a>
+                            </div>
+                            <div style="float: right;">
+                                <a class="anchor" href="#page"></a>
+                                <p>Copyright © 2010, OpenAIRE Consortium.</p>
+                            </div>
 						</div>
 					</div>
 				</div>

@@ -2,18 +2,17 @@ div.OpenAIRE div.index {
     height: 100%;
     padding: 2px;
     float: left;
-    clear: left;
+    position: relative;
+    left: 1.5em;
 }
 
 div.OpenAIRE div.metadata {
-    float: left;
     height: 100%;
-}
-
-div.OpenAIRE {
-    clear: both;
-    float: none;
-    display: block;
+    float: left;
+    border-style : none none none solid;
+    border-width : medium medium medium 2em;
+    border-left-color : #FFC0C0;
+    padding-left : 2em;
 }
 
 div.OpenAIRE div.header {
@@ -22,14 +21,6 @@ div.OpenAIRE div.header {
 
 div.clear {
     clear: both;
-}
-
-div.OpenAIRE div.metadata div.header div {
-    float: left;
-}
-
-div.OpenAIRE div.left div, div.OpenAIRE dif.right div {
-    float: none;
 }
 
 div.OpenAIRE .error {
@@ -44,20 +35,18 @@ div.OpenAIRE .ok {
     background-color: #C0FFC0;
 }
 
-div.OpenAIRE div.left {
-    float: left;
-}
-
-div.OpenAIRE div.right {
-    float: left;
-}
 
 .ui-autocomplete {
     max-height: 200px;
     overflow-y: auto;
 }
 
-div.selectedproject {
+span.tooltip {
+    border-bottom: 1px dotted;
+    cursor: pointer;
+}
+
+div.selectedproject, div.file {
     display: inline;
     border-bottom: 1px dotted;
     cursor: pointer;

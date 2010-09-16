@@ -26,12 +26,13 @@ from invenio.session import get_session
 from invenio.config import CFG_ETCDIR, CFG_VERSION, CFG_SITE_URL, CFG_SITE_SECURE_URL
 from invenio.openaire_deposit_engine import page, OpenAIREPublications, OpenAIREPublication, wash_form, get_project_information_from_projectid
 from invenio.access_control_engine import acc_authorize_action
+from invenio.urlutils import create_url
 import invenio.template
 
 openaire_deposit_templates = invenio.template.load('openaire_deposit')
 
 class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
-    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'backgroundsubmit', 'checksinglefield']
+    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'backgroundsubmit', 'checksinglefield', 'getfile']
 
     def index(self, req, form):
         argd = wash_urlargd(form, {'projectid': (str, ''), 'delete': (str, '')})
@@ -61,10 +62,13 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 publications.delete_publication(argd['delete'])
             project_information_dict = get_project_information_from_projectid(projectid)
             project_information = openaire_deposit_templates.tmpl_project_information(projectid=projectid, ln=argd['ln'], **project_information_dict)
-            fileinfo = '' ## FIXME
             forms = ""
             for index, (publicationid, publication) in enumerate(publications.iteritems()):
                 publication.merge_form(form, check_required_fields=False, ln=argd['ln'])
+                for fulltextid, fulltext in publication.fulltexts.iteritems():
+                    ## FIXME: How many fulltext are there per publication?
+                    fileinfo = openaire_deposit_templates.tmpl_file(filename=fulltext.fullname, publicationid=publicationid, download_url=create_url("%s/deposit/getfile" % CFG_SITE_URL, {'projectid': projectid, 'publicationid': publicationid, 'fileid': fulltextid}), md5=fulltext.checksum, mimetype=fulltext.mime, format=fulltext.format, size=fulltext.size, ln=argd['ln'])
+                    break
                 forms += openaire_deposit_templates.tmpl_form(projectid, publicationid, index+1, fileinfo, form=publication.metadata['__form__'], warnings=publication.warnings, errors=publication.errors, ln=argd['ln'])
             body = openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, project_information, forms, ln=argd['ln'])
             body += openaire_deposit_templates.tmpl_upload_publications(projectid=projectid, session=get_session(req).sid(), ln=argd['ln'])

@@ -81,6 +81,7 @@ img_DATA = add-small.png \
            iconeye.gif \
            iconpen.gif \
            indicator.gif \
+           invenio.png \
            journal-template1.gif \
            journal-template2.gif \
            journal-template3.gif \
