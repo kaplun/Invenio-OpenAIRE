@@ -23,7 +23,7 @@ from cgi import escape
 
 from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_ETCDIR, CFG_VERSION
 from invenio.messages import gettext_set_language
-from invenio.htmlutils import H
+from invenio.htmlutils import H, EscapedString
 from invenio.textutils import nice_size
 
 CFG_OPENAIRE_PAGE_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_page.tpl')).read()
@@ -47,17 +47,22 @@ class Template:
             <script type="text/javascript" src="%(site)s/js/swfobject.js"></script>
             <script type="text/javascript" src="http://cdn.jquerytools.org/1.2.4/all/jquery.tools.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
-            <script type="text/javascript" src="%(site)s/js/jquery.form.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.qtip-1.0.0-rc3.js"></script>
             <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
             """ % {'site': CFG_SITE_URL}
 
-    def tmpl_choose_project(self, default='', ln=CFG_SITE_LANG):
+    def tmpl_choose_project(self, default='', existing_projects=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
+        if existing_projects is None:
+            existing_projects = {}
+        body = ""
+        for existing_projectid, existing_project in existing_projects.iteritems():
+            body += self.tmpl_project_information(existing_projectid, existing_project['grant_agreement_number'], existing_project['ec_project_website'], existing_project['acronym'], existing_project['call_identifier'], existing_project['end_date'], existing_project['start_date'], existing_project['title'], existing_project['fundedby'], project_selection=True, ln=ln)
+
         script = """
             $(document).ready(function() {
                 $("#project").autocomplete({
-                    source: "%(site)s/kb/export?kbname=projects&format=jquery",
+                    source: "%(site)s/kb/export?kbname=projects&amp;format=jquery&amp;ln=%(ln)s",
                     focus: function(event, ui) {
                         $('#projectid').val(ui.item.label);
                         return false;
@@ -68,9 +73,9 @@ class Template:
                         return false;
                     }
                 }).focus();
-            })""" % {'site': CFG_SITE_URL}
+            })""" % {'site': CFG_SITE_URL, 'ln': ln}
         return H.script(script, escape_body=False, type="text/javascript") + \
-            H.div(class_="ui-widget")(
+            H.div(class_="note")(EscapedString(body, escape_nothing=True)) + H.div(class_="ui-widget")(
                 H.label(for_='project')(_("Start typing the project title or the acronym or the grant agreement number")),
                 H.input(id='project', name='project', type="text"),
                 H.input(type='hidden', name='projectid', id='projectid')
@@ -93,17 +98,19 @@ class Template:
                 H.input(size=50, id=id, name=name, value=default)
             )
 
-    def tmpl_select_a_project(self, default_project='', ln=CFG_SITE_LANG):
+    def tmpl_select_a_project(self, existing_projects=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
-        return H.h3(_('Select a Project')) + \
-            H.p()(
-                _('Start typing the name of the project'),
-                H.br(),
-                H.form(method='get')(
-                    self.tmpl_choose_project(ln=ln),
-                    H.input(type='submit', name='ok', id='ok', value=_("Select"))
-                )
-            )
+        return """
+            <h3>%(select_a_project_label)s</h3>
+            <form method="get">
+                %(choose_a_project)s
+                <input type="submit" name="ok" id="ok" value="%(select_label)s" />
+            </form>
+            """ % {
+                'select_a_project_label': escape(_("Your projects")),
+                'choose_a_project': self.tmpl_choose_project(existing_projects=existing_projects, ln=ln),
+                'select_label': escape(_("Select"), True),
+            }
 
     def tmpl_form(self, projectid, publicationid, index, fileinfo, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
@@ -125,6 +132,8 @@ class Template:
         values['authors_label'] = escape(_("Author(s)"))
         values['authors_tooltip'] = escape(_("<p>Please enter one author per line in the form: <pre>Surname, First Names: Institution</pre> Note that the <em>institution</em> is optional although recommended.</p><p>Example of valid entries are:<ul><li>John, Doe: Example institution</li><li>Jane Doe</li></ul></p>"), True)
         values['abstract_label'] = escape(_("English abstract"))
+        values['english_language_label'] = escape(_("English information"))
+        values['original_language_label'] = escape(_("Original language information"))
         values['original_abstract_label'] = escape(_("Original language abstract"))
         values['journal_title_label'] = escape(_("Journal title"))
         values['publication_date_label'] = escape(_("Publication date"))
@@ -189,7 +198,6 @@ class Template:
         _ = gettext_set_language(ln)
         return """
             <h3>%(upload_publications)s</h3>
-            %(projectid)s
             <form action="%(site)s/deposit" method="POST">
                 <input id="fileInput" name="file" type="file" />
                 <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
@@ -210,6 +218,7 @@ class Template:
                     'simUploadLimit': '2',
                     'scriptData': {'projectid': '%(projectid)s', 'session': '%(session)s'},
                     'onAllComplete': function(){
+                        $('input.save').trigger('click');
                         window.location="%(site)s/deposit?projectid=%(projectid)s";
                     },
                     'onOpen': function(){
@@ -235,20 +244,9 @@ class Template:
 
 
 
-    def tmpl_project_information(self, projectid, grant_agreement_number, ec_project_website, acronym, call_identifier, end_date, start_date, title, fundedby, ln=CFG_SITE_LANG):
+    def tmpl_project_information(self, projectid, grant_agreement_number, ec_project_website, acronym, call_identifier, end_date, start_date, title, fundedby, project_selection=False, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
-        return """
-            <div class="note">
-                <h5>%(selected_project_label)s</h5>
-                <div class="selectedproject" id="selectedproject">%(acronym)s</div> (<a href="%(site)s/deposit">%(change_project_label)s</a>)
-            </div>
-            <script type="text/javascript">// <![CDATA[
-                $(document).ready(function(){
-                    var tooltip = clone(gTipDefault);
-                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'}
-                    $('#selectedproject').qtip(tooltip);
-                });
-            // ]]></script>""" % {
+        data = {
                 'selected_project_label': escape(_("Selected Project")),
                 'acronym': escape(acronym, True),
                 'site': escape(CFG_SITE_URL, True),
@@ -267,8 +265,25 @@ class Template:
                 'fundedby_label': escape(_("Funded By"), True),
                 'fundedby': escape(fundedby, True),
                 'call_identifier_label': escape(_("Call Identifier"), True),
-                'call_identifier': escape(call_identifier, True)
+                'call_identifier': escape(call_identifier, True),
+                'id': escape(projectid, True),
+                'ln': escape(ln, True),
+                'selected_project_label': escape(_("Selected project"))
             }
+        if project_selection:
+            data['acronym_body'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s" class="selectedproject" id="selectedproject_%(id)s">%(acronym)s</a>""" % data
+        else:
+            data['acronym_body'] = """<div class="note"><h5>%(selected_project_label)s</h5>
+<div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s</div> (<a href="%(site)s/deposit">%(change_project_label)s</a>)</div>""" % data
+        return """
+            %(acronym_body)s
+            <script type="text/javascript">// <![CDATA[
+                $(document).ready(function(){
+                    var tooltip = clone(gTipDefault);
+                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'}
+                    $('#selectedproject_%(id)s').qtip(tooltip);
+                });
+            // ]]></script>""" % data
 
     def tmpl_add_publication_data_and_submit(self, projectid, project_information, publication_forms, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
@@ -287,9 +302,9 @@ class Template:
                     }).next().hide();
                     $('input.datepicker').datepicker({dateFormat: 'yy-mm-dd'});
                     $('textarea').elastic();
-                    // bind 'myForm' and provide a simple callback function
-                    $('#publication_forms').ajaxForm(function() {
-                        alert("Thank you for your comment!");
+                    $('#publication_forms').submit(function(event){
+                        event.stopPropagation();
+                        return false;
                     });
                     $('a.deletepublication').click(function(){
                         return confirm("%(confirm_delete_publication)s");

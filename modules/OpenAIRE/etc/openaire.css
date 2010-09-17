@@ -1,10 +1,4 @@
-div.OpenAIRE div.index {
-    height: 100%;
-    padding: 2px;
-    float: left;
-    position: relative;
-    left: 1.5em;
-}
+
 
 div.OpenAIRE div.metadata {
     height: 100%;
@@ -13,41 +7,75 @@ div.OpenAIRE div.metadata {
     border-width : medium medium medium 2em;
     border-left-color : #FFC0C0;
     padding-left : 2em;
-}
+  }
+
 
 div.OpenAIRE div.header {
     height: 100%;
-}
+  }
+
+
+div.OpenAIRE fieldset.left, div.OpenAIRE fieldset.right {
+    float: left;
+    width: 40%;
+  }
+
 
 div.clear {
     clear: both;
-}
+  }
+
 
 div.OpenAIRE .error {
-    background-color: #FFC0C0;
-}
+    background : #FFC0C0;
+    font : bolder inherit sans-serif;
+    padding : 4px;
+    border : #ff0000;
+    -moz-border-radius : 4px;
+    border-radius : 4px;
+  }
+
 
 div.OpenAIRE .warning {
-    background-color: #FFFFC0;
-}
+    background : #FFFFC0;
+    font : bolder inherit sans-serif;
+    padding : 4px;
+    border : #ffff00;
+    border-radius : 4px;
+  }
+
 
 div.OpenAIRE .ok {
-    background-color: #C0FFC0;
-}
+    background : #C0FFC0;
+    font : bolder inherit sans-serif;
+    padding : 4px;
+    border : #00c000;
+    -moz-border-radius : 4px;
+    border-radius : 4px;
+  }
 
 
 .ui-autocomplete {
     max-height: 200px;
     overflow-y: auto;
-}
+  }
+
 
 span.tooltip {
     border-bottom: 1px dotted;
     cursor: pointer;
-}
+  }
 
-div.selectedproject, div.file {
+
+.selectedproject, div.file {
     display: inline;
     border-bottom: 1px dotted;
     cursor: pointer;
-}
+  }
+
+
+select:focus, input[type="text"]:focus, textarea:focus {
+    background: #FFFF99;
+    border: #FFFF99 dotted;
+  }
+

@@ -189,6 +189,12 @@ def namespaced_metadata2simple_metadata(namespaced_metadata, publicationid):
 def simple_metadata2namespaced_metadata(simple_metadata, publicationid):
     return dict(("%s_%s" % (key, publicationid), value) for key, value in simple_metadata.iteritems())
 
+def get_exisiting_projectids_for_uid(uid):
+    try:
+        return [name for name in os.listdir(os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid))) if not name.startswith('.')]
+    except OSError:
+        return []
+
 class OpenAIREPublication(object):
     def __init__(self, uid, projectid, publicationid=None):
         self._metadata = {}
@@ -237,7 +243,6 @@ class OpenAIREPublication(object):
         try:
             self._metadata.update(json_unicode_to_utf8(json.load(open(os.path.join(self.path, 'metadata')))))
         except:
-            self._metadata = {}
             self._dump_metadata()
             self._load_metadata()
 
@@ -260,6 +265,9 @@ class OpenAIREPublication(object):
         self._dump_metadata()
 
     def _dump_metadata(self):
+        backup_fd, backup_name = tempfile.mkstemp(prefix='metadata-%s-' % time.strftime("%Y%m%d%H%M%S"), suffix='', dir=self.path)
+        os.write(backup_fd, open(os.path.join(self.path, 'metadata')).read())
+        os.close(backup_fd)
         json.dump(self._metadata, open(os.path.join(self.path, 'metadata'), 'w'), indent=4)
 
     def merge_form(self, form, check_required_fields=True, ln=CFG_SITE_LANG):

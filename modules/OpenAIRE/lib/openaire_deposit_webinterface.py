@@ -24,7 +24,7 @@ from invenio.webuser import collect_user_info
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio.session import get_session
 from invenio.config import CFG_ETCDIR, CFG_VERSION, CFG_SITE_URL, CFG_SITE_SECURE_URL
-from invenio.openaire_deposit_engine import page, OpenAIREPublications, OpenAIREPublication, wash_form, get_project_information_from_projectid
+from invenio.openaire_deposit_engine import page, OpenAIREPublications, OpenAIREPublication, wash_form, get_project_information_from_projectid, get_exisiting_projectids_for_uid
 from invenio.access_control_engine import acc_authorize_action
 from invenio.urlutils import create_url
 import invenio.template
@@ -52,7 +52,11 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 return page(req=req, body=_("You are not authorized to use OpenAIRE deposition."), title=_("Authorization failure"))
         projectid = argd['projectid']
         if not projectid:
-            body = openaire_deposit_templates.tmpl_select_a_project(ln=argd['ln'])
+            projectids = get_exisiting_projectids_for_uid(user_info['uid'])
+            projects = {}
+            for projectid in projectids:
+                projects[projectid] = get_project_information_from_projectid(projectid)
+            body = openaire_deposit_templates.tmpl_select_a_project(existing_projects=projects, ln=argd['ln'])
             title = _("Submit New Publications")
             return page(title=title, body=body, req=req)
         else:
@@ -114,42 +118,42 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         """ % {'site' : CFG_SITE_URL}
         return page(title='sandbox', body=body, req=req)
 
-    def checksinglefield(self, req, form):
-        argd = wash_urlargd(form, {'field': (str, ''), 'publicationid': (str, '')})
-        publicationid = argd['publicationid']
-        field = argd['field']
-        metadata = wash_form(form, publicationid)
-        errors, warnings = OpenAIREPublication.check_metadata(metadata, publicationid, field=field, ln=argd['ln'])
-        return json.dumps({'errors': errors, 'warnings': warnings})
-
     def backgroundsubmit(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, '')})
-        user_info = collect_user_info(req)
-        uid = user_info['uid']
-        auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
-        if auth_code == 0:
-            req.content_type = 'application/json'
-            publicationid = argd['publicationid']
-            projectid = argd['projectid']
+        argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, ''), 'action': (str, ''), 'current_field': (str, '')})
+        action = argd['action']
+        publicationid = argd['publicationid']
+        projectid = argd['projectid']
+        assert(action in ('save', 'verify_field', 'submit'))
+        if action == 'verify_field':
+            current_field = argd['current_field']
+            assert(current_field)
             metadata = wash_form(form, publicationid)
             errors, warnings = OpenAIREPublication.check_metadata(metadata, publicationid, check_required_fields=True, ln=argd['ln'])
-            if errors:
-                return json.dumps({'errors': errors, 'warnings': warnings})
-            else:
-                publication = OpenAIREPublication(uid, projectid, publicationid)
-                publication.merge_form(form)
-                publication.upload_record()
-                return json.dumps({'submittedpublicationid': publicationid, 'newcontent': "This would be the new form"})
+            if current_field in errors:
+                ## Let's just consider the current field ;-)
+                errors = {current_field: errors[current_field]}
+            if current_field in warnings:
+                ## Let's just consider the current field ;-)
+                warnings = {current_field: warnings[current_field]}
+            req.content_type = 'application/json'
+            return json.dumps({'errors': errors, 'warnings': warnings})
 
-    def checkmetadata(self, req, form):
-        argd = wash_urlargd(form, {'publicationid': (str, ''),
-            'check_required_fields': (int, 0)
-        })
-        publicationid = argd['publicationid']
-        check_required_fields = argd['check_required_fields']
-        metadata = wash_form(form, publicationid)
-        req.content_type = 'application/json'
-        errors, warnings = OpenAIREPublication.check_metadata(metadata, publicationid, check_required_fields=check_required_fields, ln=argd['ln'])
-        return json.dumps({'errors': errors, 'warnings': warnings, 'publicationid': publicationid})
+        user_info = collect_user_info(req)
+        auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
+        assert(auth_code == 0)
+        uid = user_info['uid']
+        publication = OpenAIREPublication(uid, projectid, publicationid)
+        publication.merge_form(form)
+        errors, warnings = publication.errors, publication.warnings
+
+        if action == 'save':
+            req.content_type = 'application/json'
+            return json.dumps({'errors': errors, 'warnings': warnings})
+        elif action == 'submit':
+            publication.upload_record()
+            req.content_type = 'application/json'
+            return json.dumps({'submittedpublicationid': publicationid, 'newcontent': "This would be the new form"})
+        assert(False)
+
 
     __call__ = index

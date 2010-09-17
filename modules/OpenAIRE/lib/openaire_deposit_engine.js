@@ -1,3 +1,4 @@
+/* Global Tooltips configuration :-) */
 var gTipDefault = {
     position: {
         corner: {
@@ -40,18 +41,22 @@ function update_language(event){
     }
 }
 
-function elaborateCheckMetadata(results, textStatus, XMLHttpRequest){
+function elaborateBackgroundSubmit(results, textStatus, XMLHttpRequest){
     var errors = results.errors;
     var warnings = results.warnings;
     var submittedpublicationid = results.submittedpublicationid;
     var newcontent = results.newcontent;
     var publicationid = results.publicationid;
     if (submittedpublicationid != undefined && newcontent != undefined) {
-        $('#form_' + submittedpublicationid + ' div.body').hide('slow').html(newcontent).show('slow');
+        $('#form_' + submittedpublicationid).hide('slow').html(newcontent).show('slow');
     } else {
-        $('#form_' + publicationid + ' .error').hide('slow');
+        $('#form_' + publicationid + ' .error').filter(function(){
+            return errors[this.id.slice("error_".length)] == undefined;
+        }).hide('slow');
+        $('#form_' + publicationid + ' .warning').filter(function(){
+            return warnings[this.id.slice("warning_".length)] == undefined;
+        }).hide('slow');
         $('#form_' + publicationid + ' .warning').hide('slow');
-        $('.warning').hide();
         for (var error in errors) {
             $('#error_' + error).html(errors[error][0]).show('slow');
         }
@@ -59,6 +64,7 @@ function elaborateCheckMetadata(results, textStatus, XMLHttpRequest){
             $('#warning_' + warning).html(warnings[warning][0]).show('slow');
         }
     }
+    return 0;
 }
 
 function getPublicationMetadata(publicationid){
@@ -90,26 +96,14 @@ function backgroundsubmit(element, action) {
     data['publicationid'] = publicationid;
     data['projectid'] = gProjectid;
     data['action'] = action;
+    data['current_field'] = element.id;
     $.ajax({
         error: onAjaxError,
         url: gSite + '/deposit/backgroundsubmit',
         data: data,
-        success: elaborateCheckMetadata
+        success: elaborateBackgroundSubmit
     });
 }
-
-$(document).ready(function(){
-    $('div.OpenAIRE input').blur(function(){
-        return backgroundsubmit(this, 'verify_field');
-    });
-    $('div.OpenAIRE textarea').blur(function(){
-        return backgroundsubmit(this, 'verify_field');
-    });
-    $('div.OpenAIRE select').blur(function(){
-        return backgroundsubmit(this, 'verify_field');
-    });
-    $('*[title]').qtip(gTipDefault);
-})
 
 function onAjaxError(XHR, textStatus, errorThrown){
   /*
@@ -127,3 +121,25 @@ function clone(obj) {
     Clone.prototype = obj;
     return new Clone();
 }
+
+/* Initialization */
+$(document).ready(function(){
+    $('div.OpenAIRE input').blur(function(){
+        return backgroundsubmit(this, 'verify_field');
+    });
+    $('div.OpenAIRE textarea').blur(function(){
+        return backgroundsubmit(this, 'verify_field');
+    });
+    $('div.OpenAIRE select').blur(function(){
+        return backgroundsubmit(this, 'verify_field');
+    });
+    $('*[title]').qtip(gTipDefault);
+    $('div.error').filter(function(){
+        return this.textContent == '';
+    }).hide()
+    $('div.warning').filter(function(){
+        return this.textContent == '';
+    }).hide()
+})
+
+
