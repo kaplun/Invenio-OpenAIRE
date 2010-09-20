@@ -27,9 +27,9 @@ var gTipDefault = {
 
 function update_embargo_date(event){
     if ($(event.data.from_id).val() == 'embargoedAccess') {
-        $(event.data.to_id).removeAttr("disabled").show('slow');
+        $(event.data.to_id).show('slow');
     } else {
-        $(event.data.to_id).attr("disabled", "disabled").hide('slow');
+        $(event.data.to_id).hide('slow');
     }
 }
 
@@ -140,6 +140,7 @@ $(document).ready(function(){
     $('div.warning').filter(function(){
         return this.textContent == '';
     }).hide()
+    $('input[hint],textarea[hint]').inputHint({hintAttr: "hint"});
 })
 
 

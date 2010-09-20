@@ -1,7 +1,7 @@
 <div class="OpenAIRE" id="form_%(id)s">
     <div class="index">%(index)s
         <div class="metadata note">
-            <div class="header">
+            <div class="header note" id="header_%(id)s">
                 <div>
                     %(title_value)s
                     <br />
@@ -15,17 +15,17 @@
                     </select>
                 </div>
                 <div id="embargo_date_container_%(id)s">
-                    <img title="%(embargo_date_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <img title="%(embargo_date_tooltip)s" class="tooltip" src="%(site)s/img/help.png" hint="%(embargo_date_hint)s"/>
                     <input name="embargo_date_%(id)s" type="text" id="embargo_date_%(id)s" value="%(embargo_date_value)s" size="10" maxlength="10" class="datepicker" />
                     <div id="error_embargo_date_%(id)s" class="error">%(error_embargo_date_value)s</div>
                     <div id="warning_embargo_date_%(id)s" class="warning">%(warning_embargo_date_value)s</div>
                 </div>
                 <div>
-                    <a href="%(site)s/deposit?projectid=%(projectid)s&amp;delete=%(id)s&amp;ln=%(ln)s" id="remove_%(id)s">%(remove_label)s</a>
+                    <a href="%(site)s/deposit?projectid=%(projectid)s&amp;delete=%(id)s&amp;ln=%(ln)s" id="remove_%(id)s"><img src="%(site)s/img/smallbin.gif" /> %(remove_label)s</a>
                 </div>
                 <div class="clear"></div>
             </div>
-            <div class="body">
+            <div class="body" id="body_%(id)s">
                 <div>
                     <img title="%(publication_date_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
                     <label for="publication_date_%(id)s">%(publication_date_label)s</label>
@@ -122,7 +122,7 @@
 </div>
 <script type="text/javascript">
 $(document).ready(function(){
-    $('#access_rights_%(id)s').bind('change', {from_id: '#access_rights_%(id)s', to_id: '#embargo_date_%(id)s'}, update_embargo_date);
+    $('#access_rights_%(id)s').bind('change', {from_id: '#access_rights_%(id)s', to_id: '#embargo_date_container_%(id)s'}, update_embargo_date);
     $('#access_rights_%(id)s').trigger('change');
     $('#language_%(id)s').bind('change', {from_id: '#language_%(id)s', to_id: '.original_language_column_%(id)s'}, update_language);
     $('#language_%(id)s').trigger('change');
@@ -136,6 +136,9 @@ $(document).ready(function(){
     });
     $('#remove_%(id)s').click(function(){
         return confirm("%(remove_confirm)s");
+    });
+    $('#header_%(id)s').click(function(){
+        $('#body_%(id)s').toggle();
     });
 });
 </script>

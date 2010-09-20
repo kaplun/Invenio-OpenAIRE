@@ -48,6 +48,7 @@ class Template:
             <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.qtip-1.0.0-rc3.js"></script>
             <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
+            <script type="text/javascript" src="%(site)s/js/jquery.input-hint.js"></script>
             """ % {'site': CFG_SITE_URL}
 
     def tmpl_choose_project(self, default='', existing_projects=None, ln=CFG_SITE_LANG):
@@ -147,6 +148,8 @@ class Template:
         values['submit_label'] = escape(_('Submit this publication'))
         values['form_status'] = 'error' ## FIXME metadata_status
         values['access_rights_options'] = self.tmpl_access_rights_options(values.get('access_rights_value', ''), ln=ln)
+        values['embargo_date_hint'] = escape(_("End of the embargo"), True)
+        values['embargo_date_tooltip'] = escape(_("Enter here the date when the embargo period for this publication will be over."), True)
         values['language_options'] = self.tmpl_language_options(values.get('language_value', ), ln)
         values['save_label'] = escape(_('Save publication'))
         values['submit_label'] = escape(_('Submit publication'))
@@ -165,7 +168,7 @@ class Template:
         from invenio.openaire_deposit_engine import CFG_ACCESS_RIGHTS
         access_rights = CFG_ACCESS_RIGHTS(ln)
         _ = gettext_set_language(ln)
-        out = '<option disabled="disabled">%s</option>' % (_("Select one"))
+        out = '<option disabled="disabled">%s</option>' % (_("Select access rights"))
         for key, value in access_rights.iteritems():
             if key == selected_access_right:
                 out += H.option(value=key, selected='selected')(value)

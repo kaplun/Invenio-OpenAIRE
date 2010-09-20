@@ -10,9 +10,10 @@ div.OpenAIRE div.metadata {
   }
 
 
-div.OpenAIRE div.header {
-    height: 100%;
-  }
+
+div.OpenAIRE div.header div {
+    float: left;
+}
 
 
 div.OpenAIRE fieldset.left, div.OpenAIRE fieldset.right {
@@ -22,8 +23,9 @@ div.OpenAIRE fieldset.left, div.OpenAIRE fieldset.right {
 
 
 div.clear {
+    float: none;
     clear: both;
-  }
+}
 
 
 div.OpenAIRE .error {
