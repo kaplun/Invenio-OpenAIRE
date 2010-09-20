@@ -15,7 +15,6 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-import os
 import sys
 if sys.hexversion < 0x2060000:
     try:
@@ -32,8 +31,8 @@ from invenio.messages import gettext_set_language
 from invenio.webuser import collect_user_info
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio.session import get_session
-from invenio.config import CFG_ETCDIR, CFG_VERSION, CFG_SITE_URL, CFG_SITE_SECURE_URL
-from invenio.openaire_deposit_engine import page, OpenAIREPublications, OpenAIREPublication, wash_form, get_project_information_from_projectid, get_exisiting_projectids_for_uid
+from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL
+from invenio.openaire_deposit_engine import page, OpenAIREProject, OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid
 from invenio.access_control_engine import acc_authorize_action
 from invenio.urlutils import create_url
 import invenio.template
@@ -41,7 +40,7 @@ import invenio.template
 openaire_deposit_templates = invenio.template.load('openaire_deposit')
 
 class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
-    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'backgroundsubmit', 'checksinglefield', 'getfile']
+    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile']
 
     def index(self, req, form):
         argd = wash_urlargd(form, {'projectid': (str, ''), 'delete': (str, '')})
@@ -60,27 +59,23 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             else:
                 return page(req=req, body=_("You are not authorized to use OpenAIRE deposition."), title=_("Authorization failure"))
         projectid = argd['projectid']
+        uid = user_info['uid']
         if not projectid:
-            projectids = get_exisiting_projectids_for_uid(user_info['uid'])
-            projects = {}
-            for projectid in projectids:
-                projects[projectid] = get_project_information_from_projectid(projectid)
+            projects = [OpenAIREProject(uid, projectid, argd['ln']).get_project_information() for projectid in get_exisiting_projectids_for_uid(user_info['uid'])]
             body = openaire_deposit_templates.tmpl_select_a_project(existing_projects=projects, ln=argd['ln'])
             title = _("Submit New Publications")
             return page(title=title, body=body, req=req)
         else:
-            uid = user_info['uid']
-            publications = OpenAIREPublications(uid, projectid)
+            publications = OpenAIREProject(uid, projectid, ln=argd['ln'])
             if argd['delete']:
                 publications.delete_publication(argd['delete'])
-            project_information_dict = get_project_information_from_projectid(projectid)
-            project_information = openaire_deposit_templates.tmpl_project_information(projectid=projectid, ln=argd['ln'], **project_information_dict)
+            project_information = publications.get_project_information(linked=False)
             forms = ""
             for index, (publicationid, publication) in enumerate(publications.iteritems()):
                 publication.merge_form(form, check_required_fields=False, ln=argd['ln'])
                 for fulltextid, fulltext in publication.fulltexts.iteritems():
                     ## FIXME: How many fulltext are there per publication?
-                    fileinfo = openaire_deposit_templates.tmpl_file(filename=fulltext.fullname, publicationid=publicationid, download_url=create_url("%s/deposit/getfile" % CFG_SITE_URL, {'projectid': projectid, 'publicationid': publicationid, 'fileid': fulltextid}), md5=fulltext.checksum, mimetype=fulltext.mime, format=fulltext.format, size=fulltext.size, ln=argd['ln'])
+                    fileinfo = openaire_deposit_templates.tmpl_fulltext_information(filename=fulltext.fullname, publicationid=publicationid, download_url=create_url("%s/deposit/getfile" % CFG_SITE_URL, {'projectid': projectid, 'publicationid': publicationid, 'fileid': fulltextid}), md5=fulltext.checksum, mimetype=fulltext.mime, format=fulltext.format, size=fulltext.size, ln=argd['ln'])
                     break
                 forms += openaire_deposit_templates.tmpl_form(projectid, publicationid, index+1, fileinfo, form=publication.metadata['__form__'], warnings=publication.warnings, errors=publication.errors, ln=argd['ln'])
             body = openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, project_information, forms, ln=argd['ln'])
@@ -97,7 +92,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         if user_info['guest'] == '1':
             raise ValueError(_("This session is invalid"))
         uid = user_info['uid']
-        publications = OpenAIREPublications(uid, argd['projectid'])
+        publications = OpenAIREProject(uid, argd['projectid'], ln=argd['ln'])
         publications.upload_several_files(form)
         return "1"
 
@@ -107,7 +102,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         publicationid = argd['publicationid']
         projectid = argd['projectid']
         fileid = argd['fileid']
-        publication = OpenAIREPublication(uid, projectid, publicationid)
+        publication = OpenAIREPublication(uid, projectid, publicationid, ln=argd['ln'])
         fulltext = publication.fulltexts[fileid]
         return fulltext.stream(req)
 
@@ -127,40 +122,53 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         """ % {'site' : CFG_SITE_URL}
         return page(title='sandbox', body=body, req=req)
 
-    def backgroundsubmit(self, req, form):
+    def ajaxgateway(self, req, form):
         argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, ''), 'action': (str, ''), 'current_field': (str, '')})
         action = argd['action']
         publicationid = argd['publicationid']
         projectid = argd['projectid']
         assert(action in ('save', 'verify_field', 'submit'))
+        out = {
+            'errors': {},
+            'warnings': {},
+            'addclasses': {},
+            'delclasses': {},
+            'substitutions': {}
+        }
         if action == 'verify_field':
             current_field = argd['current_field']
             assert(current_field)
             metadata = wash_form(form, publicationid)
-            errors, warnings = OpenAIREPublication.check_metadata(metadata, publicationid, check_required_fields=True, ln=argd['ln'])
-            if current_field in errors:
-                ## Let's just consider the current field ;-)
-                errors = {current_field: errors[current_field]}
-            if current_field in warnings:
-                ## Let's just consider the current field ;-)
-                warnings = {current_field: warnings[current_field]}
+            out["errors"], out["warnings"] = OpenAIREPublication.check_metadata(metadata, publicationid, check_only_field=current_field, ln=argd['ln'])
             req.content_type = 'application/json'
-            return json.dumps({'errors': errors, 'warnings': warnings})
+            return json.dumps(out)
 
         user_info = collect_user_info(req)
         auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
         assert(auth_code == 0)
         uid = user_info['uid']
-        publication = OpenAIREPublication(uid, projectid, publicationid)
+        publication = OpenAIREPublication(uid, projectid, publicationid, ln=argd['ln'])
         publication.merge_form(form)
-        errors, warnings = publication.errors, publication.warnings
+        out["errors"], out["warnings"] = publication.errors, publication.warnings
+        if out["errors"]:
+            out['addclasses']['#form_%s' % publicationid] = 'error'
+            out['delclasses']['#form_%s' % publicationid] = 'warning ok'
+        elif out["warnings"]:
+            out['addclasses']['#form_%s' % publicationid] = 'warning'
+            out['delclasses']['#form_%s' % publicationid] = 'error ok'
+        else:
+            out['addclasses']['#form_%s' % publicationid] = 'ok'
+            out['delclasses']['#form_%s' % publicationid] = 'warning error'
 
         if action == 'save':
             req.content_type = 'application/json'
-            return json.dumps({'errors': errors, 'warnings': warnings})
+            out["substitutions"]['#publication_info_container_%s' % publicationid] = publication.get_publication_information()
+            return json.dumps(out)
         elif action == 'submit':
             publication.upload_record()
-            req.content_type = 'application/json'
+            req.content_type = 'application/json',
+            out["substitutions"]['#publication_header_%s' % publicationid] = "NEW HEADER"
+            out["substitutions"]['#publication_body_%s' % publicationid] = "NEW BODY"
             return json.dumps({'submittedpublicationid': publicationid, 'newcontent': "This would be the new form"})
         assert(False)
 

@@ -571,7 +571,7 @@ def kb_update_attributes(req, kb="", name="", description="", sortby="to",
                                    text=auth_msg,
                                    navtrail=navtrail_previous_links)
 
-def kb_export(req, kbname="", format="kbr", searchkey="", searchvalue="", searchtype="s", ln=CFG_SITE_LANG):
+def kb_export(req, kbname="", format="kbr", searchkey="", searchvalue="", searchtype="s", limit=None, ln=CFG_SITE_LANG):
     """
     Exports the given kb so that it is listed in stdout (the browser).
     @param req the request
@@ -580,6 +580,7 @@ def kb_export(req, kbname="", format="kbr", searchkey="", searchvalue="", search
     @param searchkey include only lines that match this on the left side
     @param searchvalue include only lines that match this on the right side
     @param searchtype s = substring match, e = exact match
+    @param limit how many results to return. None means all
     @param ln language
     """
     ln = wash_language(ln)
@@ -622,6 +623,8 @@ def kb_export(req, kbname="", format="kbr", searchkey="", searchvalue="", search
                 label = m['value'] or m['key']
                 value = m['key'] or m['value']
                 ret.append({'label': label, 'value': value})
+            if limit:
+                ret = ret[:limit]
             req.content_type = 'application/json'
             return json.dumps(ret)
         if format == 'jquery2':
@@ -630,8 +633,10 @@ def kb_export(req, kbname="", format="kbr", searchkey="", searchvalue="", search
                 data = {'value': m['key']}
                 data.update(json.loads(m['value']))
                 ret.append(data)
+            if limit:
+                ret = ret[:limit]
             req.content_type = 'application/json'
-            return json.dumps(ret, indent=4)
+            return json.dumps(ret)
         if not mappings:
             body = "There is no knowledge base named "+kbname+" or it is empty",
             return page(title=_("No such knowledge base"),

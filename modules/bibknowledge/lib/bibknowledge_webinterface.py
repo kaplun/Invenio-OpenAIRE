@@ -59,7 +59,8 @@ class WebInterfaceBibKnowledgePages(WebInterfaceDirectory):
                                    'kbname':  (str, ''), #for exporting
                                    'format':  (str, ''), #for exporting
                                    'term': (str, ''), #for exporting to JQuery UI
-                                   'kbtype': (str, '')})
+                                   'kbtype': (str, ''),
+                                   'limit': (int, None)})
         ln = argd['ln']
         kb = argd['kb']
         search = argd['search']
@@ -83,6 +84,7 @@ class WebInterfaceBibKnowledgePages(WebInterfaceDirectory):
         kbname = argd['kbname']
         format = argd['format']
         term = argd['term']
+        limit = argd['limit']
 
         req.argd = argd #needed by some lower level modules
 
@@ -91,7 +93,7 @@ class WebInterfaceBibKnowledgePages(WebInterfaceDirectory):
             return bibknowledgeadmin.kb_upload(req, kb=kb, ln=ln)
         #check if this is "export"
         if self.extrapath == "export":
-            return bibknowledgeadmin.kb_export(req, kbname=kbname, format=format, ln=ln, searchvalue=term)
+            return bibknowledgeadmin.kb_export(req, kbname=kbname, format=format, ln=ln, searchvalue=term, limit=limit)
 
         #first check if this is a specific action
         if action == "new":

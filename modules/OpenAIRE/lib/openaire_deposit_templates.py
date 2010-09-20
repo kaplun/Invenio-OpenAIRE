@@ -54,10 +54,8 @@ class Template:
     def tmpl_choose_project(self, default='', existing_projects=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         if existing_projects is None:
-            existing_projects = {}
-        body = ""
-        for existing_projectid, existing_project in existing_projects.iteritems():
-            body += self.tmpl_project_information(existing_projectid, existing_project['grant_agreement_number'], existing_project['ec_project_website'], existing_project['acronym'], existing_project['call_identifier'], existing_project['end_date'], existing_project['start_date'], existing_project['title'], existing_project['fundedby'], project_selection=True, ln=ln)
+            existing_projects = []
+        body = ' '.join(existing_projects)
 
         script = """
             $(document).ready(function() {
@@ -117,12 +115,10 @@ class Template:
         values = dict(CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS)
         values['id'] = publicationid
         values['index'] = index
-        values['class'] = index % 2 and 'even' or 'odd'
         for key, value in form.iteritems():
             if key.endswith('_%s' % publicationid):
                 values['%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
-        if not values['title_value']:
-            values['title_value'] = _('unknown')
+        values['edit_metadata_label'] = escape(_("Edit"))
         values['fileinfo'] = fileinfo
         values['projectid'] = projectid
         values['site'] = CFG_SITE_URL
@@ -153,6 +149,7 @@ class Template:
         values['language_options'] = self.tmpl_language_options(values.get('language_value', ), ln)
         values['save_label'] = escape(_('Save publication'))
         values['submit_label'] = escape(_('Submit publication'))
+        values['embargo_date_size'] = len(values['embargo_date_hint'])
         if warnings:
             for key, value in warnings.iteritems():
                 if key.endswith('_%s' % publicationid):
@@ -245,8 +242,31 @@ class Template:
             }
 
 
+    def tmpl_publication_information(self, publicationid, title, authors, abstract, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        authors = authors.strip().splitlines()
+        data = {
+                'title_label': escape(_("Title")),
+                'authors_label': len(authors) != 1 and escape(_("Author(s)")) or escape(_("Author")),
+                'abstract_label': escape(_("Abstract")),
+                'title': escape(title),
+                'authors': "<br />".join([escape(author) for author in authors]),
+                'abstract': escape(abstract).replace('\n', '<br />'),
+                'id': escape(publicationid, True)
+            }
+        data['body'] = """<div id="publication_information_%(id)s" class="publication_information">%(title)s</div>""" % data
+        return """
+            %(body)s
+            <script type="text/javascript">// <![CDATA[
+                $(document).ready(function(){
+                    var tooltip = clone(gTipDefault);
+                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(authors_label)s:<strong></td><td align="left">%(authors)s</td></tr><tr><td align="right"><strong>%(abstract_label)s:<strong></td><td align="left">%(abstract)s</td></tr><tbody></table>'}
+                    $('#publication_information_%(id)s').qtip(tooltip);
+                });
+            // ]]></script>""" % data
 
-    def tmpl_project_information(self, projectid, grant_agreement_number, ec_project_website, acronym, call_identifier, end_date, start_date, title, fundedby, project_selection=False, ln=CFG_SITE_LANG):
+
+    def tmpl_project_information(self, projectid, existing_publications, grant_agreement_number, ec_project_website, acronym, call_identifier, end_date, start_date, title, fundedby, linked=True, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         data = {
                 'selected_project_label': escape(_("Selected Project")),
@@ -270,15 +290,12 @@ class Template:
                 'call_identifier': escape(call_identifier, True),
                 'id': escape(projectid, True),
                 'ln': escape(ln, True),
-                'selected_project_label': escape(_("Selected project"))
+                'existing_publications': existing_publications,
             }
-        if project_selection:
-            data['acronym_body'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s" class="selectedproject" id="selectedproject_%(id)s">%(acronym)s</a>""" % data
-        else:
-            data['acronym_body'] = """<div class="note"><h5>%(selected_project_label)s</h5>
-<div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s</div> (<a href="%(site)s/deposit">%(change_project_label)s</a>)</div>""" % data
+        if linked:
+            data['acronym'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s</a>""" % data
         return """
-            %(acronym_body)s
+            <div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s (%(existing_publications)d)</div>
             <script type="text/javascript">// <![CDATA[
                 $(document).ready(function(){
                     var tooltip = clone(gTipDefault);
@@ -291,21 +308,23 @@ class Template:
         _ = gettext_set_language(ln)
         return """
             <h3>%(add_publication_data_and_submit)s</h3>
-            <form method="POST" id="publication_forms">
+            <div class="note">
             %(project_information)s
+            </div>
+            <form method="POST" id="publication_forms">
+            <div class="note OpenAIRE">
+            <table>
             %(publication_forms)s
+            </table>
+            </div>
             </form>
             <script type="text/javascript">//<![CDATA[
                 var gProjectid = %(projectid)s;
                 jQuery(document).ready(function(){
-                    $('.accordion .head').click(function() {
-                        $(this).next().toggle('slow');
-                        return false;
-                    }).next().hide();
                     $('input.datepicker').datepicker({dateFormat: 'yy-mm-dd'});
                     $('textarea').elastic();
                     $('#publication_forms').submit(function(event){
-                        event.stopPropagation();
+                        event.preventDefault();
                         return false;
                     });
                     $('a.deletepublication').click(function(){
@@ -330,7 +349,7 @@ class Template:
             }
 
 
-    def tmpl_file(self, filename, publicationid, download_url, md5, mimetype, format, size, ln=CFG_SITE_LANG):
+    def tmpl_fulltext_information(self, filename, publicationid, download_url, md5, mimetype, format, size, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         return """
             %(file_label)s: <div class="file" id="file_%(id)s"><em>%(filename)s</em></div>

@@ -16,17 +16,14 @@ div.OpenAIRE div.header div {
 }
 
 
-div.OpenAIRE fieldset.left, div.OpenAIRE fieldset.right {
-    float: left;
-    width: 40%;
-  }
-
-
 div.clear {
     float: none;
     clear: both;
 }
 
+.mandatory:after {
+    content: url("/img/circle_red.png");
+}
 
 div.OpenAIRE .error {
     background : #FFC0C0;
@@ -37,6 +34,10 @@ div.OpenAIRE .error {
     border-radius : 4px;
   }
 
+div.OpenAIRE label {
+    font-style: italic;
+    font-weight: bolder;
+}
 
 div.OpenAIRE .warning {
     background : #FFFFC0;
@@ -69,7 +70,7 @@ span.tooltip {
   }
 
 
-.selectedproject, div.file {
+.publication_information, .selectedproject, div.file {
     display: inline;
     border-bottom: 1px dotted;
     cursor: pointer;
