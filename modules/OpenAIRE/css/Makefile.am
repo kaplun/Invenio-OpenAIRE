@@ -15,6 +15,10 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = etc lib js css
+cssdir = $(localstatedir)/www/css
 
-CLEANFILES = *~
+css_DATA = uploadify.css jquery-ui-1.8.4.custom.css
+
+EXTRA_DIST = $(css_DATA)
+
+CLEANFILES = *~ *.tmp *.pyc

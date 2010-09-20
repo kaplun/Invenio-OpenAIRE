@@ -783,6 +783,8 @@ AC_CONFIG_FILES([config.nice  \
 	  modules/OpenAIRE/Makefile \
 	  modules/OpenAIRE/etc/Makefile \
 	  modules/OpenAIRE/lib/Makefile \
+	  modules/OpenAIRE/js/Makefile \
+	  modules/OpenAIRE/css/Makefile \
 	  ])
 
 ## Finally, write output files:

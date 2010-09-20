@@ -15,6 +15,10 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = etc lib js css
+jsdir = $(localstatedir)/www/js
 
-CLEANFILES = *~
+js_DATA = jquery-1.4.2.min.js jquery.elastic.js jquery.qtip-1.0.0-rc3.js jquery-ui-1.8.4.custom.min.js jquery.uploadify.v2.1.0.min.js
+
+EXTRA_DIST = $(js_DATA)
+
+CLEANFILES = *~ *.tmp *.pyc
