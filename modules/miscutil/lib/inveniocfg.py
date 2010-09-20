@@ -840,6 +840,8 @@ WSGIRestrictStdout Off
         DirectoryIndex index.en.html index.html
         Alias /img/ %(webdir)s/img/
         Alias /js/ %(webdir)s/js/
+        Alias /css/ %(webdir)s/css/
+        Alias /flash/ %(webdir)s/flash/
         Alias /export/ %(webdir)s/export/
         Alias /jsMath/ %(webdir)s/jsMath/
         Alias /jsCalendar/ %(webdir)s/jsCalendar/
@@ -909,6 +911,8 @@ WSGIRestrictStdout Off
         DirectoryIndex index.en.html index.html
         Alias /img/ %(webdir)s/img/
         Alias /js/ %(webdir)s/js/
+        Alias /css/ %(webdir)s/css/
+        Alias /flash/ %(webdir)s/flash/
         Alias /export/ %(webdir)s/export/
         Alias /jsMath/ %(webdir)s/jsMath/
         Alias /jsCalendar/ %(webdir)s/jsCalendar/

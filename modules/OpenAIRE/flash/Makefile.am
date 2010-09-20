@@ -15,6 +15,10 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = etc lib js css flash
+flashdir = $(localstatedir)/www/flash
 
-CLEANFILES = *~
+flash_DATA = uploadify.swf
+
+EXTRA_DIST = $(flash_DATA)
+
+CLEANFILES = *~ *.tmp *.pyc
