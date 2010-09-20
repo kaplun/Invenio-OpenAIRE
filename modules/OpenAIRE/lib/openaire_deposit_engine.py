@@ -274,8 +274,7 @@ class OpenAIREPublication(object):
         self._dump_metadata()
 
     def _dump_metadata(self):
-        try:
-            if os.path.exists(self.metadata_path):
+        if os.path.exists(self.metadata_path):
             backup_fd, backup_name = tempfile.mkstemp(prefix='metadata-%s-' % time.strftime("%Y%m%d%H%M%S"), suffix='', dir=self.path)
             os.write(backup_fd, open(self.metadata_path).read())
             os.close(backup_fd)
