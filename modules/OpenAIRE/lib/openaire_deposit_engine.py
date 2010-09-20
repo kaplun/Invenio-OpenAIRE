@@ -250,7 +250,7 @@ class OpenAIREPublication(object):
 
     def _load_metadata(self):
         try:
-            self._metadata.update(json_unicode_to_utf8(json.load(open(os.path.join(self.path, 'metadata')))))
+            self._metadata.update(json_unicode_to_utf8(json.load(open(self.metadata_path))))
         except:
             self._dump_metadata()
             self._load_metadata()
@@ -274,10 +274,12 @@ class OpenAIREPublication(object):
         self._dump_metadata()
 
     def _dump_metadata(self):
-        backup_fd, backup_name = tempfile.mkstemp(prefix='metadata-%s-' % time.strftime("%Y%m%d%H%M%S"), suffix='', dir=self.path)
-        os.write(backup_fd, open(os.path.join(self.path, 'metadata')).read())
-        os.close(backup_fd)
-        json.dump(self._metadata, open(os.path.join(self.path, 'metadata'), 'w'), indent=4)
+        try:
+            if os.path.exists(self.metadata_path):
+            backup_fd, backup_name = tempfile.mkstemp(prefix='metadata-%s-' % time.strftime("%Y%m%d%H%M%S"), suffix='', dir=self.path)
+            os.write(backup_fd, open(self.metadata_path).read())
+            os.close(backup_fd)
+        json.dump(self._metadata, open(self.metadata_path, 'w'), indent=4)
 
     def merge_form(self, form, check_required_fields=True, ln=CFG_SITE_LANG):
         self.status = 'edited'
