@@ -15,6 +15,9 @@ div.OpenAIRE div.header div {
     float: left;
 }
 
+div.OpenAIRE div.file {
+    word-wrap: break-word;
+}
 
 div.clear {
     float: none;
