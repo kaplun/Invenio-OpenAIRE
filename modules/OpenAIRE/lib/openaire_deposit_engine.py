@@ -19,7 +19,16 @@ import os
 import shutil
 import tempfile
 import time
-import json
+import sys
+if sys.hexversion < 0x2060000:
+    try:
+        import simplejson as json
+    except ImportError:
+        # Okay, no Ajax app will be possible, but continue anyway,
+        # since this package is only recommended, not mandatory.
+        pass
+else:
+    import json
 import re
 import copy
 

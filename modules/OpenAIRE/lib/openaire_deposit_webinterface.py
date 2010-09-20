@@ -16,7 +16,16 @@
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
 import os
-import json
+import sys
+if sys.hexversion < 0x2060000:
+    try:
+        import simplejson as json
+    except ImportError:
+        # Okay, no Ajax app will be possible, but continue anyway,
+        # since this package is only recommended, not mandatory.
+        pass
+else:
+    import json
 
 from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 from invenio.messages import gettext_set_language
