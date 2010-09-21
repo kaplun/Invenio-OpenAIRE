@@ -110,11 +110,10 @@ class Template:
                 'select_label': escape(_("Select"), True),
             }
 
-    def tmpl_form(self, projectid, publicationid, index, fileinfo, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
+    def tmpl_form(self, projectid, publicationid, fileinfo, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         values = dict(CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS)
         values['id'] = publicationid
-        values['index'] = index
         for key, value in form.iteritems():
             if key.endswith('_%s' % publicationid):
                 values['%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)

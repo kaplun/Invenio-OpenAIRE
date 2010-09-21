@@ -257,6 +257,9 @@ def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
         if tracestack_data:
             print >> output, "\n>>> Traceback details\n"
             print >> output, tracestack_data
+        if req:
+            print >> output, "\n>>> Request object\n"
+            print >> output, req
         return output.getvalue()
     else:
         return ""

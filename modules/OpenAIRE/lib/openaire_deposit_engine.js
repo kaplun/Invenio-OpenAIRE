@@ -68,7 +68,7 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
         $(query).removeClass(delclasses[query]);
     }
     for (var query in substitutions) {
-        $(query).fadeOut('slow').html(substitutions[query]).fadeIn('slow')
+        $(query).fadeOut('slow').replaceWith(substitutions[query]).fadeIn('slow')
     }
     return 0;
 }
@@ -112,7 +112,6 @@ function ajaxGateway(element, action) {
     data['projectid'] = gProjectid;
     data['action'] = action;
     data['current_field'] = element.id;
-    alert(object_to_str(data));
     $.ajax({
         error: onAjaxError,
         url: gSite + '/deposit/ajaxgateway',

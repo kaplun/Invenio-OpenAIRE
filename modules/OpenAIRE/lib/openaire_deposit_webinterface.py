@@ -73,11 +73,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             forms = ""
             for index, (publicationid, publication) in enumerate(publications.iteritems()):
                 publication.merge_form(form, check_required_fields=False, ln=argd['ln'])
-                for fulltextid, fulltext in publication.fulltexts.iteritems():
-                    ## FIXME: How many fulltext are there per publication?
-                    fileinfo = openaire_deposit_templates.tmpl_fulltext_information(filename=fulltext.fullname, publicationid=publicationid, download_url=create_url("%s/deposit/getfile" % CFG_SITE_URL, {'projectid': projectid, 'publicationid': publicationid, 'fileid': fulltextid}), md5=fulltext.checksum, mimetype=fulltext.mime, format=fulltext.format, size=fulltext.size, ln=argd['ln'])
-                    break
-                forms += openaire_deposit_templates.tmpl_form(projectid, publicationid, index+1, fileinfo, form=publication.metadata['__form__'], warnings=publication.warnings, errors=publication.errors, ln=argd['ln'])
+                forms += publication.get_publication_form()
             body = openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, project_information, forms, ln=argd['ln'])
             body += openaire_deposit_templates.tmpl_upload_publications(projectid=projectid, session=get_session(req).sid(), ln=argd['ln'])
             title = _('Edit Publications Information')
@@ -140,37 +136,33 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             assert(current_field)
             metadata = wash_form(form, publicationid)
             out["errors"], out["warnings"] = OpenAIREPublication.check_metadata(metadata, publicationid, check_only_field=current_field, ln=argd['ln'])
-            req.content_type = 'application/json'
-            return json.dumps(out)
-
-        user_info = collect_user_info(req)
-        auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
-        assert(auth_code == 0)
-        uid = user_info['uid']
-        publication = OpenAIREPublication(uid, projectid, publicationid, ln=argd['ln'])
-        publication.merge_form(form)
-        out["errors"], out["warnings"] = publication.errors, publication.warnings
-        if out["errors"]:
-            out['addclasses']['#form_%s' % publicationid] = 'error'
-            out['delclasses']['#form_%s' % publicationid] = 'warning ok'
-        elif out["warnings"]:
-            out['addclasses']['#form_%s' % publicationid] = 'warning'
-            out['delclasses']['#form_%s' % publicationid] = 'error ok'
         else:
-            out['addclasses']['#form_%s' % publicationid] = 'ok'
-            out['delclasses']['#form_%s' % publicationid] = 'warning error'
+            user_info = collect_user_info(req)
+            auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
+            assert(auth_code == 0)
+            uid = user_info['uid']
+            publication = OpenAIREPublication(uid, projectid, publicationid, ln=argd['ln'])
+            publication.merge_form(form)
+            out["errors"], out["warnings"] = publication.errors, publication.warnings
+            if "".join(out["errors"].values()).strip(): #FIXME bad hack, we need a cleaner way to discover if there are errors
+                out['addclasses']['#form_%s' % publicationid] = 'error'
+                out['delclasses']['#form_%s' % publicationid] = 'warning ok'
+            elif "".join(out["warnings"].values()).strip():
+                out['addclasses']['#form_%s' % publicationid] = 'warning'
+                out['delclasses']['#form_%s' % publicationid] = 'error ok'
+            else:
+                out['addclasses']['#form_%s' % publicationid] = 'ok'
+                out['delclasses']['#form_%s' % publicationid] = 'warning error'
 
-        if action == 'save':
-            req.content_type = 'application/json'
-            out["substitutions"]['#publication_info_container_%s' % publicationid] = publication.get_publication_information()
-            return json.dumps(out)
-        elif action == 'submit':
-            publication.upload_record()
-            req.content_type = 'application/json',
-            out["substitutions"]['#publication_header_%s' % publicationid] = "NEW HEADER"
-            out["substitutions"]['#publication_body_%s' % publicationid] = "NEW BODY"
-            return json.dumps({'submittedpublicationid': publicationid, 'newcontent': "This would be the new form"})
-        assert(False)
+            if action == 'save':
+                out["substitutions"]['#publication_info_container_%s' % publicationid] = publication.get_publication_information()
+            elif action == 'submit':
+                if not "".join(out["errors"].values()).strip():
+                    publication.upload_record()
+                    out["substitutions"]['#publication_header_%s' % publicationid] = publication.get_publication_form()
+                    out["substitutions"]['#publication_body_%s' % publicationid] = ""
+        req.content_type = 'application/json'
+        return json.dumps(out)
 
 
     __call__ = index
