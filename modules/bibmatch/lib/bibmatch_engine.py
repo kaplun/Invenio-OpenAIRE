@@ -27,13 +27,13 @@ if sys.hexversion < 0x2040000:
 
 import os
 import getopt
-import string
 from tempfile import mkstemp
 
 from invenio.config import CFG_SITE_URL
 from invenio.invenio_connector import InvenioConnector
 from invenio.bibrecord import create_records, record_get_field_instances, \
-    record_get_field_values, record_xml_output
+    record_get_field_values, record_xml_output, record_modify_controlfield, \
+    record_has_field, record_add_field
 from invenio import bibconvert
 from invenio.dbquery import run_sql
 from invenio.textmarc2xmlmarc import transform_file
@@ -44,24 +44,14 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+
 def usage():
     """Print help"""
 
     print >> sys.stderr, \
     """ Usage: %s [options]
 
- Examples:
-
- $ bibmatch -b -n < input.xml
- $ bibmatch --field=title < input.xml >  unmatched.xml
- $ bibmatch --field=245__a --mode=a < input.xml > unmatched.xml
- $ bibmatch --print-ambiguous --query-string="245__a||100__a" < input.xml > unmatched.xml
- $ bibmatch --print-match -i input.xml -r 'http://cdsweb.cern.ch'
-
- $ bibmatch [options] < input.xml > unmatched.xml
-
  Options:
-
 
  Output:
 
@@ -105,6 +95,26 @@ def usage():
  -v,  --verbose=LEVEL      verbose level (from 0 to 9, default 1)
  -r,  --remote=URL         match against a remote invenio installation (URL, no trailing '/')
                            Beware: Only searches public records attached to home collection
+ -a,  --alter-recid        The recid (controlfield 001) of matched or fuzzy matched records in
+                           output will be replaced by the 001 value of the matched record.
+                           Useful to prepare files to then be used with BibUpload.
+
+ Common predefined fields used in querystrings: (for Invenio demo site, your fields may vary!)
+
+ 'abstract', 'affiliation', 'anyfield', 'author', 'coden', 'collaboration',
+ 'collection', 'datecreated', 'datemodified', 'division', 'exactauthor',
+ 'experiment', 'fulltext', 'isbn', 'issn', 'journal', 'keyword', 'recid',
+ 'reference', 'reportnumber', 'subject', 'title', 'year'
+
+ Examples:
+
+ $ bibmatch -b -n < input.xml
+ $ bibmatch --field=title < input.xml >  unmatched.xml
+ $ bibmatch --field=245__a --mode=a < input.xml > unmatched.xml
+ $ bibmatch --print-ambiguous --query-string="245__a||author" < input.xml > ambigmatched.xml
+ $ bibmatch --print-match -i input.xml -r 'http://cdsweb.cern.ch'
+ $ bibmatch -a -1 < input.xml > modified_match.xml
+ $ bibmatch [options] < input.xml > unmatched.xml
 
     """ % sys.argv[0]
     sys.exit(1)
@@ -135,7 +145,6 @@ class Querystring:
         self.format.append([])
         self.format.append([])
         self.format.append([])
-        self.advanced = 0
         return
 
     def from_qrystr(self, qrystr="", search_mode="eee", operator="aa"):
@@ -144,9 +153,9 @@ class Querystring:
         self.field  = []
         self.format = []
         self.mode   = ["e", "e", "e"]
-        fields = string.split(qrystr,"||")
+        fields = qrystr.split("||")
         for field in fields:
-            tags =  string.split(field, "::")
+            tags = field.split("::")
             i = 0
             format = []
             for tag in tags:
@@ -195,7 +204,6 @@ class Querystring:
         self.format.append([])
         self.format.append([])
         self.format.append([])
-        self.advanced = 1
         return
 
     def change_search_mode(self, mode="a"):
@@ -223,7 +231,8 @@ class Querystring:
 def get_field_tags(field):
     "Gets list of field 'field' for the record with 'sysno' system number from the database."
 
-    query = "select tag.value from tag left join field_tag on tag.id=field_tag.id_tag left join field on field_tag.id_field=field.id where field.code='%s'" % field;
+    query = "select tag.value from tag left join field_tag on tag.id=field_tag.id_tag " \
+            + "left join field on field_tag.id_field=field.id where field.code='%s'" % (field, )
     out = []
     res = run_sql(query)
     for row in res:
@@ -251,16 +260,68 @@ def main_words_list(wstr):
         words = words[:5]
     return words
 
-def match_records(records, qrystrs=None, perform_request_search_mode="eee", operator="a", verbose=1, server_url=CFG_SITE_URL):
-    """ Do the actual job. Check which records are new, which are matched,
-        which are ambiguous and which are fuzzy-matched.
-    Parameters:
-    @records: an array of records to analyze
-    @qrystrs: querystrings
-    @perform_request_search_mode: run the query in this mode
-    @operator: "o" "a"
-    @verbose: be loud
-    @server_url: server url to match against
+def match_result_output(recID_list, server_url, qrystr, matchmode="no match"):
+    """Generates result as XML comments from passed record and matching parameters.
+
+    @param record: record tuple containing results
+    @type record: list
+
+    @param server_url: url to the server the matching has been performed
+    @type server_url: str
+
+    @param qrystrs: Querystrings
+    @type qrystrs: list of object
+
+    @param matchmode: matching type
+    @type matchmode: str
+
+    @rtype str
+    @return XML result string
+    """
+    result = []
+    for recID in recID_list:
+        result.append("<!-- BibMatch-Matching-Found: %s/record/%s -->" \
+                             % (server_url, recID))
+    result.append("<!-- BibMatch-Matching-Mode: %s -->" \
+                              % (matchmode, ))
+    query = []
+    for field in qrystr.field:
+        if field != "":
+            query.append(field)
+    result.append("<!-- BibMatch-Matching-Criteria: %s -->" \
+                              % ("||".join(query), ))
+    return "\n".join(result)
+
+def match_records(records, qrystrs=None, perform_request_search_mode="eee", \
+                  operator="a", verbose=1, server_url=CFG_SITE_URL, modify=0):
+    """ Match passed records with existing records on a local or remote Invenio
+    installation. Returns which records are new (no match), which are matched,
+    which are ambiguous and which are fuzzy-matched. A formatted result of each
+    records matching are appended to each record tuple:
+    (record, status_code, list_of_errors, result)
+
+    @param records: records to analyze
+    @type records: list of records
+
+    @param qrystrs: Querystrings
+    @type qrystrs: list of object
+
+    @param server_url: which server to search on. Local installation by default
+    @type server_url: str
+
+    @param perform_request_search_mode: run the query in this mode
+    @type perform_request_search_mode: string
+
+    @param operator: "o" "a"
+    @type operator: str
+
+    @param verbose: be loud
+    @type verbose: int
+
+    @param modify: output modified records of matches
+    @type modify: int
+
+    @rtype: list of lists
     @return an array of arrays of records, like this [newrecs,matchedrecs,
                                                       ambiguousrecs,fuzzyrecs]
     """
@@ -305,6 +366,11 @@ def match_records(records, qrystrs=None, perform_request_search_mode="eee", oper
 
             ### get appropriate fields from database
             for field in querystring.field:
+                tags = get_field_tags(field)
+                if len(tags) > 0:
+                    # Fetch value from input record of first tag only
+                    # FIXME: Extracting more then first tag, evaluating each
+                    field = tags[0]
                 ### use expanded tags
                 tag  = field[0:3]
                 ind1 = field[3:4]
@@ -354,7 +420,6 @@ def match_records(records, qrystrs=None, perform_request_search_mode="eee", oper
                 p3 = inst[2]
                 f3 = querystring.field[2]
                 m3 = querystring.mode[2]
-                aas = querystring.advanced
 
                 #1st run the basic perform_req_search
                 recID_list = server.search(
@@ -370,11 +435,20 @@ def match_records(records, qrystrs=None, perform_request_search_mode="eee", oper
                      " result="+str(recID_list)+"\n")
 
                 if len(recID_list) > 1: #ambig match
-                    ambiguousrecs.append(rec)
+                    ambiguousrecs.append(rec + (match_result_output(recID_list, \
+                                                server_url, querystring, "ambiguous-matched"), ))
                     if (verbose > 8):
                         sys.stderr.write("ambiguous\n")
                 if len(recID_list) == 1: #match
-                    matchedrecs.append(rec)
+                    if modify:
+                        if record_has_field(rec[0], '001'):
+                            record_modify_controlfield(rec[0], '001', \
+                                                       controlfield_value=str(recID_list[0]), \
+                                                       field_position_global=1)
+                        else:
+                            record_add_field(rec[0], '001', controlfield_value=str(recID_list[0]))
+                    matchedrecs.append(rec + (match_result_output(recID_list, \
+                                                server_url, querystring, "exact-matched"), ))
                     if (verbose > 8):
                         sys.stderr.write("match\n")
                 if len(recID_list) == 0: #no match..
@@ -418,11 +492,20 @@ def match_records(records, qrystrs=None, perform_request_search_mode="eee", oper
 
                     if intersected:
                         #this was a fuzzy match
-                        fuzzyrecs.append(rec)
+                        if modify:
+                            if record_has_field(rec[0], '001'):
+                                record_modify_controlfield(rec[0], '001', \
+                                      controlfield_value=str(intersected[0]), field_position_global=1)
+                            else:
+                                record_add_field(rec[0], '001', controlfield_value=str(intersected[0]))
+                        fuzzyrecs.append(rec + (match_result_output(intersected, \
+                                                server_url, querystring, "fuzzy-matched"), ))
                         if (verbose > 8):
                             sys.stderr.write("fuzzy\n")
                     else:
-                        newrecs.append(rec)
+                        #no match
+                        newrecs.append(rec + (match_result_output(recID_list, \
+                                                server_url, querystring), ))
                         if (verbose > 8):
                             sys.stderr.write("new\n")
     #return results
@@ -454,7 +537,7 @@ def main():
     Using advanced search only 3 fields can be queried concurrently
     qrystr - querystring in the UpLoader format. """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "0123hVFm:q:c:nv:o:b:i:r:t",
+        opts, args = getopt.getopt(sys.argv[1:], "0123hVFm:q:c:nv:o:b:i:r:ta",
                  [
                    "print-new",
                    "print-match",
@@ -472,7 +555,8 @@ def main():
                    "batch-output=",
                    "input=",
                    "remote=",
-                   "text-marc-output"
+                   "text-marc-output",
+                   "alter-recid"
                  ])
 
     except getopt.GetoptError, e:
@@ -489,7 +573,7 @@ def main():
     batch_output = ""               #print stuff in files
     f_input = ""                    #read from where, if param "i"
     server_url = CFG_SITE_URL       #url to server performing search, local by default
-    predefined_fields = ["title", "author"]
+    modify = 0                      #alter output with matched record identifiers
     textmarc_output = 0
 
     for opt, opt_value in opts:
@@ -527,10 +611,11 @@ def main():
             f_input     = opt_value
         if opt in ["-r", "--remote"]:
             server_url = opt_value
+        if opt in ["-a", "--alter-recid"]:
+            modify = 1
         if opt in ["-f", "--field"]:
-            alternate_querystring = []
-            if opt_value in predefined_fields:
-                alternate_querystring = get_field_tags(opt_value)
+            alternate_querystring = get_field_tags(opt_value)
+            if len(alternate_querystring) > 0:
                 for item in alternate_querystring:
                     qrystrs.append(item)
             else:
@@ -539,7 +624,7 @@ def main():
             config_file      = opt_value
             config_file_read = bibconvert.read_file(config_file, 0)
             for line in config_file_read:
-                tmp = string.split(line, "---")
+                tmp = line.split("---")
                 if(tmp[0] == "QRYSTR"):
                     qrystrs.append(tmp[1])
 
@@ -575,7 +660,8 @@ def main():
                                       perform_request_search_mode,
                                       operator,
                                       verbose,
-                                      server_url)
+                                      server_url,
+                                      modify)
     # set the output according to print..
     # 0-newrecs 1-matchedrecs 2-ambiguousrecs 3-fuzzyrecs
     recs_out = match_results[print_mode]
@@ -597,6 +683,7 @@ def main():
                 sysno = get_sysno_from_record(record[0], options)
                 print create_marc_record(record[0], sysno, options)
             else:
+                print record[3]
                 print record_xml_output(record[0])
 
     if batch_output:
@@ -611,6 +698,7 @@ def main():
                     sysno = get_sysno_from_record(record[0], options)
                     out += create_marc_record(record[0], sysno, options)
                 else:
+                    out += record[3]
                     out += record_xml_output(record[0])
                 file_fd.write(out + '\n')
             file_fd.close()

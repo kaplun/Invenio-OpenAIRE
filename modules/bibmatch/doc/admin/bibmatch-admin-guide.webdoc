@@ -57,11 +57,11 @@ To print potential duplicate entries before manual upload, run:
 </pre>
 </blockquote>
 
-To print undecided result from a match on multiple fields:
+To print undecided result from a match on multiple fields, including predefined fields (title, author etc.):
 
 <blockquote>
 <pre>
- $ bibmatch --print-ambiguous --query-string=\"245__a||100__a\" < input.xml > output.xml
+ $ bibmatch --print-ambiguous --query-string=\"245__a||author\" < input.xml > output.xml
 </pre>
 </blockquote>
 
@@ -86,6 +86,16 @@ Using text-marc as output-format:
 <blockquote>
 <pre>
  $ bibmatch -b out.marc -t < input.xml
+</pre>
+</blockquote>
+
+To print matched or fuzzy matched records replacing old identifier
+(controlfield 001) with one from the matched record, i.e to then be
+used with BibUpload to update record:
+
+<blockquote>
+<pre>
+ $ bibmatch -a -1 < input.xml > modified_match.xml
 </pre>
 </blockquote>
 
@@ -133,6 +143,16 @@ Command line options:
  -v,  --verbose=LEVEL      verbose level (from 0 to 9, default 1)
  -r,  --remote=URL         match against a remote invenio installation (URL, no trailing '/')
                            Beware: Only searches public records attached to home collection
+ -a,  --alter-recid        The recid (controlfield 001) of matched or fuzzy matched records in
+                           output will be replaced by the 001 value of the matched record.
+                           Useful to prepare files to then be used with BibUpload.
+
+ Common predefined fields used in querystrings: (for Invenio demo site, your fields may vary!)
+
+ 'abstract', 'affiliation', 'anyfield', 'author', 'coden', 'collaboration',
+ 'collection', 'datecreated', 'datemodified', 'division', 'exactauthor',
+ 'experiment', 'fulltext', 'isbn', 'issn', 'journal', 'keyword', 'recid',
+ 'reference', 'reportnumber', 'subject', 'title', 'year'
 
 </pre>
 </blockquote>
