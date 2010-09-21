@@ -122,11 +122,13 @@ class Template:
         values['fileinfo'] = fileinfo
         values['projectid'] = projectid
         values['site'] = CFG_SITE_URL
+        values['mandatory_label'] = escape(_("The symbol %(x_asterisk)s means the field is mandatory.")) % {"x_asterisk": """<img src="%s/img/asterisk.png" alt="mandatory" />""" % CFG_SITE_URL}
         values['language_label'] = escape(_("Document language"))
         values['title_label'] = escape(_("English title"))
         values['original_title_label'] = escape(_("Original language title"))
         values['authors_label'] = escape(_("Author(s)"))
         values['authors_tooltip'] = escape(_("<p>Please enter one author per line in the form: <pre>Surname, First Names: Institution</pre> Note that the <em>institution</em> is optional although recommended.</p><p>Example of valid entries are:<ul><li>John, Doe: Example institution</li><li>Jane Doe</li></ul></p>"), True)
+        values['authors_hint'] = escape(_("Doe, John: Example institution"))
         values['abstract_label'] = escape(_("English abstract"))
         values['english_language_label'] = escape(_("English information"))
         values['original_language_label'] = escape(_("Original language information"))
@@ -146,7 +148,7 @@ class Template:
         values['access_rights_options'] = self.tmpl_access_rights_options(values.get('access_rights_value', ''), ln=ln)
         values['embargo_date_hint'] = escape(_("End of the embargo"), True)
         values['embargo_date_tooltip'] = escape(_("Enter here the date when the embargo period for this publication will be over."), True)
-        values['language_options'] = self.tmpl_language_options(values.get('language_value', ), ln)
+        values['language_options'] = self.tmpl_language_options(values.get('language_value', 'eng'), ln)
         values['save_label'] = escape(_('Save publication'))
         values['submit_label'] = escape(_('Submit publication'))
         values['embargo_date_size'] = len(values['embargo_date_hint'])
@@ -175,9 +177,11 @@ class Template:
 
     def tmpl_language_options(self, selected_language='eng', ln=CFG_SITE_LANG):
         from invenio.bibknowledge import get_kb_mappings
+        if not selected_language:
+            selected_language = 'eng'
         languages = get_kb_mappings('languages')
         _ = gettext_set_language(ln)
-        out = '<option disabled="disabled">%s</option>' % (_("Select one"))
+        out = ""
         for mapping in languages:
             key = mapping['key']
             value = mapping['value']
@@ -249,7 +253,7 @@ class Template:
                 'title_label': escape(_("Title")),
                 'authors_label': len(authors) != 1 and escape(_("Author(s)")) or escape(_("Author")),
                 'abstract_label': escape(_("Abstract")),
-                'title': escape(title),
+                'title': escape(title) or escape(_("Unknown title")),
                 'authors': "<br />".join([escape(author) for author in authors]),
                 'abstract': escape(abstract).replace('\n', '<br />'),
                 'id': escape(publicationid, True)

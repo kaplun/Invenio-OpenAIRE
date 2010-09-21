@@ -25,6 +25,7 @@ img_DATA = add-small.png \
            arrow_link-icon-15x11-right.gif \
            arrow_up.gif \
            arrow_up2.png \
+           asterisk.png \
            at.gif \
            balloon_arrow_left_shadow.png \
            balloon_bottom_left_shadow.png \

@@ -283,7 +283,7 @@ class OpenAIREPublication(object):
         self.touch()
         self._metadata['__form__'] = wash_form(form, self.publicationid)
         self._metadata.update(namespaced_metadata2simple_metadata(self._metadata['__form__'], self.publicationid))
-        self.errors, self.warnings = self.check_metadata(self._metadata, ln=ln)
+        self.errors, self.warnings = self.check_metadata(self._metadata, self.publicationid, ln=ln)
 
     def touch(self):
         self._metadata['__md__'] = time.time()
@@ -380,18 +380,22 @@ class OpenAIREPublication(object):
         if publicationid:
             metadata = namespaced_metadata2simple_metadata(metadata, publicationid)
 
-        errors = {}
-        warnings = {}
 
         if check_only_field:
             ## Just one check, if it actually exist for the given field
             fieldname = strip_publicationid(check_only_field, publicationid)
             if fieldname in CFG_METADATA_FIELDS_CHECKS:
                 checks = [CFG_METADATA_FIELDS_CHECKS[fieldname]]
+                errors = {fieldname: []}
+                warnings = {fieldname: []}
             else:
                 checks = []
+                errors = {}
+                warnings = {}
         else:
             checks = CFG_METADATA_FIELDS_CHECKS.values()
+            errors = dict((field, []) for field in CFG_METADATA_FIELDS_CHECKS)
+            warnings = dict((field, []) for field in CFG_METADATA_FIELDS_CHECKS)
 
         for check in checks:
             ret = check(metadata, ln, _)
@@ -408,6 +412,10 @@ class OpenAIREPublication(object):
                         warnings[ret[0]] = [ret[2]]
                     else:
                         warnings[ret[0]].append(ret[2])
+        for errorid, error_lines in errors.items():
+            errors[errorid] = '<br />'.join(error_lines)
+        for warningid, warning_lines in warnings.items():
+            warnings[warningid] = '<br />'.join(warning_lines)
         if publicationid:
             errors = simple_metadata2namespaced_metadata(errors, publicationid)
             warnings = simple_metadata2namespaced_metadata(warnings, publicationid)
@@ -470,7 +478,7 @@ def _check_title(metadata, ln, _):
             return ('title', 'warning', _('The title field of the Publication seems to be written all in UPPERCASE'))
 
 def _check_original_title(metadata, ln, _):
-    title = metadata.get('original_title')
+    title = metadata.get('original_title', '')
     title = title.encode('UTF8')
     if title:
         uppers = 0

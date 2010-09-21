@@ -49,16 +49,16 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     var substitutions = results.substitutions;
     for (var error in errors) {
         if (errors[error]) {
-            $('#error_' + error).html(errors[error]).show('slow');
+            $('#error_' + error).html(errors[error]).fadeIn('slow');
         } else {
-            $('#error_' + error).hide('slow')
+            $('#error_' + error).fadeOut('slow')
         }
     }
     for (var warning in warnings) {
         if (warnings[warning]) {
-            $('#warning_' + warning).html(warnings[warning]).show('slow');
+            $('#warning_' + warning).html(warnings[warning]).fadeIn('slow');
         } else {
-            $('#warning_' + warning).hide('slow')
+            $('#warning_' + warning).fadeOut('slow')
         }
     }
     for (var query in addclasses) {
@@ -68,20 +68,29 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
         $(query).removeClass(delclasses[query]);
     }
     for (var query in substitutions) {
-        $(query).hide('slow').html(substitutions[query]).show('slow')
+        $(query).fadeOut('slow').html(substitutions[query]).fadeIn('slow')
     }
     return 0;
 }
 
 function getPublicationMetadata(publicationid){
     var ret = {};
-    $('#form_' + publicationid + ' input').each(function(){
+    $('#body_' + publicationid + ' input').each(function(){
         ret[this.id] = this.value;
     });
-    $('#form_' + publicationid + ' select').each(function(){
+    $('#body_' + publicationid + ' select').each(function(){
         ret[this.id] = this.value;
     });
-    $('#form_' + publicationid + ' textarea').each(function(){
+    $('#body_' + publicationid + ' textarea').each(function(){
+        ret[this.id] = this.value;
+    });
+    $('#header_' + publicationid + ' input').each(function(){
+        ret[this.id] = this.value;
+    });
+    $('#header_' + publicationid + ' select').each(function(){
+        ret[this.id] = this.value;
+    });
+    $('#header_' + publicationid + ' textarea').each(function(){
         ret[this.id] = this.value;
     });
     return ret;
@@ -103,6 +112,7 @@ function ajaxGateway(element, action) {
     data['projectid'] = gProjectid;
     data['action'] = action;
     data['current_field'] = element.id;
+    alert(object_to_str(data));
     $.ajax({
         error: onAjaxError,
         url: gSite + '/deposit/ajaxgateway',
@@ -130,13 +140,13 @@ function clone(obj) {
 
 /* Initialization */
 $(document).ready(function(){
-    $('div.OpenAIRE input').blur(function(){
+    $('div.OpenAIRE input').focusout(function(){
         return ajaxGateway(this, 'verify_field');
     });
-    $('div.OpenAIRE textarea').blur(function(){
+    $('div.OpenAIRE textarea').focusout(function(){
         return ajaxGateway(this, 'verify_field');
     });
-    $('div.OpenAIRE select').blur(function(){
+    $('div.OpenAIRE select').focusout(function(){
         return ajaxGateway(this, 'verify_field');
     });
     $('*[title]').qtip(gTipDefault);
@@ -147,7 +157,6 @@ $(document).ready(function(){
         return this.textContent == '';
     }).hide()
     $('input[hint],textarea[hint]').inputHint({hintAttr: "hint"});
-    $('tr.body').hide();
 })
 
 
