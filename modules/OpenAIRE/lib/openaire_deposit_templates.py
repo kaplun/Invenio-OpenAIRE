@@ -32,10 +32,11 @@ CFG_OPENAIRE_FORM_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_form.tpl'))
 RE_PLACEMARKS = re.compile(r'%\((?P<placemark>\w+)\)s')
 CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS = dict((placemark, '') for placemark in RE_PLACEMARKS.findall(CFG_OPENAIRE_FORM_TEMPLATE))
 class Template:
-    def tmpl_headers(self):
+    def tmpl_headers(self, ln):
         return """
             <script type="text/javascript">
                 var gSite = "%(site)s";
+                var gLn = "%(ln)s";
             </script>
             <link type="text/css" href="%(site)s/css/jquery-ui-1.8.4.custom.css" rel="Stylesheet" />
             <link type="text/css" href="%(site)s/css/uploadify.css" rel="Stylesheet" />
@@ -49,7 +50,7 @@ class Template:
             <script type="text/javascript" src="%(site)s/js/jquery.qtip-1.0.0-rc3.js"></script>
             <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.input-hint.js"></script>
-            """ % {'site': CFG_SITE_URL}
+            """ % {'site': CFG_SITE_URL, 'ln': ln}
 
     def tmpl_choose_project(self, default='', existing_projects=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
@@ -100,7 +101,7 @@ class Template:
         _ = gettext_set_language(ln)
         return """
             <h3>%(select_a_project_label)s</h3>
-            <form method="get">
+            <form method="POST">
                 %(choose_a_project)s
                 <input type="submit" name="ok" id="ok" value="%(select_label)s" />
             </form>
@@ -114,9 +115,10 @@ class Template:
         _ = gettext_set_language(ln)
         values = dict(CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS)
         values['id'] = publicationid
-        for key, value in form.iteritems():
-            if key.endswith('_%s' % publicationid):
-                values['%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
+        if form:
+            for key, value in form.iteritems():
+                if key.endswith('_%s' % publicationid):
+                    values['%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
         values['edit_metadata_label'] = escape(_("Edit"))
         values['fileinfo'] = fileinfo
         values['projectid'] = projectid
@@ -199,8 +201,8 @@ class Template:
     def tmpl_upload_publications(self, projectid, session, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         return """
-            <h3>%(upload_publications)s</h3>
-            <form action="%(site)s/deposit" method="POST">
+            <form action="%(site)s/deposit?ln=%(ln)s" method="POST">
+                <h3>%(upload_publications)s</h3>
                 <input id="fileInput" name="file" type="file" />
                 <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
                 <input type="hidden" value="%(projectid)s" name="projectid" />
@@ -233,7 +235,7 @@ class Template:
                     });
                 });
             // ]]></script>""" % {
-                'upload_publications': escape(_("Upload Publications")),
+                'upload_publications': escape(_("Upload New Publications")),
                 'projectid': 'bla',
                 'site': CFG_SITE_URL,
                 'projectid': projectid,
@@ -241,7 +243,8 @@ class Template:
                 'upload': escape(_("Upload")),
                 'begin_upload': escape(_("Begin upload")),
                 'cancel_upload': escape(_("Cancel upload")),
-                'buttontext': _("BROWSE"),
+                'buttontext': _("Upload"),
+                'ln': ln,
             }
 
 
@@ -309,22 +312,36 @@ class Template:
 
     def tmpl_add_publication_data_and_submit(self, projectid, project_information, publication_forms, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
-        return """
-            <h3>%(add_publication_data_and_submit)s</h3>
-            <div class="note">
-            %(project_information)s
-            </div>
-            <form method="POST" id="publication_forms">
+
+        if publication_forms:
+            publication_forms = """<form method="POST" id="publication_forms">
             <div class="note OpenAIRE">
             <table>
             %(publication_forms)s
             </table>
             </div>
-            </form>
+            </form>""" % {'publication_forms': publication_forms}
+        else:
+            publication_forms = ''
+
+
+        return """
+            <h3>%(title)s</h3>
+            <div class="note">
+            %(project_information)s (<a href="%(site)s/deposit?ln=%(ln)s" alt="%(change_project_label)s">%(change_project_label)s</a>)
+            </div>
+            %(publication_forms)s
             <script type="text/javascript">//<![CDATA[
                 var gProjectid = %(projectid)s;
                 jQuery(document).ready(function(){
-                    $('input.datepicker').datepicker({dateFormat: 'yy-mm-dd'});
+                    $('input.datepicker').datepicker({
+                        dateFormat: 'yy-mm-dd',
+                        showOn: 'both',
+                        onClose: function(){
+                            $(this).focus();
+                        },
+                        showButtonPanel: true,
+                        });
                     $('textarea').elastic();
                     $('#publication_forms').submit(function(event){
                         event.preventDefault();
@@ -337,10 +354,10 @@ class Template:
             //]]></script>
             """ % {
                 'project_information': project_information,
-                'add_publication_data_and_submit': escape(_('Add Publication Data & Submit')),
+                'title': escape(_('Your Current Publications')),
                 'selected_project_title': escape(_("Selected Project")),
                 'projectid': projectid,
-                'change_project': escape(_('change project')),
+                'change_project_label': escape(_('change project'), True),
                 'uploaded_publications': escape(_('Uploaded Publications')),
                 'title_head': escape(_('Title')),
                 'license_type_head': escape(_('License Type')),
@@ -348,7 +365,12 @@ class Template:
                 'publication_forms': publication_forms,
                 'confirm_delete_publication': _("Are you sure you want to delete this publication?"),
                 'ln': ln,
-                'projectid': projectid
+                'projectid': projectid,
+                'done': escape(_("Done"), True),
+                'today': escape(_("Today"), True),
+                'next': escape(_("Next"), True),
+                'prev': escape(_("Prev"), True),
+                'site': escape(CFG_SITE_URL, True),
             }
 
 

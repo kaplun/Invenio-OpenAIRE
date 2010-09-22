@@ -68,7 +68,7 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
         $(query).removeClass(delclasses[query]);
     }
     for (var query in substitutions) {
-        $(query).fadeOut('slow').replaceWith(substitutions[query]).fadeIn('slow')
+        $(query).replaceWith(substitutions[query]);
     }
     return 0;
 }
@@ -112,12 +112,7 @@ function ajaxGateway(element, action) {
     data['projectid'] = gProjectid;
     data['action'] = action;
     data['current_field'] = element.id;
-    $.ajax({
-        error: onAjaxError,
-        url: gSite + '/deposit/ajaxgateway',
-        data: data,
-        success: elaborateAjaxGateway
-    });
+    $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
 }
 
 function onAjaxError(XHR, textStatus, errorThrown){
@@ -156,6 +151,7 @@ $(document).ready(function(){
         return this.textContent == '';
     }).hide()
     $('input[hint],textarea[hint]').inputHint({hintAttr: "hint"});
+    $.datepicker.setDefaults($.datepicker.regional[gLn]);
 })
 
 

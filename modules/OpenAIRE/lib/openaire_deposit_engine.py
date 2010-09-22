@@ -44,7 +44,7 @@ from invenio.websearch_webcoll import mymkdir
 from invenio.dbquery import run_sql
 from invenio.bibtask import task_low_level_submission
 from invenio.bibrecord import record_add_field, record_xml_output
-from invenio.bibknowledge import get_kb_mapping
+from invenio.bibknowledge import get_kb_mapping, get_kbr_keys
 from invenio.search_engine import record_empty
 from invenio.openaire_deposit_utils import wash_form, simple_metadata2namespaced_metadata, namespaced_metadata2simple_metadata, strip_publicationid
 from invenio.urlutils import create_url
@@ -124,7 +124,7 @@ def page(title, body, navtrail="", description="", keywords="",
     else:
         style = 'invenio'
     if not metaheaderadd:
-        metaheaderadd = openaire_deposit_templates.tmpl_headers()
+        metaheaderadd = openaire_deposit_templates.tmpl_headers(argd['ln'])
     body = """<noscript>
             <strong>WARNING: You must enable Javascript in your browser (or you must whitelist this website in the Firefox NoScript plugin) in order to properly deposit a publication into the OpenAIRE Orphan Record Repository.</strong>
         </noscript>
@@ -196,9 +196,17 @@ class OpenAIREProject(dict):
         return self.__ln
     ln = property(get_ln)
 
+def get_all_projectsids():
+    """
+    @return: the set of all the valid projects IDs
+    @rtype: set of string
+    """
+    return set(project[0] for project in get_kbr_keys("projects"))
+
 def get_exisiting_projectids_for_uid(uid):
+    valid_projectsid = get_all_projectsids()
     try:
-        return [name for name in os.listdir(os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid))) if not name.startswith('.')]
+        return [name for name in os.listdir(os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid))) if name in valid_projectsid]
     except OSError:
         return []
 
@@ -279,7 +287,7 @@ class OpenAIREPublication(object):
             os.close(backup_fd)
         json.dump(self._metadata, open(self.metadata_path, 'w'), indent=4)
 
-    def merge_form(self, form, check_required_fields=True, ln=CFG_SITE_LANG):
+    def merge_form(self, form, ln=CFG_SITE_LANG):
         if self.status in ('initialized', 'edited'):
             if self.status == 'initialized':
                 self.status = 'edited'

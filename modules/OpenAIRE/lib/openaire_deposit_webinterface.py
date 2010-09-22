@@ -32,7 +32,7 @@ from invenio.webuser import collect_user_info
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio.session import get_session
 from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL
-from invenio.openaire_deposit_engine import page, OpenAIREProject, OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid
+from invenio.openaire_deposit_engine import page, OpenAIREProject, OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid, get_all_projectsids
 from invenio.access_control_engine import acc_authorize_action
 from invenio.urlutils import create_url
 import invenio.template
@@ -59,6 +59,8 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             else:
                 return page(req=req, body=_("You are not authorized to use OpenAIRE deposition."), title=_("Authorization failure"))
         projectid = argd['projectid']
+        if projectid not in get_all_projectsids():
+            projectid = ''
         uid = user_info['uid']
         if not projectid:
             projects = [OpenAIREProject(uid, projectid, argd['ln']).get_project_information() for projectid in get_exisiting_projectids_for_uid(user_info['uid'])]
@@ -72,11 +74,15 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             project_information = publications.get_project_information(linked=False)
             forms = ""
             for index, (publicationid, publication) in enumerate(publications.iteritems()):
-                publication.merge_form(form, check_required_fields=False, ln=argd['ln'])
+                if req.method.lower() == 'POST':
+                    publication.merge_form(form, ln=argd['ln'])
+                    if 'submit_%s' % publicationid in form:
+                        ## i.e. if the button submit for the corresponding publication has been pressed...
+                        publication.upload_record()
                 forms += publication.get_publication_form()
             body = openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, project_information, forms, ln=argd['ln'])
             body += openaire_deposit_templates.tmpl_upload_publications(projectid=projectid, session=get_session(req).sid(), ln=argd['ln'])
-            title = _('Edit Publications Information')
+            title = _('Manage Your Publications')
             return page(body=body, title=title, req=req)
 
     def uploadifybackend(self, req, form):
@@ -155,12 +161,12 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 out['delclasses']['#form_%s' % publicationid] = 'warning error'
 
             if action == 'save':
-                out["substitutions"]['#publication_info_container_%s' % publicationid] = publication.get_publication_information()
+                out["substitutions"]['#publication_information_%s' % publicationid] = publication.get_publication_information()
             elif action == 'submit':
                 if not "".join(out["errors"].values()).strip():
                     publication.upload_record()
-                    out["substitutions"]['#publication_header_%s' % publicationid] = publication.get_publication_form()
-                    out["substitutions"]['#publication_body_%s' % publicationid] = ""
+                    out["substitutions"]['#header_%s' % publicationid] = publication.get_publication_form()
+                    out["substitutions"]['#body_%s' % publicationid] = ""
         req.content_type = 'application/json'
         return json.dumps(out)
 

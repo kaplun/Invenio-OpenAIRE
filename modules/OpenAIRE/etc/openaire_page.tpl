@@ -347,7 +347,8 @@ div.wrapper { width: 900px; }
                                 <a href="http://invenio-software.org/" alt="Invenio" target="_blank"><img src="%(site)s/img/invenio.png" alt="Invenio" /></a>
                             </span>-->
                             <a class="anchor" href="#page"></a>
-                            <p>Copyright © 2010, OpenAIRE Consortium.</p>
+                            <p>Copyright © 2010, OpenAIRE Consortium.<br />
+                            Orphan Repository <em>Powered by</em> <a href="http://invenio-software.org/" alt="Invenio" target="_blank">Invenio</a></p>
 						</div>
 					</div>
 				</div>

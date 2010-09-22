@@ -131,7 +131,7 @@
                 <div id="error_pages_%(id)s" class="error">%(error_pages_value)s</div>
                 <div id="warning_pages_%(id)s" class="warning">%(warning_pages_value)s</div>
             </div>
-            <input type="submit" value="%(save_label)s" id="save_%(id)s"/><input type="submit" value="%(submit_label)s" id="submit_%(id)s"/>
+            <input type="submit" value="%(save_label)s" name="save_%(id)s" id="save_%(id)s"/><input type="submit" value="%(submit_label)s" name="submit_%(id)s" id="submit_%(id)s"/>
         </div>
     </td>
 </tr>
