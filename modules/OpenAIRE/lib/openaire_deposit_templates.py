@@ -38,11 +38,11 @@ class Template:
                 var gSite = "%(site)s";
                 var gLn = "%(ln)s";
             </script>
-            <link type="text/css" href="%(site)s/css/jquery-ui-1.8.4.custom.css" rel="Stylesheet" />
+            <link type="text/css" href="%(site)s/css/jquery-ui-1.8.5.custom.css" rel="Stylesheet" />
             <link type="text/css" href="%(site)s/css/uploadify.css" rel="Stylesheet" />
             <link type="text/css" href="%(site)s/css/openaire.css" rel="Stylesheet" />
             <script type="text/javascript" src="%(site)s/js/jquery-1.4.2.min.js"></script>
-            <script type="text/javascript" src="%(site)s/js/jquery-ui-1.8.4.custom.min.js"></script>
+            <script type="text/javascript" src="%(site)s/js/jquery-ui-1.8.5.custom.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.uploadify.v2.1.0.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/swfobject.js"></script>
             <script type="text/javascript" src="http://cdn.jquerytools.org/1.2.4/all/jquery.tools.min.js"></script>

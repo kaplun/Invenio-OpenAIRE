@@ -100,6 +100,28 @@ def get_project_information_from_projectid(projectid):
     else:
         return {}
 
+def get_favourite_authorships_for_user(uid, projectid, term=''):
+    return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s and projectid=%s and authorship LIKE %s ORDER BY authorship", (uid, projectid, '%%%s%%' % term))]
+
+def update_favourite_authorships_for_user(uid, projectid, publicationid, authorships):
+    run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%s AND projectid=%s and publicationid=%s")
+    for authorship in authorships:
+        run_sql("INSERT INTO OpenAIREauthorships(uid, projectid, publicationid, authorship) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, authorship))
+
+def normalize_authorships(authorships):
+    ret = []
+    for authorship in authorships.splitlines():
+        authorship = authorship.split(':', 1)
+        if len(authorship) == 2:
+            name, affiliation = authorship
+            name = ', '.join(item.strip() for item in name.split(','))
+            affiliation = affiliation.strip()
+            authorship = '%s: %s' % (name, affiliation)
+        else:
+            authorship = authorship.strip()
+        ret.append(authorship)
+    return '\n'.join(ret)
+
 def page(title, body, navtrail="", description="", keywords="",
          metaheaderadd="", uid=None,
          cdspageheaderadd="", cdspageboxlefttopadd="",
@@ -328,7 +350,7 @@ class OpenAIREPublication(object):
     def get_publication_form(self):
         fileinfo = self.get_fulltext_information()
         publication_information = self.get_publication_information()
-        return openaire_deposit_templates.tmpl_form(projectid=self.projectid, publicationid=self.publicationid, publication_information=publication_information, fileinfo=fileinfo, form=self._metadata.get("__form__"), metadata_status=self.metadata_status, warnings=self.warnings, errors=self.errors, ln=self.ln)
+        return openaire_deposit_templates.tmpl_form(projectid=self.projectid, publicationid=self.publicationid, publication_information=publication_information, fileinfo=fileinfo, form=self._metadata.get("__form__"), metadata_status=self.metadata_status, warnings=simple_metadata2namespaced_metadata(self.warnings, self.publicationid), errors=simple_metadata2namespaced_metadata(self.errors, self.publicationid), ln=self.ln)
 
     def get_publication_preview(self):
         body = format_record(recID=self.recid, xml_record=self.marcxml, ln=self.ln, of='hd')
@@ -336,7 +358,10 @@ class OpenAIREPublication(object):
 
 
     def check_metadata(self):
-        self.errors, self.warnings = self.static_check_metadata(self._metadata['__form__'], self.publicationid, ln=self.ln)
+        self.errors, self.warnings = self.static_check_metadata(self._metadata, ln=self.ln)
+        if self._metadata.get('authors') and not self.errors.get('authors'):
+            self._metadata['authors'] = normalize_authorships(self._metadata['authors'])
+            update_favourite_authorships_for_user(self.uid, self.projectid, self.publicationid, self._metadata['authors'])
 
     def static_check_metadata(metadata, publicationid=None, check_only_field=None, ln=CFG_SITE_LANG):
         """

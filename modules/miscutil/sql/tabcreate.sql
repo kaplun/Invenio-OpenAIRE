@@ -3701,4 +3701,12 @@ CREATE TABLE IF NOT EXISTS projects_projectsubject (
   PRIMARY KEY (id_project, id_projectsubject),
 ) TYPE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS OpenAIREauthorships (
+  uid int(15) NOT NULL,
+  projectid varchar(30) NOT NULL,
+  publicationid varchar(30) NOT NULL,
+  authorship varchar(255) NOT NULL,
+  KEY (uid, projectid, publicationid),
+  KEY (uid, projectid, authorship)
+) TYPE=MyISAM;
 -- end of file

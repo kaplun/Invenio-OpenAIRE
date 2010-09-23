@@ -32,15 +32,19 @@ from invenio.webuser import collect_user_info
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio.session import get_session
 from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL
-from invenio.openaire_deposit_engine import page, OpenAIREProject, OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid, get_all_projectsids
+from invenio.openaire_deposit_engine import page, OpenAIREProject, \
+    OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid, \
+    get_all_projectsids, get_favourite_authorships_for_user
+from invenio.openaire_deposit_utils import simple_metadata2namespaced_metadata
 from invenio.access_control_engine import acc_authorize_action
+from invenio.bibknowledge import get_kbr_keys
 from invenio.urlutils import create_url
 import invenio.template
 
 openaire_deposit_templates = invenio.template.load('openaire_deposit')
 
 class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
-    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile']
+    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships']
 
     def index(self, req, form):
         argd = wash_urlargd(form, {'projectid': (str, ''), 'delete': (str, '')})
@@ -130,6 +134,22 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         """ % {'site' : CFG_SITE_URL}
         return page(title='sandbox', body=body, req=req)
 
+    def authorships(self, req, form):
+        argd = wash_urlargd(form, {'projectid': (int, 0), 'term': (str, '')})
+        user_info = collect_user_info(req)
+        uid = user_info['uid']
+        req.content_type = 'application/json'
+        term = argd['term']
+        projectid = argd['projectid']
+        ret = get_favourite_authorships_for_user(uid, projectid, term)
+        if ret:
+            return json.dumps(ret)
+        if ':' in term:
+            ## an institution is being typed
+            name, institute = term.split(':', 1)
+            institutes = get_kbr_keys('institutes', searchkey=institute, searchtype='s')
+            return json.dumps(["%s: %s" % (name, institute[0]) for institute in institutes])
+
     def ajaxgateway(self, req, form):
         argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, ''), 'action': (str, ''), 'current_field': (str, '')})
         action = argd['action']
@@ -159,7 +179,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             publication = OpenAIREPublication(uid, projectid, publicationid, ln=argd['ln'])
             publication.merge_form(form)
             publication.check_metadata()
-            out["errors"], out["warnings"] = publication.errors, publication.warnings
+            out["errors"], out["warnings"] = simple_metadata2namespaced_metadata(publication.errors, publicationid), simple_metadata2namespaced_metadata(publication.warnings, publicationid)
             if "".join(out["errors"].values()).strip(): #FIXME bad hack, we need a cleaner way to discover if there are errors
                 out['addclasses']['#status_%s' % publicationid] = 'error'
                 out['delclasses']['#status_%s' % publicationid] = 'warning ok'

@@ -18,7 +18,7 @@
 cssdir = $(localstatedir)/www/css
 imagesdir = $(localstatedir)/www/css/images
 
-css_DATA = uploadify.css jquery-ui-1.8.4.custom.css
+css_DATA = uploadify.css jquery-ui-1.8.5.custom.css
 images_DATA = ui-bg_flat_0_aaaaaa_40x100.png \
               ui-bg_glass_55_fbf9ee_1x400.png \
               ui-bg_glass_75_dadada_1x400.png \

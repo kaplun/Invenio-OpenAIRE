@@ -152,6 +152,38 @@ $(document).ready(function(){
     $('div.OpenAIRE select').focusout(function(){
         return ajaxGateway(this, 'verify_field');
     });
+    $(function(){
+        /* Adapted from <http://jqueryui.com/demos/autocomplete/#multiple> */
+        function split(val) {
+            return val.split(/\r\n|\r|\n/);
+        }
+        function extractLast(term) {
+            return split(term).pop();
+        }
+
+        $('textarea.authors').autocomplete({
+            source: function(request, response) {
+                // delegate back to autocomplete, but extract the last term
+                var term = extractLast(request.term);
+                $.getJSON(gSite + "/deposit/authorships", {
+                    projectid: gProjectid,
+                    term: term,
+                }, function(data, status, xhr) {
+                    response(data);
+                });
+            },
+            select: function(event, ui) {
+                var terms = split(this.value);
+                // remove the current input
+                terms.pop();
+                // add the selected item
+                terms.push(ui.item.value);
+                // add placeholder to get the comma-and-space at the end
+                this.value = terms.join("\n") + "\n";
+                return false;
+            }
+        });
+    });
     $('*[title]').qtip(gTipDefault);
     $('div.error').filter(function(){
         return this.textContent == '';

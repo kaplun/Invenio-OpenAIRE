@@ -52,7 +52,8 @@ CFG_DNET_KBS = {
     'json_projects': """SELECT projectid,grant_agreement_number,ec_project_website,acronym,call_identifier,end_date,start_date,title,fundedby FROM projects""",
     'projects': "SELECT grant_agreement_number, acronym || ' - ' || title || ' (' || grant_agreement_number || ')' FROM projects",
     'project_subjects': "SELECT project, project_subject FROM projects_projectsubjects",
-    'languages': "SELECT languageid, name FROM languages"
+    'languages': "SELECT languageid, name FROM languages",
+    'institutes': "SELECT legal_name, legal_name FROM organizations",
 }
 
 
