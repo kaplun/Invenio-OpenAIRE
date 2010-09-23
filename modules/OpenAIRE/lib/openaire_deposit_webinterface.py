@@ -147,8 +147,12 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         if ':' in term:
             ## an institution is being typed
             name, institute = term.split(':', 1)
-            institutes = get_kbr_keys('institutes', searchkey=institute, searchtype='s')
-            return json.dumps(["%s: %s" % (name, institute[0]) for institute in institutes])
+            institute = institute.strip()
+            if len(institute) > 1:
+                institutes = [row[0] for row in get_kbr_keys('institutes', searchkey=institute, searchtype='s')]
+                institutes.sort()
+                return json.dumps(["%s: %s" % (name, institute) for institute in institutes[:100]])
+        return json.dumps([])
 
     def ajaxgateway(self, req, form):
         argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, ''), 'action': (str, ''), 'current_field': (str, '')})

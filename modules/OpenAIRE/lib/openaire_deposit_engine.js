@@ -161,16 +161,30 @@ $(document).ready(function(){
             return split(term).pop();
         }
 
-        $('textarea.authors').autocomplete({
+        $('textarea.authors').keydown(function(event) {
+            /* Thanks to: http://forum.jquery.com/topic/autocomplete-changing-key-bindings */
+            var isOpen = $( this ).autocomplete( "widget" ).is( ":visible" );
+            var keyCode = $.ui.keyCode;
+            if ( !isOpen && ( event.keyCode == keyCode.UP || event.keyCode == keyCode.DOWN ) ) {
+                    event.stopImmediatePropagation();
+            }
+          }).autocomplete({
             source: function(request, response) {
                 // delegate back to autocomplete, but extract the last term
                 var term = extractLast(request.term);
-                $.getJSON(gSite + "/deposit/authorships", {
-                    projectid: gProjectid,
-                    term: term,
-                }, function(data, status, xhr) {
-                    response(data);
-                });
+                if (term) {
+                    $.getJSON(gSite + "/deposit/authorships", {
+                        projectid: gProjectid,
+                        term: term,
+                    }, function(data, status, xhr) {
+                        if (data) {
+                            response(data);
+                        };
+                    });
+                }
+            },
+            focus: function(event, ui){
+                return false;
             },
             select: function(event, ui) {
                 var terms = split(this.value);
@@ -178,7 +192,6 @@ $(document).ready(function(){
                 terms.pop();
                 // add the selected item
                 terms.push(ui.item.value);
-                // add placeholder to get the comma-and-space at the end
                 this.value = terms.join("\n") + "\n";
                 return false;
             }

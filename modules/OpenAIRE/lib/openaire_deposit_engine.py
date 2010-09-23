@@ -104,8 +104,8 @@ def get_favourite_authorships_for_user(uid, projectid, term=''):
     return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s and projectid=%s and authorship LIKE %s ORDER BY authorship", (uid, projectid, '%%%s%%' % term))]
 
 def update_favourite_authorships_for_user(uid, projectid, publicationid, authorships):
-    run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%s AND projectid=%s and publicationid=%s")
-    for authorship in authorships:
+    run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%s AND projectid=%s and publicationid=%s", (uid, projectid, publicationid))
+    for authorship in authorships.splitlines():
         run_sql("INSERT INTO OpenAIREauthorships(uid, projectid, publicationid, authorship) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, authorship))
 
 def normalize_authorships(authorships):
@@ -249,7 +249,9 @@ class OpenAIREPublication(object):
                     break
                 os.rmdir(self.path)
             self._metadata['__cd__'] = self._metadata['__md__'] = time.time()
+            self.__touched = True
         else:
+            self.__touched = False
             self.path = os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid), str(publicationid))
             if not os.path.exists(self.path):
                 raise ValueError("publicationid %s for projectid %s does not exist for user %s" % (publicationid, projectid, uid))
@@ -260,14 +262,14 @@ class OpenAIREPublication(object):
         self.errors = {}
         self._initialize_storage()
         self._load()
-        self.deleted = False
+        self.__deleted = False
 
     def __del__(self):
-        if not self.deleted:
+        if not self.__deleted and self.__touched:
             self._dump()
 
     def delete(self):
-        self.deleted = True
+        self.__deleted = True
         shutil.rmtree(self.path)
 
     def _initialize_storage(self):
@@ -319,6 +321,7 @@ class OpenAIREPublication(object):
 
     def touch(self):
         self._metadata['__md__'] = time.time()
+        self.__touched = True
 
     def get_metadata_status(self):
         if self.errors:
