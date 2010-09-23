@@ -4,26 +4,26 @@ var gTipDefault = {
         corner: {
             target: 'bottomMiddle',
             tooltip: 'topMiddle'
-        },
+        }
     },
     adjust: {
-        screen: true,
+        screen: true
     },
     hide: {
-        fixed: true,
+        fixed: true
     },
     border: {
         width: 7,
-        radius: 5,
+        radius: 5
     },
     style: {
         width: {
-            max: 500,
+            max: 500
         },
         name: 'light',
-        tip: 'topMiddle',
+        tip: 'topMiddle'
     }
-}
+};
 
 function update_embargo_date(event){
     if ($(event.data.from_id).val() == 'embargoedAccess') {
@@ -46,37 +46,37 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     var warnings = results.warnings;
     var addclasses = results.addclasses;
     var delclasses = results.delclasses;
-    var substitutions = results.substitutions;
     var hiddens = results.hiddens;
     var appends = results.appends;
     var showns = results.showns;
+    var query;
     for (var error in errors) {
         if (errors[error]) {
             $('#error_' + error).html(errors[error]).fadeIn('slow');
         } else {
-            $('#error_' + error).fadeOut('slow')
+            $('#error_' + error).fadeOut('slow');
         }
     }
     for (var warning in warnings) {
         if (warnings[warning]) {
             $('#warning_' + warning).html(warnings[warning]).fadeIn('slow');
         } else {
-            $('#warning_' + warning).fadeOut('slow')
+            $('#warning_' + warning).fadeOut('slow');
         }
     }
-    for (var query in addclasses) {
+    for (query in addclasses) {
         $(query).addClass(addclasses[query]);
     }
-    for (var query in delclasses) {
+    for (query in delclasses) {
         $(query).removeClass(delclasses[query]);
     }
-    for (var query in hiddens) {
+    for (query in hiddens) {
         $(hiddens[query]).hide('slow');
     }
-    for (var query in appends) {
+    for (query in appends) {
         $(query).append(appends[query]);
     }
-    for (var query in showns) {
+    for (query in showns) {
         $(showns[query]).show('slow');
     }
     return 0;
@@ -117,10 +117,10 @@ function object_to_str(o){
 function ajaxGateway(element, action) {
     var publicationid = element.id.split('_').pop();
     var data = getPublicationMetadata(publicationid);
-    data['publicationid'] = publicationid;
-    data['projectid'] = gProjectid;
-    data['action'] = action;
-    data['current_field'] = element.id;
+    data.publicationid = publicationid;
+    data.projectid = gProjectid;
+    data.action = action;
+    data.current_field = element.id;
     $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
 }
 
@@ -175,11 +175,11 @@ $(document).ready(function(){
                 if (term) {
                     $.getJSON(gSite + "/deposit/authorships", {
                         projectid: gProjectid,
-                        term: term,
+                        term: term
                     }, function(data, status, xhr) {
                         if (data) {
                             response(data);
-                        };
+                        }
                     });
                 }
             },
@@ -199,12 +199,10 @@ $(document).ready(function(){
     });
     $('*[title]').qtip(gTipDefault);
     $('div.error').filter(function(){
-        return this.textContent == '';
-    }).hide()
+        return this.textContent === '';
+    }).hide();
     $('div.warning').filter(function(){
-        return this.textContent == '';
-    }).hide()
+        return this.textContent === '';
+    }).hide();
     $.datepicker.setDefaults($.datepicker.regional[gLn]);
-})
-
-
+});
