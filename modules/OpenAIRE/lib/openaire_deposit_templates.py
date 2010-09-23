@@ -49,7 +49,6 @@ class Template:
             <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.qtip-1.0.0-rc3.js"></script>
             <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
-            <script type="text/javascript" src="%(site)s/js/jquery.input-hint.js"></script>
             """ % {'site': CFG_SITE_URL, 'ln': ln}
 
     def tmpl_choose_project(self, default='', existing_projects=None, ln=CFG_SITE_LANG):
@@ -376,6 +375,8 @@ class Template:
 
     def tmpl_fulltext_information(self, filename, publicationid, download_url, md5, mimetype, format, size, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
+        filename = filename.decode('utf8')
+        filename = ''.join(["%s<br />" % escape(filename[i:i+30].encode('utf8')) for i in xrange(0, len(filename), 30)])
         return """
             %(file_label)s: <div class="file" id="file_%(id)s"><em>%(filename)s</em></div>
             <script type="text/javascript">//<![CDATA[
@@ -387,7 +388,7 @@ class Template:
             //]]></script>""" % {
                 'file_label': escape(_('file')),
                 'id': escape(publicationid, True),
-                'filename': escape(filename),
+                'filename': filename,
                 'filename_label': escape(_("Name")),
                 'download_url': escape(download_url, True),
                 'mimetype': escape(mimetype, True),

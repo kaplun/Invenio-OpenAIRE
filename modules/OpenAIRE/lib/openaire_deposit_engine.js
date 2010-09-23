@@ -150,7 +150,6 @@ $(document).ready(function(){
     $('div.warning').filter(function(){
         return this.textContent == '';
     }).hide()
-    $('input[hint],textarea[hint]').inputHint({hintAttr: "hint"});
     $.datepicker.setDefaults($.datepicker.regional[gLn]);
 })
 

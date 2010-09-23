@@ -1,11 +1,11 @@
 <tr class="header odd" id="header_%(id)s">
-    <td width="40%%">
+    <td width="40%%" valign="top">
         <span id="publication_info_container_%(id)s">%(title_value)s</span>
         <br />
         %(fileinfo)s
         <br />
     </td>
-    <td width="40%%">
+    <td width="40%%" valign="top">
         <img title="%(access_rights_tooltip)s" class="tooltip mandatory" src="%(site)s/img/help.png" />
         <select id="access_rights_%(id)s" name="access_rights_%(id)s" class="access_rights">
             %(access_rights_options)s
@@ -14,18 +14,18 @@
         <div id="warning_access_rights_%(id)s" class="warning">%(warning_embargo_date_value)s</div>
         <div id="embargo_date_container_%(id)s">
             <img title="%(embargo_date_tooltip)s" class="tooltip mandatory" src="%(site)s/img/help.png"/>
-            <input name="embargo_date_%(id)s" type="text" id="embargo_date_%(id)s" value="%(embargo_date_value)s" hint="%(embargo_date_hint)s" size="%(embargo_date_size)s" maxlength="10" class="datepicker" />
+            <input name="embargo_date_%(id)s" type="text" id="embargo_date_%(id)s" value="%(embargo_date_value)s" size="%(embargo_date_size)s" maxlength="10" class="datepicker" />
             <div id="error_embargo_date_%(id)s" class="error">%(error_embargo_date_value)s</div>
             <div id="warning_embargo_date_%(id)s" class="warning">%(warning_embargo_date_value)s</div>
         </div>
     </td>
-    <td width="20%%">
+    <td width="20%%" valign="top">
         <a href="javascript:void(0)" id="edit_metadata_%(id)s"><img src="%(site)s/img/wb-notes.png" alt="%(edit_metadata_label)s"/> <strong>%(edit_metadata_label)s</strong></a><br />
         <a href="%(site)s/deposit?projectid=%(projectid)s&amp;delete=%(id)s&amp;ln=%(ln)s" id="remove_%(id)s"><img src="%(site)s/img/smallbin.gif" /> %(remove_label)s</a>
     <td>
 </tr>
 <tr class="body even">
-    <td colspan="3">
+    <td colspan="3" valign="top">
         <div id="body_%(id)s" class="body">
             <p><em>%(mandatory_label)s</em></p>
             <div>
@@ -33,7 +33,7 @@
                 <label for="authors_%(id)s" class="mandatory">%(authors_label)s
                 </label>
                 <br />
-                <textarea name="authors_%(id)s" id="authors_%(id)s" cols="60" rows="5" class="authors" hint="%(authors_hint)s">%(authors)s</textarea>
+                <textarea name="authors_%(id)s" id="authors_%(id)s" cols="60" rows="5" class="authors">%(authors)s</textarea>
                 <div id="error_authors_%(id)s" class="error">%(error_authors_value)s</div>
                 <div id="warning_authors_%(id)s" class="warning">%(warning_authors_value)s</div>
             </div>
