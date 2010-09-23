@@ -31,7 +31,7 @@ div.clear {
   }
 
 
-div.OpenAIRE .error {
+div.OpenAIRE div.error {
     background : #FFC0C0 url('/img/iconcross.gif') no-repeat center left;
     font : inherit bolder medium sans-serif;
     padding : 4px 4px 4px 20px;
@@ -40,8 +40,44 @@ div.OpenAIRE .error {
     border-radius : 4px;
   }
 
-div.OpenAIRE .warning {
-  background : #FFFFC0 url('/img/warning.png') no-repeat center left;
+
+div.joomla div.OpenAIRE tr td.error {
+    background : #FFC0C0 url('/img/iconcross.gif') no-repeat center center;
+    font : inherit bolder medium sans-serif;
+    padding : 4px 4px 4px 20px;
+    border : #ff0000;
+    -moz-border-radius : 4px;
+    border-radius : 4px;
+  }
+
+
+div.OpenAIRE div.warning {
+    background : #FFFFC0 url('/img/warning.png') no-repeat center left;
+    font : bolder inherit sans-serif;
+    padding : 4px 4px 4px 20px;
+    border : #ffff00;
+    border-radius : 4px;
+  }
+
+  div.joomla div.OpenAIRE tr td.warning {
+  background : #FFFFC0 url('/img/warning.png') no-repeat center center;
+  font : bolder inherit sans-serif;
+  padding : 4px 4px 4px 20px;
+  border : #ffff00;
+  border-radius : 4px;
+  }
+
+
+div.joomla div.OpenAIRE tr td.empty {
+    background : #FFFFC0 url('/img/wb-notes.png') no-repeat center center;
+    font : bolder inherit sans-serif;
+    padding : 4px 4px 4px 20px;
+    border : #ffff00;
+    border-radius : 4px;
+  }
+
+div.joomla div.OpenAIRE tr td.ok {
+  background : #C0FFC0 url('/img/okay.gif') no-repeat center center;
   font : bolder inherit sans-serif;
   padding : 4px 4px 4px 20px;
   border : #ffff00;
@@ -53,8 +89,6 @@ div.OpenAIRE label {
     font-style: italic;
     font-weight: bolder;
   }
-
-
 
 
 div.OpenAIRE .ok {

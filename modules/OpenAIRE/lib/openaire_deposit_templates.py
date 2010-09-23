@@ -110,7 +110,24 @@ class Template:
                 'select_label': escape(_("Select"), True),
             }
 
-    def tmpl_form(self, projectid, publicationid, fileinfo, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
+    def tmpl_publication_preview(self, body, recid, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        return """
+            <p>%(description)s</p>
+            <div class="note">%(body)s</div>
+            """ % {
+                'description': escape(_("This is a preview of the submitted publication. It will be available at %(url)s.")) % {
+                    "url": """<a href="%(site)s/record/%(recid)s" alt="%(the_record)s">%(site)s/record/%(recid)s</a>""" % {
+                        'site': escape(CFG_SITE_URL, True),
+                        'recid': recid,
+                        'the_record': escape(_("The record"), True),
+                    },
+                },
+                'body': body,
+            }
+
+
+    def tmpl_form(self, projectid, publicationid, publication_information, fileinfo, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         values = dict(CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS)
         values['id'] = publicationid
@@ -152,6 +169,8 @@ class Template:
         values['save_label'] = escape(_('Save publication'))
         values['submit_label'] = escape(_('Submit publication'))
         values['embargo_date_size'] = len(values['embargo_date_hint'])
+        values['publication_information'] = publication_information
+        values['status'] = metadata_status
         if warnings:
             for key, value in warnings.iteritems():
                 if key.endswith('_%s' % publicationid):
@@ -250,11 +269,13 @@ class Template:
     def tmpl_publication_information(self, publicationid, title, authors, abstract, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         authors = authors.strip().splitlines()
+        if not title:
+            title = _("Title not yet defined")
         data = {
                 'title_label': escape(_("Title")),
                 'authors_label': len(authors) != 1 and escape(_("Author(s)")) or escape(_("Author")),
                 'abstract_label': escape(_("Abstract")),
-                'title': escape(title) or escape(_("Unknown title")),
+                'title': escape(title),
                 'authors': "<br />".join([escape(author) for author in authors]),
                 'abstract': escape(abstract).replace('\n', '<br />'),
                 'id': escape(publicationid, True)
@@ -309,7 +330,7 @@ class Template:
                 });
             // ]]></script>""" % data
 
-    def tmpl_add_publication_data_and_submit(self, projectid, project_information, publication_forms, ln=CFG_SITE_LANG):
+    def tmpl_add_publication_data_and_submit(self, projectid, project_information, publication_forms, submitted_publications, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
 
         if publication_forms:
@@ -323,13 +344,16 @@ class Template:
         else:
             publication_forms = ''
 
-
         return """
             <h3>%(title)s</h3>
             <div class="note">
             %(project_information)s (<a href="%(site)s/deposit?ln=%(ln)s" alt="%(change_project_label)s">%(change_project_label)s</a>)
             </div>
             %(publication_forms)s
+            <div id="submitted_publications">
+            <h3>%(submitted_publications_title)s</h3>
+            %(submitted_publications)s
+            </div>
             <script type="text/javascript">//<![CDATA[
                 var gProjectid = %(projectid)s;
                 jQuery(document).ready(function(){
@@ -349,9 +373,11 @@ class Template:
                     $('a.deletepublication').click(function(){
                         return confirm("%(confirm_delete_publication)s");
                     })
+                    %(hide_submitted_publications)s
                     });
             //]]></script>
             """ % {
+                'submitted_publications_title': escape(_("Successfully submitted publications")),
                 'project_information': project_information,
                 'title': escape(_('Your Current Publications')),
                 'selected_project_title': escape(_("Selected Project")),
@@ -363,6 +389,9 @@ class Template:
                 'embargo_release_date_head': escape(_('Embargo%(x_br)sRelease Date')) % {'x_br': '<br />'},
                 'publication_forms': publication_forms,
                 'confirm_delete_publication': _("Are you sure you want to delete this publication?"),
+                'submitted_publications': submitted_publications,
+                'hide_submitted_publications': not submitted_publications and \
+                    """$("#submitted_publications").hide();""" or '',
                 'ln': ln,
                 'projectid': projectid,
                 'done': escape(_("Done"), True),

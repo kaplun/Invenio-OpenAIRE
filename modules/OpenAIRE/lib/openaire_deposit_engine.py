@@ -52,7 +52,7 @@ from invenio.bibformat import format_record
 
 CFG_OPENAIRE_PROJECT_INFORMATION_KB = 'json_projects'
 CFG_OPENAIRE_DEPOSIT_PATH = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, 'OpenAIRE')
-RE_AUTHOR_ROW = re.compile(u'^\w\w+,\s*\w+\s*(:\s*\w+.*)?$')
+RE_AUTHOR_ROW = re.compile(u'^\w{2,}(\s+\w{2,})*,\s*\w{2,}\s*(:\s*\w{2,}.*)?$')
 RE_PAGES = re.compile('\d+(-\d+)?')
 
 def _(foo):
@@ -294,7 +294,6 @@ class OpenAIREPublication(object):
             self.touch()
             self._metadata['__form__'] = wash_form(form, self.publicationid)
             self._metadata.update(namespaced_metadata2simple_metadata(self._metadata['__form__'], self.publicationid))
-            self.errors, self.warnings = self.check_metadata(self._metadata['__form__'], self.publicationid, ln=ln)
 
     def touch(self):
         self._metadata['__md__'] = time.time()
@@ -305,7 +304,7 @@ class OpenAIREPublication(object):
         if self.warnings:
             return 'warning'
         for field in CFG_METADATA_FIELDS:
-            if self._metadata['field']:
+            if field in self._metadata and self._metadata[field]:
                 ## There is at least one field filled. Since there are no
                 ## warnings or errors, that means it's OK :-)
                 return 'ok'
@@ -318,7 +317,7 @@ class OpenAIREPublication(object):
         self.status = 'submitted'
 
     def get_publication_information(self):
-        return openaire_deposit_templates.tmpl_publication_information(publicationid=self.publicationid, title=self._metadata['title'], authors=self._metadata['authors'], abstract=self._metadata['abstract'], ln=self.ln)
+        return openaire_deposit_templates.tmpl_publication_information(publicationid=self.publicationid, title=self._metadata.get('title', ""), authors=self._metadata.get('authors', ""), abstract=self._metadata.get('abstract', ""), ln=self.ln)
 
     def get_fulltext_information(self):
         out = ""
@@ -327,13 +326,19 @@ class OpenAIREPublication(object):
         return out
 
     def get_publication_form(self):
-        if self.status in ('initialized', 'edited'):
-            fileinfo = self.get_fulltext_information()
-            return openaire_deposit_templates.tmpl_form(projectid=self.projectid, publicationid=self.publicationid, fileinfo=fileinfo, form=self._metadata.get("__form__"), metadata_status=self.status, warnings=self.warnings, errors=self.errors, ln=self.ln)
-        else:
-            return """<tr class="header odd" id="header_%(id)s">%(body)s</td>""" % {'id': self.publicationid, 'body': format_record(recID=self.recid, xml_record=self.marcxml, ln=self.ln, of='hd')}
+        fileinfo = self.get_fulltext_information()
+        publication_information = self.get_publication_information()
+        return openaire_deposit_templates.tmpl_form(projectid=self.projectid, publicationid=self.publicationid, publication_information=publication_information, fileinfo=fileinfo, form=self._metadata.get("__form__"), metadata_status=self.metadata_status, warnings=self.warnings, errors=self.errors, ln=self.ln)
 
-    def check_metadata(metadata, publicationid=None, check_only_field=None, ln=CFG_SITE_LANG):
+    def get_publication_preview(self):
+        body = format_record(recID=self.recid, xml_record=self.marcxml, ln=self.ln, of='hd')
+        return openaire_deposit_templates.tmpl_publication_preview(body, self.recid, ln=self.ln)
+
+
+    def check_metadata(self):
+        self.errors, self.warnings = self.static_check_metadata(self._metadata['__form__'], self.publicationid, ln=self.ln)
+
+    def static_check_metadata(metadata, publicationid=None, check_only_field=None, ln=CFG_SITE_LANG):
         """
         Given a mapping in metadata.
         Check that all the required metadata are properly set.
@@ -383,7 +388,7 @@ class OpenAIREPublication(object):
             errors = simple_metadata2namespaced_metadata(errors, publicationid)
             warnings = simple_metadata2namespaced_metadata(warnings, publicationid)
         return errors, warnings
-    check_metadata = staticmethod(check_metadata)
+    static_check_metadata = staticmethod(static_check_metadata)
 
     def get_ln(self):
         return self.__ln
@@ -477,6 +482,7 @@ class OpenAIREPublication(object):
     publicationid = property(get_publicationid)
     recid = property(get_recid)
     metadata = property(get_metadata)
+    metadata_status = property(get_metadata_status)
     marcxml = property(get_marcxml)
 
 
@@ -514,7 +520,7 @@ def _check_authors(metadata, ln, _):
         row = row.strip()
         if row:
             if not RE_AUTHOR_ROW.match(row):
-                return ('authors', 'error', _('%(row)s is not a well formatted authorship') % {"row": row})
+                return ('authors', 'error', _('"%(row)s" is not a well formatted authorship') % {"row": row})
 
 def _check_abstract(metadata, ln, _):
     abstract = metadata.get('abstract', '')

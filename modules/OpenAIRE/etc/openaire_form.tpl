@@ -1,11 +1,12 @@
-<tr class="header odd" id="header_%(id)s">
+<tr class="header odd" id="header_row_%(id)s">
+    <td width="5%%" id="status_%(id)s" rowspan="2" class="%(status)s"></td>
     <td width="40%%" valign="top">
-        <span id="publication_info_container_%(id)s">%(title_value)s</span>
+        %(publication_information)s
         <br />
         %(fileinfo)s
         <br />
     </td>
-    <td width="40%%" valign="top">
+    <td width="35%%" valign="top">
         <img title="%(access_rights_tooltip)s" class="tooltip mandatory" src="%(site)s/img/help.png" />
         <select id="access_rights_%(id)s" name="access_rights_%(id)s" class="access_rights">
             %(access_rights_options)s
@@ -24,7 +25,7 @@
         <a href="%(site)s/deposit?projectid=%(projectid)s&amp;delete=%(id)s&amp;ln=%(ln)s" id="remove_%(id)s"><img src="%(site)s/img/smallbin.gif" /> %(remove_label)s</a>
     <td>
 </tr>
-<tr class="body even">
+<tr class="body even" id="body_row_%(id)s">
     <td colspan="3" valign="top">
         <div id="body_%(id)s" class="body">
             <p><em>%(mandatory_label)s</em></p>
@@ -33,7 +34,7 @@
                 <label for="authors_%(id)s" class="mandatory">%(authors_label)s
                 </label>
                 <br />
-                <textarea name="authors_%(id)s" id="authors_%(id)s" cols="60" rows="5" class="authors">%(authors)s</textarea>
+                <textarea name="authors_%(id)s" id="authors_%(id)s" cols="60" rows="5" class="authors">%(authors_value)s</textarea>
                 <div id="error_authors_%(id)s" class="error">%(error_authors_value)s</div>
                 <div id="warning_authors_%(id)s" class="warning">%(warning_authors_value)s</div>
             </div>
@@ -156,7 +157,7 @@ $(document).ready(function(){
     $('#remove_%(id)s').click(function(){
         return confirm("%(remove_confirm)s");
     });
-    $('#edit_metadata_%(id)s').click(function(){
+    $('#edit_metadata_%(id)s,#status_%(id)s').click(function(){
         $('#body_%(id)s').toggle('slow');
         return false;
     });

@@ -47,6 +47,9 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     var addclasses = results.addclasses;
     var delclasses = results.delclasses;
     var substitutions = results.substitutions;
+    var hiddens = results.hiddens;
+    var appends = results.appends;
+    var showns = results.showns;
     for (var error in errors) {
         if (errors[error]) {
             $('#error_' + error).html(errors[error]).fadeIn('slow');
@@ -67,30 +70,36 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     for (var query in delclasses) {
         $(query).removeClass(delclasses[query]);
     }
-    for (var query in substitutions) {
-        $(query).replaceWith(substitutions[query]);
+    for (var query in hiddens) {
+        $(hiddens[query]).hide('slow');
+    }
+    for (var query in appends) {
+        $(query).append(appends[query]);
+    }
+    for (var query in showns) {
+        $(showns[query]).show('slow');
     }
     return 0;
 }
 
 function getPublicationMetadata(publicationid){
     var ret = {};
-    $('#body_' + publicationid + ' input').each(function(){
+    $('#body_row_' + publicationid + ' input').each(function(){
         ret[this.id] = this.value;
     });
-    $('#body_' + publicationid + ' select').each(function(){
+    $('#body_row_' + publicationid + ' select').each(function(){
         ret[this.id] = this.value;
     });
-    $('#body_' + publicationid + ' textarea').each(function(){
+    $('#body_row_' + publicationid + ' textarea').each(function(){
         ret[this.id] = this.value;
     });
-    $('#header_' + publicationid + ' input').each(function(){
+    $('#header_row_' + publicationid + ' input').each(function(){
         ret[this.id] = this.value;
     });
-    $('#header_' + publicationid + ' select').each(function(){
+    $('#header_row_' + publicationid + ' select').each(function(){
         ret[this.id] = this.value;
     });
-    $('#header_' + publicationid + ' textarea').each(function(){
+    $('#header_row_' + publicationid + ' textarea').each(function(){
         ret[this.id] = this.value;
     });
     return ret;
