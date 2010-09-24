@@ -152,6 +152,18 @@ $(document).ready(function(){
     $('div.OpenAIRE select').focusout(function(){
         return ajaxGateway(this, 'verify_field');
     });
+    $('#project').autocomplete({
+        source: gSite + "/kb/export?kbname=projects&format=jquery&ln=" + gLn,
+        focus: function(event, ui) {
+            $('#projectid').val(ui.item.label);
+            return false;
+        },
+        select: function(event, ui) {
+            $('#project').val(ui.item.label);
+            $('#projectid').val(ui.item.value);
+            return false;
+        }
+    }).focus();
     $(function(){
         /* Adapted from <http://jqueryui.com/demos/autocomplete/#multiple> */
         function split(val) {

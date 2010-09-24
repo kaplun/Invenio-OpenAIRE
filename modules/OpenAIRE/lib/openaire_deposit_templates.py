@@ -34,10 +34,10 @@ CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS = dict((placemark, '') for placemark in RE
 class Template:
     def tmpl_headers(self, ln):
         return """
-            <script type="text/javascript">
+            <script type="text/javascript">// <![CDATA[
                 var gSite = "%(site)s";
                 var gLn = "%(ln)s";
-            </script>
+            // ]]></script>
             <link type="text/css" href="%(site)s/css/jquery-ui-1.8.5.custom.css" rel="Stylesheet" />
             <link type="text/css" href="%(site)s/css/uploadify.css" rel="Stylesheet" />
             <link type="text/css" href="%(site)s/css/openaire.css" rel="Stylesheet" />
@@ -56,44 +56,10 @@ class Template:
         if existing_projects is None:
             existing_projects = []
         body = ' '.join(existing_projects)
-
-        script = """
-            $(document).ready(function() {
-                $("#project").autocomplete({
-                    source: "%(site)s/kb/export?kbname=projects&amp;format=jquery&amp;ln=%(ln)s",
-                    focus: function(event, ui) {
-                        $('#projectid').val(ui.item.label);
-                        return false;
-                    },
-                    select: function(event, ui) {
-                        $('#project').val(ui.item.label);
-                        $('#projectid').val(ui.item.value);
-                        return false;
-                    }
-                }).focus();
-            })""" % {'site': CFG_SITE_URL, 'ln': ln}
-        return H.script(script, escape_body=False, type="text/javascript") + \
-            H.div(class_="note")(EscapedString(body, escape_nothing=True)) + H.div(class_="ui-widget")(
+        return  H.div(class_="note")(EscapedString(body, escape_nothing=True)) + H.div(class_="ui-widget")(
                 H.label(for_='project')(_("Start typing the project title or the acronym or the grant agreement number")),
                 H.input(id='project', name='project', type="text"),
                 H.input(type='hidden', name='projectid', id='projectid')
-            )
-
-    def tmpl_dropdown_menu(self, kbname, label, name, id, default=''):
-        script = """
-            $(document).ready(function() {
-                $("#%(name)s").autocomplete({
-                    source: "%(site)s/kb/export?kbname=%(kbname)s&format=jquery"
-                });
-            });
-        """ % {
-            'name': name,
-            'site': CFG_SITE_URL,
-            'kbname': kbname
-        }
-        return H.script(script, escape_body=False, type="text/javascript") + H.div(class_="ui-widget")(
-                H.label(for_=name)(label + ': '),
-                H.input(size=50, id=id, name=name, value=default)
             )
 
     def tmpl_select_a_project(self, existing_projects=None, ln=CFG_SITE_LANG):
@@ -230,22 +196,22 @@ class Template:
                 $(document).ready(function() {
                     $('#cancel_upload').hide();
                     $('#fileInput').uploadify({
-                    'uploader'  : '%(site)s/flash/uploadify.swf',
-                    'script'    : '%(site)s/deposit/uploadifybackend',
-                    'cancelImg' : '%(site)s/img/cancel.png',
-                    'auto'      : true,
-                    'folder'    : '/uploads',
-                    'multi'     : true,
-                    'buttonText': '%(buttontext)s',
-                    'simUploadLimit': '2',
-                    'scriptData': {'projectid': '%(projectid)s', 'session': '%(session)s'},
-                    'onAllComplete': function(){
-                        $('input.save').trigger('click');
-                        window.location="%(site)s/deposit?projectid=%(projectid)s";
-                    },
-                    'onOpen': function(){
-                        $('#cancel_upload').show();
-                    }
+                        'uploader'  : '%(site)s/flash/uploadify.swf',
+                        'script'    : '%(site)s/deposit/uploadifybackend',
+                        'cancelImg' : '%(site)s/img/cancel.png',
+                        'auto'      : true,
+                        'folder'    : '/uploads',
+                        'multi'     : true,
+                        'buttonText': '%(buttontext)s',
+                        'simUploadLimit': '2',
+                        'scriptData': {'projectid': '%(projectid)s', 'session': '%(session)s'},
+                        'onAllComplete': function(){
+                            $('input.save').trigger('click');
+                            window.location="%(site)s/deposit?projectid=%(projectid)s";
+                        },
+                        'onOpen': function(){
+                            $('#cancel_upload').show();
+                        }
                     });
                     $('#cancel_upload').click(function(){
                         $('#fileInput').uploadifyClearQueue();
@@ -286,7 +252,9 @@ class Template:
             <script type="text/javascript">// <![CDATA[
                 $(document).ready(function(){
                     var tooltip = clone(gTipDefault);
-                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(authors_label)s:<strong></td><td align="left">%(authors)s</td></tr><tr><td align="right"><strong>%(abstract_label)s:<strong></td><td align="left">%(abstract)s</td></tr><tbody></table>'}
+                    tooltip.content = {
+                        'text': '<table><tbody><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(authors_label)s:<strong></td><td align="left">%(authors)s</td></tr><tr><td align="right"><strong>%(abstract_label)s:<strong></td><td align="left">%(abstract)s</td></tr><tbody></table>'
+                    };
                     $('#publication_information_%(id)s').qtip(tooltip);
                 });
             // ]]></script>""" % data
@@ -325,7 +293,9 @@ class Template:
             <script type="text/javascript">// <![CDATA[
                 $(document).ready(function(){
                     var tooltip = clone(gTipDefault);
-                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'}
+                    tooltip.content = {
+                        'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'
+                    };
                     $('#selectedproject_%(id)s').qtip(tooltip);
                 });
             // ]]></script>""" % data
@@ -356,7 +326,7 @@ class Template:
             </div>
             <script type="text/javascript">//<![CDATA[
                 var gProjectid = %(projectid)s;
-                jQuery(document).ready(function(){
+                $(document).ready(function(){
                     $('input.datepicker').datepicker({
                         dateFormat: 'yy-mm-dd',
                         showOn: 'both',
@@ -364,7 +334,7 @@ class Template:
                             $(this).focus();
                         },
                         showButtonPanel: true,
-                        });
+                    });
                     $('textarea').elastic();
                     $('#publication_forms').submit(function(event){
                         event.preventDefault();
@@ -372,9 +342,9 @@ class Template:
                     });
                     $('a.deletepublication').click(function(){
                         return confirm("%(confirm_delete_publication)s");
-                    })
-                    %(hide_submitted_publications)s
                     });
+                    %(hide_submitted_publications)s
+                });
             //]]></script>
             """ % {
                 'submitted_publications_title': escape(_("Successfully submitted publications")),
@@ -411,7 +381,9 @@ class Template:
             <script type="text/javascript">//<![CDATA[
                 $(document).ready(function(){
                     var tooltip = clone(gTipDefault);
-                    tooltip.content = {'text': '<table><tbody><tr><td align="right"><strong>%(filename_label)s:<strong></td><td align="left"><a href="%(download_url)s" target="_blank" type="%(mimetype)s">%(filename)s</a></td></tr><tr><td align="right"><strong>%(checksum_label)s:<strong></td><td align="left">%(md5)s</td></tr><tr><td align="right"><strong>%(mimetype_label)s:<strong></td><td align="left">%(mimetype)s</td></tr><tr><td align="right"><strong>%(format_label)s:<strong></td><td align="left">%(format)s</td></tr><tr><td align="right"><strong>%(size_label)s:<strong></td><td align="left">%(size)s</td></tr><tbody></table>'}
+                    tooltip.content = {
+                        'text': '<table><tbody><tr><td align="right"><strong>%(filename_label)s:<strong></td><td align="left"><a href="%(download_url)s" target="_blank" type="%(mimetype)s">%(filename)s</a></td></tr><tr><td align="right"><strong>%(checksum_label)s:<strong></td><td align="left">%(md5)s</td></tr><tr><td align="right"><strong>%(mimetype_label)s:<strong></td><td align="left">%(mimetype)s</td></tr><tr><td align="right"><strong>%(format_label)s:<strong></td><td align="left">%(format)s</td></tr><tr><td align="right"><strong>%(size_label)s:<strong></td><td align="left">%(size)s</td></tr><tbody></table>'
+                    };
                     $('#file_%(id)s').qtip(tooltip);
                 });
             //]]></script>""" % {
