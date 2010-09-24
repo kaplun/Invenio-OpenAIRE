@@ -49,6 +49,7 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     var hiddens = results.hiddens;
     var appends = results.appends;
     var showns = results.showns;
+    var substitutions = results.substitutions;
     var query;
     for (var error in errors) {
         if (errors[error]) {
@@ -78,6 +79,9 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     }
     for (query in showns) {
         $(showns[query]).show('slow');
+    }
+    for (query in substitutions) {
+        $(query).replaceWith(substitutions[query]);
     }
     return 0;
 }

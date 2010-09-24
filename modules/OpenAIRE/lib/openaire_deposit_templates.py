@@ -333,7 +333,7 @@ class Template:
                         onClose: function(){
                             $(this).focus();
                         },
-                        showButtonPanel: true,
+                        showButtonPanel: true
                     });
                     $('textarea').elastic();
                     $('#publication_forms').submit(function(event){

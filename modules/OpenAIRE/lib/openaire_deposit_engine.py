@@ -520,7 +520,7 @@ def _check_title(metadata, ln, _):
     if not title:
         return ('title', 'error', _('The title field of the Publication is mandatory but is currently empty'))
     elif title:
-        title = title.encode('UTF8')
+        title = title.decode('UTF8')
         uppers = 0
         for c in title:
             if c.isupper():
@@ -530,7 +530,7 @@ def _check_title(metadata, ln, _):
 
 def _check_original_title(metadata, ln, _):
     title = metadata.get('original_title', '')
-    title = title.encode('UTF8')
+    title = title.decode('UTF8')
     if title:
         uppers = 0
         for c in title:
@@ -541,7 +541,7 @@ def _check_original_title(metadata, ln, _):
 
 def _check_authors(metadata, ln, _):
     authors = metadata.get('authors', '')
-    authors = authors.encode('UTF8')
+    authors = authors.decode('UTF8')
     if not authors.strip():
         return ('authors', 'error', _('The authorship of the Publication is a mandatory field but is currently empty'))
     for row in authors.split('\n'):
