@@ -9,6 +9,7 @@ from invenio.errorlib import register_exception
 import datetime
 import urllib
 import sys
+import gzip
 if sys.hexversion < 0x2060000:
     try:
         import simplejson as json
@@ -19,6 +20,8 @@ if sys.hexversion < 0x2060000:
 else:
     import json
 
+CFG_ENTREZ = "ftp://ftp.ncbi.nih.gov/pubmed/J_Entrez.gz"
+
 class ComplexEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, datetime.date):
@@ -26,16 +29,43 @@ class ComplexEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def _init_journals():
-    import gzip
-    run_sql(gzip.open("journals.sql.gz").read())
+def get_journals_from_entrez():
+    global ENTREZ_JOURNALS
+    try:
+        return ENTREZ_JOURNALS
+    except NameError:
+        pass
+    name, mimetype = urllib.urlretrieve(CFG_ENTREZ)
+    ENTREZ_JOURNALS = {}
+    item = {}
+    for line in gzip.open(name):
+        if line.startswith('---'):
+            if item:
+                ENTREZ_JOURNALS[item["JrId"]] = item
+                item = {}
+        else:
+            key, value = line.split(':', 1)
+            key = key.strip()
+            value = value.strip()
+            item[key] = value
+    if item:
+        ENTREZ_JOURNALS[item["JrId"]] = item
+    return ENTREZ_JOURNALS
+
+#def _init_journals():
+    #import gzip
+    #run_sql(gzip.open("journals.sql.gz").read())
 
 CFG_JOURNAL_KBS = {
-    'journal_issn': 'SELECT name, issn FROM journals_journal',
-    'journal_essn': 'SELECT name, essn FROM journals_journal',
-    'journal_publisher': 'SELECT journals_journal.name, journals_publisher.name FROM journals_journal JOIN journals_publisher ON journals_journal.publisher_id=journals_publisher.id',
-    'journal_name': 'SELECT journals_journal.name, journals_variantname.name FROM journals_journal JOIN journals_variantname ON journals_journal.id=journals_variantname.journal_id'
+    'journal_name': """tuple((item["JournalTitle"], "%s - %s" % (item["JournalTitle"], item["IsoAbbr"])) for item in get_journals_from_entrez().itervalues())"""
 }
+
+#CFG_JOURNAL_KBS = {
+    #'journal_issn': 'SELECT name, issn FROM journals_journal',
+    #'journal_essn': 'SELECT name, essn FROM journals_journal',
+    #'journal_publisher': 'SELECT journals_journal.name, journals_publisher.name FROM journals_journal JOIN journals_publisher ON journals_journal.publisher_id=journals_publisher.id',
+    #'journal_name': 'SELECT journals_journal.name, journals_variantname.name FROM journals_journal JOIN journals_variantname ON journals_journal.id=journals_variantname.journal_id'
+#}
 
 CFG_DNET_KBS = {
     #'project_acronym': 'SELECT grant_agreement_number, acronym FROM projects',
@@ -56,6 +86,8 @@ CFG_DNET_KBS = {
     'institutes': "SELECT legal_name, legal_name FROM organizations",
 }
 
+def none_run_sql(query):
+    return eval(query)
 
 def load_kbs(cfg, run_sql):
     for kb, query in cfg.iteritems():
@@ -81,12 +113,10 @@ def load_kbs(cfg, run_sql):
             original_keys = set([key[0] for key in get_kbr_keys(kb)])
             for i, row in enumerate(mapping):
                 key, value = row[0], row[1:]
-                print key, value
                 if kb.startswith('json_'):
                     value = encoder.encode(dict(zip(description, value)))
                 else:
                     value = value[0]
-                print value
                 if value:
                     if key in original_keys:
                         original_keys.remove(key)
@@ -104,10 +134,9 @@ def load_kbs(cfg, run_sql):
             continue
 
 
-def bst_load_OpenAIRE_kbs(journals=False):
+def bst_load_OpenAIRE_kbs():
     load_kbs(CFG_DNET_KBS, dnet_run_sql)
-    if journals:
-        load_kbs(CFG_JOURNAL_KBS, run_sql)
+    load_kbs(CFG_JOURNAL_KBS, none_run_sql)
 
 if __name__ == '__main__':
     bst_load_OpenAIRE_kbs(journals=True)

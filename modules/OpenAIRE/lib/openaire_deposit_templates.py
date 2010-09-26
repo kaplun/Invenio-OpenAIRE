@@ -116,6 +116,7 @@ class Template:
         values['english_language_label'] = escape(_("English information"))
         values['original_language_label'] = escape(_("Original language information"))
         values['original_abstract_label'] = escape(_("Original language abstract"))
+        values["journal_title_tooltip"] = escape(_("""<p>Start typing part of the name of the journal where you published your publication, and it will be possibly automatically completed against a list of known journal titles.</p><p><em>Note that the journal title list has been retrieved from the freely available resource in the <a href="http://www.ncbi.nlm.nih.gov/entrez/citmatch_help.html#JournalLists" target="_blank"><strong>Entrez</strong></a> database.</p>"""), True)
         values['journal_title_label'] = escape(_("Journal title"))
         values['publication_date_label'] = escape(_("Publication date"))
         values['volume_label'] = escape(_("Volume"))
@@ -382,7 +383,7 @@ class Template:
                 $(document).ready(function(){
                     var tooltip = clone(gTipDefault);
                     tooltip.content = {
-                        'text': '<table><tbody><tr><td align="right"><strong>%(filename_label)s:<strong></td><td align="left"><a href="%(download_url)s" target="_blank" type="%(mimetype)s">%(filename)s</a></td></tr><tr><td align="right"><strong>%(checksum_label)s:<strong></td><td align="left">%(md5)s</td></tr><tr><td align="right"><strong>%(mimetype_label)s:<strong></td><td align="left">%(mimetype)s</td></tr><tr><td align="right"><strong>%(format_label)s:<strong></td><td align="left">%(format)s</td></tr><tr><td align="right"><strong>%(size_label)s:<strong></td><td align="left">%(size)s</td></tr><tbody></table>'
+                        'text': '<table><tbody><tr><td align="right"><strong>%(filename_label)s:<strong></td><td align="left"><a href="%(download_url)s" target="_blank" type="%(mimetype)s">%(filename)s</a></td></tr><tr><td align="right"><strong>%(format_label)s:<strong></td><td align="left">%(format)s</td></tr><tr><td align="right"><strong>%(size_label)s:<strong></td><td align="left">%(size)s</td></tr><tr><td align="right"><strong>%(mimetype_label)s:<strong></td><td align="left">%(mimetype)s</td></tr><tr><td align="right"><strong>%(checksum_label)s:<strong></td><td align="left">%(md5)s</td></tr><tbody></table>'
                     };
                     $('#file_%(id)s').qtip(tooltip);
                 });
