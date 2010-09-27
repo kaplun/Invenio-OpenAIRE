@@ -2,7 +2,7 @@
 
 from invenio.bibtask import write_message, task_update_progress
 from invenio.dbquery import run_sql
-from invenio.bibknowledge import add_kb_mapping, kb_exists, update_kb_mapping, add_kb, kb_mapping_exists, add_kb_mapping, remove_kb_mapping, get_kbr_keys
+from invenio.bibknowledge import add_kb_mapping, kb_exists, update_kb_mapping, add_kb, kb_mapping_exists, add_kb_mapping, remove_kb_mapping, get_kbr_keys, get_kb_mappings
 from invenio.dnetutils import dnet_run_sql
 from invenio.errorlib import register_exception
 
@@ -80,7 +80,7 @@ CFG_DNET_KBS = {
             #LEFT OUTER JOIN participants ON beneficiaryid=participant
     #""",
     'json_projects': """SELECT projectid,grant_agreement_number,ec_project_website,acronym,call_identifier,end_date,start_date,title,fundedby FROM projects""",
-    'projects': "SELECT grant_agreement_number, acronym || ' - ' || title || ' (' || grant_agreement_number || ')' FROM projects",
+    'projects': """SELECT grant_agreement_number, COALESCE(acronym, title) || ' - ' || COALESCE(title, acronym) || ' (' || grant_agreement_number || ')' FROM projects""",
     'project_subjects': "SELECT project, project_subject FROM projects_projectsubjects",
     'languages': "SELECT languageid, name FROM languages",
     'institutes': "SELECT legal_name, legal_name FROM organizations",
@@ -89,15 +89,21 @@ CFG_DNET_KBS = {
 def none_run_sql(query):
     return eval(query)
 
-def load_kbs(cfg, run_sql):
+def load_kbs(cfg, run_sql, in_task=False):
     for kb, query in cfg.iteritems():
         if not kb_exists(kb):
             add_kb(kb)
-        write_message("Updating %s KB..." % kb)
+        if in_task:
+            write_message("Updating %s KB..." % kb)
         try:
+            if not in_task:
+                print "kb:", kb
+                print "kb beginning:", len(get_kb_mappings(kb))
             if kb.startswith('json_'):
                 encoder = ComplexEncoder()
                 mapping, description = run_sql(query, with_desc=True)
+                if not in_task:
+                    print "mapping:", len(mapping)
                 column_counter = {}
                 new_description = []
                 for column in description[1:]:
@@ -110,7 +116,14 @@ def load_kbs(cfg, run_sql):
                 description = new_description
             else:
                 mapping = run_sql(query)
+                if not in_task:
+                    print "mapping:", len(mapping)
             original_keys = set([key[0] for key in get_kbr_keys(kb)])
+            if not in_task:
+                print "original_keys before:", len(original_keys)
+
+            updated = 0
+            added = 0
             for i, row in enumerate(mapping):
                 key, value = row[0], row[1:]
                 if kb.startswith('json_'):
@@ -120,14 +133,24 @@ def load_kbs(cfg, run_sql):
                 if value:
                     if key in original_keys:
                         original_keys.remove(key)
-                    task_update_progress("%s - %s%%" % (kb, i * 100 / len(mapping)))
+                    if in_task:
+                        task_update_progress("%s - %s%%" % (kb, i * 100 / len(mapping)))
                     if kb_mapping_exists(kb, key):
+                        updated += 1
                         update_kb_mapping(kb, key, key, value)
                     else:
+                        added += 1
                         add_kb_mapping(kb, key, value)
-            task_update_progress("Cleaning %s" % kb)
+            if not in_task:
+                print "updated:", updated, "added:", added
+                print "kb after update:", len(get_kb_mappings(kb))
+                print "original_keys after:", len(original_keys)
+            if in_task:
+                task_update_progress("Cleaning %s" % kb)
             for key in original_keys:
                 remove_kb_mapping(kb, key)
+            if not in_task:
+                print "kb after remove:", len(get_kb_mappings(kb))
         except:
             raise
             register_exception(alert_admin=True, prefix="Error when updating KB %s" % kb)
@@ -135,8 +158,8 @@ def load_kbs(cfg, run_sql):
 
 
 def bst_load_OpenAIRE_kbs():
-    load_kbs(CFG_DNET_KBS, dnet_run_sql)
-    load_kbs(CFG_JOURNAL_KBS, none_run_sql)
+    load_kbs(CFG_DNET_KBS, dnet_run_sql, in_task=True)
+    load_kbs(CFG_JOURNAL_KBS, none_run_sql, in_task=True)
 
 if __name__ == '__main__':
     bst_load_OpenAIRE_kbs(journals=True)
