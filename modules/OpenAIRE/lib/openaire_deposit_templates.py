@@ -68,18 +68,34 @@ class Template:
                 H.input(type='hidden', name='projectid', id='projectid')
             )
 
-    def tmpl_select_a_project(self, existing_projects=None, ln=CFG_SITE_LANG):
+    def tmpl_select_a_project(self, existing_projects=None, plus=False, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
+        if plus:
+            openaire_plus = """
+                <p>%(explanation)s<br />
+                <form method="POST">
+                    <input type="hidden" name="projectid" value="000000" />
+                    <input type="submit" value="%(no_project)s" />
+                </form>
+            """ % {
+                'explanation': escape(_("If the publications you wish to deposit do not belong"
+                    " to any FP7 EU Project, just click the following button.")),
+                'no_project': escape(_("No project"), True),
+            }
+        else:
+            openaire_plus = ''
         return """
             <h3>%(select_a_project_label)s</h3>
             <form method="POST">
                 %(choose_a_project)s
                 <input type="submit" name="ok" id="ok" value="%(select_label)s" />
             </form>
+            %(openaire_plus)s
             """ % {
                 'select_a_project_label': escape(_("Your projects")),
                 'choose_a_project': self.tmpl_choose_project(existing_projects=existing_projects, ln=ln),
                 'select_label': escape(_("Select"), True),
+                'openaire_plus': openaire_plus
             }
 
     def tmpl_publication_preview(self, body, recid, ln=CFG_SITE_LANG):
@@ -267,45 +283,59 @@ class Template:
             // ]]></script>""" % data
 
 
-    def tmpl_project_information(self, projectid, existing_publications, grant_agreement_number, ec_project_website, acronym, call_identifier, end_date, start_date, title, fundedby, linked=True, ln=CFG_SITE_LANG):
+    def tmpl_project_information(self, projectid, existing_publications, grant_agreement_number='', ec_project_website='', acronym='', call_identifier='', end_date='', start_date='', title='', fundedby='', linked=True, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
-        data = {
-                'selected_project_label': escape(_("Selected Project")),
-                'acronym': escape(acronym, True),
-                'site': escape(CFG_SITE_URL, True),
-                'change_project_label': escape(_("change project")),
-                'acronym_label': escape(_("Acronym"), True),
-                'title_label': escape(_("Title"), True),
-                'title': escape(title, True),
-                'grant_agreement_number_label': escape(_("Grant Agreement Number"), True),
-                'grant_agreement_number': escape(str(grant_agreement_number), True),
-                'ec_project_website_label': escape(_("EC Project Website"), True),
-                'ec_project_website': escape(ec_project_website, True),
-                'start_date_label': escape(_("Start Date"), True),
-                'start_date': escape(start_date, True),
-                'end_date_label': escape(_("End Date"), True),
-                'end_date': escape(end_date, True),
-                'fundedby_label': escape(_("Funded By"), True),
-                'fundedby': escape(fundedby, True),
-                'call_identifier_label': escape(_("Call Identifier"), True),
-                'call_identifier': escape(call_identifier, True),
-                'id': escape(projectid, True),
-                'ln': escape(ln, True),
-                'existing_publications': existing_publications,
-            }
-        if linked:
-            data['acronym'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s</a>""" % data
-        return """
-            <div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s (%(existing_publications)d)</div>
-            <script type="text/javascript">// <![CDATA[
-                $(document).ready(function(){
-                    var tooltip = clone(gTipDefault);
-                    tooltip.content = {
-                        'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'
-                    };
-                    $('#selectedproject_%(id)s').qtip(tooltip);
-                });
-            // ]]></script>""" % data
+        if projectid == '000000':
+            data = {
+                    'selected_project_label': escape(_("Selected Project")),
+                    'acronym': escape(_('NO PROJECT'), True),
+                    'site': escape(CFG_SITE_URL, True),
+                    'id': escape(projectid, True),
+                    'ln': escape(ln, True),
+                    'existing_publications': existing_publications,
+                }
+            if linked:
+                data['acronym'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s</a>""" % data
+            return """
+                <div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s (%(existing_publications)d)</div>""" % data
+        else:
+            data = {
+                    'selected_project_label': escape(_("Selected Project")),
+                    'acronym': escape(acronym, True),
+                    'site': escape(CFG_SITE_URL, True),
+                    'change_project_label': escape(_("change project")),
+                    'acronym_label': escape(_("Acronym"), True),
+                    'title_label': escape(_("Title"), True),
+                    'title': escape(title, True),
+                    'grant_agreement_number_label': escape(_("Grant Agreement Number"), True),
+                    'grant_agreement_number': escape(str(grant_agreement_number), True),
+                    'ec_project_website_label': escape(_("EC Project Website"), True),
+                    'ec_project_website': escape(ec_project_website, True),
+                    'start_date_label': escape(_("Start Date"), True),
+                    'start_date': escape(start_date, True),
+                    'end_date_label': escape(_("End Date"), True),
+                    'end_date': escape(end_date, True),
+                    'fundedby_label': escape(_("Funded By"), True),
+                    'fundedby': escape(fundedby, True),
+                    'call_identifier_label': escape(_("Call Identifier"), True),
+                    'call_identifier': escape(call_identifier, True),
+                    'id': escape(projectid, True),
+                    'ln': escape(ln, True),
+                    'existing_publications': existing_publications,
+                }
+            if linked:
+                data['acronym'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s</a>""" % data
+            return """
+                <div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s (%(existing_publications)d)</div>
+                <script type="text/javascript">// <![CDATA[
+                    $(document).ready(function(){
+                        var tooltip = clone(gTipDefault);
+                        tooltip.content = {
+                            'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'
+                        };
+                        $('#selectedproject_%(id)s').qtip(tooltip);
+                    });
+                // ]]></script>""" % data
 
     def tmpl_add_publication_data_and_submit(self, projectid, project_information, publication_forms, submitted_publications, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
@@ -332,7 +362,7 @@ class Template:
             %(submitted_publications)s
             </div>
             <script type="text/javascript">//<![CDATA[
-                var gProjectid = %(projectid)s;
+                var gProjectid = "%(projectid)s";
                 $(document).ready(function(){
                     $('input.datepicker').datepicker({
                         dateFormat: 'yy-mm-dd',

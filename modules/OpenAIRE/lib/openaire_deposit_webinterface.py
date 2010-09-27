@@ -28,7 +28,7 @@ else:
 
 from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 from invenio.messages import gettext_set_language
-from invenio.webuser import collect_user_info
+from invenio.webuser import collect_user_info, session_param_get, session_param_set
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio.session import get_session
 from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL
@@ -47,7 +47,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
     _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships']
 
     def index(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (str, ''), 'delete': (str, '')})
+        argd = wash_urlargd(form, {'projectid': (str, ''), 'delete': (str, ''), 'plus': (int, -1)})
         _ = gettext_set_language(argd['ln'])
         user_info = collect_user_info(req)
         auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
@@ -63,12 +63,23 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             else:
                 return page(req=req, body=_("You are not authorized to use OpenAIRE deposition."), title=_("Authorization failure"))
         projectid = argd['projectid']
+        plus = argd['plus']
+        if plus == -1:
+            try:
+                plus = bool(session_param_get(req, 'plus'))
+            except KeyError:
+                plus = False
+                session_param_set(req, 'plus', plus)
+        else:
+            plus = bool(plus)
+            session_param_set(req, 'plus', plus)
+
         if projectid not in get_all_projectsids():
             projectid = ''
         uid = user_info['uid']
         if not projectid:
             projects = [OpenAIREProject(uid, projectid, argd['ln']).get_project_information() for projectid in get_exisiting_projectids_for_uid(user_info['uid'])]
-            body = openaire_deposit_templates.tmpl_select_a_project(existing_projects=projects, ln=argd['ln'])
+            body = openaire_deposit_templates.tmpl_select_a_project(existing_projects=projects, plus=plus, ln=argd['ln'])
             title = _("Submit New Publications")
             return page(title=title, body=body, req=req)
         else:
@@ -90,13 +101,15 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                     forms += publication.get_publication_form()
                 else:
                     submitted_publications += publication.get_publication_preview()
+            if projectid == '000000':
+                project_information = ''
             body = openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, project_information, forms, submitted_publications, ln=argd['ln'])
             body += openaire_deposit_templates.tmpl_upload_publications(projectid=projectid, session=get_session(req).sid(), ln=argd['ln'])
             title = _('Manage Your Publications')
             return page(body=body, title=title, req=req)
 
     def uploadifybackend(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, 0), 'session': (str, '')})
+        argd = wash_urlargd(form, {'projectid': (str, ''), 'session': (str, '')})
         _ = gettext_set_language(argd['ln'])
         session = argd['session']
         get_session(req=req, sid=session)
@@ -109,7 +122,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         return "1"
 
     def getfile(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, ''), 'fileid': (str, '')})
+        argd = wash_urlargd(form, {'projectid': (str, ''), 'publicationid': (str, ''), 'fileid': (str, '')})
         uid = collect_user_info(req)['uid']
         publicationid = argd['publicationid']
         projectid = argd['projectid']
@@ -135,7 +148,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         return page(title='sandbox', body=body, req=req)
 
     def authorships(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, 0), 'term': (str, '')})
+        argd = wash_urlargd(form, {'projectid': (str, ''), 'term': (str, '')})
         user_info = collect_user_info(req)
         uid = user_info['uid']
         req.content_type = 'application/json'
@@ -155,7 +168,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         return json.dumps([])
 
     def ajaxgateway(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, 0), 'publicationid': (str, ''), 'action': (str, ''), 'current_field': (str, '')})
+        argd = wash_urlargd(form, {'projectid': (str, ''), 'publicationid': (str, ''), 'action': (str, ''), 'current_field': (str, '')})
         action = argd['action']
         publicationid = argd['publicationid']
         projectid = argd['projectid']

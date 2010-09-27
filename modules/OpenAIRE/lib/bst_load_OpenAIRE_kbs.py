@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from invenio.bibtask import write_message, task_update_progress
+from invenio.bibtask import write_message, task_update_progress, task_sleep_now_if_required
 from invenio.dbquery import run_sql
 from invenio.bibknowledge import add_kb_mapping, kb_exists, update_kb_mapping, add_kb, kb_mapping_exists, add_kb_mapping, remove_kb_mapping, get_kbr_keys, get_kb_mappings
 from invenio.dnetutils import dnet_run_sql
@@ -91,6 +91,7 @@ def none_run_sql(query):
 
 def load_kbs(cfg, run_sql, in_task=False):
     for kb, query in cfg.iteritems():
+        task_sleep_now_if_required(can_stop_too=True)
         if not kb_exists(kb):
             add_kb(kb)
         if in_task:
@@ -118,6 +119,10 @@ def load_kbs(cfg, run_sql, in_task=False):
                 mapping = run_sql(query)
                 if not in_task:
                     print "mapping:", len(mapping)
+                if kb == 'projects':
+                    mapping = list(mapping)
+                    mapping.append(('000000', 'NO PROJECT'))
+                    mapping = tuple(mapping)
             original_keys = set([key[0] for key in get_kbr_keys(kb)])
             if not in_task:
                 print "original_keys before:", len(original_keys)
