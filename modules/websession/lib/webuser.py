@@ -557,6 +557,17 @@ def loginUser(req, p_un, p_pw, login_method):
                     return([], p_email, p_pw_local, 19)
                 else:
                     return([], p_email, p_pw_local, 13)
+            elif CFG_EXTERNAL_AUTHENTICATION[login_method].enforce_external_nicknames:
+                ## Let's still fetch a possibly upgraded nickname.
+                    try: # Let's discover the external nickname!
+                        p_nickname = CFG_EXTERNAL_AUTHENTICATION[login_method].fetch_user_nickname(p_email, p_pw, req)
+                        if nickname_valid_p(p_nickname) and nicknameUnique(p_nickname) == 0:
+                            updateDataUser(query_result[0][0], p_email, p_nickname)
+                    except (AttributeError, NotImplementedError):
+                        pass
+                    except:
+                        register_exception(alert_admin=True)
+                        raise
             try:
                 groups = CFG_EXTERNAL_AUTHENTICATION[login_method].fetch_user_groups_membership(p_email, p_pw, req)
                 # groups is a dictionary {group_name : group_description,}
