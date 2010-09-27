@@ -216,6 +216,16 @@ def get_permitted_restricted_collections(user_info):
             ret.append(collection)
     return ret
 
+def get_all_restricted_recids():
+    """
+    Return the set of all the restricted recids, i.e. the ids of those records
+    which belong to at least one restricted collection.
+    """
+    ret = HitSet()
+    for collection in restricted_collection_cache.cache:
+        ret |= get_collection_reclist(collection)
+    return ret
+
 def get_restricted_collections_for_recid(recid):
     """
     Return the list of restricted collection names to which recid belongs.
