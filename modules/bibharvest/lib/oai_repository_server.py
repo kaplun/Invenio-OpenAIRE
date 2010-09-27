@@ -735,23 +735,18 @@ def oaigetsysnolist(set="", fromdate="", untildate=""):
     else:
         untildate = get_latest_datestamp()
 
-    set_definition = get_set_definitions(set)
-    try:
-        collection = set_definition[0]['c']
-        if not collection:
-            collection = CFG_SITE_NAME
-    except KeyError:
-        collection = CFG_SITE_NAME
-
+    collections = []
+    for set_definition in get_set_definitions(set):
+        collections.extend(coll.strip() for coll in set_definition['c'].split(','))
     recids = perform_request_search(f1=CFG_OAI_ID_FIELD, p1="oai:*", m1="e", op1='a',
                                     f2=((set and CFG_OAI_SET_FIELD) or ""), p2=set, m2="e",
                                     d1=utc_to_localtime(fromdate),
                                     d2=utc_to_localtime(untildate),
-                                    cc=collection,
+                                    c=collections,
                                     dt='m',
                                     ap=0)
     ## Let's discard non public records
-    return list(intbitset(recids) & get_all_restricted_recids())
+    return list(intbitset(recids) - get_all_restricted_recids())
 
 def oaigenresumptionToken():
     "Generates unique ID for resumption token management."
