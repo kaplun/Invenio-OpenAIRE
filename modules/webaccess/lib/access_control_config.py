@@ -101,7 +101,7 @@ else:
     CFG_EXTERNAL_AUTH_LOGOUT_SSO = None
     CFG_EXTERNAL_AUTHENTICATION = {
     "Local": None,
-    "Robot": ExternalAuthRobot()}
+    "Robot": ExternalAuthRobot(enforce_external_nicknames=True)}
 
 
 # default data for the add_default_settings function
