@@ -86,7 +86,7 @@ def portal_page(title, body, navtrail="", description="", keywords="",
          body_css_classes=None):
     if req is not None:
         user_info = collect_user_info(req)
-        username = user_info.get('EXTERNAL_username', user_info['email'])
+        username = user_info.get('nickname', user_info['email'])
         logout_key = user_info.get('EXTERNAL_logout_key', '')
     else:
         username = 'Guest'
