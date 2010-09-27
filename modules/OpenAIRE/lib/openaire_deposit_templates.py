@@ -19,7 +19,7 @@
 
 import os
 import re
-from cgi import escape
+from cgi import escape as cgi_escape
 
 from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_ETCDIR, CFG_VERSION
 from invenio.messages import gettext_set_language
@@ -28,6 +28,12 @@ from invenio.textutils import nice_size
 
 CFG_OPENAIRE_PAGE_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_page.tpl')).read()
 CFG_OPENAIRE_FORM_TEMPLATE = open(os.path.join(CFG_ETCDIR, 'openaire_form.tpl')).read()
+
+def escape(value, *args, **argd):
+    """Always cast to string as to avoid None values."""
+    if value is None:
+        value = ''
+    return cgi_escape(str(value), *args, **argd)
 
 RE_PLACEMARKS = re.compile(r'%\((?P<placemark>\w+)\)s')
 CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS = dict((placemark, '') for placemark in RE_PLACEMARKS.findall(CFG_OPENAIRE_FORM_TEMPLATE))
