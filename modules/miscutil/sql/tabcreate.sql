@@ -3681,6 +3681,7 @@ CREATE TABLE IF NOT EXISTS OpenAIREauthorships (
   publicationid varchar(30) NOT NULL,
   authorship varchar(255) NOT NULL,
   KEY (uid, projectid, publicationid),
-  KEY (uid, projectid, authorship)
+  KEY (uid, projectid, authorship),
+  KEY (projectid, authorship)
 ) TYPE=MyISAM;
 -- end of file

@@ -101,6 +101,8 @@ def get_project_information_from_projectid(projectid):
         return {}
 
 def get_favourite_authorships_for_user(uid, projectid, term=''):
+    if uid is None:
+        return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE projectid=%s and authorship LIKE %s ORDER BY authorship", (projectid, '%%%s%%' % term))]
     return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s and projectid=%s and authorship LIKE %s ORDER BY authorship", (uid, projectid, '%%%s%%' % term))]
 
 def update_favourite_authorships_for_user(uid, projectid, publicationid, authorships):

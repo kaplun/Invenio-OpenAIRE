@@ -144,6 +144,9 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         ret = get_favourite_authorships_for_user(uid, projectid, term)
         if ret:
             return json.dumps(ret)
+        ret = get_favourite_authorships_for_user(None, projectid, term)
+        if ret:
+            return json.dumps(ret)
         if ':' in term:
             ## an institution is being typed
             name, institute = term.split(':', 1)
