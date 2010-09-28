@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import random, os
+import random, os, sys
 import tempfile
 import marshal
 from datetime import timedelta, datetime, date
@@ -15,7 +15,7 @@ CFG_CHOMSKY_DIR = os.path.join(CFG_TMPDIR, 'chomsky')
 
 rns = {}
 
-def bst_chomsky():
+def bst_chomsky(howmany=1, collection="TEST"):
     global rns
     marcxml_template = open(os.path.join(CFG_CHOMSKY_DIR, "template_marcxml.xml")).read()
     names = open(os.path.join(CFG_CHOMSKY_DIR, "names.txt")).read().split("\n")[:-1]
@@ -39,35 +39,39 @@ def bst_chomsky():
         marshal.dump(rns, open(os.path.join(CFG_CHOMSKY_DIR, "rns.dat"), 'w'))
         return 'OpenAIRE-TEST-%s-%03d' % (year, rns[year])
 
-    dcfields = dict(AUTHOR = encode_for_xml("%s, %s" % (random.choice(names), random.choice(names))),
-                TITLE = encode_for_xml(chomsky(1)),
-                DESCRIPTION = encode_for_xml(chomsky(4)),
-                SUBJECT = encode_for_xml(chomsky(1)),
-                DATE = random_date(),
-                JOURNAL = encode_for_xml(random.choice(journals)[0]),
-                LANGUAGE = encode_for_xml(random.choice(language)[0]),
-                RN = encode_for_xml(random_rn()),
-                YEAR = random.randrange(2008, 2011),
-                AUTHOR2 = '',
-                EMBARGO = '',
-                FULLTEXT = encode_for_xml(os.path.join(CFG_CHOMSKY_DIR, 'test.pdf')),
-                PID = random.choice(pids)
-                )
-    rights = random.choice(['closedAccess', 'embargoedAccess', 'restrictedAccess', 'openAccess'])
-    dcfields['LICENSE'] = rights
-    if rights == 'embargoedAccess':
-        embargo_date = random_date().strftime('%Y-%m-%d')
-        dcfields["EMBARGO"] = """    <datafield tag="942" ind1=" " ind2=" ">
-        <subfield code="a">%s</subfield>
-    </datafield>""" % embargo_date
-    dcfields['RIGHTS'] = rights
+    output = ""
+    for i in xrange(howmany):
+        print >> sys.stderr, "Creating record %i" % i
+        dcfields = dict(AUTHOR = encode_for_xml("%s, %s" % (random.choice(names), random.choice(names))),
+                    TITLE = encode_for_xml(chomsky(1)),
+                    DESCRIPTION = encode_for_xml(chomsky(4)),
+                    SUBJECT = encode_for_xml(chomsky(1)),
+                    DATE = random_date(),
+                    JOURNAL = encode_for_xml(random.choice(journals)[0]),
+                    LANGUAGE = encode_for_xml(random.choice(language)[0]),
+                    RN = encode_for_xml(random_rn()),
+                    YEAR = random.randrange(2008, 2011),
+                    AUTHOR2 = '',
+                    EMBARGO = '',
+                    FULLTEXT = encode_for_xml(os.path.join(CFG_CHOMSKY_DIR, 'test.pdf')),
+                    PID = random.choice(pids),
+                    COLLECTION = collection
+                    )
+        rights = random.choice(['closedAccess', 'embargoedAccess', 'restrictedAccess', 'openAccess'])
+        dcfields['LICENSE'] = rights
+        if rights == 'embargoedAccess':
+            embargo_date = random_date().strftime('%Y-%m-%d')
+            dcfields["EMBARGO"] = """    <datafield tag="942" ind1=" " ind2=" ">
+            <subfield code="a">%s</subfield>
+        </datafield>""" % embargo_date
+        dcfields['RIGHTS'] = rights
 
-    if random.random() > .5:
-        dcfields["AUTHOR2"] = """    <datafield tag="700" ind1=" " ind2=" ">
-        <subfield code="a">%s</subfield>
-    </datafield>""" % encode_for_xml("%s, %s" % (random.choice(names), random.choice(names)))
+        if random.random() > .5:
+            dcfields["AUTHOR2"] = """    <datafield tag="700" ind1=" " ind2=" ">
+            <subfield code="a">%s</subfield>
+        </datafield>""" % encode_for_xml("%s, %s" % (random.choice(names), random.choice(names)))
 
-    output = marcxml_template % dcfields
+        output += marcxml_template % dcfields
 
     fd, name = tempfile.mkstemp(dir=CFG_CHOMSKY_DIR, suffix='.xml')
     os.write(fd, output)
