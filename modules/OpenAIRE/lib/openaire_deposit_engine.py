@@ -118,7 +118,7 @@ def normalize_authorships(authorships):
             affiliation = affiliation.strip()
             authorship = '%s: %s' % (name, affiliation)
         else:
-            authorship = authorship.strip()
+            authorship = authorship[0].strip()
         ret.append(authorship)
     return '\n'.join(ret)
 
