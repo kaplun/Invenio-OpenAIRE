@@ -313,11 +313,16 @@ class OpenAIREPublication(object):
 
     def merge_form(self, form, ln=CFG_SITE_LANG):
         if self.status in ('initialized', 'edited'):
-            if self.status == 'initialized':
-                self.status = 'edited'
-            self.touch()
             self._metadata['__form__'] = wash_form(form, self.publicationid)
-            self._metadata.update(namespaced_metadata2simple_metadata(self._metadata['__form__'], self.publicationid))
+            touched = False
+            for key, value in namespaced_metadata2simple_metadata(self._metadata['__form__'], self.publicationid).iteritems():
+                if value is not None:
+                    self._metadata[key] = value
+                    touched = True
+            if touched:
+                if self.status == 'initialized':
+                    self.status = 'edited'
+                self.touch()
 
     def touch(self):
         self._metadata['__md__'] = time.time()
@@ -471,31 +476,31 @@ class OpenAIREPublication(object):
                     record_add_field(rec, '700', subfields=[('a', name)])
         record_add_field(rec, '041', subfields=[('a', self._metadata['language'])])
         record_add_field(rec, '245', subfields=[('a', self._metadata['title'])])
-        if self._metadata['original_title']:
+        if self._metadata.get('original_title'):
             record_add_field(rec, '246', subfields=[('a', self._metadata['original_title'])])
         record_add_field(rec, '520', subfields=[('a', self._metadata['abstract'])])
-        if self._metadata['original_abstract']:
+        if self._metadata.get('original_abstract'):
             record_add_field(rec, '560', subfields=[('a', self._metadata['original_abstract'])])
-        if self._metadata['note']:
+        if self._metadata.get('note'):
             record_add_field(rec, '500', subfields=[('a', self._metadata['note'])])
         record_add_field(rec, '980', subfields=[('a', 'OPENAIRE')])
-        if self._metadata['publication_date']:
+        if self._metadata.get('publication_date'):
             record_add_field(rec, '260', subfields=[('c', self._metadata['publication_date'])])
         record_add_field(rec, '536', subfields=[('c', str(self.projectid))])
         record_add_field(rec, '856', ind1='0', subfields=[('f', get_email(self.uid))])
-        if self._metadata['embargo_date']:
+        if self._metadata.get('embargo_date'):
             record_add_field(rec, '942', subfields=[('a', self._metadata['embargo_date'])])
         for key, fulltext in self.fulltexts.iteritems():
             record_add_field(rec, 'FFT', subfields=[('a', fulltext.fullpath)])
         subfields = []
-        if self._metadata['journal_title']:
+        if self._metadata.get('journal_title'):
             subfields.append(('p', self._metadata['journal_title']))
-        if self._metadata['publication_date']:
+        if self._metadata.get('publication_date'):
             year = self._metadata['publication_date'][:4]
             subfields.append(('y', year))
-        if self._metadata['issue']:
+        if self._metadata.get('issue'):
             subfields.append(('n', self._metadata['issue']))
-        if self._metadata['pages']:
+        if self._metadata.get('pages'):
             subfields.append(('c', self._metadata['pages']))
         if subfields:
             record_add_field(rec, '909', 'C', '4', subfields=subfields)

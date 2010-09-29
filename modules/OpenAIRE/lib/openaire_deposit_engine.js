@@ -126,6 +126,7 @@ function ajaxGateway(element, action) {
     data.action = action;
     data.current_field = element.id;
     $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
+    return 1;
 }
 
 function onAjaxError(XHR, textStatus, errorThrown){
@@ -147,13 +148,7 @@ function clone(obj) {
 
 /* Initialization */
 $(document).ready(function(){
-    $('div.OpenAIRE input').focusout(function(){
-        return ajaxGateway(this, 'verify_field');
-    });
-    $('div.OpenAIRE textarea').focusout(function(){
-        return ajaxGateway(this, 'verify_field');
-    });
-    $('div.OpenAIRE select').focusout(function(){
+    $('div.OpenAIRE input:text,div.OpenAIRE textarea,div.OpenAIRE select').focusout(function(){
         return ajaxGateway(this, 'verify_field');
     });
     $('#project').autocomplete({

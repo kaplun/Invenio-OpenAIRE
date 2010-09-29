@@ -22,9 +22,9 @@ from invenio.webinterface_handler import wash_urlargd
 
 def wash_form(form, publicationid=None):
     if publicationid is None:
-        return wash_urlargd(form, dict([(field, (str, '')) for field in CFG_METADATA_FIELDS]))
+        return wash_urlargd(form, dict([(field, (str, None)) for field in CFG_METADATA_FIELDS]))
     else:
-        return wash_urlargd(form, dict([('%s_%s' % (field, publicationid), (str, '')) for field in CFG_METADATA_FIELDS]))
+        return wash_urlargd(form, dict([('%s_%s' % (field, publicationid), (str, None)) for field in CFG_METADATA_FIELDS]))
 
 def strip_publicationid(fieldname, publicationid):
     return fieldname[:-len("_%s" % publicationid)]
