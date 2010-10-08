@@ -51,6 +51,7 @@ from invenio.bibrankadminlib import \
 from invenio.dbquery import \
      run_sql, \
      get_table_update_time
+from invenio.intbitset import intbitset
 from invenio.websearch_external_collections import \
      external_collections_dictionary, \
      external_collection_sort_engine_by_name, \
@@ -1211,6 +1212,7 @@ def perform_rearrangefieldvalue(colID, fldID, ln, callback='yes', confirm=-1):
                 run_sql("UPDATE collection_field_fieldvalue SET score_fieldvalue=%s WHERE id_collection=%s and id_field=%s and id_fieldvalue=%s", (vscore, colID, fldID, fldvID))
                 vscore -= 1
         output += write_outcome((1, ""))
+        touch_collection(colID)
     else:
         output += write_outcome((0, (0, "No values to order")))
 
@@ -1236,6 +1238,7 @@ def perform_rearrangefield(colID, ln, fmeth, callback='yes', confirm=-1):
                 run_sql("UPDATE collection_field_fieldvalue SET score=%s WHERE id_collection=%s and id_field=%s", (score, colID, fldID))
                 score -= 1
         output += write_outcome((1, ""))
+        touch_collection(colID)
     else:
         output += write_outcome((0, (0, "No fields to order")))
 
@@ -1784,6 +1787,7 @@ def perform_update_detailed_record_options(colID, ln, tabs, recurse):
         run_sql("DELETE FROM collectiondetailedrecordpagetabs WHERE id_collection=%s", (colID, ))
         run_sql("REPLACE INTO collectiondetailedrecordpagetabs" + \
                 " SET id_collection=%s, tabs=%s", (colID, ';'.join(tabs)))
+        touch_collection(colID)
  ##        for enabled_tab in tabs:
 ##             run_sql("REPLACE INTO collectiondetailedrecordpagetabs" + \
 ##                 " SET id_collection='%s', tabs='%s'" % (colID, ';'.join(tabs)))
@@ -1972,6 +1976,7 @@ def perform_index(colID=1, ln=CFG_SITE_LANG, mtype='', content='', confirm=0):
             return "Cannot create root collection, please check database."
     if CFG_SITE_NAME != run_sql("SELECT name from collection WHERE id=1")[0][0]:
         res = run_sql("update collection set name=%s where id=1", (CFG_SITE_NAME, ))
+        touch_collection(1)
         if res:
             fin_output += """<b><span class="info">The name of the root collection has been modified to be the same as the %(sitename)s installation name given prior to installing %(sitename)s.</span><b><br />""" % {'sitename' : CFG_SITE_NAME}
         else:
@@ -2554,6 +2559,7 @@ def perform_checkexternalcollections(colID, ln, icl=None, update="", confirm=0, 
                 if not results_select:
                     query_insert = "INSERT INTO externalcollection (name) VALUES ('%(name)s');" % {'name': collection}
                     run_sql(query_insert)
+                    touch_collection(colID)
                     output += """<br /><span class=info>New collection \"%s\" has been added to the database table \"externalcollection\".</span><br />""" % (collection)
                 else:
                     output += """<br /><span class=info>Collection \"%s\" has already been added to the database table \"externalcollection\" or was already there.</span><br />""" % (collection)
@@ -2570,6 +2576,7 @@ def perform_checkexternalcollections(colID, ln, icl=None, update="", confirm=0, 
                     query_delete_states = "DELETE FROM collection_externalcollection WHERE id_externalcollection like '%(id)s';" % {'id': results_select[0][0]}
                     run_sql(query_delete)
                     run_sql(query_delete_states)
+                    touch_collection(colID)
                     output += """<br /><span class=info>Collection \"%s\" has been deleted from the database table \"externalcollection\".</span><br />""" % (collection)
                 else:
                     output += """<br /><span class=info>Collection \"%s\" has already been delete from the database table \"externalcollection\" or was never there.</span><br />""" % (collection)
@@ -2719,6 +2726,8 @@ def add_col_dad_son(add_dad, add_son, rtype):
                 highscore = int(score[0])
         highscore += 1
         res = run_sql("INSERT INTO collection_collection(id_dad,id_son,score,type) values(%s,%s,%s,%s)", (add_dad, add_son, highscore, rtype))
+        touch_collection(add_dad)
+        touch_collection(add_son)
         return (1, highscore)
     except StandardError, e:
         register_exception()
@@ -2880,12 +2889,18 @@ def remove_col_subcol(id_son, id_dad, type):
         if id_son != id_dad:
             tree = get_col_tree(id_son)
             run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s", (id_son, id_dad))
+            touch_collection(id_son)
+            touch_collection(id_dad)
         else:
             tree = get_col_tree(id_son, type)
             run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s and type=%s", (id_son, id_dad, type))
+            touch_collection(id_son)
+            touch_collection(id_dad)
         if not run_sql("SELECT id_dad,id_son,type,score from collection_collection WHERE id_son=%s and type=%s", (id_son, type)):
             for (id, up, down, dad, rtype) in tree:
                 run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s", (id, dad))
+                touch_collection(id)
+                touch_collection(dad)
         return (1, "")
     except StandardError, e:
         return (0, e)
@@ -2920,6 +2935,7 @@ def attach_rnk_col(colID, rnkID):
 
     try:
         res = run_sql("INSERT INTO collection_rnkMETHOD(id_collection, id_rnkMETHOD) values (%s,%s)", (colID, rnkID))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -2932,6 +2948,7 @@ def detach_rnk_col(colID, rnkID):
 
     try:
         res = run_sql("DELETE FROM collection_rnkMETHOD WHERE id_collection=%s AND id_rnkMETHOD=%s", (colID, rnkID))
+        touch_collection(rnkID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -2943,6 +2960,10 @@ def switch_col_treescore(col_1, col_2):
         res2 = run_sql("SELECT score FROM collection_collection WHERE id_dad=%s and id_son=%s", (col_2[3], col_2[0]))
         res = run_sql("UPDATE collection_collection SET score=%s WHERE id_dad=%s and id_son=%s", (res2[0][0], col_1[3], col_1[0]))
         res = run_sql("UPDATE collection_collection SET score=%s WHERE id_dad=%s and id_son=%s", (res1[0][0], col_2[3], col_2[0]))
+        touch_collection(col_1[3])
+        touch_collection(col_1[0])
+        touch_collection(col_2[3])
+        touch_collection(col_2[0])
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -2965,6 +2986,9 @@ def move_col_tree(col_from, col_to, move_to_rtype=''):
             move_to_rtype = col_from[4]
         res = run_sql("DELETE FROM collection_collection WHERE id_son=%s and id_dad=%s", (col_from[0], col_from[3]))
         res = run_sql("INSERT INTO collection_collection(id_dad,id_son,score,type) values(%s,%s,%s,%s)", (col_to[0], col_from[0], highscore, move_to_rtype))
+        touch_collection(col_from[0])
+        touch_collection(col_from[3])
+        touch_collection(col_to[0])
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -2978,6 +3002,7 @@ def remove_pbx(colID, pbxID, ln):
 
     try:
         res = run_sql("DELETE FROM collection_portalbox WHERE id_collection=%s AND id_portalbox=%s AND ln=%s", (colID, pbxID, ln))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -2990,6 +3015,7 @@ def remove_fmt(colID, fmtID):
 
     try:
         res = run_sql("DELETE FROM collection_format WHERE id_collection=%s AND id_format=%s", (colID, fmtID))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3002,6 +3028,7 @@ def remove_fld(colID, fldID, fldvID=''):
 
     try:
         sql = "DELETE FROM collection_field_fieldvalue WHERE id_collection=%s AND id_field=%s"
+        touch_collection(colID)
         params = [colID, fldID]
         if fldvID:
             if fldvID != "None":
@@ -3020,6 +3047,8 @@ def delete_fldv(fldvID):
     fldvID - delete all data in the tables associated with fieldvalue and this id"""
 
     try:
+        for colID in run_sql("SELECT id_collection FROM collection_field_fieldvalue WHERE id_fieldvalue=%s", (fldvID, )):
+            touch_collection(colID[0])
         res = run_sql("DELETE FROM collection_field_fieldvalue WHERE id_fieldvalue=%s", (fldvID, ))
         res = run_sql("DELETE FROM fieldvalue WHERE id=%s", (fldvID, ))
         return (1, "")
@@ -3032,6 +3061,8 @@ def delete_pbx(pbxID):
     pbxID - delete all data in the tables associated with portalbox and this id """
 
     try:
+        for colID in run_sql("SELECT id_collection FROM collection_portalbox WHERE id_portalbox=%s", (pbxID, )):
+            touch_collection(colID[0])
         res = run_sql("DELETE FROM collection_portalbox WHERE id_portalbox=%s", (pbxID, ))
         res = run_sql("DELETE FROM portalbox WHERE id=%s", (pbxID, ))
         return (1, "")
@@ -3044,6 +3075,8 @@ def delete_fmt(fmtID):
     fmtID - delete all data in the tables associated with format and this id """
 
     try:
+        for colID in run_sql("SELECT id_collection FROM collection_format WHERE id_format=%s", (fmtID, )):
+            touch_collection(colID[0])
         res = run_sql("DELETE FROM format WHERE id=%s", (fmtID, ))
         res = run_sql("DELETE FROM collection_format WHERE id_format=%s", (fmtID, ))
         res = run_sql("DELETE FROM formatname WHERE id_format=%s", (fmtID, ))
@@ -3065,6 +3098,7 @@ def delete_col(colID):
         res = run_sql("DELETE FROM collection_portalbox WHERE id_collection=%s", (colID, ))
         res = run_sql("DELETE FROM collection_format WHERE id_collection=%s", (colID, ))
         res = run_sql("DELETE FROM collection_field_fieldvalue WHERE id_collection=%s", (colID, ))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3095,6 +3129,8 @@ def update_fldv(fldvID, name, value):
     try:
         res = run_sql("UPDATE fieldvalue set name=%s where id=%s", (name, fldvID))
         res = run_sql("UPDATE fieldvalue set value=%s where id=%s", (value, fldvID))
+        for colID in run_sql("SELECT id_collection FROM collection_field_fieldvalue WHERE id_fieldvalue=%s", (fldvID, )):
+            touch_collection(colID[0])
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3175,6 +3211,7 @@ def add_col_pbx(colID, pbxID, ln, position, score=''):
             else:
                 score = 0
             res = run_sql("INSERT INTO collection_portalbox(id_portalbox, id_collection, ln, score, position) values (%s,%s,%s,%s,%s)", (pbxID, colID, ln, (score + 1), position))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3196,6 +3233,7 @@ def add_col_fmt(colID, fmtID, score=''):
             else:
                 score = 0
             res = run_sql("INSERT INTO collection_format(id_format, id_collection, score) values (%s,%s,%s)", (fmtID, colID, (score + 1)))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3236,6 +3274,7 @@ def add_col_fld(colID, fldID, type, fldvID=''):
             else:
                 run_sql("UPDATE collection_field_fieldvalue SET score=score+1")
                 res = run_sql("INSERT INTO collection_field_fieldvalue(id_field, id_collection, type, score,score_fieldvalue) values (%s,%s,%s,%s, 0)", (fldID, colID, type, 1))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3250,6 +3289,7 @@ def modify_dbquery(colID, dbquery=None):
         dbquery = None
     try:
         res = run_sql("UPDATE collection SET dbquery=%s WHERE id=%s", (dbquery, colID))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3274,6 +3314,7 @@ def modify_pbx(colID, pbxID, sel_ln, score='', position='', title='', body=''):
             res = run_sql("UPDATE collection_portalbox SET score=%s WHERE id_collection=%s and id_portalbox=%s and ln=%s", (score, colID, pbxID, sel_ln))
         if position:
             res = run_sql("UPDATE collection_portalbox SET position=%s WHERE id_collection=%s and id_portalbox=%s and ln=%s", (position, colID, pbxID, sel_ln))
+        touch_collection(colID)
         return (1, "")
     except Exception, e:
         register_exception()
@@ -3293,6 +3334,7 @@ def switch_fld_score(colID, id_1, id_2):
         else:
             res = run_sql("UPDATE collection_field_fieldvalue SET score=%s WHERE id_collection=%s and id_field=%s", (res2[0][0], colID, id_1))
             res = run_sql("UPDATE collection_field_fieldvalue SET score=%s WHERE id_collection=%s and id_field=%s", (res1[0][0], colID, id_2))
+        touch_collection(colID)
         return (1, "")
     except StandardError, e:
         register_exception()
@@ -3312,6 +3354,7 @@ def switch_fld_value_score(colID, id_1, fldvID_1, fldvID_2):
         else:
             res = run_sql("UPDATE collection_field_fieldvalue SET score_fieldvalue=%s WHERE id_collection=%s and id_field=%s and id_fieldvalue=%s", (res2[0][0], colID, id_1, fldvID_1))
             res = run_sql("UPDATE collection_field_fieldvalue SET score_fieldvalue=%s WHERE id_collection=%s and id_field=%s and id_fieldvalue=%s", (res1[0][0], colID, id_1, fldvID_2))
+        touch_collection(colID)
         return (1, "")
     except Exception, e:
         register_exception()
@@ -3330,6 +3373,7 @@ def switch_pbx_score(colID, id_1, id_2, sel_ln):
             return (0, (1, "Cannot rearrange the selected fields, either rearrange by name or use the mySQL client to fix the problem."))
         res = run_sql("UPDATE collection_portalbox SET score=%s WHERE id_collection=%s and id_portalbox=%s and ln=%s", (res2[0][0], colID, id_1, sel_ln))
         res = run_sql("UPDATE collection_portalbox SET score=%s WHERE id_collection=%s and id_portalbox=%s and ln=%s", (res1[0][0], colID, id_2, sel_ln))
+        touch_collection(colID)
         return (1, "")
     except Exception, e:
         register_exception()
@@ -3348,6 +3392,7 @@ def switch_score(colID, id_1, id_2, table):
             return (0, (1, "Cannot rearrange the selected fields, either rearrange by name or use the mySQL client to fix the problem."))
         res = run_sql("UPDATE collection_%s SET score=%%s WHERE id_collection=%%s and id_%s=%%s" % (table, table), (res2[0][0], colID, id_1))
         res = run_sql("UPDATE collection_%s SET score=%%s WHERE id_collection=%%s and id_%s=%%s" % (table, table), (res1[0][0], colID, id_2))
+        touch_collection(colID)
         return (1, "")
     except Exception, e:
         register_exception()
@@ -3455,3 +3500,25 @@ def get_detailed_page_tabs(colID=None, recID=None, ln=CFG_SITE_LANG):
 
     return tabs
 
+def touch_collection(colID):
+    """
+    Update the timestamp of the given collection so that the cache pages
+    will be rebuilt the next time some user will request them.
+    """
+    run_sql("UPDATE collection SET last_configuration_change=NOW() WHERE id=%s", (colID, ))
+
+def touch_all_collections():
+    """
+    Update the timestamp of all the collections so that the cache pages
+    will be rebuilt the next time some user will request them.
+    """
+    run_sql("UPDATE collection SET last_configuration_change=NOW()")
+
+def touch_all_collections_related_to_recids(recids):
+    """
+    Given a set of recids, touch any collection containing at least one
+    of the specified recids.
+    """
+    for colID, reclist in run_sql("SELECT id, reclist FROM collection"):
+        if intbitset(reclist) & recids:
+            touch_collection(colID)

@@ -426,6 +426,7 @@ update-v0.99.2-tables:
 	echo "ALTER TABLE bibdoc CHANGE status status text NOT NULL default '';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE bibdoc ADD COLUMN text_extraction_date datetime NOT NULL default '0000-00-00';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE collection DROP COLUMN restricted;" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE collection ADD COLUMN last_configuration_change datetime NOT NULL default '9999-12-31 23:59:59';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE schTASK CHANGE host host varchar(255) NOT NULL default '';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE hstTASK CHANGE host host varchar(255) NOT NULL default '';" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE bib85x DROP INDEX kv, ADD INDEX kv (value(100));" | ${prefix}/bin/dbexec

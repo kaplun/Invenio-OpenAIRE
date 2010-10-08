@@ -81,7 +81,8 @@ from invenio.config import \
      CFG_WEBSEARCH_PERMITTED_RESTRICTED_COLLECTIONS_LEVEL, \
      CFG_WEBSEARCH_USE_ALEPH_SYSNOS, \
      CFG_WEBSEARCH_RSS_I18N_COLLECTIONS, \
-     CFG_INSPIRE_SITE
+     CFG_INSPIRE_SITE, \
+     CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES
 from invenio.dbquery import Error
 from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd, drop_default_urlargd
@@ -124,6 +125,7 @@ from invenio.errorlib import register_exception
 from invenio.bibedit_webinterface import WebInterfaceEditPages
 from invenio.bibeditmulti_webinterface import WebInterfaceMultiEditPages
 from invenio.bibmerge_webinterface import WebInterfaceMergePages
+from invenio.websearch_webcoll import refresh_webcoll_cache_if_needed
 
 import invenio.template
 websearch_templates = invenio.template.load('websearch')
@@ -979,10 +981,12 @@ def display_collection(req, c, aas, verbose, ln):
                     req=req,
                     navmenuid='search')
     # wash `aas' argument:
-    if not os.path.exists("%s/collections/%d/body-as=%d-ln=%s.html" % \
-                          (CFG_CACHEDIR, colID, aas, ln)):
+    if aas not in CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES:
         # nonexistent `aas' asked for, fall back to Simple Search:
         aas = 0
+
+    refresh_webcoll_cache_if_needed(colID, ln)
+
     # display collection interface page:
     try:
         filedesc = open("%s/collections/%d/navtrail-as=%d-ln=%s.html" % \

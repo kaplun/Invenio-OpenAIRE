@@ -111,6 +111,7 @@ from invenio.bibdocfile import BibRecDocs, file_strip_ext, normalize_format, \
     bibdocfile_url_p, CFG_BIBDOCFILE_AVAILABLE_FLAGS, guess_format_from_url
 
 from invenio.search_engine import search_pattern
+from invenio.websearchadminlib import touch_all_collections_related_to_recids
 
 #Statistic variables
 stat = {}
@@ -120,6 +121,8 @@ stat['nb_records_inserted'] = 0
 stat['nb_errors'] = 0
 stat['nb_holdingpen'] = 0
 stat['exectime'] = time.localtime()
+
+AFFECTED_RECIDS = intbitset()
 
 ## Let's set a reasonable timeout for URL request (e.g. FFT)
 socket.setdefaulttimeout(40)
@@ -164,6 +167,7 @@ def bibupload(record, opt_tag=None, opt_mode=None,
 
     Return (error_code, recID) of the processed record.
     """
+    global AFFECTED_RECIDS
     assert(opt_mode in ('insert', 'replace', 'replace_or_insert', 'reference',
         'correct', 'append', 'format', 'holdingpen', 'delete'))
     error = None
@@ -178,6 +182,7 @@ def bibupload(record, opt_tag=None, opt_mode=None,
     if rec_id == -1:
         return (1, -1)
     elif rec_id > 0:
+        AFFECTED_RECIDS.add(rec_id)
         write_message("   -Retrieve record ID (found %s): DONE." % rec_id, verbose=2)
         if not record.has_key('001'):
             # Found record ID by means of SYSNO or OAIID, and the
@@ -1940,6 +1945,7 @@ def writing_rights_p():
 
 def task_run_core():
     """ Reimplement to add the body of the task."""
+    affected_recids = []
     error = 0
     write_message("Input file '%s', input mode '%s'." %
             (task_get_option('file_path'), task_get_option('mode')))
@@ -1992,6 +1998,10 @@ def task_run_core():
                     (stat['nb_records_inserted'] + \
                     stat['nb_records_updated'],
                     stat['nb_records_to_upload']))
+            ## Some records have surely been modified. Let's touch any
+            ## already existing collection, so that its cached pages will be
+            ## refreshed
+            touch_all_collections_related_to_recids(AFFECTED_RECIDS)
         else:
             write_message("   Error bibupload failed: No record found",
                         verbose=1, stream=sys.stderr)

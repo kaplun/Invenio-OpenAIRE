@@ -2554,6 +2554,7 @@ CREATE TABLE IF NOT EXISTS collection (
   dbquery text,
   nbrecs int(10) unsigned default '0',
   reclist longblob,
+  last_configuration_change datetime NOT NULL default '9999-12-31 23:59:59',
   PRIMARY KEY  (id),
   UNIQUE KEY name (name),
   KEY dbquery (dbquery(50))

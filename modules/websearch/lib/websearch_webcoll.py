@@ -27,6 +27,7 @@ import re
 import os
 import string
 import time
+from datetime import datetime
 
 from invenio.config import \
      CFG_CERN_SITE, \
@@ -45,6 +46,7 @@ from invenio.dbquery import run_sql, Error, get_table_update_time
 from invenio.bibrank_record_sorter import get_bibrank_methods
 from invenio.dateutils import convert_datestruct_to_dategui
 from invenio.bibformat import format_record
+from invenio.websearchadminlib import touch_all_collections
 from invenio.websearch_external_collections import \
      external_collection_load_states, \
      dico_collection_external_searches, \
@@ -135,6 +137,21 @@ def check_nbrecs_for_all_external_collections():
             return True
     write_message("All external collections are up to date.", verbose=6)
     return False
+
+def refresh_webcoll_cache_if_needed(colID, ln):
+    """
+    Check wether the cached version for the given combination of collection
+    and ln is uptodate on disk, and otherwise, rebuilt it on the fly.
+    """
+    try:
+        refresh_needed = datetime.fromtimestamp(os.path.getmtime(os.path.join(CFG_CACHEDIR, 'collections', str(colID), 'last-updated-ln=%s.html' % ln))) < run_sql("SELECT last_configuration_change FROM collection WHERE id=%s", (colID, ))[0][0]
+    except (IOError, OSError):
+        ## Most probably the cache has never been created.
+        refresh_needed = True
+    if refresh_needed:
+        name = run_sql("SELECT name FROM collection WHERE id=%s", (colID, ))[0][0]
+        collection = Collection(name)
+        collection.update_webpage_cache(ln)
 
 class Collection:
     "Holds the information on collections (id,name,dbquery)."
@@ -285,7 +302,7 @@ class Collection:
         # close file:
         f.close()
 
-    def update_webpage_cache(self):
+    def update_webpage_cache(self, lang):
         """Create collection page header, navtrail, body (including left and right stripes) and footer, and
            call write_cache_file() afterwards to update the collection webpage cache."""
 
@@ -294,47 +311,41 @@ class Collection:
         if self.dbquery and not CFG_WEBSEARCH_I18N_LATEST_ADDITIONS:
             self.create_latest_additions_info()
 
-        ## do this for each language:
-        for lang, lang_fullname in language_list_long():
 
-            # but only if some concrete language was not chosen only:
-            if lang in task_get_option("language", [lang]):
+        if self.dbquery and CFG_WEBSEARCH_I18N_LATEST_ADDITIONS:
+            self.create_latest_additions_info(ln=lang)
 
-                if self.dbquery and CFG_WEBSEARCH_I18N_LATEST_ADDITIONS:
-                    self.create_latest_additions_info(ln=lang)
+        # load the right message language
+        _ = gettext_set_language(lang)
 
-                # load the right message language
-                _ = gettext_set_language(lang)
+        ## first, update navtrail:
+        for aas in CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES:
+            self.write_cache_file("navtrail-as=%s-ln=%s" % (aas, lang),
+                                    self.create_navtrail_links(aas, lang))
 
-                ## first, update navtrail:
-                for aas in CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES:
-                    self.write_cache_file("navtrail-as=%s-ln=%s" % (aas, lang),
-                                          self.create_navtrail_links(aas, lang))
-
-                ## second, update page body:
-                for aas in CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES: # do light, simple and advanced search pages:
-                    body = websearch_templates.tmpl_webcoll_body(
-                        ln=lang, collection=self.name,
-                        te_portalbox = self.create_portalbox(lang, 'te'),
-                        searchfor = self.create_searchfor(aas, lang),
-                        np_portalbox = self.create_portalbox(lang, 'np'),
-                        narrowsearch = self.create_narrowsearch(aas, lang, 'r'),
-                        focuson = self.create_narrowsearch(aas, lang, "v") + \
-                        self.create_external_collections_box(lang),
-                        instantbrowse = self.create_instant_browse(aas=aas, ln=lang),
-                        ne_portalbox = self.create_portalbox(lang, 'ne')
-                        )
-                    self.write_cache_file("body-as=%s-ln=%s" % (aas, lang), body)
-                ## third, write portalboxes:
-                self.write_cache_file("portalbox-tp-ln=%s" % lang, self.create_portalbox(lang, "tp"))
-                self.write_cache_file("portalbox-te-ln=%s" % lang, self.create_portalbox(lang, "te"))
-                self.write_cache_file("portalbox-lt-ln=%s" % lang, self.create_portalbox(lang, "lt"))
-                self.write_cache_file("portalbox-rt-ln=%s" % lang, self.create_portalbox(lang, "rt"))
-                ## fourth, write 'last updated' information:
-                self.write_cache_file("last-updated-ln=%s" % lang,
-                                      convert_datestruct_to_dategui(time.localtime(),
-                                                                    ln=lang))
-        return
+        ## second, update page body:
+        for aas in CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES: # do light, simple and advanced search pages:
+            body = websearch_templates.tmpl_webcoll_body(
+                ln=lang, collection=self.name,
+                te_portalbox = self.create_portalbox(lang, 'te'),
+                searchfor = self.create_searchfor(aas, lang),
+                np_portalbox = self.create_portalbox(lang, 'np'),
+                narrowsearch = self.create_narrowsearch(aas, lang, 'r'),
+                focuson = self.create_narrowsearch(aas, lang, "v") + \
+                self.create_external_collections_box(lang),
+                instantbrowse = self.create_instant_browse(aas=aas, ln=lang),
+                ne_portalbox = self.create_portalbox(lang, 'ne')
+                )
+            self.write_cache_file("body-as=%s-ln=%s" % (aas, lang), body)
+        ## third, write portalboxes:
+        self.write_cache_file("portalbox-tp-ln=%s" % lang, self.create_portalbox(lang, "tp"))
+        self.write_cache_file("portalbox-te-ln=%s" % lang, self.create_portalbox(lang, "te"))
+        self.write_cache_file("portalbox-lt-ln=%s" % lang, self.create_portalbox(lang, "lt"))
+        self.write_cache_file("portalbox-rt-ln=%s" % lang, self.create_portalbox(lang, "rt"))
+        ## fourth, write 'last updated' information:
+        self.write_cache_file("last-updated-ln=%s" % lang,
+                                convert_datestruct_to_dategui(time.localtime(),
+                                                            ln=lang))
 
     def create_navtrail_links(self, aas=CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE, ln=CFG_SITE_LANG):
         """Creates navigation trail links, i.e. links to collection
@@ -790,8 +801,11 @@ class Collection:
         write_message("... updating reclist of %s (%s recs)" % (self.name, self.nbrecs), verbose=6)
         sys.stdout.flush()
         try:
-            run_sql("UPDATE collection SET nbrecs=%s, reclist=%s WHERE id=%s",
-                    (self.nbrecs, self.reclist.fastdump(), self.id))
+            original_reclist = run_sql("SELECT reclist FROM collection WHERE id=%s", (self.id, ))[0][0]
+            new_reclist = self.reclist.fastdump()
+            if original_reclist != new_reclist:
+                run_sql("UPDATE collection SET nbrecs=%s, reclist=%s, last_configuration_change=NOW() WHERE id=%s",
+                        (self.nbrecs, new_reclist, self.id))
             self.reclist_updated_since_start = 1
         except Error, e:
             print "Database Query Error %d: %s." % (e.args[0], e.args[1])
@@ -1000,6 +1014,7 @@ def task_run_core():
             res = run_sql("SELECT name FROM collection ORDER BY id")
             for row in res:
                 colls.append(get_collection(row[0]))
+
         # secondly, update collection reclist cache:
         if task_get_option('part', 1) == 1:
             i = 0
@@ -1014,22 +1029,20 @@ def task_run_core():
                 coll.update_reclist()
                 task_update_progress("Part 1/2: done %d/%d" % (i, len(colls)))
                 task_sleep_now_if_required(can_stop_too=True)
-        # thirdly, update collection webpage cache:
-        if task_get_option("part", 2) == 2:
-            i = 0
-            for coll in colls:
-                i += 1
-                write_message("%s / webpage cache update" % coll.name)
-                coll.update_webpage_cache()
-                task_update_progress("Part 2/2: done %d/%d" % (i, len(colls)))
-                task_sleep_now_if_required(can_stop_too=True)
 
-        # finally update the cache last updated timestamp:
+        # thirdly, update the cache last updated timestamp:
         # (but only when all collections were updated, not when only
         # some of them were forced-updated as per admin's demand)
         if not task_has_option("collection"):
             set_cache_last_updated_timestamp(task_run_start_timestamp)
             write_message("Collection cache timestamp is set to %s." % get_cache_last_updated_timestamp(), verbose=3)
+
+        # finally, update collection webpage cache if requested:
+        if task_get_option("part", 2) == 2:
+            task_update_progress("Part 2/2: done")
+            touch_all_collections()
+
+
     else:
         ## cache up to date, we don't have to run
         write_message("Collection cache is up to date, no need to run.")
