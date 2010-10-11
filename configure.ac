@@ -20,7 +20,7 @@
 ## script.
 
 ## Initialize autoconf and automake:
-AC_INIT(cds-invenio, 0.99.90.20100827-OpenAIRE, OpenAIRE-Support@cern.ch)
+AC_INIT(cds-invenio, 0.99.90.20101011-OpenAIRE, OpenAIRE-Support@cern.ch)
 AM_INIT_AUTOMAKE([tar-ustar])
 
 ## By default we shall install into /opt/cds-invenio.  (Do not use
@@ -669,6 +669,7 @@ AC_CONFIG_FILES([config.nice  \
 	  modules/miscutil/bin/dbdump \
 	  modules/miscutil/bin/dbexec \
 	  modules/miscutil/bin/inveniocfg \
+	  modules/miscutil/bin/plotextractor \
 	  modules/miscutil/demo/Makefile \
 	  modules/miscutil/doc/Makefile \
 	  modules/miscutil/doc/hacking/Makefile \
