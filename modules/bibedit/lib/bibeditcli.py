@@ -34,6 +34,7 @@ Options to inspect record history:
                     [recidC.revdateD]    record A dated B and record C dated D
    --revert-to-revision [recid.revdate]  submit given record revision to
                                          become current revision
+   --revert-to-previous-revision [recid] undo the very last change
 
 """
 
@@ -130,6 +131,33 @@ def cli_revert_to_revision(revid):
     print 'Your modifications have now been submitted. They will be ' \
         'processed as soon as the task queue is empty.'
 
+def cli_revert_to_previous_revision(recid):
+    """Undo the very last change.
+    """
+    revids = get_record_revision_ids(recid)
+    if len(revids) > 1:
+        previous_revid = revids[1]
+    else:
+        print 'ERROR: recid %s does not have a previous revision' % recid
+        sys.exit(1)
+
+    xml_record = get_marcxml_of_revision_id(previous_revid)
+
+    if record_locked_by_other_user(recid, -1):
+        print 'The record is currently being edited. ' \
+            'Please try again in a few minutes.'
+        sys.exit(1)
+
+    if record_locked_by_queue(recid):
+        print 'The record is locked because of unfinished upload tasks. ' \
+            'Please try again in a few minutes.'
+        sys.exit(1)
+
+    save_xml_record(recid, 0, xml_record)
+    print 'Your modifications have now been submitted. They will be ' \
+        'processed as soon as the task queue is empty.'
+
+
 def main():
     """Main entry point."""
     if '--help' in sys.argv or \
@@ -176,6 +204,13 @@ def main():
                 print_usage()
                 sys.exit(1)
             cli_revert_to_revision(revid)
+        elif cmd == '--revert-to-previous-revision':
+            try:
+                recid = opts[0]
+            except IndexError:
+                print_usage()
+                sys.exit(1)
+            cli_revert_to_previous_revision(recid)
         else:
             print "ERROR: Please specify a command.  Please see '--help'."
             sys.exit(1)
