@@ -579,7 +579,6 @@ def get_pdf_snippets(recID, patterns,
             # no hit, so check stemmed versions:
             from invenio.bibindex_engine_stemmer import stem
             stemmed_patterns = [stem(p, 'en') for p in patterns]
-            print stemmed_patterns
             out = get_text_snippets(text_path, stemmed_patterns, nb_words_around, max_snippets)
         if out:
             out_courtesy = ""
@@ -609,13 +608,14 @@ def get_text_snippets(textfile_path, patterns, nb_words_around, max_snippets):
     words_left = max_snippets * (nb_words_around * 2 + 1)
     # Assuming that there will be at least one word per line we can produce the
     # big snippets like this
-    cmd = "grep -i -A%s -B%s -m%s"
-    cmdargs = [str(nb_words_around), str(nb_words_around), str(max_snippets)]
+    # FIXME: the ligature replacement should be done at the textification time;
+    # then the sed expression can go away here.
+    cmd = "sed \'s/ﬀ/ff/g; s/ﬁ/fi/g; s/ﬂ/fl/g; s/ﬃ/ffi/g; s/ﬄ/ffl/g\' \
+           %s | grep -i -A%s -B%s -m%s"
+    cmdargs = [textfile_path, str(nb_words_around), str(nb_words_around), str(max_snippets)]
     for p in patterns:
         cmd += " -e %s"
         cmdargs.append(p)
-    cmd += " %s"
-    cmdargs.append(textfile_path)
     (dummy1, output, dummy2) = run_shell_command(cmd, cmdargs)
 
     result = []
