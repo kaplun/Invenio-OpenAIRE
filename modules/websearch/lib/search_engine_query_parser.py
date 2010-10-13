@@ -23,9 +23,19 @@
 
 import re
 import string
+from datetime import datetime
+
+try:
+    import dateutil.parser
+    GOT_DATEUTIL = True
+except ImportError:
+    # Ok, no date parsing is possible, but continue anyway,
+    # since this package is only recommended, not mandatory.
+    GOT_DATEUTIL = False
 
 from invenio.bibindex_engine_tokenizer import BibIndexFuzzyNameTokenizer as FNT
 from invenio.logicutils import to_cnf
+
 
 NameScanner = FNT()
 
@@ -314,9 +324,9 @@ class SpiresToInvenioSyntaxConverter:
     """
 
     # Constants defining fields
-    _DATE_ADDED_FIELD = '961__x:'
-    _DATE_UPDATED_FIELD = '961__c:' # FIXME: define and use dateupdate:
-    _DATE_FIELD = '269__c:'
+    _DATE_ADDED_FIELD = 'datecreated:'
+    _DATE_UPDATED_FIELD = 'datemodified:'
+    _DATE_FIELD = 'year:'
 
     _A_TAG = 'author:'
     _EA_TAG = 'exactauthor:'
@@ -434,12 +444,21 @@ class SpiresToInvenioSyntaxConverter:
         'ti' : 'title:',
         'title' : 'title:',
         'with-language' : 'title:',
+        # fulltext
+        'fulltext' : 'fulltext:',
+        'ft' : 'fulltext:',
         # topic
         'topic' : '695__a:',
         'tp' : '695__a:',
         'hep-topic' : '695__a:',
         'desy-keyword' : '695__a:',
         'dk' : '695__a:',
+
+        # second-order operators
+        'refersto' : 'refersto:',
+        'refs': 'refersto:',
+        'citedby' : 'citedby:',
+
         # replace all the keywords without match with empty string
         # this will remove the noise from the unknown keywrds in the search
         # and will in all fields for the words following the keywords
@@ -519,24 +538,24 @@ class SpiresToInvenioSyntaxConverter:
         # in case of changes correct also the code in this method
         self._re_exact_author_match = re.compile(r'\bexactauthor:(?P<author_name>[^\'\"].*?[^\'\"]\b)(?= and not | and | or | not |$)', re.IGNORECASE)
 
-        # regular expression that matches search term, its conent (words that
-        # are searched)and the operator preceding the term. In case that the
+        # regular expression that matches search term, its content (words that
+        # are searched) and the operator preceding the term. In case that the
         # names of the groups defined in the expression are changed, the
         # chagned should be reflected in the code that use it.
-        #self._re_search_term_pattern_match = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>title:|keyword:)(?P<search_content>.*?(\b|\'|\"|\/))(?= and | or | not |$)', re.IGNORECASE)
-        self._re_search_term_pattern_match = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>title:|keyword:)(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
+        self._re_search_term_pattern_match = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>title:|keyword:|fulltext:)(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # regular expression matching date after pattern
-        self._re_date_after_match = re.compile(r'\b(d|date)\b\s*(after|>)\s*(?P<year>\d{4})\b', re.IGNORECASE)
+        self._re_date_after_match = re.compile(r'\b(?P<searchop>d|date|dupd|dadd|da|date-added|du|date-updated)\b\s*(after|>)\s*(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # regular expression matching date after pattern
-        self._re_date_before_match = re.compile(r'\b(d|date)\b\s*(before|<)\s*(?P<year>\d{4})\b', re.IGNORECASE)
+        self._re_date_before_match = re.compile(r'\b(?P<searchop>d|date|dupd|dadd|da|date-added|du|date-updated)\b\s*(before|<)\s*(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
-        # regular expression matching dates in general
-        self._re_dates_match = self._compile_dates_regular_expression()
+        # regular expression that matches date searches which have been
+        # keyword-substituted
+        self._re_keysubbed_date_expr = re.compile(r'\b(?P<term>(' + self._DATE_ADDED_FIELD + ')|(' + self._DATE_UPDATED_FIELD + ')|(' + self._DATE_FIELD + '))\s*(?P<content>.+)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # for finding (and changing) a variety of different SPIRES search keywords
-        self._re_find_or_fin_at_start = re.compile('^find? .*$')
+        self._re_spires_find_keyword = re.compile('^(?P<find>f|fin|find)\s+(?P<query>.*)$', re.IGNORECASE)
 
         # patterns for subbing out spaces within quotes temporarily
         self._re_pattern_single_quotes = re.compile("'(.*?)'")
@@ -545,20 +564,27 @@ class SpiresToInvenioSyntaxConverter:
         self._re_pattern_space = re.compile("__SPACE__")
         self._re_pattern_IRN_search = re.compile(r'970__a:(?P<irn>\d+)')
 
+    def is_applicable(self, query):
+        """Is this converter applicable to this query?
+
+        Returns True IFF the query starts with SPIRES' 'find' keyword or some
+        acceptable variation thereof."""
+        if self._re_spires_find_keyword.match(query.lower()):
+            return True
+        else:
+            return False
+
     def convert_query(self, query):
-        """Converts the query from SPIRES syntax to Invenio syntax
+        """Convert SPIRES syntax queries to Invenio syntax.
 
-        Queries are assumed SPIRES queries only if they start with FIND or FIN"""
-
-        # allow users to use "f" only...
-        query = re.sub('^[fF] ', 'find ', query)
+        Do nothing to queries not in SPIRES syntax."""
 
         # SPIRES syntax allows searches with 'find' or 'fin'.
-        if self._re_find_or_fin_at_start.match(query.lower()):
+        if self.is_applicable(query):
 
             # Everywhere else make the assumption that all and only queries
             # starting with 'find' are SPIRES queries.  Turn fin into find.
-            query = re.sub('^[fF][iI][nN] ', 'find ', query)
+            query = self._re_spires_find_keyword.sub(lambda m: 'find '+m.group('query'), query)
 
             # these calls are before keywords replacement becuase when keywords
             # are replaced, date keyword is replaced by specific field search
@@ -601,7 +627,7 @@ class SpiresToInvenioSyntaxConverter:
                          'oct':'10', 'october':'10',
                          'nov':'11', 'november':'11',
                          'dec':'12', 'december':'12'}
-        # this dicrionary is used to transform name of the month
+        # this dictionary is used to transform name of the month
         # to a number used in the date format. By this reason it
         # contains also the numbers itself to simplify the conversion
         self._month_name_to_month_number = {'1':'01', '01':'01',
@@ -630,77 +656,43 @@ class SpiresToInvenioSyntaxConverter:
 
         return months_match
 
-    def _get_month_number(self, month_name):
-        """Returns the corresponding number for a given month
-        e.g. for February it returns 02"""
-
-        return self._month_name_to_month_number[month_name.lower()]
-
-    def _compile_dates_regular_expression(self):
-        """ Returns compiled regular expression matching dates in general that follow particular keywords"""
-
-        date_preceding_terms_match = r'\b((?<=' + \
-                    self._DATE_ADDED_FIELD +')|(?<=' + \
-                    self._DATE_UPDATED_FIELD + ')|(?<=' + \
-                    self._DATE_FIELD +'))'
-        day_match = r'\b(0?[1-9]|[12][0-9]|3[01])\b'
-        month_match = r'\b(0?[1-9]|1[012])\b'
-        month_names_match = self._get_month_names_match()
-        year_match = r'\b([1-9][0-9]?)?[0-9]{2}\b'
-        date_separator_match = r'(\s+|\s*[,/\-\.]\s*)'
-
-        dates_re = date_preceding_terms_match + r'\s*' + \
-            r'(((((?P<day>' + day_match + r')' + date_separator_match + ')?' + \
-            r'(?P<month>' + month_match + r'|' + month_names_match + r'))' + \
-            r'|' + \
-            r'((?P<month2>' + month_names_match + r')' + date_separator_match + \
-            r'(?P<day2>' + day_match + r')))' + \
-            date_separator_match + r')?' + \
-            r'(?P<year>' + year_match + r')'
-
-        return re.compile(dates_re, re.IGNORECASE)
-
     def _convert_dates(self, query):
-        """Converts dates in the query in format expected from invenio"""
+        """Tries to find dates in query and make them look like ISO-8601."""
 
-        def create_replacement_pattern(match):
-            """method used for replacement with regular expression"""
+        def mangle_with_dateutils(query):
+            DEFAULT = datetime(datetime.today().year, 1, 1)
+            result = ''
+            position = 0
+            for match in self._re_keysubbed_date_expr.finditer(query):
+                result += query[position : match.start()]
 
-            QUOTES = '"'
+                isodates = []
+                dates = match.group('content').split('->') # Warning: generalizing but should only ever be 2 items
+                for datestamp in dates:
+                    if datestamp != None:
+                        if re.match('[0-9]{1,4}$', datestamp):
+                            isodates.append(datestamp)
+                        else:
+                            try:
+                                dtobj = dateutil.parser.parse(datestamp, default=DEFAULT)
+                                if dtobj.day == 1:
+                                    isodates.append("%d-%02d" % (dtobj.year, dtobj.month))
+                                else:
+                                    isodates.append("%d-%02d-%02d" % (dtobj.year, dtobj.month, dtobj.day))
+                            except ValueError:
+                                isodates.append(datestamp)
 
-            # retrieve the year
-            year = match.group('year')
-            # in case only last two digits are provided, consider it is 19xx
-            if len(year) == 2:
-                year = '19' + year
+                daterange = '->'.join(isodates)
+                #if re.search('[^\s]+-[^>][^\s]*', daterange):
+                #    daterange = '"' + daterange + '"'
+                result += match.group('term') + daterange
+                position = match.end()
+            result += query[position : ]
+            return result
 
-            # retrieve the month
-            month_name = match.group('month')
-            if None == month_name:
-                month_name =  match.group('month2')
-
-            # if there is no month, look for everything in given year
-            if None == month_name:
-                return QUOTES + year + '*' + QUOTES
-
-            month = self._get_month_number(month_name)
-
-            # retrieve the day
-            day = match.group('day')
-            if None == day:
-                day = match.group('day2')
-
-            # if day is missing, look for everything in given year and month
-            if None == day:
-                return QUOTES + year + '-' + month + '-*' + QUOTES
-
-            if len(day) == 1:
-                day = '0'+day
-
-            return   QUOTES + year + '-' + month + '-' + day + QUOTES
-
-        query = self._re_dates_match.sub(create_replacement_pattern, query)
-
+        if GOT_DATEUTIL:
+            query = mangle_with_dateutils(query)
+        # else do nothing with the dates
         return query
 
     def _convert_irns_to_spires_irns(self, query):
@@ -716,7 +708,7 @@ class SpiresToInvenioSyntaxConverter:
 
         def create_replacement_pattern(match):
             """method used for replacement with regular expression"""
-            return 'year:' + match.group('year') + '->9999'
+            return match.group('searchop') + ' ' + match.group('search_content') + '->9999'
 
         query = self._re_date_after_match.sub(create_replacement_pattern, query)
 
@@ -727,7 +719,7 @@ class SpiresToInvenioSyntaxConverter:
 
         # method used for replacement with regular expression
         def create_replacement_pattern(match):
-            return 'year:' + '0->' + match.group('year')
+            return match.group('searchop') + ' ' + '0->' + match.group('search_content')
 
         query = self._re_date_before_match.sub(create_replacement_pattern, query)
 
@@ -737,11 +729,11 @@ class SpiresToInvenioSyntaxConverter:
         """Expands search queries.
 
         If a search term is followed by several words e.g.
-        author: ellis or title:THESE THREE WORDS it is exoanded to
+        author: ellis or title:THESE THREE WORDS it is expanded to
         author:ellis or (title: THESE and title:THREE...)
 
-        Not all the search terms are expanded this way, but only title: and
-        keyword: - see _re_search_term_pattern_match for details.
+        Not all the search terms are expanded this way, but only title:,
+        keyword:, and fulltext: - see _re_search_term_pattern_match for details.
         """
 
         def create_replacements(term, content):
@@ -855,9 +847,10 @@ class SpiresToInvenioSyntaxConverter:
                     search_pattern += ' or ' + self._EA_TAG + "\"%s, %s %s\"" % (author_surname, author_name[0:i], author_middle_name)
             return search_pattern
 
-        # ellis, jacqueline ---> "ellis, jacqueline" or "ellis, j.*" or "ellis, j" or "ellis, ja.*" or "ellis, ja" or "ellis, jacqueline *"
+        # ellis, jacqueline ---> "ellis, jacqueline" or "ellis, j.*" or "ellis, j" or "ellis, ja.*" or "ellis, ja" or "ellis, jacqueline *, ellis, j *"
         # in case we don't use SPIRES data, the ending dot is ommited.
         search_pattern = self._A_TAG + '"' + author_surname + ', ' + author_name + '*"'
+        search_pattern += " or " + self._EA_TAG + "\"%s, %s *\"" % (author_surname, author_name[0])
         if NAME_IS_NOT_INITIAL:
             for i in range(1,len(author_name)):
                 search_pattern += ' or ' + self._EA_TAG + "\"%s, %s\"" % (author_surname, author_name[0:i])

@@ -94,14 +94,16 @@ if CFG_CERN_SITE:
     CFG_EXTERNAL_AUTH_LOGOUT_SSO = 'https://login.cern.ch/adfs/ls/?wa=wsignout1.0'
     CFG_EXTERNAL_AUTHENTICATION = {
         CFG_EXTERNAL_AUTH_USING_SSO : ea_sso.ExternalAuthSSO(),
-        "Robot": ExternalAuthRobot()}
+    }
 else:
     CFG_EXTERNAL_AUTH_DEFAULT = 'Local'
     CFG_EXTERNAL_AUTH_USING_SSO = False
     CFG_EXTERNAL_AUTH_LOGOUT_SSO = None
     CFG_EXTERNAL_AUTHENTICATION = {
     "Local": None,
-    "Robot": ExternalAuthRobot(enforce_external_nicknames=True)}
+    "Robot": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=False),
+    "ZRobot": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=True)
+    }
 
 
 # default data for the add_default_settings function
@@ -162,6 +164,7 @@ DEF_ACTIONS = (
                ('cfgoairepository', 'configure OAI Repository', '', 'no'),
                ('cfgbibindex', 'configure BibIndex', '', 'no'),
                ('cfgbibexport', 'configure BibExport', '', 'no'),
+               ('cfgrobotkeys', 'configure Robot keys', 'login_method,robot', 'yes'),
                ('runbibindex', 'run BibIndex', '', 'no'),
                ('runbibupload', 'run BibUpload', '', 'no'),
                ('runwebcoll', 'run webcoll', 'collection', 'yes'),

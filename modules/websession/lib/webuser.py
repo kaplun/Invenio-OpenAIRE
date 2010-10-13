@@ -551,6 +551,7 @@ def loginUser(req, p_un, p_pw, login_method):
                     res = registerUser(req, p_email, p_pw_local, '',
                     register_without_nickname=True,
                     login_method=login_method)
+                    query_result = run_sql("SELECT id from user where email=%s", (p_email,))
                 elif res == 0: # Everything was ok, with or without nickname.
                     query_result = run_sql("SELECT id from user where email=%s", (p_email,))
                 elif res == 6: # error in contacting the user via email
@@ -581,7 +582,7 @@ def loginUser(req, p_un, p_pw, login_method):
                 register_exception(alert_admin=True)
                 return([], p_email, p_pw, 16)
             else: # Groups synchronization
-                if groups != 0:
+                if groups:
                     userid = query_result[0][0]
                     from invenio.webgroup import synchronize_external_groups
                     synchronize_external_groups(userid, groups, login_method)

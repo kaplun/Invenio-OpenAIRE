@@ -27,6 +27,12 @@ from invenio import search_engine_query_parser
 from invenio.testutils import make_test_suite, run_test_suite
 from invenio.search_engine import create_basic_search_units, perform_request_search
 
+try:
+    import dateutil
+    DATEUTIL_AVAILABLE = True
+except ImportError:
+    DATEUTIL_AVAILABLE = False
+
 
 class TestSearchQueryParenthesisedParser(unittest.TestCase):
     """Test parenthesis parsing."""
@@ -103,28 +109,24 @@ class TestSearchQueryParenthesisedParser(unittest.TestCase):
                          ['+', '+ expr1 | expr4', '+', '+ expr2 | expr4', '+', '+ expr3 | expr4'])
 
     def test_sqpp_nested_paren_success(self):
-        """SearchQueryParenthesizedParser: Arbitrarily nested parentheses: ((expr1)) + (expr2 - expr3)"""
+        """SearchQueryParenthesizedParser - Arbitrarily nested parentheses: ((expr1)) + (expr2 - expr3)"""
         self.assertEqual(self.parser.parse_query('((expr1)) + (expr2 - expr3)'),
                          ['+', 'expr1', '+', 'expr2', '-', 'expr3'])
 
     def test_sqpp_nested_paren_really_nested(self):
-        """SearchQueryParenthesisedParser: Nested parentheses where order matters: expr1 - ((expr2 - expr3) | expr4)"""
+        """SearchQueryParenthesisedParser - Nested parentheses where order matters: expr1 - ((expr2 - expr3) | expr4)"""
         self.assertEqual(self.parser.parse_query('expr1 - (expr2 - (expr3 | expr4))'),
                          ['+', 'expr1', '+', '- expr2 | expr3 | expr4'])
 
     def test_sqpp_paren_open_only_failure(self):
-        """SearchQueryParenthesizedParser: Parentheses that only open should raise an exception"""
+        """SearchQueryParenthesizedParser - Parentheses that only open should raise an exception"""
         self.failUnlessRaises(SyntaxError,
                               self.parser.parse_query,"(expr")
-        #self.failUnlessRaises(search_engine_query_parser.InvenioWebSearchMismatchedParensError,
-        #                      self.parser.parse_query,"(expr")
 
     def test_sqpp_paren_close_only_failure(self):
-        """SearchQueryParenthesizedParser: Parentheses that only close should raise an exception"""
+        """SearchQueryParenthesizedParser - Parentheses that only close should raise an exception"""
         self.failUnlessRaises(SyntaxError,
                               self.parser.parse_query,"expr)")
-        #self.failUnlessRaises(search_engine_query_parser.InvenioWebSearchMismatchedParensError,
-        #                      self.parser.parse_query,"expr)")
 
     def test_sqpp_paren_expr1_not_expr2_and_paren_expr3_or_expr4_WORDS(self):
         """SearchQueryParenthesisedParser - (expr1) not expr2 and (expr3) or expr4"""
@@ -325,7 +327,7 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
 
     def test_author_full_first(self):
         """SPIRES search syntax - find a ellis, john"""
-        invenio_search = 'author:"ellis, john*" or exactauthor:"ellis, j" or exactauthor:"ellis, jo" or exactauthor:"ellis, joh"'
+        invenio_search = 'author:"ellis, john*" or exactauthor:"ellis, j *" or exactauthor:"ellis, j" or exactauthor:"ellis, jo" or exactauthor:"ellis, joh"'
         spires_search = 'find a ellis, john'
         self._compare_searches(invenio_search, spires_search)
 
@@ -407,6 +409,18 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         inv_search = "title:bob and title:sam"
         self._compare_searches(inv_search, spi_search)
 
+    def test_syntax_converter_expand_fulltext(self):
+        """SPIRES search syntax - fulltext support"""
+        spi_search = "find ft The holographic RG is based on"
+        inv_search = "fulltext:The and fulltext:holographic and fulltext:RG and fulltext:is and fulltext:based and fulltext:on"
+        self._compare_searches(inv_search, spi_search)
+
+    def test_syntax_converter_expand_fulltext_within_larger(self):
+        """SPIRES search syntax - fulltext subsearch support"""
+        spi_search = "find au taylor and ft The holographic RG is based on and t brane"
+        inv_search = "author:taylor fulltext:The and fulltext:holographic and fulltext:RG and fulltext:is and fulltext:based and fulltext:on title:brane"
+        self._compare_searches(inv_search, spi_search)
+
     def test_syntax_converter_expand_search_patterns_conjoined(self):
         """SPIRES search syntax - simplest distribution"""
         spi_search = "find t bob and sam"
@@ -424,6 +438,89 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         spi_search = "find t bob sam and couch"
         inv_search = "title:bob and title:sam and title:couch"
         self._compare_searches(inv_search, spi_search)
+
+    def test_date_by_yr(self):
+        """SPIRES search syntax - searching by date year"""
+        spi_search = "find date 2002"
+        inv_search = "year:2002"
+        self._compare_searches(inv_search, spi_search)
+
+    def test_date_by_lt_yr(self):
+        """SPIRES search syntax - searching by date < year"""
+        spi_search = "find date < 2002"
+        inv_search = 'year:0->2002'
+        self._compare_searches(inv_search, spi_search)
+
+    def test_date_by_gt_yr(self):
+        """SPIRES search syntax - searching by date > year"""
+        spi_search = "find date > 1980"
+        inv_search = 'year:1980->9999'
+        self._compare_searches(inv_search, spi_search)
+
+    def test_date_by_yr_mo(self):
+        """SPIRES search syntax - searching by date 1976-04"""
+        spi_search = "find date 1976-04"
+        inv_search = 'year:1976-04'
+        self._compare_searches(inv_search, spi_search)
+
+    def test_date_by_eq_yr_mo(self):
+        """SPIRES search syntax - searching by date 1976-04"""
+        spi_search = "find date 1976-04"
+        inv_search = 'year:1976-04'
+        self._compare_searches(inv_search, spi_search)
+
+    def test_date_by_lt_yr_mo(self):
+        """SPIRES search syntax - searching by date < 1978-10-21"""
+        spi_search = "find date < 1978-10-21"
+        inv_search = 'year:0->1978-10-21'
+        self._compare_searches(inv_search, spi_search)
+
+    def test_date_by_gt_yr_mo(self):
+        """SPIRES search syntax - searching by date > 1978-10-21"""
+        spi_search = "find date > 1978-10-21"
+        inv_search = 'year:1978-10-21->9999'
+        self._compare_searches(inv_search, spi_search)
+
+    if DATEUTIL_AVAILABLE:
+        def test_date_by_lt_d_MO_yr(self):
+            """SPIRES search syntax - searching by date < 23 Sep 2010: will only work with dateutil installed"""
+            spi_search = "find date < 23 Sep 2010"
+            inv_search = 'year:0->2010-09-23'
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_by_gt_d_MO_yr(self):
+            """SPIRES search syntax - searching by date > 12 Jun 1960: will only work with dateutil installed"""
+            spi_search = "find date > 12 Jun 1960"
+            inv_search = 'year:1960-06-12->9999'
+            self._compare_searches(inv_search, spi_search)
+
+    def test_spires_syntax_detected_f(self):
+        """SPIRES search syntax - test detection f t p"""
+        # trac #261
+        converter = search_engine_query_parser.SpiresToInvenioSyntaxConverter()
+        spi_search = converter.is_applicable("f t p")
+        self.assertEqual(spi_search, True)
+
+    def test_spires_syntax_detected_fin(self):
+        """SPIRES search syntax - test detection fin t p"""
+        # trac #261
+        converter = search_engine_query_parser.SpiresToInvenioSyntaxConverter()
+        spi_search = converter.is_applicable("fin t p")
+        self.assertEqual(spi_search, True)
+
+    def test_spires_syntax_detected_find(self):
+        """SPIRES search syntax - test detection find t p"""
+        # trac #261
+        converter = search_engine_query_parser.SpiresToInvenioSyntaxConverter()
+        spi_search = converter.is_applicable("find t p")
+        self.assertEqual(spi_search, True)
+
+    def test_spires_syntax_detected_invenio(self):
+        """SPIRES search syntax - test detection Not SPIRES"""
+        # trac #261
+        converter = search_engine_query_parser.SpiresToInvenioSyntaxConverter()
+        inv_search = converter.is_applicable("t:p a:c")
+        self.assertEqual(inv_search, False)
 
 
 TEST_SUITE = make_test_suite(TestSearchQueryParenthesisedParser,
