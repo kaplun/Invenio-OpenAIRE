@@ -210,10 +210,10 @@ $(document).ready(function(){
     });
     $('*[title]').qtip(gTipDefault);
     $('div.error').filter(function(){
-        return this.textContent === '';
+        return this.textContent == '' || this.textContent == undefined;
     }).hide();
     $('div.warning').filter(function(){
-        return this.textContent === '';
+        return this.textContent == '' || this.textContent == undefined;
     }).hide();
     $.datepicker.setDefaults($.datepicker.regional[gLn]);
 });
