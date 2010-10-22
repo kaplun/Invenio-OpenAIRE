@@ -40,7 +40,23 @@ from invenio.urlutils import string_to_numeric_char_reference
 from invenio.textutils import encode_for_xml
 from invenio.shellutils import run_shell_command
 
-def highlight(text, keywords=None, prefix_tag='<strong>', suffix_tag="</strong>"):
+def highlight_matches(text, compiled_pattern, \
+                      prefix_tag='<strong>', suffix_tag="</strong>"):
+    """
+    Highlight words in 'text' matching the 'compiled_pattern'
+    """
+
+    #Add 'prefix_tag' and 'suffix_tag' before and after 'match'
+    #FIXME decide if non english accentuated char should be desaccentuaded
+    def replace_highlight(match):
+        """ replace match.group() by prefix_tag + match.group() + suffix_tag"""
+        return prefix_tag + match.group() + suffix_tag
+
+    #Replace and return keywords with prefix+keyword+suffix
+    return compiled_pattern.sub(replace_highlight, text)
+
+def highlight(text, keywords=None, \
+              prefix_tag='<strong>', suffix_tag="</strong>"):
     """
     Returns text with all words highlighted with given tags (this
     function places 'prefix_tag' and 'suffix_tag' before and after
@@ -56,17 +72,16 @@ def highlight(text, keywords=None, prefix_tag='<strong>', suffix_tag="</strong>"
     if not keywords:
         return text
 
-    #FIXME decide if non english accentuated char should be desaccentuaded
-    def replace_highlight(match):
-        """ replace match.group() by prefix_tag + match.group() + suffix_tag"""
-        return prefix_tag + match.group() + suffix_tag
-
+    escaped_keywords = []
+    for k in keywords:
+        escaped_keywords.append(re.escape(k))
     #Build a pattern of the kind keyword1 | keyword2 | keyword3
-    pattern = '|'.join(keywords)
+    pattern = '|'.join(escaped_keywords)
     compiled_pattern = re.compile(pattern, re.IGNORECASE)
 
     #Replace and return keywords with prefix+keyword+suffix
-    return compiled_pattern.sub(replace_highlight, text)
+    return highlight_matches(text, compiled_pattern, \
+                             prefix_tag, suffix_tag)
 
 def get_contextual_content(text, keywords, max_lines=2):
     """
@@ -579,7 +594,8 @@ def get_pdf_snippets(recID, patterns,
             # no hit, so check stemmed versions:
             from invenio.bibindex_engine_stemmer import stem
             stemmed_patterns = [stem(p, 'en') for p in patterns]
-            out = get_text_snippets(text_path, stemmed_patterns, nb_words_around, max_snippets)
+            out = get_text_snippets(text_path, stemmed_patterns,
+                                    nb_words_around, max_snippets, False)
         if out:
             out_courtesy = ""
             if text_path_courtesy:
@@ -590,13 +606,16 @@ def get_pdf_snippets(recID, patterns,
     else:
         return ""
 
-def get_text_snippets(textfile_path, patterns, nb_words_around, max_snippets):
+def get_text_snippets(textfile_path, patterns, nb_words_around, max_snippets, \
+                      right_boundary = True):
     """
     Extract text snippets around 'patterns' from file found at 'textfile_path'
     The snippets are meant to look like in the results of the popular search
     engine: using " ... " between snippets.
     For empty patterns it returns ""
-    The idea is to first produce big snippets with grep and narrow them
+    The idea is to first produce big snippets with grep and then narrow them
+    using the cut_out_snippet function.
+    @param right_boundary: match the right word boundary
     TODO: - distinguish the beginning of sentences and try to make the snippets
           start there
     """
@@ -604,17 +623,34 @@ def get_text_snippets(textfile_path, patterns, nb_words_around, max_snippets):
     if len(patterns) == 0:
         return ""
 
-    # the max number of words that can still be added to the snippet
+    # split multiword patterns
+    # escape the parenthesis unless there is no space between then (e.g. U(1))
+    escaped_keywords = []
+    for p in patterns:
+        for w in str(p).split():
+            #if there are both '(' and ')' in one word we leave them
+            if w.count('(') or w.count(')'):
+                if re.match("\w*\(\w*\)\w*", w):
+                    w1 = w.replace('(', '\(')
+                    escaped_keywords.append(w1.replace(')', '\)'))
+                else:
+                    w1 = w.replace('(', '')
+                    escaped_keywords.append(w1.replace(')', ''))
+            else:
+                escaped_keywords.append(w)
+    # the max number of words that the snippets can have for this record
     words_left = max_snippets * (nb_words_around * 2 + 1)
     # Assuming that there will be at least one word per line we can produce the
     # big snippets like this
     # FIXME: the ligature replacement should be done at the textification time;
     # then the sed expression can go away here.
     cmd = "sed \'s/ﬀ/ff/g; s/ﬁ/fi/g; s/ﬂ/fl/g; s/ﬃ/ffi/g; s/ﬄ/ffl/g\' \
-           %s | grep -i -A%s -B%s -m%s"
+           %s | grep -i -E -A%s -B%s -m%s"
     cmdargs = [textfile_path, str(nb_words_around), str(nb_words_around), str(max_snippets)]
-    for p in patterns:
-        cmd += " -e %s"
+    for p in escaped_keywords:
+        cmd += " -e \"(\\b|\\s)\"%s"
+        if right_boundary:
+            cmd += "\"(\\b|\\s)\""
         cmdargs.append(p)
     (dummy1, output, dummy2) = run_shell_command(cmd, cmdargs)
 
@@ -623,52 +659,57 @@ def get_text_snippets(textfile_path, patterns, nb_words_around, max_snippets):
 
     # cut the snippets to match the nb_words_around parameter precisely:
     for s in big_snippets:
-        small_snippet = cut_out_snippet(s, patterns, nb_words_around, words_left)
-        #count words
-        words_left -= len(small_snippet.split())
-        #if words_left <= 0:
-            #print "Error: snippet too long"
-        result.append(small_snippet)
+        if words_left > 0:
+            (small_snippets, words_left) = cut_out_snippet(s, escaped_keywords, \
+             nb_words_around, words_left, right_boundary)
+            #count words
+            result += small_snippets
 
     # combine snippets
     out = ""
+    count = 0
     for snippet in result:
-        if snippet:
+        if snippet and count < max_snippets:
             if out:
                 out += "<br>"
-            out += "..." + highlight(snippet, patterns) + "..."
+            out += "..." + snippet + "..."
+            count += 1
     return out
 
-def cut_out_snippet(text, patterns, nb_words_around, max_words):
-    # the snippet can include many occurances of the patterns if they are not
-    # further appart than 2 * nb_words_around
+def cut_out_snippet(text, patterns, nb_words_around, max_words, right_boundary = True):
+    # Cut out one ore more snippets, limits to max_words param.
+    # The snippet can include many occurances of the patterns if they are not
+    # further appart than 2 * nb_words_around.
 
-    def starts_with_any(word, patterns):
-        # Check whether the word's beginning matches any of the patterns.
-        # The second argument is an array of patterns to match.
+    def matches_any(w1):
+        if compiled_pattern.search(' ' + w1 + ' '):
+            return True
+        else:
+            return False
 
-        ret = False
-        lower_case = word.lower()
-        for p in patterns:
-            if lower_case.startswith(str(p).lower()):
-                ret = True
-                break
-        return ret
+    #Build a pattern of the kind keyword1 | keyword2 | keyword3
+    if right_boundary:
+        pattern = '(\\b|\\s)(' + '|'.join(patterns) + ')(\\b|\\s)'
+    else:
+        pattern = '(\\b|\\s)(' + '|'.join(patterns) + ')'
+    compiled_pattern = re.compile(pattern, re.IGNORECASE | re.UNICODE)
 
-    # make the nb_words_around smaller if required by max_words
-    # to make sure that at least one pattern is included
-    while nb_words_around * 2 + 1 > max_words:
-        nb_words_around -= 1
-    if nb_words_around < 1:
-        return ""
-
+    snippets = []
     snippet = ""
     words = text.split()
 
     last_written_word = -1
     i = 0
-    while i < len(words):
-        if starts_with_any(words[i], patterns):
+    while i < len(words) and max_words > 3:
+
+        # For the last snippet for this record:
+        # make the nb_words_around smaller if required by max_words
+        # to make sure that at least one pattern is included
+        while nb_words_around * 2 + 1 > max_words:
+            nb_words_around -= 1
+
+        #can be first or a following pattern in this snippet
+        if matches_any(words[i]):
             # add part before first or following occurance of a word
             j = max(last_written_word + 1, i - nb_words_around)
             while j < i:
@@ -681,7 +722,7 @@ def cut_out_snippet(text, patterns, nb_words_around, max_words):
             # write the suffix. If pattern found, break
             j = 1
             while j <= nb_words_around and i + j < len(words):
-                if starts_with_any(words[i+j], patterns):
+                if matches_any(words[i+j]):
                     break
                 else:
                     snippet += (" " + words[i+j])
@@ -690,16 +731,11 @@ def cut_out_snippet(text, patterns, nb_words_around, max_words):
             i += j
         else:
             i += 1
+        # if the snippet is ready (i.e. we didn't just find a new match)
+        if snippet != "" and i < len(words) and not matches_any(words[i]):
+            max_words -= len(snippet.split())
+            snippets.append(highlight_matches(snippet, compiled_pattern))
+            snippet = ""
 
-    # apply max_words param if needed
-    snippet_words = snippet.split()
-    length = len(snippet_words)
-    if (length > max_words):
-        j = 0
-        shorter_snippet = ""
-        while j < max_words:
-            shorter_snippet += " " + snippet_words[j]
-            j += 1
-        return shorter_snippet
-    else:
-        return snippet
+    return (snippets, max_words)
+

@@ -1,3 +1,4 @@
+.version
 Makefile
 Makefile.in
 configure
@@ -76,7 +77,6 @@ modules/webstyle/bin/webdoc
 modules/websubmit/bin/bibdocfile
 modules/websubmit/bin/websubmit_dump
 tags
-config.rpath
 config.status.lineno
 configure.lineno
 *.kdevelop

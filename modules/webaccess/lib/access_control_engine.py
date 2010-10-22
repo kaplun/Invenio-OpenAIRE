@@ -29,7 +29,7 @@ if sys.hexversion < 0x2040000:
     # pylint: enable=W0622
 
 from invenio.config import CFG_SITE_SECURE_URL
-from invenio.dbquery import run_sql_cached
+from invenio.dbquery import run_sql
 from invenio.access_control_admin import acc_find_possible_roles, acc_is_user_in_role, CFG_SUPERADMINROLE_ID, acc_get_role_users
 from invenio.access_control_config import CFG_WEBACCESS_WARNING_MSGS, CFG_WEBACCESS_MSGS
 from invenio.webuser import collect_user_info
