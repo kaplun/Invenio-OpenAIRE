@@ -58,7 +58,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                         make_canonical_urlargd({
                     'referer' : "%s%s" % (
                         CFG_SITE_URL,
-                        req.uri),
+                        req.unparsed_uri),
                     "ln" : argd['ln']}, {})))
             else:
                 return page(req=req, body=_("You are not authorized to use OpenAIRE deposition."), title=_("Authorization failure"))

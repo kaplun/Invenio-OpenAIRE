@@ -2,8 +2,8 @@
 var gTipDefault = {
     position: {
         corner: {
-            target: 'bottomMiddle',
-            tooltip: 'topMiddle'
+            target: 'bottomRight',
+            tooltip: 'topLeft'
         }
     },
     adjust: {
@@ -21,7 +21,7 @@ var gTipDefault = {
             max: 500
         },
         name: 'light',
-        tip: 'topMiddle'
+        tip: 'topLeft'
     }
 };
 

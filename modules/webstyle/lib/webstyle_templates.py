@@ -361,7 +361,7 @@ template function generated it.
              &nbsp;
        </td>
        <td class="headermoduleboxbody%(submit_selected)s">
-             <a class="header%(submit_selected)s" href="%(siteurl)s/submit/direct?sub=SBIART&ln=%(ln)s">%(msg_submit)s</a>
+             <a class="header%(submit_selected)s" href="%(siteurl)s/deposit?style=invenio&ln=%(ln)s">%(msg_submit)s</a>
        </td>
        <td class="headermoduleboxbodyblank">
              &nbsp;
