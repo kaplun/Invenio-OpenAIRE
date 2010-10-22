@@ -35,6 +35,19 @@ def escape(value, *args, **argd):
         value = ''
     return cgi_escape(str(value), *args, **argd)
 
+def prepare4js(data):
+    """
+    Enhance the given dictionary that will be used for string formatting
+    with new key prefixed with js_ that will have values where the single
+    quote is escaped.
+    """
+    for key, value in data.items():
+        if value:
+            data["js_%s" % key] = str(value).replace("'", "\\'")
+        else:
+            data["js_%s" % key] = value
+    return data
+
 RE_PLACEMARKS = re.compile(r'%\((?P<placemark>\w+)\)s')
 CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS = dict((placemark, '') for placemark in RE_PLACEMARKS.findall(CFG_OPENAIRE_FORM_TEMPLATE))
 class Template:
@@ -207,6 +220,19 @@ class Template:
 
     def tmpl_upload_publications(self, projectid, session, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
+        data = {
+                'upload_publications': escape(_("Upload New Publications")),
+                'projectid': 'bla',
+                'site': CFG_SITE_URL,
+                'projectid': projectid,
+                'session': session,
+                'upload': escape(_("Upload")),
+                'begin_upload': escape(_("Begin upload")),
+                'cancel_upload': escape(_("Cancel upload")),
+                'buttontext': _("Upload"),
+                'ln': ln,
+            }
+        prepare4js(data)
         return """
             <form action="%(site)s/deposit?ln=%(ln)s" method="POST">
                 <h3>%(upload_publications)s</h3>
@@ -219,18 +245,18 @@ class Template:
                 $(document).ready(function() {
                     $('#cancel_upload').hide();
                     $('#fileInput').uploadify({
-                        'uploader'  : '%(site)s/flash/uploadify.swf',
-                        'script'    : '%(site)s/deposit/uploadifybackend',
-                        'cancelImg' : '%(site)s/img/cancel.png',
+                        'uploader'  : '%(js_site)s/flash/uploadify.swf',
+                        'script'    : '%(js_site)s/deposit/uploadifybackend',
+                        'cancelImg' : '%(js_site)s/img/cancel.png',
                         'auto'      : true,
                         'folder'    : '/uploads',
                         'multi'     : true,
-                        'buttonText': '%(buttontext)s',
+                        'buttonText': '%(js_buttontext)s',
                         'simUploadLimit': '2',
-                        'scriptData': {'projectid': '%(projectid)s', 'session': '%(session)s'},
+                        'scriptData': {'projectid': '%(js_projectid)s', 'session': '%(js_session)s'},
                         'onAllComplete': function(){
                             $('input.save').trigger('click');
-                            window.location="%(site)s/deposit?projectid=%(projectid)s";
+                            window.location="%(js_site)s/deposit?projectid=%(js_projectid)s";
                         },
                         'onOpen': function(){
                             $('#cancel_upload').show();
@@ -241,18 +267,7 @@ class Template:
                         return 0;
                     });
                 });
-            // ]]></script>""" % {
-                'upload_publications': escape(_("Upload New Publications")),
-                'projectid': 'bla',
-                'site': CFG_SITE_URL,
-                'projectid': projectid,
-                'session': session,
-                'upload': escape(_("Upload")),
-                'begin_upload': escape(_("Begin upload")),
-                'cancel_upload': escape(_("Cancel upload")),
-                'buttontext': _("Upload"),
-                'ln': ln,
-            }
+            // ]]></script>""" % data
 
 
     def tmpl_publication_information(self, publicationid, title, authors, abstract, ln=CFG_SITE_LANG):
@@ -270,13 +285,14 @@ class Template:
                 'id': escape(publicationid, True)
             }
         data['body'] = """<div id="publication_information_%(id)s" class="publication_information">%(title)s</div>""" % data
+        prepare4js(data)
         return """
             %(body)s
             <script type="text/javascript">// <![CDATA[
                 $(document).ready(function(){
                     var tooltip = clone(gTipDefault);
                     tooltip.content = {
-                        'text': '<table><tbody><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(authors_label)s:<strong></td><td align="left">%(authors)s</td></tr><tr><td align="right"><strong>%(abstract_label)s:<strong></td><td align="left">%(abstract)s</td></tr><tbody></table>'
+                        'text': '<table><tbody><tr><td align="right"><strong>%(js_title_label)s:<strong></td><td align="left">%(js_title)s</td></tr><tr><td align="right"><strong>%(js_authors_label)s:<strong></td><td align="left">%(js_authors)s</td></tr><tr><td align="right"><strong>%(js_abstract_label)s:<strong></td><td align="left">%(js_abstract)s</td></tr><tbody></table>'
                     };
                     $('#publication_information_%(id)s').qtip(tooltip);
                 });
@@ -325,13 +341,14 @@ class Template:
                 }
             if linked:
                 data['acronym'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s</a>""" % data
+            prepare4js(data)
             return """
                 <div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s (%(existing_publications)d)</div>
                 <script type="text/javascript">// <![CDATA[
                     $(document).ready(function(){
                         var tooltip = clone(gTipDefault);
                         tooltip.content = {
-                            'text': '<table><tbody><tr><td align="right"><strong>%(acronym_label)s:<strong></td><td align="left">%(acronym)s</td></tr><tr><td align="right"><strong>%(title_label)s:<strong></td><td align="left">%(title)s</td></tr><tr><td align="right"><strong>%(grant_agreement_number_label)s:<strong></td><td align="left">%(grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(ec_project_website_label)s:<strong></td><td align="left"><a href="%(ec_project_website)s" target="_blank">%(ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(start_date_label)s:<strong></td><td align="left">%(start_date)s</td></tr><tr><td align="right"><strong>%(end_date_label)s:<strong></td><td align="left">%(end_date)s</td></tr><tr><td align="right"><strong>%(fundedby_label)s:<strong></td><td align="left">%(fundedby)s</td></tr><tr><td align="right"><strong>%(call_identifier_label)s:<strong></td><td align="left">%(call_identifier)s</td></tr><tbody></table>'
+                            'text': '<table><tbody><tr><td align="right"><strong>%(js_acronym_label)s:<strong></td><td align="left">%(js_acronym)s</td></tr><tr><td align="right"><strong>%(js_title_label)s:<strong></td><td align="left">%(js_title)s</td></tr><tr><td align="right"><strong>%(js_grant_agreement_number_label)s:<strong></td><td align="left">%(js_grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(js_ec_project_website_label)s:<strong></td><td align="left"><a href="%(js_ec_project_website)s" target="_blank">%(js_ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(js_start_date_label)s:<strong></td><td align="left">%(js_start_date)s</td></tr><tr><td align="right"><strong>%(js_end_date_label)s:<strong></td><td align="left">%(js_end_date)s</td></tr><tr><td align="right"><strong>%(js_fundedby_label)s:<strong></td><td align="left">%(js_fundedby)s</td></tr><tr><td align="right"><strong>%(js_call_identifier_label)s:<strong></td><td align="left">%(js_call_identifier)s</td></tr><tbody></table>'
                         };
                         $('#selectedproject_%(id)s').qtip(tooltip);
                     });
@@ -413,17 +430,7 @@ class Template:
         _ = gettext_set_language(ln)
         filename = filename.decode('utf8')
         filename = ''.join(["%s<br />" % escape(filename[i:i+30].encode('utf8')) for i in xrange(0, len(filename), 30)])
-        return """
-            %(file_label)s: <div class="file" id="file_%(id)s"><em>%(filename)s</em></div>
-            <script type="text/javascript">//<![CDATA[
-                $(document).ready(function(){
-                    var tooltip = clone(gTipDefault);
-                    tooltip.content = {
-                        'text': '<table><tbody><tr><td align="right"><strong>%(filename_label)s:<strong></td><td align="left"><a href="%(download_url)s" target="_blank" type="%(mimetype)s">%(filename)s</a></td></tr><tr><td align="right"><strong>%(format_label)s:<strong></td><td align="left">%(format)s</td></tr><tr><td align="right"><strong>%(size_label)s:<strong></td><td align="left">%(size)s</td></tr><tr><td align="right"><strong>%(mimetype_label)s:<strong></td><td align="left">%(mimetype)s</td></tr><tr><td align="right"><strong>%(checksum_label)s:<strong></td><td align="left">%(md5)s</td></tr><tbody></table>'
-                    };
-                    $('#file_%(id)s').qtip(tooltip);
-                });
-            //]]></script>""" % {
+        data = {
                 'file_label': escape(_('file')),
                 'id': escape(publicationid, True),
                 'filename': filename,
@@ -438,6 +445,18 @@ class Template:
                 'checksum_label': escape(_("MD5 Checksum")),
                 'md5': escape(md5),
             }
+        prepare4js(data)
+        return """
+            %(file_label)s: <div class="file" id="file_%(id)s"><em>%(filename)s</em></div>
+            <script type="text/javascript">//<![CDATA[
+                $(document).ready(function(){
+                    var tooltip = clone(gTipDefault);
+                    tooltip.content = {
+                        'text': '<table><tbody><tr><td align="right"><strong>%(js_filename_label)s:<strong></td><td align="left"><a href="%(js_download_url)s" target="_blank" type="%(js_mimetype)s">%(js_filename)s</a></td></tr><tr><td align="right"><strong>%(js_format_label)s:<strong></td><td align="left">%(js_format)s</td></tr><tr><td align="right"><strong>%(js_size_label)s:<strong></td><td align="left">%(js_size)s</td></tr><tr><td align="right"><strong>%(js_mimetype_label)s:<strong></td><td align="left">%(js_mimetype)s</td></tr><tr><td align="right"><strong>%(js_checksum_label)s:<strong></td><td align="left">%(js_md5)s</td></tr><tbody></table>'
+                    };
+                    $('#file_%(id)s').qtip(tooltip);
+                });
+            //]]></script>""" % data
 
     def tmpl_page(self, title, body, headers, username, logout_key="", ln=CFG_SITE_LANG):
         return CFG_OPENAIRE_PAGE_TEMPLATE % {
