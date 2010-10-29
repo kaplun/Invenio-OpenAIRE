@@ -152,7 +152,7 @@ $(document).ready(function(){
         return ajaxGateway(this, 'verify_field');
     });
     $('#project').autocomplete({
-        source: gSite + "/kb/export?kbname=projects&format=jquery&ln=" + gLn,
+        source: gSite + "/kb/export?kbname=projects&format=jquery&limit=20&ln=" + gLn,
         focus: function(event, ui) {
             $('#projectid').val(ui.item.label);
             return false;
