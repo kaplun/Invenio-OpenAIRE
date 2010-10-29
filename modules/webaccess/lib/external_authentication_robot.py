@@ -116,7 +116,7 @@ class ExternalAuthRobot(ExternalAuth):
       - groups: an optional ';'-separated list of groups to which the user
         belongs to.
       - __timeout__: the number of seconds (floating point) from the Epoch,
-        after which the URL will no longer be valid.
+        after which the URL will no longer be valid. (expressed in UTC)
       - __userip__: the IP address of the user for whom this URL has been
         created. (if the user will follow this URL using a different URL the
         request will not be valid)
@@ -166,7 +166,7 @@ class ExternalAuthRobot(ExternalAuth):
             nickname_attribute_name=CFG_ROBOT_NICKNAME_ATTRIBUTE_NAME,
             groups_attribute_name=CFG_ROBOT_GROUPS_ATTRIBUTE_NAME,
             groups_separator=CFG_ROBOT_GROUPS_SEPARATOR,
-            timeout_attribute_name=CFG_ROBOT_GROUPS_SEPARATOR,
+            timeout_attribute_name=CFG_ROBOT_TIMEOUT_ATTRIBUTE_NAME,
             userip_attribute_name=CFG_ROBOT_USERIP_ATTRIBUTE_NAME,
             check_user_ip=True,
             use_zlib=True,

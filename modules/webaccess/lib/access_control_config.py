@@ -95,6 +95,15 @@ if CFG_CERN_SITE:
     CFG_EXTERNAL_AUTHENTICATION = {
         CFG_EXTERNAL_AUTH_USING_SSO : ea_sso.ExternalAuthSSO(),
     }
+elif CFG_OPENAIRE_SITE:
+    CFG_EXTERNAL_AUTH_DEFAULT = 'Local'
+    CFG_EXTERNAL_AUTH_USING_SSO = False
+    CFG_EXTERNAL_AUTH_LOGOUT_SSO = None
+    CFG_EXTERNAL_AUTHENTICATION = {
+    "Local": None,
+    "OpenAIRE": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=False),
+    "ZOpenAIRE": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=True)
+    }
 else:
     CFG_EXTERNAL_AUTH_DEFAULT = 'Local'
     CFG_EXTERNAL_AUTH_USING_SSO = False
