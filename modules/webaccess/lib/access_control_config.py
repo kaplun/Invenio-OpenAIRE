@@ -23,7 +23,8 @@ __revision__ = \
 # pylint: disable=C0301
 
 from invenio.config import CFG_SITE_NAME, CFG_SITE_URL, CFG_SITE_LANG, \
-     CFG_SITE_SECURE_URL, CFG_SITE_SUPPORT_EMAIL, CFG_CERN_SITE
+     CFG_SITE_SECURE_URL, CFG_SITE_SUPPORT_EMAIL, CFG_CERN_SITE, \
+     CFG_OPENAIRE_SITE
 from invenio.messages import gettext_set_language
 
 
