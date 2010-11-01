@@ -712,7 +712,10 @@ class WordTable:
         @param table_name_pattern: i.e. idxWORD%02dF or idxPHRASE%02dF
         @parm default_get_words_fnc: the default function called to extract words from a metadata
         @param tag_to_words_fnc_map: a mapping to specify particular function to
-        extract words from particular metdata (such as 8564_u)
+            extract words from particular metdata (such as 8564_u)
+        @param wash_index_terms: do we wash index terms, and if yes (when >0),
+            how many characters do we keep in the index terms; see
+            max_char_length parameter of wash_index_term()
         """
         self.index_id = index_id
         self.tablename = table_name_pattern % index_id

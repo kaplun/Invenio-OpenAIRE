@@ -29,22 +29,17 @@
     <td colspan="3" valign="top">
         <div id="body_%(id)s" class="body">
             <p><em>%(mandatory_label)s</em></p>
-            <div>
-                <img title="%(authors_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                <label for="authors_%(id)s" class="mandatory">%(authors_label)s
-                </label>
-                <br />
-                <textarea name="authors_%(id)s" id="authors_%(id)s" cols="60" rows="5" class="authors">%(authors_value)s</textarea>
-                <div id="error_authors_%(id)s" class="error">%(error_authors_value)s</div>
-                <div id="warning_authors_%(id)s" class="warning">%(warning_authors_value)s</div>
-            </div>
-            <div>
-                <img title="%(publication_date_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                <label for="publication_date_%(id)s" class="mandatory">%(publication_date_label)s</label>
-                <input name="publication_date_%(id)s" type="text" id="publication_date_%(id)s" value="%(publication_date_value)s" size="10" maxlength="10" class="datepicker" />
-                <div id="error_publication_date_%(id)s" class="error">%(error_publication_date_value)s</div>
-                <div id="warning_publication_date_%(id)s" class="warning">%(warning_publication_date_value)s</div>
-            </div>
+            <fieldset style="float: left; margin: 5px;">
+                <div>
+                    <img title="%(authors_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="authors_%(id)s" class="mandatory">%(authors_label)s
+                    </label>
+                    <br />
+                    <textarea name="authors_%(id)s" id="authors_%(id)s" cols="60" rows="5" class="authors">%(authors_value)s</textarea>
+                    <div id="error_authors_%(id)s" class="error">%(error_authors_value)s</div>
+                    <div id="warning_authors_%(id)s" class="warning">%(warning_authors_value)s</div>
+                </div>
+            </fieldset>
             <div style="float: left; margin: 5px;">
                 <fieldset>
                     <legend>%(english_language_label)s</legend>
@@ -103,35 +98,45 @@
                     </div>
                 </fieldset>
             </div>
+            <fieldset style="float: left;">
+                <legend>%(publication_information_label)s</legend>
+                <div>
+                    <img title="%(publication_date_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="publication_date_%(id)s" class="mandatory">%(publication_date_label)s</label>
+                    <input name="publication_date_%(id)s" type="text" id="publication_date_%(id)s" value="%(publication_date_value)s" size="10" maxlength="10" class="datepicker" />
+                    <div id="error_publication_date_%(id)s" class="error">%(error_publication_date_value)s</div>
+                    <div id="warning_publication_date_%(id)s" class="warning">%(warning_publication_date_value)s</div>
+                </div>
+               <div>
+                    <img title="%(journal_title_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="journal_title_%(id)s">%(journal_title_label)s
+                    </label>
+                    <br />
+                    <input type="text" name="journal_title_%(id)s" id="journal_title_%(id)s" value="%(journal_title_value)s" size="30" class="journal_title" />
+                    <div id="error_journal_title_%(id)s" class="error">%(error_journal_title_value)s</div>
+                    <div id="warning_journal_title_%(id)s" class="warning">%(warning_journal_title_value)s</div>
+                </div>
+                <div>
+                    <img title="%(volume_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="volume_%(id)s">%(volume_label)s</label>
+                    <input name="volume_%(id)s" type="text" id="volume_%(id)s" value="%(volume_value)s" size="4" class="volume" />
+                    <br />
+                    <img title="%(issue_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="issue_%(id)s">%(issue_label)s</label>
+                    <input name="issue_%(id)s" type="text" id="issue_%(id)s" value="%(issue_value)s" size="4" class="issue" />
+                    <br />
+                    <img title="%(pages_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="pages_%(id)s">%(pages_label)s</label>
+                    <input name="pages_%(id)s" type="text" id="pages_%(id)s" value="%(pages_value)s" size="8" class="pages" />
+                    <div id="error_volume_%(id)s" class="error">%(error_volume_value)s</div>
+                    <div id="warning_volume_%(id)s" class="warning">%(warning_volume_value)s</div>
+                    <div id="error_issue_%(id)s" class="error">%(error_issue_value)s</div>
+                    <div id="warning_issue_%(id)s" class="warning">%(warning_issue_value)s</div>
+                    <div id="error_pages_%(id)s" class="error">%(error_pages_value)s</div>
+                    <div id="warning_pages_%(id)s" class="warning">%(warning_pages_value)s</div>
+                </div>
+            </fieldset>
             <div class="clear"></div>
-            <div>
-                <img title="%(journal_title_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                <label for="journal_title_%(id)s">%(journal_title_label)s
-                </label>
-                <br />
-                <input type="text" name="journal_title_%(id)s" id="journal_title_%(id)s" value="%(journal_title_value)s" size="30" class="journal_title" />
-                <div id="error_journal_title_%(id)s" class="error">%(error_journal_title_value)s</div>
-                <div id="warning_journal_title_%(id)s" class="warning">%(warning_journal_title_value)s</div>
-            </div>
-            <div>
-                <img title="%(volume_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                <label for="volume_%(id)s">%(volume_label)s</label>
-                <input name="volume_%(id)s" type="text" id="volume_%(id)s" value="%(volume_value)s" size="4" class="volume" />
-                <br />
-                <img title="%(issue_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                <label for="issue_%(id)s">%(issue_label)s</label>
-                <input name="issue_%(id)s" type="text" id="issue_%(id)s" value="%(issue_value)s" size="4" class="issue" />
-                <br />
-                <img title="%(pages_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                <label for="pages_%(id)s">%(pages_label)s</label>
-                <input name="pages_%(id)s" type="text" id="pages_%(id)s" value="%(pages_value)s" size="8" class="pages" />
-                <div id="error_volume_%(id)s" class="error">%(error_volume_value)s</div>
-                <div id="warning_volume_%(id)s" class="warning">%(warning_volume_value)s</div>
-                <div id="error_issue_%(id)s" class="error">%(error_issue_value)s</div>
-                <div id="warning_issue_%(id)s" class="warning">%(warning_issue_value)s</div>
-                <div id="error_pages_%(id)s" class="error">%(error_pages_value)s</div>
-                <div id="warning_pages_%(id)s" class="warning">%(warning_pages_value)s</div>
-            </div>
             <input type="submit" value="%(save_label)s" name="save_%(id)s" id="save_%(id)s"/><input type="submit" value="%(submit_label)s" name="submit_%(id)s" id="submit_%(id)s"/>
         </div>
     </td>
