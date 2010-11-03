@@ -1,21 +1,21 @@
-## This file is part of CDS Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
+## This file is part of Invenio.
+## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
 ##
-## CDS Invenio is free software; you can redistribute it and/or
+## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
 ## published by the Free Software Foundation; either version 2 of the
 ## License, or (at your option) any later version.
 ##
-## CDS Invenio is distributed in the hope that it will be useful, but
+## Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
-## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
+## along with Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-"""Create CDS Invenio collection cache."""
+"""Create Invenio collection cache."""
 
 __revision__ = "$Id$"
 
@@ -210,8 +210,13 @@ class Collection:
             res = run_sql(query, None, 1)
             if res:
                 col_ancestor = get_collection(res[0][1])
-                ancestors.append(col_ancestor)
-                id_son = res[0][0]
+                # looking for loops
+                if col_ancestor in ancestors:
+                    write_message("Loop found in collection %s" % self.name, stream=sys.stderr)
+                    raise OverflowError
+                else:
+                    ancestors.append(col_ancestor)
+                    id_son = res[0][0]
             else:
                 break
         ancestors.reverse()
@@ -246,8 +251,13 @@ class Collection:
         res = run_sql(query)
         for row in res:
             col_desc = get_collection(row[1])
-            descendants.append(col_desc)
-            descendants += col_desc.get_descendants()
+            # looking for loops
+            if col_desc in descendants:
+                write_message("Loop found in collection %s" % self.namee, stream=sys.stderr)
+                raise OverflowError
+            else:
+                descendants.append(col_desc)
+                descendants += col_desc.get_descendants()
         return descendants
 
     def write_cache_file(self, filename='', filebody=''):

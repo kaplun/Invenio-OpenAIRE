@@ -1,23 +1,23 @@
-## This file is part of CDS Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
+## This file is part of Invenio.
+## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
 ##
-## CDS Invenio is free software; you can redistribute it and/or
+## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
 ## published by the Free Software Foundation; either version 2 of the
 ## License, or (at your option) any later version.
 ##
-## CDS Invenio is distributed in the hope that it will be useful, but
+## Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
-## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
+## along with Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
 # pylint: disable=C0301
 
-"""CDS Invenio WebSearch Administrator Interface."""
+"""Invenio WebSearch Administrator Interface."""
 
 __revision__ = "$Id$"
 
@@ -2448,7 +2448,7 @@ def perform_modifyrestricted(colID, ln, rest='', callback='yes', confirm=-1):
         colID = int(colID)
         subtitle = """<a name="2">2. Modify access restrictions for collection '%s'</a>&nbsp;&nbsp;&nbsp;<small>[<a title="See guide" href="%s/help/admin/websearch-admin-guide#3.2">?</a>]</small>""" % (col_dict[colID], CFG_SITE_URL)
 
-        output = """<p>Please note that CDS Invenio versions greater than <em>0.92.1</em> manage collection restriction via the standard
+        output = """<p>Please note that Invenio versions greater than <em>0.92.1</em> manage collection restriction via the standard
         <strong><a href="/admin/webaccess/webaccessadmin.py/showactiondetails?id_action=%i">WebAccess Admin Interface</a></strong> (action '%s').</p>
         """ % (action_id, VIEWRESTRCOLL)
     body = [output]
@@ -2905,7 +2905,8 @@ def check_col(add_dad, add_son):
             res = run_sql("SELECT id_dad FROM collection_collection WHERE id_son=%s", (colID, ))
             for id in res:
                 if int(id[0]) == int(add_son):
-                    raise StandardError
+                    # raise StandardError # this was the original but it didnt work
+                    return(0)
                 else:
                     stack.append(id[0])
         return (1, "")

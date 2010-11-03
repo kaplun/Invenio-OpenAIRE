@@ -1,18 +1,18 @@
-## This file is part of CDS Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
+## This file is part of Invenio.
+## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
 ##
-## CDS Invenio is free software; you can redistribute it and/or
+## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
 ## published by the Free Software Foundation; either version 2 of the
 ## License, or (at your option) any later version.
 ##
-## CDS Invenio is distributed in the hope that it will be useful, but
+## Invenio is distributed in the hope that it will be useful, but
 ## WITHOUT ANY WARRANTY; without even the implied warranty of
 ## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ## General Public License for more details.
 ##
 ## You should have received a copy of the GNU General Public License
-## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
+## along with Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
 __lastupdated__ = """$Date$"""
@@ -200,7 +200,7 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                                     warn += print_warning(_("This file is restricted: ") + auth_message)
                                     break
 
-                            if display_hidden or not docfile.hidden_p():
+                            if not docfile.hidden_p():
                                 if not readonly:
                                     ip = str(req.remote_ip)
                                     res = doc.register_download(ip, version, format, uid)
@@ -212,7 +212,7 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                                     return warningMsg(_("An error has happened in trying to stream the request file."), req, CFG_SITE_NAME, ln)
                             else:
                                 req.status = apache.HTTP_UNAUTHORIZED
-                                warn = print_warning(_("The requested file is hidden and you don't have the proper rights to access it."))
+                                warn = print_warning(_("The requested file is hidden and can not be accessed."))
 
                         except InvenioWebSubmitFileError, msg:
                             register_exception(req=req, alert_admin=True)

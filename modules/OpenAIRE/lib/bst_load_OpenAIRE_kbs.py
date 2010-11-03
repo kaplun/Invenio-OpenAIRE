@@ -157,7 +157,6 @@ def load_kbs(cfg, run_sql, in_task=False):
             if not in_task:
                 print "kb after remove:", len(get_kb_mappings(kb))
         except:
-            raise
             register_exception(alert_admin=True, prefix="Error when updating KB %s" % kb)
             continue
 
