@@ -216,4 +216,5 @@ $(document).ready(function(){
         return this.textContent == '' || this.textContent == undefined;
     }).hide();
     $.datepicker.setDefaults($.datepicker.regional[gLn]);
+    $('span.yesscript').show();
 });

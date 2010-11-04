@@ -39,7 +39,7 @@ from invenio.webinterface_handler import wash_urlargd
 from invenio.webuser import session_param_set, session_param_get, collect_user_info, get_email
 from invenio import template
 from invenio.messages import gettext_set_language
-from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_WEBSUBMIT_STORAGEDIR
+from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_WEBSUBMIT_STORAGEDIR, CFG_SITE_ADMIN_EMAIL
 from invenio.websearch_webcoll import mymkdir
 from invenio.dbquery import run_sql
 from invenio.bibtask import task_low_level_submission
@@ -49,9 +49,9 @@ from invenio.search_engine import record_empty
 from invenio.openaire_deposit_utils import wash_form, simple_metadata2namespaced_metadata, namespaced_metadata2simple_metadata, strip_publicationid
 from invenio.urlutils import create_url
 from invenio.bibformat import format_record
+from invenio.openaire_deposit_config import CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, CFG_OPENAIRE_PROJECT_INFORMATION_KB, CFG_OPENAIRE_DEPOSIT_PATH, CFG_OPENAIRE_CURATORS
+from invenio.mailutils import send_email
 
-CFG_OPENAIRE_PROJECT_INFORMATION_KB = 'json_projects'
-CFG_OPENAIRE_DEPOSIT_PATH = os.path.join(CFG_WEBSUBMIT_STORAGEDIR, 'OpenAIRE')
 RE_AUTHOR_ROW = re.compile(u'^\w{2,}(\s+\w{2,})*,\s*\w{2,}\s*(:\s*\w{2,}.*)?$')
 RE_PAGES = re.compile('\d+(-\d+)?')
 
@@ -93,6 +93,13 @@ def portal_page(title, body, navtrail="", description="", keywords="",
         logout_key = ''
     return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, logout_key=logout_key, ln=language)
 
+def get_project_description(projectid):
+    info = get_kb_mapping(CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, str(projectid))
+    if info:
+        return info['value']
+    else:
+        return ''
+
 def get_project_information_from_projectid(projectid):
     info = get_kb_mapping(CFG_OPENAIRE_PROJECT_INFORMATION_KB, str(projectid))
     if info:
@@ -100,13 +107,20 @@ def get_project_information_from_projectid(projectid):
     else:
         return {}
 
-def get_favourite_authorships_for_user(uid, projectid, term=''):
-    return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s and projectid=%s and authorship LIKE %s ORDER BY authorship", (uid, projectid, '%%%s%%' % term))]
+def get_all_publications_for_project(uid, projectid, ln):
+    ret = {}
+    for publicationid in run_sql("SELECT publicationid FROM eupublication WHERE uid=%s AND projectid=%s", (uid, projectid)):
+        ret[publicationid[0]] = OpenAIREPublication(uid, publicationid[0], ln)
+    return ret
 
-def update_favourite_authorships_for_user(uid, projectid, publicationid, authorships):
-    run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%s AND projectid=%s and publicationid=%s", (uid, projectid, publicationid))
+def get_favourite_authorships_for_user(uid, projectids, term=''):
+    return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%%s and projectid IN (%s) and authorship LIKE %%s ORDER BY authorship" % ','.join([str(projectid) for projectid in projectids]), (uid, '%%%s%%' % term))]
+
+def update_favourite_authorships_for_user(uid, projectids, publicationid, authorships):
+    run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%%s AND publicationid=%%s AND projectid IN (%s) " % ','.join([str(projectid) for projectid in projectids]), (uid, publicationid))
     for authorship in authorships.splitlines():
-        run_sql("INSERT INTO OpenAIREauthorships(uid, projectid, publicationid, authorship) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, authorship))
+        for projectid in projectids:
+            run_sql("INSERT INTO OpenAIREauthorships(uid, projectid, publicationid, authorship) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, authorship))
 
 def normalize_authorships(authorships):
     ret = []
@@ -172,89 +186,67 @@ def page(title, body, navtrail="", description="", keywords="",
             navtrail_append_title_p, of, rssurl, show_title_p,
             body_css_classes)
 
-class OpenAIREProject(dict):
-    def __init__(self, uid, projectid, ln=CFG_SITE_LANG):
-        self.uid = uid
-        self.projectid = projectid
-        self.path = os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid))
-        self.errors = []
-        self.warnings = []
-        self.__ln = ln
-        self._initialize_storage()
-        self._load()
+def update_publication_projects_mapping(uid, publicationid, new_projectids):
+    old_projectids = run_sql("SELECT projectid WHERE uid=%s AND publicationid=%s", (uid, publicationid))
+    old_projectids = set([row[0] for row in old_projectids])
+    new_projectids = set(new_projectids)
+    for projectid in new_projectids - old_projectids:
+        run_sql("INSERT INTO eupublication(uid, publicationid, projectid) VALUES(%s, %s, %s)", (uid, publicationid, projectid))
+    for projectid in old_projectids - new_projectids:
+        run_sql("DELETE FROM eupublication WHERE uid=%s AND publicationid=%s AND projectid=%s", (uid, publicationid, projectid))
 
-    def _initialize_storage(self):
-        mymkdir(self.path)
+def get_project_information(uid, projectid, deletable, linked, ln, global_projectid=None, publicationid=None):
+    project_information = get_project_information_from_projectid(projectid)
+    existing_publications = run_sql("SELECT count(*) FROM eupublication WHERE uid=%s AND projectid=%s", (uid, projectid))
+    return openaire_deposit_templates.tmpl_project_information(global_projectid=global_projectid, projectid=projectid, ln=ln, existing_publications=existing_publications[0][0], deletable=deletable, linked=linked, publicationid=publicationid, **project_information)
 
-    def _load(self):
-        for publicationid in os.listdir(self.path):
-            self[publicationid] = OpenAIREPublication(self.uid, self.projectid, publicationid)
-            if self[publicationid].errors:
-                self.errors.append(publicationid)
-            if self[publicationid].warnings:
-                self.warnings.append(publicationid)
-
-    def delete_publication(self, publicationid):
-        if publicationid in self:
-            self[publicationid].delete()
-            del self[publicationid]
-
-    def upload_several_files(self, form, field='Filedata'):
-        afile = form[field]
-        publication = OpenAIREPublication(self.uid, self.projectid)
-        publicationid = publication.publicationid
-        self[publicationid] = publication
-        publication.add_a_fulltext(afile.file.name, afile.filename)
-        if publication.warnings:
-            self.warnings.append(publicationid)
-        if publication.errors:
-            self.errors.append(publicationid)
-
-    def get_project_information(self, linked=True):
-        project_information = get_project_information_from_projectid(self.projectid)
-        return openaire_deposit_templates.tmpl_project_information(projectid=self.projectid, ln=self.ln, existing_publications=len(self), linked=linked, **project_information)
-
-    def get_ln(self):
-        return self.__ln
-    ln = property(get_ln)
+def upload_file(form, uid, projectid=0, field='Filedata'):
+    afile = form[field]
+    publication = OpenAIREPublication(uid)
+    publication.link_project(projectid)
+    publication.add_a_fulltext(afile.file.name, afile.filename)
 
 def get_all_projectsids():
     """
     @return: the set of all the valid projects IDs
     @rtype: set of string
     """
-    return set(project[0] for project in get_kbr_keys("projects"))
+    ret = set(int(project[0]) for project in get_kbr_keys("projects"))
+    ret.add(0) ## Let's add the NO-PROJECT
+    return ret
 
 def get_exisiting_projectids_for_uid(uid):
-    valid_projectsid = get_all_projectsids()
-    try:
-        return [name for name in os.listdir(os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid))) if name in valid_projectsid]
-    except OSError:
-        return []
+    return sort_projectsid_by_acronym([row[0] for row in run_sql("SELECT DISTINCT projectid FROM eupublication WHERE uid=%s", (uid, ))])
+
+def sort_projectsid_by_acronym(projectids):
+    decorated_projectsid = [(get_project_description(projectid), projectid) for projectid in projectids]
+    decorated_projectsid.sort()
+    return [row[1] for row in decorated_projectsid]
 
 class OpenAIREPublication(object):
-    def __init__(self, uid, projectid, publicationid=None, ln=CFG_SITE_LANG):
+    def __init__(self, uid, publicationid=None, ln=CFG_SITE_LANG):
         self._metadata = {}
         self._metadata['__uid__'] = uid
-        self._metadata['__projectid__'] = projectid
         self._metadata['__publicationid__'] = publicationid
         self.__ln = ln
         if publicationid is None:
             self.status = 'initialized'
+            mymkdir(os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid)))
             while True:
-                self.path = tempfile.mkdtemp(dir=os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid)), prefix='')
-                self._metadata['__publicationid__'] = os.path.basename(self.path)
+                self.path = tempfile.mkdtemp(dir=os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), ), prefix='')
+                publicationid = self._metadata['__publicationid__'] = os.path.basename(self.path)
                 if '_' not in self.publicationid:
                     ## We don't want '_' at all in publicationid!
                     break
                 os.rmdir(self.path)
             self._metadata['__cd__'] = self._metadata['__md__'] = time.time()
+            run_sql("INSERT IGNORE INTO eupublication(uid, publicationid, projectid) VALUES(%s, %s, 0)", (self.uid, publicationid))
             self.__touched = True
         else:
             self.__touched = False
-            self.path = os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(projectid), str(publicationid))
+            self.path = os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid), str(publicationid))
             if not os.path.exists(self.path):
-                raise ValueError("publicationid %s for projectid %s does not exist for user %s" % (publicationid, projectid, uid))
+                raise ValueError("publicationid %s does not exist for user %s" % (publicationid, uid))
         self.fulltext_path = os.path.join(self.path, 'files')
         self.metadata_path = os.path.join(self.path, 'metadata')
         self.fulltexts = {}
@@ -268,8 +260,24 @@ class OpenAIREPublication(object):
         if not self.__deleted and self.__touched:
             self._dump()
 
+    def link_project(self, projectid):
+        if projectid == 0:
+            if not run_sql("SELECT * FROM eupublication WHERE uid=%s AND publicationid=%s", (self.uid, self.publicationid)):
+                run_sql("INSERT IGNORE INTO eupublication(uid, publicationid, projectid) VALUES(%s, %s, 0)", (self.uid, self.publicationid))
+        else:
+            run_sql("INSERT IGNORE INTO eupublication(uid, publicationid, projectid) VALUES(%s, %s, %s)", (self.uid, self.publicationid, projectid))
+            run_sql("DELETE FROM eupublication WHERE uid=%s AND publicationid=%s AND projectid=0", (self.uid, self.publicationid))
+        self.touch()
+
+    def unlink_project(self, projectid):
+        run_sql("DELETE FROM eupublication WHERE uid=%s AND publicationid=%s AND projectid=%s", (self.uid, self.publicationid, projectid))
+        if not run_sql("SELECT * FROM eupublication WHERE uid=%s AND publicationid=%s", (self.uid, self.publicationid)):
+            run_sql("INSERT IGNORE INTO eupublication(uid, publicationid, projectid) VALUES(%s, %s, 0)", (self.uid, self.publicationid))
+        self.touch()
+
     def delete(self):
         self.__deleted = True
+        run_sql("DELETE FROM eupublication WHERE uid=%s AND publicationid=%s", (self.uid, self.publicationid))
         shutil.rmtree(self.path)
 
     def _initialize_storage(self):
@@ -345,6 +353,21 @@ class OpenAIREPublication(object):
         open(marcxml_path, 'w').write(self.marcxml)
         task_low_level_submission('bibupload', 'openaire', '-r', marcxml_path, '-P5')
         self.status = 'submitted'
+        self.send_emails()
+
+    def send_emails(self):
+        _ = gettext_set_language(self.ln)
+        content = openaire_deposit_templates.tmpl_confirmation_email_body(title=self._metadata['title'], authors=self._metadata['authors'].splitlines(), url=self.url, ln=self.ln)
+        send_email(CFG_SITE_ADMIN_EMAIL, get_email(self.uid), _("Successful deposition of a Publication into OpenAIRE"), content=content)
+        bibedit_url = CFG_SITE_URL + "/record/edit/#state=edit&recid=%s" % self.recid
+        content = openaire_deposit_templates.tmpl_curators_email_body(title=self._metadata['title'], authors=self._metadata['authors'].splitlines(), url=self.url, bibedit_url=bibedit_url)
+        send_email(CFG_SITE_ADMIN_EMAIL, CFG_OPENAIRE_CURATORS, "Publication in OpenAIRE needs your approval", content=content)
+
+    def get_projects_information(self, global_projectid=None):
+        associated_projects = []
+        for projectid in self.projectids:
+            associated_projects.append(get_project_information(self.uid, projectid, deletable=True, linked=False, ln=self.ln, global_projectid=global_projectid, publicationid=self.publicationid))
+        return openaire_deposit_templates.tmpl_projects_box(publicationid=self.publicationid, associated_projects=associated_projects, ln=self.ln)
 
     def get_publication_information(self):
         return openaire_deposit_templates.tmpl_publication_information(publicationid=self.publicationid, title=self._metadata.get('title', ""), authors=self._metadata.get('authors', ""), abstract=self._metadata.get('abstract', ""), ln=self.ln)
@@ -352,24 +375,24 @@ class OpenAIREPublication(object):
     def get_fulltext_information(self):
         out = ""
         for fulltextid, fulltext in self.fulltexts.iteritems():
-            out += openaire_deposit_templates.tmpl_fulltext_information(filename=fulltext.fullname, publicationid=self.publicationid, download_url=create_url("%s/deposit/getfile" % CFG_SITE_URL, {'projectid': self.projectid, 'publicationid': self.publicationid, 'fileid': fulltextid}), md5=fulltext.checksum, mimetype=fulltext.mime, format=fulltext.format, size=fulltext.size, ln=self.ln)
+            out += openaire_deposit_templates.tmpl_fulltext_information(filename=fulltext.fullname, publicationid=self.publicationid, download_url=create_url("%s/deposit/getfile" % CFG_SITE_URL, {'publicationid': self.publicationid, 'fileid': fulltextid}), md5=fulltext.checksum, mimetype=fulltext.mime, format=fulltext.format, size=fulltext.size, ln=self.ln)
         return out
 
     def get_publication_form(self):
-        fileinfo = self.get_fulltext_information()
+        fulltext_information = self.get_fulltext_information()
         publication_information = self.get_publication_information()
-        return openaire_deposit_templates.tmpl_form(projectid=self.projectid, publicationid=self.publicationid, publication_information=publication_information, fileinfo=fileinfo, form=self._metadata.get("__form__"), metadata_status=self.metadata_status, warnings=simple_metadata2namespaced_metadata(self.warnings, self.publicationid), errors=simple_metadata2namespaced_metadata(self.errors, self.publicationid), ln=self.ln)
+        projects_information = self.get_projects_information()
+        return openaire_deposit_templates.tmpl_form(publicationid=self.publicationid, projects_information=projects_information, publication_information=publication_information, fulltext_information=fulltext_information, form=self._metadata.get("__form__"), metadata_status=self.metadata_status, warnings=simple_metadata2namespaced_metadata(self.warnings, self.publicationid), errors=simple_metadata2namespaced_metadata(self.errors, self.publicationid), ln=self.ln)
 
     def get_publication_preview(self):
         body = format_record(recID=self.recid, xml_record=self.marcxml, ln=self.ln, of='hd')
         return openaire_deposit_templates.tmpl_publication_preview(body, self.recid, ln=self.ln)
 
-
     def check_metadata(self):
         self.errors, self.warnings = self.static_check_metadata(self._metadata, ln=self.ln)
         if self._metadata.get('authors') and not self.errors.get('authors'):
             self._metadata['authors'] = normalize_authorships(self._metadata['authors'])
-            update_favourite_authorships_for_user(self.uid, self.projectid, self.publicationid, self._metadata['authors'])
+            update_favourite_authorships_for_user(self.uid, self.projectids, self.publicationid, self._metadata['authors'])
 
     def static_check_metadata(metadata, publicationid=None, check_only_field=None, ln=CFG_SITE_LANG):
         """
@@ -380,7 +403,6 @@ class OpenAIREPublication(object):
 
         if publicationid:
             metadata = namespaced_metadata2simple_metadata(metadata, publicationid)
-
 
         if check_only_field:
             ## Just one check, if it actually exist for the given field
@@ -442,14 +464,21 @@ class OpenAIREPublication(object):
         return self._metadata['__cd__']
     def get_uid(self):
         return self._metadata['__uid__']
-    def get_projectid(self):
-        return self._metadata['__projectid__']
+    def get_projectids(self):
+        projectids = run_sql("SELECT projectid FROM eupublication WHERE uid=%s AND publicationid=%s", (self.uid, self.publicationid))
+        if not projectids:
+            return [0]
+        else:
+            return sort_projectsid_by_acronym([row[0] for row in projectids])
     def get_publicationid(self):
         return self._metadata['__publicationid__']
     def get_recid(self):
         if '__recid__' not in self._metadata:
             self._metadata['__recid__'] = run_sql("INSERT INTO bibrec(creation_date, modification_date) values(NOW(), NOW())")
+            self.touch()
         return self._metadata['__recid__']
+    def get_url(self):
+        return "%s/record/%s" % (CFG_SITE_URL, self.recid)
     def get_metadata(self):
         return copy.deepcopy(self._metadata)
     def get_marcxml(self):
@@ -483,10 +512,18 @@ class OpenAIREPublication(object):
             record_add_field(rec, '560', subfields=[('a', self._metadata['original_abstract'])])
         if self._metadata.get('note'):
             record_add_field(rec, '500', subfields=[('a', self._metadata['note'])])
-        record_add_field(rec, '980', subfields=[('a', 'OPENAIRE')])
+        record_add_field(rec, '542', subfields=[('l', self._metadata['access_rights'])])
+        record_add_field(rec, '980', subfields=[('a', 'PROVISIONAL')])
         if self._metadata.get('publication_date'):
             record_add_field(rec, '260', subfields=[('c', self._metadata['publication_date'])])
-        record_add_field(rec, '536', subfields=[('c', str(self.projectid))])
+        for projectid in self.projectids:
+            if projectid:
+                subfields = []
+                project_description = get_project_description(projectid)
+                if project_description:
+                    subfields.append(('a', project_description))
+                subfields.append(('c', str(projectid)))
+                record_add_field(rec, '536', subfields=subfields)
         record_add_field(rec, '856', ind1='0', subfields=[('f', get_email(self.uid))])
         if self._metadata.get('embargo_date'):
             record_add_field(rec, '942', subfields=[('a', self._metadata['embargo_date'])])
@@ -511,12 +548,13 @@ class OpenAIREPublication(object):
     md = property(get_md)
     cd = property(get_cd)
     uid = property(get_uid)
-    projectid = property(get_projectid)
+    projectids = property(get_projectids)
     publicationid = property(get_publicationid)
     recid = property(get_recid)
     metadata = property(get_metadata)
     metadata_status = property(get_metadata_status)
     marcxml = property(get_marcxml)
+    url = property(get_url)
 
 
 def _check_title(metadata, ln, _):

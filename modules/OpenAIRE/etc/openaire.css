@@ -9,6 +9,10 @@ div.OpenAIRE div.metadata {
     padding-left : 2em;
   }
 
+div.OpenAIRE fieldset {
+    margin: 2px;
+    float: left;
+}
 
 div.OpenAIRE div.header div {
     float: left;
@@ -41,7 +45,15 @@ div.OpenAIRE div.error {
   }
 
 
-div.OpenAIRE tr td.error {
+div.OpenAIRE div.warning {
+    background : #FFFFC0 url('/img/warning.png') no-repeat center left;
+    font : bolder inherit sans-serif;
+    padding : 4px 4px 4px 20px;
+    border : #ffff00;
+    border-radius : 4px;
+  }
+
+div.joomla div.OpenAIRE tr td.error, div.OpenAIRE tr td.error {
     background : #FFC0C0 url('/img/iconcross.gif') no-repeat center center;
     font : inherit bolder medium sans-serif;
     padding : 4px 4px 4px 20px;
@@ -50,14 +62,6 @@ div.OpenAIRE tr td.error {
     border-radius : 4px;
   }
 
-
-div.OpenAIRE div.warning {
-    background : #FFFFC0 url('/img/warning.png') no-repeat center left;
-    font : bolder inherit sans-serif;
-    padding : 4px 4px 4px 20px;
-    border : #ffff00;
-    border-radius : 4px;
-  }
 
 div.joomla div.OpenAIRE tr td.warning, div.OpenAIRE tr td.warning {
   background : #FFFFC0 url('/img/warning.png') no-repeat center center;
