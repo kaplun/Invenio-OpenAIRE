@@ -1,4 +1,4 @@
-<tr class="header odd" id="header_row_%(id)s">
+r<tr class="header odd" id="header_row_%(id)s">
     <td width="5%%" id="status_%(id)s" rowspan="2" class="%(status)s"></td>
     <td width="40%%" valign="top">
         %(publication_information)s
@@ -23,7 +23,7 @@
     <td width="20%%" valign="top">
         <a href="javascript:void(0)" id="edit_metadata_%(id)s"><img src="%(site)s/img/wb-notes.png" alt="%(edit_metadata_label)s"/> <strong>%(edit_metadata_label)s</strong></a><br />
         <a href="%(site)s/deposit?projectid=%(projectid)s&amp;delete=%(id)s&amp;ln=%(ln)s" id="remove_%(id)s"><img src="%(site)s/img/smallbin.gif" /> %(remove_label)s</a>
-    <td>
+    </td>
 </tr>
 <tr class="body even" id="body_row_%(id)s">
     <td colspan="3" valign="top">
