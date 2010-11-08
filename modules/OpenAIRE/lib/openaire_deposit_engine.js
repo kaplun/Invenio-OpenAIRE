@@ -182,10 +182,13 @@ $(document).ready(function(){
           }).autocomplete({
             source: function(request, response) {
                 // delegate back to autocomplete, but extract the last term
+                var publicationid = this.element[0].name; // FIXME: find a better
+                // way to retrieve the publicationid!
                 var term = extractLast(request.term);
                 if (term) {
+
                     $.getJSON(gSite + "/deposit/authorships", {
-                        publicationid: this.name.split('_')[1],
+                        publicationid: publicationid,
                         term: term
                     }, function(data, status, xhr) {
                         if (data) {

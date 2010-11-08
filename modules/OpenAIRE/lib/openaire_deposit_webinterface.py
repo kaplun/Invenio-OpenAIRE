@@ -106,7 +106,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                     publications[argd['publicationid']].link_project(argd['linkproject'])
                 if argd['delproject'] in all_project_ids:
                     publications[argd['publicationid']].unlink_project(argd['unlinkproject'])
-            if argd['delete']:
+            if argd['delete'] and argd['delete'] in publications:
                 ## there was a request to delete a publication
                 publications[argd['delete']].delete()
                 del publications[argd['delete']]

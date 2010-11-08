@@ -114,9 +114,12 @@ def get_all_publications_for_project(uid, projectid, ln):
     return ret
 
 def get_favourite_authorships_for_user(uid, publicationid, term=''):
-    if uid is None:
-        return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE publicationid=%s and authorship LIKE %s ORDER BY authorship", (publicationid, '%%%s%%' % term))]
-    return [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE uid=%s and publicationid=%s and authorship LIKE %s ORDER BY authorship", (uid, publicationid, '%%%s%%' % term))]
+    ret = [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE uid=%s and publicationid=%s and authorship LIKE %s ORDER BY authorship", (uid, publicationid, '%%%s%%' % term))]
+    if not ret:
+        ret = [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE publicationid=%s and authorship LIKE %s ORDER BY authorship", (publicationid, '%%%s%%' % term))]
+    if not ret:
+        ret = [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s and authorship LIKE %s ORDER BY authorship", (uid, '%%%s%%' % term))]
+    return ret
 
 def update_favourite_authorships_for_user(uid, projectids, publicationid, authorships):
     run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%%s AND publicationid=%%s AND projectid IN (%s) " % ','.join([str(projectid) for projectid in projectids]), (uid, publicationid))

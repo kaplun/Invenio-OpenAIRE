@@ -30,6 +30,9 @@
         <div id="body_%(id)s" class="body">
             <p><em>%(mandatory_label)s</em></p>
             <fieldset>
+                <legend>%(projects_information_label)s</legend>
+                <img title="%(projects_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                <label class="mandatory">%(projects_description)s</label>
                 %(projects_information)s
             </fieldset>
             <div class="clear"></div>

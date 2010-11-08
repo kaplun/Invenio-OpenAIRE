@@ -228,6 +228,12 @@ class Template:
         values['submit_label'] = escape(_('Submit publication'))
         values['embargo_date_size'] = len(values['embargo_date_hint'])
         values['publication_information'] = publication_information
+        values['projects_information_label'] = escape(_("Projects information"))
+        values['projects_description'] = escape(_("List of projects linked with this publication"))
+        values['projects_tooltip'] = escape(_("""<p>This is the list of projects that are associated with this publications.</p><p>Click on the small %(trash_icon)s in order to unlink the corresponding project.</p><p>Start typing a <em>project acronym</em>, a <em>project title</em> or a <em>grant agreement number</em>, choose a project from the menu that will appear and click on the small %(plus_icon)s in order to link a new project to your publication.</p>""") % {
+            'trash_icon': """<img src="%s/img/smallbin.gif" alt="Unlink project" />""" % CFG_SITE_URL,
+            'plus_icon': """<img src="%s/img/add.png" alt="link project" />""" % CFG_SITE_URL
+        }, True)
         values['status'] = metadata_status
         values['projectid'] = projectid
         if warnings:
