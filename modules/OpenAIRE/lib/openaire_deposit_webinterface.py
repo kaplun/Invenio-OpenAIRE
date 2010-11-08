@@ -162,13 +162,16 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         return page(title='sandbox', body=body, req=req)
 
     def authorships(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (str, ''), 'term': (str, '')})
+        argd = wash_urlargd(form, {'publicationid': (str, ''), 'term': (str, '')})
         user_info = collect_user_info(req)
         uid = user_info['uid']
         req.content_type = 'application/json'
         term = argd['term']
-        projectid = argd['projectid']
-        ret = get_favourite_authorships_for_user(uid, projectid, term)
+        publicationid = argd['publicationid']
+        ret = get_favourite_authorships_for_user(uid, publicationid, term)
+        if ret:
+            return json.dumps(ret)
+        ret = get_favourite_authorships_for_user(None, publicationid, term)
         if ret:
             return json.dumps(ret)
         if ':' in term:

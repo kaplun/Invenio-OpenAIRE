@@ -185,7 +185,7 @@ $(document).ready(function(){
                 var term = extractLast(request.term);
                 if (term) {
                     $.getJSON(gSite + "/deposit/authorships", {
-                        projectid: gProjectid,
+                        publicationid: this.name.split('_')[1],
                         term: term
                     }, function(data, status, xhr) {
                         if (data) {
