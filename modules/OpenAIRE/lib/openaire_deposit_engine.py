@@ -378,11 +378,11 @@ class OpenAIREPublication(object):
             out += openaire_deposit_templates.tmpl_fulltext_information(filename=fulltext.fullname, publicationid=self.publicationid, download_url=create_url("%s/deposit/getfile" % CFG_SITE_URL, {'publicationid': self.publicationid, 'fileid': fulltextid}), md5=fulltext.checksum, mimetype=fulltext.mime, format=fulltext.format, size=fulltext.size, ln=self.ln)
         return out
 
-    def get_publication_form(self):
+    def get_publication_form(self, current_projectid):
         fulltext_information = self.get_fulltext_information()
         publication_information = self.get_publication_information()
         projects_information = self.get_projects_information()
-        return openaire_deposit_templates.tmpl_form(publicationid=self.publicationid, projects_information=projects_information, publication_information=publication_information, fulltext_information=fulltext_information, form=self._metadata.get("__form__"), metadata_status=self.metadata_status, warnings=simple_metadata2namespaced_metadata(self.warnings, self.publicationid), errors=simple_metadata2namespaced_metadata(self.errors, self.publicationid), ln=self.ln)
+        return openaire_deposit_templates.tmpl_form(publicationid=self.publicationid, projectid=current_projectid, projects_information=projects_information, publication_information=publication_information, fulltext_information=fulltext_information, form=self._metadata.get("__form__"), metadata_status=self.metadata_status, warnings=simple_metadata2namespaced_metadata(self.warnings, self.publicationid), errors=simple_metadata2namespaced_metadata(self.errors, self.publicationid), ln=self.ln)
 
     def get_publication_preview(self):
         body = format_record(recID=self.recid, xml_record=self.marcxml, ln=self.ln, of='hd')

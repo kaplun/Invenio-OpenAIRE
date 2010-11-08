@@ -90,7 +90,13 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         else:
             selected_project = get_project_information(uid, projectid, deletable=False, linked=False, ln=argd['ln'])
         body = openaire_deposit_templates.tmpl_choose_project(existing_projects=projects, selected_project=selected_project, ln=argd['ln'])
-        body += openaire_deposit_templates.tmpl_upload_publications(projectid=projectid, session=get_session(req).sid(), ln=argd['ln'])
+        if projectid < 0:
+            upload_to_projectid = 0
+            upload_to_project_information = get_project_information(uid, 0, deletable=False, linked=False, ln=argd['ln'])
+        else:
+            upload_to_projectid = projectid
+            upload_to_project_information = selected_project
+        body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), ln=argd['ln'])
 
         if projectid >= 0:
             ## There is a project on which we are working good!
@@ -100,10 +106,10 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                     publications[argd['publicationid']].link_project(argd['linkproject'])
                 if argd['delproject'] in all_project_ids:
                     publications[argd['publicationid']].unlink_project(argd['unlinkproject'])
-                if argd['delete']:
-                    ## there was a request to delete a publication
-                    publications[argd['publicationid']].delete()
-                    del publications[argd['publicationid']]
+            if argd['delete']:
+                ## there was a request to delete a publication
+                publications[argd['delete']].delete()
+                del publications[argd['delete']]
 
             forms = ""
             submitted_publications = ""
@@ -116,7 +122,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                         ## i.e. if the button submit for the corresponding publication has been pressed...
                         publication.upload_record()
                 if publication.status in ('initialized', 'edited'):
-                    forms += publication.get_publication_form()
+                    forms += publication.get_publication_form(projectid)
                 else:
                     submitted_publications += publication.get_publication_preview()
             body += openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, forms, submitted_publications, ln=argd['ln'])
@@ -133,7 +139,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             raise ValueError(_("This session is invalid"))
         projectid = argd['projectid']
         if projectid < 0:
-            raise ValueError(_("Invalid project ID: %s") % projectid)
+            projectid = 0
         uid = user_info['uid']
         upload_file(form, uid, projectid)
         return "1"

@@ -173,7 +173,7 @@ class Template:
             }
 
 
-    def tmpl_form(self, publicationid, projects_information, publication_information, fulltext_information, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
+    def tmpl_form(self, publicationid, projectid, projects_information, publication_information, fulltext_information, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         values = dict(CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS)
         values['id'] = publicationid
@@ -229,6 +229,7 @@ class Template:
         values['embargo_date_size'] = len(values['embargo_date_hint'])
         values['publication_information'] = publication_information
         values['status'] = metadata_status
+        values['projectid'] = projectid
         if warnings:
             for key, value in warnings.iteritems():
                 if key.endswith('_%s' % publicationid):
@@ -274,16 +275,16 @@ class Template:
                 }
         return out
 
-    def tmpl_upload_publications(self, projectid, session, ln=CFG_SITE_LANG):
+    def tmpl_upload_publications(self, projectid, project_information, session, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         data = {
                 'upload_publications': escape(_("Upload New Publications")),
-                'upload_publications_description': escape(_("Click on %(x_fmt_open)s%(upload)s%(x_fmt_cose)s to start uploading one or more publications.")) % {
+                'upload_publications_description': escape(_("Click on %(x_fmt_open)s%(upload)s%(x_fmt_cose)s to start uploading one or more publications. These publications will initially be associated with the project %(project_information)s")) % {
                     'x_fmt_open': "<strong>",
                     'x_fmt_cose': "</strong>",
-                    'upload': escape(_("Upload"))
+                    'upload': escape(_("Upload")),
+                    'project_information': project_information
                 },
-                'projectid': 'bla',
                 'site': CFG_SITE_URL,
                 'projectid': projectid,
                 'session': session,
