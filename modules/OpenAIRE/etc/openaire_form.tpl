@@ -1,4 +1,4 @@
-r<tr class="header odd" id="header_row_%(id)s">
+<tr class="header odd" id="header_row_%(id)s">
     <td width="5%%" id="status_%(id)s" rowspan="2" class="%(status)s"></td>
     <td width="40%%" valign="top">
         %(publication_information)s
