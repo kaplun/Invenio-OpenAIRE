@@ -47,7 +47,7 @@ class TestPluginContainer(unittest.TestCase):
 
         plugin_builder = create_enhanced_plugin_builder(
             compulsory_objects={
-                'format' : format_signature,
+                'format_element' : format_signature,
             },
             optional_objects={
                 'escape_values' : escape_values_signature,
