@@ -131,8 +131,5 @@
     <dc:type>
       info:eu-repo/semantics/article
     </dc:type>
-    <dc:date>
-      <xsl:value-of select="fn:creation_date(controlfield[@tag=001])"/>
-    </dc:date>
   </xsl:template>
 </xsl:stylesheet>

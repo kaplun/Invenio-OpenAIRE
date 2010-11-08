@@ -17,7 +17,7 @@
 
 jsdir = $(localstatedir)/www/js
 
-js_DATA = jquery-1.4.2.min.js jquery.elastic.js jquery.qtip-1.0.0-rc3.js jquery-ui-1.8.5.custom.min.js jquery.uploadify.v2.1.0.min.js
+js_DATA = jquery-1.4.2.min.js jquery.elastic.js jquery.qtip-1.0.0-rc3.js jquery-ui-1.8.5.custom.min.js jquery.uploadify.v2.1.4.min.js
 
 EXTRA_DIST = $(js_DATA)
 

@@ -3,7 +3,7 @@ r<tr class="header odd" id="header_row_%(id)s">
     <td width="40%%" valign="top">
         %(publication_information)s
         <br />
-        %(fileinfo)s
+        %(fulltext_information)s
         <br />
     </td>
     <td width="35%%" valign="top">
@@ -29,7 +29,14 @@ r<tr class="header odd" id="header_row_%(id)s">
     <td colspan="3" valign="top">
         <div id="body_%(id)s" class="body">
             <p><em>%(mandatory_label)s</em></p>
-            <fieldset style="float: left; margin: 5px;">
+            <fieldset>
+                <legend>%(projects_information_label)s</legend>
+                <img title="%(projects_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                <label class="mandatory">%(projects_description)s</label>
+                %(projects_information)s
+            </fieldset>
+            <div class="clear"></div>
+            <fieldset>
                 <div>
                     <img title="%(authors_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
                     <label for="authors_%(id)s" class="mandatory">%(authors_label)s
@@ -40,65 +47,63 @@ r<tr class="header odd" id="header_row_%(id)s">
                     <div id="warning_authors_%(id)s" class="warning">%(warning_authors_value)s</div>
                 </div>
             </fieldset>
-            <div style="float: left; margin: 5px;">
-                <fieldset>
-                    <legend>%(english_language_label)s</legend>
+            <div class="clear"></div>
+            <fieldset>
+                <legend>%(english_language_label)s</legend>
+                <div>
+                    <img title="%(title_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="title_%(id)s" class="mandatory">%(title_label)s
+                    </label>
+                    <br />
+                    <input type="text" name="title_%(id)s" id="title_%(id)s" value="%(title_value)s" size="75" class="title" />
+                    <div id="error_title_%(id)s" class="error">%(error_title_value)s</div>
+                    <div id="warning_title_%(id)s" class="warning">%(warning_title_value)s</div>
+                </div>
+                <div>
+                    <img title="%(abstract_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="abstract_%(id)s" class="mandatory">%(abstract_label)s
+                    </label>
+                    <br />
+                    <textarea name="abstract_%(id)s" id="abstract_%(id)s" cols="60" rows="5" class="abstract">%(abstract_value)s</textarea>
+                    <div id="error_abstract_%(id)s" class="error">%(error_abstract_value)s</div>
+                    <div id="warning_abstract_%(id)s" class="warning">%(warning_abstract_value)s</div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>%(original_language_label)s</legend>
+                <div>
+                    <img title="%(language_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="language_%(id)s" class="mandatory">%(language_label)s
+                    </label>
+                    <select name="language_%(id)s" id="language_%(id)s" class="language" style="width: 100px">
+                        %(language_options)s
+                    </select>
+                    <div id="error_language_%(id)s" class="error">%(error_language_value)s</div>
+                    <div id="warning_language_%(id)s" class="warning">%(warning_language_value)s</div>
+                </div>
+                <div id="original_language_container_%(id)s">
                     <div>
-                        <img title="%(title_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                        <label for="title_%(id)s" class="mandatory">%(title_label)s
+                        <img title="%(original_title_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                        <label for="original_title_%(id)s">%(original_title_label)s
                         </label>
                         <br />
-                        <input type="text" name="title_%(id)s" id="title_%(id)s" value="%(title_value)s" size="30" class="title" />
-                        <div id="error_title_%(id)s" class="error">%(error_title_value)s</div>
-                        <div id="warning_title_%(id)s" class="warning">%(warning_title_value)s</div>
+                        <input type="text" name="original_title_%(id)s" id="original_title_%(id)s" value="%(original_title_value)s" size="75" class="original_title mandatory" />
+                        <div id="error_original_title_%(id)s" class="error">%(error_original_title_value)s</div>
+                        <div id="warning_original_title_%(id)s" class="warning">%(warning_original_title_value)s</div>
                     </div>
                     <div>
-                        <img title="%(abstract_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                        <label for="abstract_%(id)s" class="mandatory">%(abstract_label)s
+                        <img title="%(original_abstract_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                        <label for="original_abstract_%(id)s">%(original_abstract_label)s
                         </label>
                         <br />
-                        <textarea name="abstract_%(id)s" id="abstract_%(id)s" cols="60" rows="5" class="abstract">%(abstract_value)s</textarea>
-                        <div id="error_abstract_%(id)s" class="error">%(error_abstract_value)s</div>
-                        <div id="warning_abstract_%(id)s" class="warning">%(warning_abstract_value)s</div>
+                        <textarea name="original_abstract_%(id)s" id="original_abstract_%(id)s" cols="60" rows="5" class="original_abstract">%(original_abstract_value)s</textarea>
+                        <div id="error_original_abstract_%(id)s" class="error">%(error_original_abstract_value)s</div>
+                        <div id="warning_original_abstract_%(id)s" class="warning" >%(warning_original_abstract_value)s</div>
                     </div>
-                </fieldset>
-            </div>
-            <div style="float: left; margin: 5px;">
-                <fieldset style="float: left;">
-                    <legend>%(original_language_label)s</legend>
-                    <div>
-                        <img title="%(language_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                        <label for="language_%(id)s" class="mandatory">%(language_label)s
-                        </label>
-                        <select name="language_%(id)s" id="language_%(id)s" class="language" style="width: 100px">
-                            %(language_options)s
-                        </select>
-                        <div id="error_language_%(id)s" class="error">%(error_language_value)s</div>
-                        <div id="warning_language_%(id)s" class="warning">%(warning_language_value)s</div>
-                    </div>
-                    <div id="original_language_container_%(id)s">
-                        <div>
-                            <img title="%(original_title_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                            <label for="original_title_%(id)s">%(original_title_label)s
-                            </label>
-                            <br />
-                            <input type="text" name="original_title_%(id)s" id="original_title_%(id)s" value="%(original_title_value)s" size="30" class="original_title mandatory" />
-                            <div id="error_original_title_%(id)s" class="error">%(error_original_title_value)s</div>
-                            <div id="warning_original_title_%(id)s" class="warning">%(warning_original_title_value)s</div>
-                        </div>
-                        <div>
-                            <img title="%(original_abstract_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
-                            <label for="original_abstract_%(id)s">%(original_abstract_label)s
-                            </label>
-                            <br />
-                            <textarea name="original_abstract_%(id)s" id="original_abstract_%(id)s" cols="60" rows="5" class="original_abstract">%(original_abstract_value)s</textarea>
-                            <div id="error_original_abstract_%(id)s" class="error">%(error_original_abstract_value)s</div>
-                            <div id="warning_original_abstract_%(id)s" class="warning" >%(warning_original_abstract_value)s</div>
-                        </div>
-                    </div>
-                </fieldset>
-            </div>
-            <fieldset style="float: left;">
+                </div>
+            </fieldset>
+            <div class="clear"></div>
+            <fieldset>
                 <legend>%(publication_information_label)s</legend>
                 <div>
                     <img title="%(publication_date_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
@@ -112,7 +117,7 @@ r<tr class="header odd" id="header_row_%(id)s">
                     <label for="journal_title_%(id)s">%(journal_title_label)s
                     </label>
                     <br />
-                    <input type="text" name="journal_title_%(id)s" id="journal_title_%(id)s" value="%(journal_title_value)s" size="30" class="journal_title" />
+                    <input type="text" name="journal_title_%(id)s" id="journal_title_%(id)s" value="%(journal_title_value)s" size="75" class="journal_title" />
                     <div id="error_journal_title_%(id)s" class="error">%(error_journal_title_value)s</div>
                     <div id="warning_journal_title_%(id)s" class="warning">%(warning_journal_title_value)s</div>
                 </div>

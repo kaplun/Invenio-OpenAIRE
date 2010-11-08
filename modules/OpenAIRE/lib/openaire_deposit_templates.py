@@ -62,7 +62,7 @@ class Template:
             <link type="text/css" href="%(site)s/css/openaire.css" rel="Stylesheet" />
             <script type="text/javascript" src="%(site)s/js/jquery-1.4.2.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery-ui-1.8.5.custom.min.js"></script>
-            <script type="text/javascript" src="%(site)s/js/jquery.uploadify.v2.1.0.min.js"></script>
+            <script type="text/javascript" src="%(site)s/js/jquery.uploadify.v2.1.4.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/swfobject.js"></script>
             <script type="text/javascript" src="http://cdn.jquerytools.org/1.2.4/all/jquery.tools.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
@@ -70,16 +70,61 @@ class Template:
             <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
             """ % {'site': CFG_SITE_URL, 'ln': ln}
 
-    def tmpl_choose_project(self, default='', existing_projects=None, ln=CFG_SITE_LANG):
+    def tmpl_choose_project(self, existing_projects=None, selected_project=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         if existing_projects is None:
             existing_projects = []
-        body = ' '.join(existing_projects)
-        return  H.div(class_="note")(EscapedString(body, escape_nothing=True)) + H.div(class_="ui-widget")(
-                H.label(for_='project')(_("Start typing the project title or the acronym or the grant agreement number")),
-                H.input(id='project', name='project', type="text"),
-                H.input(type='hidden', name='projectid', id='projectid')
-            )
+        out = ""
+        select_project_title = escape(_("Select a project"))
+        if selected_project is not None:
+            out += """
+                <div class="note">
+                    <h3>%(selected_project_title)s</h3>
+                    <p>%(selected_project_description)s</p>
+                </div>
+            """ % {
+                'selected_project_title': escape(_("Current Project")),
+                'selected_project_description': escape(_("You have currently selected the project %(selected_project)s. Any publication you are currently seeing in this page belong to this project. Any new publication you will start to deposit will as well belong to this project.")) % {'selected_project': selected_project}
+            }
+            select_project_title = escape(_("Select another project"))
+        out += """
+            <div class="note">
+                <h3>%(select_project_title)s</h3>
+            """ % {'select_project_title': select_project_title}
+        if existing_projects:
+            if selected_project:
+                select_project_description = escape(_("This is the list of other projects for which you have already deposited (or begun to deposit) at least one publication. Click on any project to focus on its publications:"))
+            else:
+                select_project_description = escape(_("This is the list of projects for which you have already deposited (or begun a deposit) at least one publication. Click on any project to focus on its publications:"))
+            out += """<p>%(select_project_description)s<br />%(existing_projects)s.</p>""" % {
+                'select_project_description': select_project_description,
+                'existing_projects': ', '.join(existing_projects)
+            }
+        out += """
+            <p>
+                <noscript>
+                    <form>
+                        <label for="project">%(noscript_description)s</label>
+                        <input type="text" name="projectid" size="75" />
+                        <input type="submit" value="%(submit)s" />
+                    </form>
+                </noscript>
+                <span style="display: none;" class="yesscript">
+                    <form>
+                        <label for="project">%(yesscript_description)s</label>
+                        <input type="text" id="project" name="project" size="75" />
+                        <input type="hidden" id="projectid" name="projectid" />
+                        <input type="submit" value="%(submit)s" />
+                    </form>
+                </span>
+            </p>
+            </div>
+            """ % {
+                'noscript_description': escape(_("Enter the grant agreement number for the project you wish to select: ")),
+                'yesscript_description': escape(_("Start typing the project title or acronym or the grant agreement number for the project you wish to select: ")),
+                'submit': escape(_("Select project"), True)
+            }
+        return out
 
     def tmpl_select_a_project(self, existing_projects=None, plus=False, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
@@ -128,7 +173,7 @@ class Template:
             }
 
 
-    def tmpl_form(self, projectid, publicationid, publication_information, fileinfo, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
+    def tmpl_form(self, publicationid, projectid, projects_information, publication_information, fulltext_information, form=None, metadata_status='empty', warnings=None, errors=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         values = dict(CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS)
         values['id'] = publicationid
@@ -137,8 +182,8 @@ class Template:
                 if key.endswith('_%s' % publicationid):
                     values['%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
         values['edit_metadata_label'] = escape(_("Edit"))
-        values['fileinfo'] = fileinfo
-        values['projectid'] = projectid
+        values['fulltext_information'] = fulltext_information
+        values['projects_information'] = projects_information
         values['site'] = CFG_SITE_URL
         values['mandatory_label'] = escape(_("The symbol %(x_asterisk)s means the field is mandatory.")) % {"x_asterisk": """<img src="%s/img/asterisk.png" alt="mandatory" />""" % CFG_SITE_URL}
         values['language_label'] = escape(_("Document language"))
@@ -183,7 +228,14 @@ class Template:
         values['submit_label'] = escape(_('Submit publication'))
         values['embargo_date_size'] = len(values['embargo_date_hint'])
         values['publication_information'] = publication_information
+        values['projects_information_label'] = escape(_("Projects information"))
+        values['projects_description'] = escape(_("List of projects linked with this publication"))
+        values['projects_tooltip'] = escape(_("""<p>This is the list of projects that are associated with this publications.</p><p>Click on the small %(trash_icon)s in order to unlink the corresponding project.</p><p>Start typing a <em>project acronym</em>, a <em>project title</em> or a <em>grant agreement number</em>, choose a project from the menu that will appear and click on the small %(plus_icon)s in order to link a new project to your publication.</p>""") % {
+            'trash_icon': """<img src="%s/img/smallbin.gif" alt="Unlink project" />""" % CFG_SITE_URL,
+            'plus_icon': """<img src="%s/img/add.png" alt="link project" />""" % CFG_SITE_URL
+        }, True)
         values['status'] = metadata_status
+        values['projectid'] = projectid
         if warnings:
             for key, value in warnings.iteritems():
                 if key.endswith('_%s' % publicationid):
@@ -229,11 +281,16 @@ class Template:
                 }
         return out
 
-    def tmpl_upload_publications(self, projectid, session, ln=CFG_SITE_LANG):
+    def tmpl_upload_publications(self, projectid, project_information, session, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         data = {
                 'upload_publications': escape(_("Upload New Publications")),
-                'projectid': 'bla',
+                'upload_publications_description': escape(_("Click on %(x_fmt_open)s%(upload)s%(x_fmt_cose)s to start uploading one or more publications. These publications will initially be associated with the project %(project_information)s")) % {
+                    'x_fmt_open': "<strong>",
+                    'x_fmt_cose': "</strong>",
+                    'upload': escape(_("Upload")),
+                    'project_information': project_information
+                },
                 'site': CFG_SITE_URL,
                 'projectid': projectid,
                 'session': session,
@@ -242,11 +299,13 @@ class Template:
                 'cancel_upload': escape(_("Cancel upload")),
                 'buttontext': _("Upload"),
                 'ln': ln,
+                'filedescription': _("Publications"),
             }
         prepare4js(data)
         return """
+            <h3>%(upload_publications)s</h3>
             <form action="%(site)s/deposit?ln=%(ln)s" method="POST">
-                <h3>%(upload_publications)s</h3>
+                <p>%(upload_publications_description)s</p>
                 <input id="fileInput" name="file" type="file" />
                 <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
                 <input type="hidden" value="%(projectid)s" name="projectid" />
@@ -264,6 +323,8 @@ class Template:
                         'multi'     : true,
                         'buttonText': '%(js_buttontext)s',
                         'simUploadLimit': '2',
+                        'fileExt': '*.pdf;*.doc;*.docx;*.odt',
+                        'fileDesc': '%(js_filedescription)s',
                         'scriptData': {'projectid': '%(js_projectid)s', 'session': '%(js_session)s'},
                         'onAllComplete': function(){
                             $('input.save').trigger('click');
@@ -309,65 +370,141 @@ class Template:
                 });
             // ]]></script>""" % data
 
-
-    def tmpl_project_information(self, projectid, existing_publications, grant_agreement_number='', ec_project_website='', acronym='', call_identifier='', end_date='', start_date='', title='', fundedby='', linked=True, ln=CFG_SITE_LANG):
+    def tmpl_project_information(self, global_projectid, projectid, existing_publications, grant_agreement_number='', ec_project_website='', acronym='', call_identifier='', end_date='', start_date='', title='', fundedby='', deletable=True, linked=True, publicationid=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
-        if projectid == '000000':
-            data = {
-                    'selected_project_label': escape(_("Selected Project")),
-                    'acronym': escape(_('NO PROJECT'), True),
-                    'site': escape(CFG_SITE_URL, True),
-                    'id': escape(projectid, True),
-                    'ln': escape(ln, True),
-                    'existing_publications': existing_publications,
-                }
-            if linked:
-                data['acronym'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s</a>""" % data
-            return """
-                <div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s (%(existing_publications)d)</div>""" % data
+        if projectid == 0:
+            acronym = _('NO PROJECT')
+        if not acronym:
+            acronym = title
+        out = """<span class="selectedproject" id="project_%(id)s_%(publicationid)s">"""
+        if linked:
+            out += """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s (%(existing_publications)s)</a>"""
         else:
-            data = {
-                    'selected_project_label': escape(_("Selected Project")),
-                    'acronym': escape(acronym, True),
-                    'site': escape(CFG_SITE_URL, True),
-                    'change_project_label': escape(_("change project")),
-                    'acronym_label': escape(_("Acronym"), True),
-                    'title_label': escape(_("Title"), True),
-                    'title': escape(title, True),
-                    'grant_agreement_number_label': escape(_("Grant Agreement Number"), True),
-                    'grant_agreement_number': escape(str(grant_agreement_number), True),
-                    'ec_project_website_label': escape(_("EC Project Website"), True),
-                    'ec_project_website': escape(ec_project_website, True),
-                    'start_date_label': escape(_("Start Date"), True),
-                    'start_date': escape(start_date, True),
-                    'end_date_label': escape(_("End Date"), True),
-                    'end_date': escape(end_date, True),
-                    'fundedby_label': escape(_("Funded By"), True),
-                    'fundedby': escape(fundedby, True),
-                    'call_identifier_label': escape(_("Call Identifier"), True),
-                    'call_identifier': escape(call_identifier, True),
-                    'id': escape(projectid, True),
-                    'ln': escape(ln, True),
-                    'existing_publications': existing_publications,
-                }
-            if linked:
-                data['acronym'] = """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s</a>""" % data
-            prepare4js(data)
-            return """
-                <div class="selectedproject" id="selectedproject_%(id)s">%(acronym)s (%(existing_publications)d)</div>
+            out += """<strong>%(acronym)s</strong>"""
+        out += """</span>"""
+        if projectid > 0:
+            out += """
                 <script type="text/javascript">// <![CDATA[
                     $(document).ready(function(){
                         var tooltip = clone(gTipDefault);
                         tooltip.content = {
                             'text': '<table><tbody><tr><td align="right"><strong>%(js_acronym_label)s:<strong></td><td align="left">%(js_acronym)s</td></tr><tr><td align="right"><strong>%(js_title_label)s:<strong></td><td align="left">%(js_title)s</td></tr><tr><td align="right"><strong>%(js_grant_agreement_number_label)s:<strong></td><td align="left">%(js_grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(js_ec_project_website_label)s:<strong></td><td align="left"><a href="%(js_ec_project_website)s" target="_blank">%(js_ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(js_start_date_label)s:<strong></td><td align="left">%(js_start_date)s</td></tr><tr><td align="right"><strong>%(js_end_date_label)s:<strong></td><td align="left">%(js_end_date)s</td></tr><tr><td align="right"><strong>%(js_fundedby_label)s:<strong></td><td align="left">%(js_fundedby)s</td></tr><tr><td align="right"><strong>%(js_call_identifier_label)s:<strong></td><td align="left">%(js_call_identifier)s</td></tr><tbody></table>'
                         };
-                        $('#selectedproject_%(id)s').qtip(tooltip);
+                        $('#project_%(js_id)s_%(js_publicationid)s').qtip(tooltip);
                     });
-                // ]]></script>""" % data
+                // ]]></script>"""
+        if deletable:
+            out += """
+                <noscript>
+                    <a href="%(site)s/deposit?projectid=%(global_projectid)s&amp;publicationid=%(publicationid)s&amp;unlinkproject=%(id)s&amp;ln=%(ln)s"><img src="%(site)s/img/smallbin.gif" alt="%(delete_project_label)s" /></a>
+                </noscript>
+                <img src="%(site)s/img/smallbin.gif" alt="%(delete_project_label)s" id="delete_%(id)s_%(publicationid)s" class="hidden" />
+                <script type="text/javascript">// <![CDATA[
+                    $(document).ready(function(){
+                        $("#delete_%(js_id)s_%(js_publicationid)s").click(function(){
+                            var data = {};
+                            data.projectid = %(js_id)s;
+                            data.publicationid = "%(js_publicationid)s";
+                            data.action = "unlinkproject";
+                            if (confirm("%(js_confirm_delete_project)s"))
+                                $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
+                            return false;
+                        }).show();
+                    });
+                // ]]></script>"""
+        data = {
+            'id': escape(projectid, True),
+            'publicationid': escape(publicationid, True),
+            'site': escape(CFG_SITE_URL, True),
+            'ln': escape(ln, True),
+            'acronym': escape(acronym),
+            'acronym_label': escape(_("Acronym"), True),
+            'existing_publications': escape(existing_publications),
+            'title_label': escape(_("Title"), True),
+            'title': escape(title, True),
+            'grant_agreement_number_label': escape(_("Grant Agreement Number"), True),
+            'grant_agreement_number': escape(str(grant_agreement_number), True),
+            'ec_project_website_label': escape(_("EC Project Website"), True),
+            'ec_project_website': escape(ec_project_website, True),
+            'start_date_label': escape(_("Start Date"), True),
+            'start_date': escape(start_date, True),
+            'end_date_label': escape(_("End Date"), True),
+            'end_date': escape(end_date, True),
+            'fundedby_label': escape(_("Funded By"), True),
+            'fundedby': escape(fundedby, True),
+            'call_identifier_label': escape(_("Call Identifier"), True),
+            'call_identifier': escape(call_identifier, True),
+            'global_projectid': escape(global_projectid, True),
+            'confirm_delete_project': escape(_("Are you really sure you want to unlink this publication from the project %(acronym)s?") % {'acronym': acronym}, True),
+            'delete_project_label': escape(_("Unlink project %(acronym)s") % {'acronym': acronym}, True)
+        }
+        prepare4js(data)
+        return out % data
 
-    def tmpl_add_publication_data_and_submit(self, projectid, project_information, publication_forms, submitted_publications, ln=CFG_SITE_LANG):
+
+    def tmpl_projects_box(self, publicationid, associated_projects, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
 
+        associated_projects = ''.join(["%s<br />" % (associated_project) for associated_project in associated_projects])
+
+        out = """
+            <div id="projectsbox_%(id)s">
+                %(associated_projects)s
+                <noscript>
+                    <label for="linkproject_%(id)s">Grant Agreement Number</label>
+                </noscript>
+                <input type="text" name="linkproject" id="linkproject_%(id)s" size="75" />
+                <input type="hidden" name="dummy" id="linkproject_%(id)s_hidden" />
+                <input type="hidden" name="publicationid" value="%(id)s" />
+                <img src="%(site)s/img/add.png" alt="%(link_project)s" id="projectsbox_submit_%(id)s" />
+            </div>
+            <script type="text/javascript">//<![CDATA[
+                $(document).ready(function() {
+                    $('#linkproject_%(js_id)s').each(function() {
+                        // Since Javascript is working, lets disable sending
+                        // the text filled up by the user, and instead
+                        // let's consider what is filled by the autocomplete plugin
+                        // inside the hidden field.
+                        this.name = "dummy";
+                    });
+                    $('#linkproject_%(js_id)s_hidden').each(function() {
+                        this.name = "linkproject";
+                    });
+                    $('#linkproject_%(js_id)s').autocomplete({
+                        source: gSite + "/kb/export?kbname=projects&format=jquery&limit=20&ln=" + gLn,
+                        focus: function(event, ui) {
+                            $('#linkproject_%(js_id)s').val(ui.item.label);
+                            return false;
+                        },
+                        select: function(event, ui) {
+                            $('#linkproject_%(js_id)s').val(ui.item.label);
+                            $('#linkproject_%(js_id)s_hidden').val(ui.item.value);
+                            return false;
+                        }
+                    });
+                    $("#projectsbox_submit_%(js_id)s").click(function(){
+                        var data = {};
+                        data.projectid = $('#linkproject_%(js_id)s_hidden').val();
+                        data.publicationid = "%(js_id)s";
+                        data.action = "linkproject";
+                        $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
+                        return false;
+                    });
+                });
+            //]]></script>"""
+        data = {
+            "id": publicationid,
+            "associated_projects": associated_projects,
+            "site": CFG_SITE_URL,
+            "link_project": escape(_("Link project")),
+        }
+        data = prepare4js(data)
+        return out % data
+
+    def tmpl_add_publication_data_and_submit(self, projectid, publication_forms, submitted_publications, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+
+        out = ""
         if publication_forms:
             publication_forms = """<form method="POST" id="publication_forms">
             <div class="note OpenAIRE">
@@ -376,65 +513,68 @@ class Template:
             </table>
             </div>
             </form>""" % {'publication_forms': publication_forms}
-        else:
-            publication_forms = ''
 
-        return """
-            <h3>%(title)s</h3>
-            <div class="note">
-            %(project_information)s (<a href="%(site)s/deposit?ln=%(ln)s" alt="%(change_project_label)s">%(change_project_label)s</a>)
-            </div>
-            %(publication_forms)s
-            <div id="submitted_publications">
-            <h3>%(submitted_publications_title)s</h3>
-            %(submitted_publications)s
-            </div>
-            <script type="text/javascript">//<![CDATA[
-                var gProjectid = "%(projectid)s";
-                $(document).ready(function(){
-                    $('input.datepicker').datepicker({
-                        dateFormat: 'yy-mm-dd',
-                        showOn: 'both',
-                        onClose: function(){
-                            $(this).focus();
-                        },
-                        showButtonPanel: true
+            out += """
+                <h3>%(title)s</h3>
+                %(publication_forms)s
+                <script type="text/javascript">//<![CDATA[
+                    var gProjectid = "%(js_projectid)s";
+                    $(document).ready(function(){
+                        $('input.datepicker').datepicker({
+                            dateFormat: 'yy-mm-dd',
+                            showOn: 'both',
+                            onClose: function(){
+                                $(this).focus();
+                            },
+                            showButtonPanel: true
+                        });
+                        $('textarea').elastic();
+                        $('#publication_forms').submit(function(event){
+                            event.preventDefault();
+                            return false;
+                        });
+                        $('a.deletepublication').click(function(){
+                            return confirm("%(js_confirm_delete_publication)s");
+                        });
                     });
-                    $('textarea').elastic();
-                    $('#publication_forms').submit(function(event){
-                        event.preventDefault();
-                        return false;
-                    });
-                    $('a.deletepublication').click(function(){
-                        return confirm("%(confirm_delete_publication)s");
-                    });
-                    %(hide_submitted_publications)s
-                });
-            //]]></script>
-            """ % {
-                'submitted_publications_title': escape(_("Successfully submitted publications")),
-                'project_information': project_information,
-                'title': escape(_('Your Current Publications')),
-                'selected_project_title': escape(_("Selected Project")),
-                'projectid': projectid,
-                'change_project_label': escape(_('change project'), True),
-                'uploaded_publications': escape(_('Uploaded Publications')),
-                'title_head': escape(_('Title')),
-                'license_type_head': escape(_('License Type')),
-                'embargo_release_date_head': escape(_('Embargo%(x_br)sRelease Date')) % {'x_br': '<br />'},
-                'publication_forms': publication_forms,
-                'confirm_delete_publication': _("Are you sure you want to delete this publication?"),
-                'submitted_publications': submitted_publications,
-                'hide_submitted_publications': not submitted_publications and \
-                    """$("#submitted_publications").hide();""" or '',
-                'ln': ln,
-                'projectid': projectid,
-                'done': escape(_("Done"), True),
-                'today': escape(_("Today"), True),
-                'next': escape(_("Next"), True),
-                'prev': escape(_("Prev"), True),
-                'site': escape(CFG_SITE_URL, True),
-            }
+                //]]></script>
+                """
+        out += """
+        <div id="submitted_publications">
+        <h3>%(submitted_publications_title)s</h3>
+        %(submitted_publications)s
+        </div>
+        <script type="text/javascript">//<![CDATA[
+            $(document).ready(function(){
+                if (%(hide_submitted_publications_section)s)
+                    $("#submitted_publications").hide();
+            });
+        //]]> </script>
+        """
+        data = {
+            'submitted_publications_title': escape(_("Successfully submitted publications")),
+            'title': escape(_('Your Current Publications')),
+            'selected_project_title': escape(_("Selected Project")),
+            'projectid': projectid,
+            'change_project_label': escape(_('change project'), True),
+            'uploaded_publications': escape(_('Uploaded Publications')),
+            'title_head': escape(_('Title')),
+            'license_type_head': escape(_('License Type')),
+            'embargo_release_date_head': escape(_('Embargo%(x_br)sRelease Date')) % {'x_br': '<br />'},
+            'publication_forms': publication_forms,
+            'confirm_delete_publication': _("Are you sure you want to delete this publication?"),
+            'submitted_publications': submitted_publications,
+            'hide_submitted_publications_section': submitted_publications and "false" or "true",
+            'ln': ln,
+            'projectid': projectid,
+            'done': escape(_("Done"), True),
+            'today': escape(_("Today"), True),
+            'next': escape(_("Next"), True),
+            'prev': escape(_("Prev"), True),
+            'site': escape(CFG_SITE_URL, True),
+        }
+        data = prepare4js(data)
+        return out % data
 
 
     def tmpl_fulltext_information(self, filename, publicationid, download_url, md5, mimetype, format, size, ln=CFG_SITE_LANG):
@@ -478,3 +618,47 @@ class Template:
             'logout_key': logout_key,
             'site': CFG_SITE_URL,
             'release': "Invenio %s" % CFG_VERSION}
+
+    def tmpl_confirmation_email_body(self, title, authors, url, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        return _("""\
+this is to confirm that you successfully deposited a publication into OpenAIRE:
+
+    title: %(title)s
+    authors: %(authors)s
+    url: <%(url)s>
+
+OpenAIRE Orphan Record Repository curators will soon review your deposition and
+eventually approve it.
+
+If you wish to deposit other documents, please visit:
+    <%(site)s/deposit>
+""") % {
+        'title': title,
+        'authors': ', '.join(authors),
+        'url': url,
+        'site': CFG_SITE_URL
+        }
+
+    def tmpl_curators_email_body(self, title, authors, url, bibedit_url):
+        return """\
+this is to let you know that a new publication has just been deposited into
+OpenAIRE and is waiting for your approval:
+
+    title: %(title)s
+    authors: %(authors)s
+    url: <%(url)s>
+
+In order to approve it, open it with BibEdit at this URL:
+    <%(bibedit_url)s>
+
+and change its collection definition (tag 980__a) from PROVISIONAL to OPENAIRE.
+
+In order to reject it change its collection definition (tag 980__a) from
+PROVISIONAL to REJECTED.
+""" % {
+        'title': title,
+        'authors': ', '.join(authors),
+        'url': url,
+        'bibedit_url': bibedit_url
+        }
