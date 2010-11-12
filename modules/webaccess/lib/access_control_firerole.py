@@ -206,7 +206,11 @@ def acc_firerole_check_user(user_info, firerole_def_obj):
     try:
         default_allow_p, rules = firerole_def_obj
         for (allow_p, not_p, field, expressions_list) in rules: # for every rule
+<<<<<<< HEAD
             group_p = field == 'group' # Is it related to group?
+=======
+            group_p = field in ('group', 'apache_group') # Is it related to group?
+>>>>>>> master
             ip_p = field == 'remote_ip' # Is it related to Ips?
             until_p = field == 'until' # Is it related to dates?
             from_p = field == 'from' # Idem.
