@@ -2663,7 +2663,7 @@ class BibDocFile:
                  description = self.description or ''
                )
 
-    def is_restricted(self, req):
+    def is_restricted(self, user_info):
         """Returns restriction state. (see acc_authorize_action return values)"""
         if self.status not in ('', 'DELETED'):
             return check_bibdoc_authorization(user_info, status=self.status)

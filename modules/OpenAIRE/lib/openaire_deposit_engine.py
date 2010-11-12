@@ -532,8 +532,16 @@ class OpenAIREPublication(object):
         record_add_field(rec, '856', ind1='0', subfields=[('f', get_email(self.uid))])
         if self._metadata.get('embargo_date'):
             record_add_field(rec, '942', subfields=[('a', self._metadata['embargo_date'])])
+        fft_status = ''
+        if self._metadata['access_rights'] == 'embargoedAccess':
+            fft_status = 'firerole: allow after "%s"\nallow any' % self._metadata['embargo_date']
+        elif self._metadata['access_rights'] in ('closedAccess', 'restrictedAccess'):
+            fft_status = 'status: %s' % self._metadata['access_rights']
         for key, fulltext in self.fulltexts.iteritems():
-            record_add_field(rec, 'FFT', subfields=[('a', fulltext.fullpath)])
+            subfields = [('a', fulltext.fullpath)]
+            if fft_status:
+                subfields.append(('r', fft_status))
+            record_add_field(rec, 'FFT', subfields=subfields)
         subfields = []
         if self._metadata.get('journal_title'):
             subfields.append(('p', self._metadata['journal_title']))
