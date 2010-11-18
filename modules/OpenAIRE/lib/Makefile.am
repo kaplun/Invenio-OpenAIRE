@@ -23,8 +23,14 @@ jsdir = $(localstatedir)/www/js
 
 submit_DATA = OpenAIRE_recmysql2curdir.py OpenAIRE_Response_Elements.py
 format_DATA = bfe_dnet_field.py
-tasklet_DATA = bst_chomsky.py bst_load_OpenAIRE_kbs.py
-pylib_DATA = chomsky.py openaire_deposit_webinterface.py openaire_deposit_engine.py openaire_deposit_templates.py dnetutils.py openaire_deposit_utils.py openaire_deposit_config.py
+tasklet_DATA = bst_chomsky.py bst_load_OpenAIRE_kbs.py bst_OpenAIRE_pgreplayqueue.py
+pylib_DATA = chomsky.py \
+			 openaire_deposit_webinterface.py \
+			 openaire_deposit_engine.py \
+			 openaire_deposit_templates.py \
+			 dnetutils.py \
+			 openaire_deposit_utils.py \
+			 openaire_deposit_config.py
 js_DATA = openaire_deposit_engine.js
 
 EXTRA_DIST = $(pylib_DATA) $(jsdir)

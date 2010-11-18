@@ -3740,4 +3740,11 @@ CREATE TABLE IF NOT EXISTS eupublication (
   KEY (uid)
 ) TYPE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS pgreplayqueue (
+  id int(15) unsigned NOT NULL auto_increment,
+  query longblob,
+  first_try datetime NOT NULL default '0000-00-00',
+  last_try datetime NOT NULL default '0000-00-00',
+  PRIMARY KEY (id)
+) TYPE=MyISAM;
 -- end of file
