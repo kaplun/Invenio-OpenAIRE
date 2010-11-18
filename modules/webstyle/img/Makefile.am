@@ -57,6 +57,7 @@ img_DATA = add-small.png \
            drop_down_menu_arrow_down_lb.gif \
            drop_down_menu_arrow_down_w.gif \
            edit1.gif \
+           einfrastructure_sm.png \
            external-icon-light-8x8.gif \
            favicon.png \
            feed-icon-12x12.gif \
@@ -67,6 +68,7 @@ img_DATA = add-small.png \
            file-icon-text-96x128.gif \
            forbidden_left.gif \
            forbidden_right.gif \
+           fp7-capacities_tr.png \
            gradient-lightgray-1x100.gif \
            gradient_tab-gray-1x23.gif \
            gradient_tab_on-gray-1x23.gif \

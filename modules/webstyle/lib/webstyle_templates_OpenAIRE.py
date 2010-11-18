@@ -694,9 +694,11 @@ var YtSettings = { tplurl: 'http://www.openaire.eu/templates/yoo_level', color: 
 %(pagefooteradd)s
 <!-- replaced page footer -->
  <div class="pagefooterstripeleft">
+  <img style="margin-top: 0px; margin-left: 0px; float: left;" alt="fp7-capacities" src="/img/fp7-capacities_tr.png" height="45" width="58">
+  <img style="margin-left: 10px; margin-top: 10px; float: left;" alt="e_infrastructures" src="/einfrastructure_sm.png" height="32" width="87">
   %(sitename)s&nbsp;::&nbsp;<a class="footer" href="%(siteurl)s/?ln=%(ln)s">%(msg_search)s</a>&nbsp;::&nbsp;<a class="footer" href="%(siteurl)s/submit?ln=%(ln)s">%(msg_submit)s</a>&nbsp;::&nbsp;<a class="footer" href="%(sitesecureurl)s/youraccount/display?ln=%(ln)s">%(msg_personalize)s</a>&nbsp;::&nbsp;<a class="footer" href="%(siteurl)s/help/%(langlink)s">%(msg_help)s</a>
   <br />
-  %(msg_poweredby)s <a class="footer" href="http://cdsware.cern.ch/">CDS Invenio</a> v%(version)s
+  %(msg_poweredby)s <a class="footer" href="http://cdsware.cern.ch/">Invenio</a> v%(version)s
   <br />
   %(msg_maintainedby)s <a class="footer" href="mailto:%(sitesupportemail)s">%(sitesupportemail)s</a>
   <br />
