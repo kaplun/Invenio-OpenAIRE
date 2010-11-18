@@ -134,7 +134,7 @@ DEF_ROLES = ((SUPERADMINROLE, 'superuser with all rights', 'deny any'),
 
 # Demo site roles
 DEF_DEMO_ROLES = (('photocurator', 'Photo collection curator', 'deny any'),
-                  ('thesesviewer', 'Theses viewer', 'allow group "Theses viewers"\nallow apache_group "theses"'),
+                  ('thesesviewer', 'Theses viewer', 'allow group "Theses viewers"'),
                   ('thesescurator', 'Theses collection curator', 'deny any'),
                   ('referee_DEMOBOO_*', 'Book collection curator', 'deny any'),
                   ('restrictedpicturesviewer', 'Restricted pictures viewer', 'deny any'),

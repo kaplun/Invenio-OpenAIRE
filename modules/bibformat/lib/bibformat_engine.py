@@ -1720,8 +1720,6 @@ class BibFormatObject:
             'referer' : '',
             'uri' : '',
             'agent' : '',
-            'apache_user' : '',
-            'apache_group' : [],
             'uid' : -1,
             'nickname' : '',
             'email' : '',

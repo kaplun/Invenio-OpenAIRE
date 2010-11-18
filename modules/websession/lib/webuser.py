@@ -1098,7 +1098,7 @@ def collect_user_info(req, login_time=False, refresh=False):
 
     try:
         is_req = False
-        if req is None:
+        if not req:
             uid = -1
         elif type(req) in (type(1), type(1L)):
             ## req is infact a user identification

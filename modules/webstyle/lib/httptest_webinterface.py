@@ -88,7 +88,7 @@ class WebInterfaceHTTPTestPages(WebInterfaceDirectory):
             body = """<p>Please send a file via POST.</p>"""
             return page("test2", body=body, req=req)
         path, mimetype = handle_file_post(req)
-        return  stream_file(req, path, mime=mimetype)
+        return stream_file(req, path, mime=mimetype)
 
     def complexpost(self, req, form):
         body = """

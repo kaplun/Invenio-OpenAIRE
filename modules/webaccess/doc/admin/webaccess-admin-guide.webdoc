@@ -1102,9 +1102,6 @@ II. Example - connecting role and user</a>
         <li><strong>referer</strong>: the webpage from where the user is coming from</li>
         <li><strong>uri</strong>: the uri the user is visiting</li>
         <li><strong>agent</strong>: the agent string describing the user's browser</li>
-        <li><strong>apache_user</strong>: the <a href="websearch-admin-guide#3.2">Apache user</a> provided by the authenticated user</li>
-        <li><strong>apache_group/apache_groups</strong>: the Apache groups to which the apache user
-            belong</li>
     </ul>
 
     Note that you can specify either (apache_)group or (apache_)groups (with or
