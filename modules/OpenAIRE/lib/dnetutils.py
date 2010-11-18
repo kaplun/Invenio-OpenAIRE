@@ -1,5 +1,5 @@
-## This file is part of CDS Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008 CERN.
+## This file is part of Invenio.
+## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
 ##
 ## CDS Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -89,7 +89,18 @@ def _db_login(relogin = 0):
             _DB_CONN[thread_ident] =psycopg2.connect(CFG_DNET_PG_DSN)
             return _DB_CONN[thread_ident]
 
-def dnet_run_sql(sql, param=None, n=0, with_desc=0):
+def dnet_save_query_into_pgreplayqueue(query, param):
+    """
+    If for some reason the D-NET Db is not working, we save a query and its
+    param inside the pgreplayqueue, and we expect a daemon to replay such
+    query in the future.
+    """
+    from invenio.dbquery import run_sql
+    from marshal import dumps
+    from zlib import compress
+    run_sql("INSERT INTO pgreplayqueue(query, first_try, last_try) VALUES(%s, NOW(), NOW())", (compress(dumps((query, param)))))
+
+def dnet_run_sql(sql, param=None, n=0, with_desc=0, support_replay=True):
     """Run SQL on the server with PARAM and return result.
 
     @param param: tuple of string params to insert in the query (see
@@ -99,6 +110,12 @@ def dnet_run_sql(sql, param=None, n=0, with_desc=0):
 
     @param with_desc: if True, will return a DB API 7-tuple describing
         columns in query.
+
+    @param support_replay: if support_replay is True then, in case of errors,
+        the query is queued and replayed later in the future. Of course
+        this flag should be set to false when the query is actually being
+        replayed from the very queue, as otherwise we would enter an endless
+        loop (at least in case of errors ;-).
 
     @return: If SELECT, SHOW, DESCRIBE statements, return tuples of
         data, followed by description if parameter with_desc is
@@ -134,6 +151,8 @@ def dnet_run_sql(sql, param=None, n=0, with_desc=0):
             rc = cur.execute(sql, param)
             db.commit()
         except (psycopg2.OperationalError, psycopg2.InternalError): # again an unexpected disconnect, bad malloc error, etc
+            if support_replay and sql.split()[0].upper() in ("INSERT", "UPDATE", "DELETE"):
+                dnet_save_query_into_pgreplayqueue(sql, param)
             raise
 
     if sql.split()[0].upper() in ("SELECT", "SHOW", "DESC", "DESCRIBE"):
