@@ -31,6 +31,7 @@ else:
     import json
 import re
 import copy
+from base64 import encodestring
 
 from invenio.bibdocfile import generic_path2bidocfile
 from invenio.bibedit_utils import json_unicode_to_utf8
@@ -39,7 +40,7 @@ from invenio.webinterface_handler import wash_urlargd
 from invenio.webuser import session_param_set, session_param_get, collect_user_info, get_email
 from invenio import template
 from invenio.messages import gettext_set_language
-from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_WEBSUBMIT_STORAGEDIR, CFG_SITE_ADMIN_EMAIL
+from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, CFG_WEBSUBMIT_STORAGEDIR, CFG_SITE_ADMIN_EMAIL, CFG_SITE_SECURE_URL, CFG_OPENAIRE_PORTAL_URL
 from invenio.websearch_webcoll import mymkdir
 from invenio.dbquery import run_sql
 from invenio.bibtask import task_low_level_submission
@@ -87,11 +88,12 @@ def portal_page(title, body, navtrail="", description="", keywords="",
     if req is not None:
         user_info = collect_user_info(req)
         username = user_info.get('nickname', user_info['email'])
-        logout_key = user_info.get('EXTERNAL_logout_key', '')
+        invenio_logouturl = "%s/youraccount/logout?ln=%s" % (CFG_SITE_SECURE_URL, language)
+        logouturl = create_url(CFG_OPENAIRE_PORTAL_URL, {"option": "com_openaire", "view": "logout", "return": encodestring(invenio_logouturl)})
     else:
         username = 'Guest'
-        logout_key = ''
-    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, logout_key=logout_key, ln=language)
+        logouturl = ''
+    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, logouturl=logouturl, ln=language)
 
 def get_project_description(projectid):
     info = get_kb_mapping(CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, str(projectid))

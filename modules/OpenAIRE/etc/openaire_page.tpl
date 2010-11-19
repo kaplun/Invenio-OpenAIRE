@@ -97,7 +97,7 @@ div.wrapper { width: 900px; }
 							<div class="box-3 deepest">
 																<h3 class="header"><span class="header-2"><span class="header-3">Consortium<span class="color"> members</span></span></span></h3>
 
-<form action="index.php" method="post" name="login">
+<form action="%(logouturl)s" method="get" name="login">
 
 <span class="niftyquick" style="display: block;">
 	<span class="yoo-login">
@@ -107,13 +107,8 @@ div.wrapper { width: 900px; }
 						<span class="greeting">Hi %(username)s,</span>
 
 			<span class="logout-button">
-				<button value="Logout" name="Submit" type="submit" title="Logout">Logout</button>
+				<button type="submit" title="Logout">Logout</button>
 			</span>
-
-			<input type="hidden" name="option" value="com_user" />
-			<input type="hidden" name="task" value="logout" />
-			<input type="hidden" name="return" value="%(logout_key)s" />
-
 		</span>
 
 

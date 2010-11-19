@@ -609,13 +609,13 @@ class Template:
                 });
             //]]></script>""" % data
 
-    def tmpl_page(self, title, body, headers, username, logout_key="", ln=CFG_SITE_LANG):
+    def tmpl_page(self, title, body, headers, username, logouturl, ln=CFG_SITE_LANG):
         return CFG_OPENAIRE_PAGE_TEMPLATE % {
             'headers': headers,
             'title': title,
             'body': body,
             'username': username,
-            'logout_key': logout_key,
+            'logouturl': logouturl,
             'site': CFG_SITE_URL,
             'release': "Invenio %s" % CFG_VERSION}
 
