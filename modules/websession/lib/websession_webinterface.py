@@ -37,7 +37,8 @@ from invenio.config import \
      CFG_SITE_SECURE_URL, \
      CFG_SITE_URL, \
      CFG_CERN_SITE, \
-     CFG_WEBSESSION_RESET_PASSWORD_EXPIRE_IN_DAYS
+     CFG_WEBSESSION_RESET_PASSWORD_EXPIRE_IN_DAYS, \
+     CFG_OPENAIRE_SITE
 from invenio import webuser
 from invenio.webpage import page
 from invenio import webaccount
@@ -759,6 +760,15 @@ class WebInterfaceYourAccountPages(WebInterfaceDirectory):
             'action': (str, ''),
             'remember_me' : (str, ''),
             'referer': (str, '')})
+
+        if CFG_OPENAIRE_SITE:
+            from invenio.config import CFG_OPENAIRE_PORTAL_URL
+            if CFG_OPENAIRE_PORTAL_URL:
+                from invenio.urlutils import create_url
+                from base64 import encodestring
+                invenio_loginurl = args['referer'] or '%s/youraccount/display?ln=%s' % (CFG_SITE_SECURE_URL, args['ln'])
+                loginurl = create_url(CFG_OPENAIRE_PORTAL_URL, {"option": "com_openaire", "view": "login", "return": encodestring(invenio_loginurl)})
+                redirect_to_url(req, loginurl)
 
         # sanity checks:
         args['login_method'] = wash_login_method(args['login_method'])
