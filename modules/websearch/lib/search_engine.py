@@ -66,7 +66,8 @@ from invenio.config import \
      CFG_LOGDIR, \
      CFG_BIBFORMAT_HIDDEN_TAGS, \
      CFG_SITE_URL, \
-     CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS
+     CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS, \
+     CFG_BIBRANK_SHOW_CITATION_LINKS
 from invenio.search_engine_config import InvenioWebSearchUnknownCollectionError
 from invenio.bibrecord import create_record, record_get_field_instances
 from invenio.bibrank_record_sorter import get_bibrank_methods, rank_records, is_method_valid
@@ -2018,10 +2019,10 @@ def search_unit(p, f=None, m=None):
         # we are doing search by the citation count
         set = search_unit_citedby(p)
     elif m == 'a' or m == 'r':
-        # FIXME: workaround for not having phrase index yet
-        if f == 'fulltext':
-            return search_pattern(None, p, f, 'w')
         # we are doing either phrase search or regexp search
+        if f == 'fulltext':
+            # FIXME: workaround for not having phrase index yet
+            return search_pattern(None, p, f, 'w')
         index_id = get_index_id_from_field(f)
         if index_id != 0:
             set = search_unit_in_idxphrases(p, f, m)
@@ -3472,15 +3473,16 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
 
                     citedbynum = 0 #num of citations, to be shown in the cit tab
                     references = -1 #num of references
-
-                    citedbynum = get_cited_by_count(recid)
-                    reftag = ""
-                    reftags = get_field_tags("reference")
-                    if reftags:
-                        reftag = reftags[0]
-                    tmprec = get_record(recid)
-                    if reftag and len(reftag) > 4:
-                        references = len(record_get_field_instances(tmprec, reftag[0:3], reftag[3], reftag[4]))
+                    if CFG_BIBRANK_SHOW_CITATION_LINKS:
+                        citedbynum = get_cited_by_count(recid)
+                    if not CFG_CERN_SITE:#FIXME:should be replaced by something like CFG_SHOW_REFERENCES
+                        reftag = ""
+                        reftags = get_field_tags("reference")
+                        if reftags:
+                            reftag = reftags[0]
+                        tmprec = get_record(recid)
+                        if reftag and len(reftag) > 4:
+                            references = len(record_get_field_instances(tmprec, reftag[0:3], reftag[3], reftag[4]))
 
                     tabs = [(unordered_tabs[tab_id]['label'], \
                              '%s/record/%s/%s%s' % (CFG_SITE_URL, recid_to_display, tab_id, link_ln), \
