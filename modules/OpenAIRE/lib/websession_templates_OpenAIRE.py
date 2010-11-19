@@ -86,7 +86,7 @@ class Template(DefaultTemplate):
                     'ln' : escape(ln, True),
                     'username' : escape(username)
                }
-            out += """<a class="userinfo" href="%(logouturl)s>%(logout)s</a>""" % {
+            out += """<a class="userinfo" href="%(logouturl)s">%(logout)s</a>""" % {
                     'logouturl': escape(logouturl, True),
                     'logout' : escape(_("logout")),
                 }
