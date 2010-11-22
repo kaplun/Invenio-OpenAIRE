@@ -28,6 +28,7 @@ def format_element(bfo):
     ln = bfo.lang
     _ = gettext_set_language(ln)
     access_rights = bfo.field('542__l')
+    embargo = ''
     if access_rights == 'embargoedAccess':
         embargo = bfo.field('942__a')
         if embargo <= time.strftime("%Y-%m-%d"):
