@@ -24,7 +24,7 @@ bfx_DATA = oaidc2marcxml.bfx
 
 xsldir = $(sysconfdir)/bibconvert/config
 xsl_DATA = oaidc2marcxml.xsl oaimarc2marcxml.xsl oaiarxiv2marcxml.xsl \
-           oaidmf2marcxml.xsl
+           oaidmf2marcxml.xsl identity.xsl
 
 EXTRA_DIST = $(kb_DATA) $(bfx_DATA) $(xsl_DATA)
 

@@ -24,6 +24,21 @@ import sys
 import threading
 import thread
 import psycopg2
+import pyRXP
+
+from invenio.bibknowledge import add_kb_mapping, kb_exists, update_kb_mapping, add_kb, kb_mapping_exists, add_kb_mapping, remove_kb_mapping, get_kbr_keys, get_kb_mappings
+
+if sys.hexversion < 0x2060000:
+    try:
+        import simplejson as json
+    except ImportError:
+        # Okay, no Ajax app will be possible, but continue anyway,
+        # since this package is only recommended, not mandatory.
+        pass
+else:
+    import json
+
+
 
 from xml.dom.minidom import parseString
 if sys.hexversion < 0x2060000:
@@ -304,3 +319,93 @@ def get_ajax_suggestions(name, query, cmp_function=lambda x, y: cmp(x.lower(), y
         return _autocomplete_cache[(name, cmp_function)][2][query]
     finally:
         _autocomplete_cache_lock.release()
+
+def get_oaioaf(path):
+    return pyRXP.Parser().parse(open(path).read())
+
+def oaioaf2oafs(oaioaf):
+    for elem in oaioaf[2]:
+        if elem[0] == 'ListRecords':
+            return elem[2]
+
+def oafs2oafrecords(oafs):
+    for record in oafs:
+        if isinstance(record, tuple) and record[0] == 'record':
+            yield record[2]
+
+def oafrecords2oafmetadatas(oafrecords):
+    for oafrecord in oafrecords:
+        for elem in oafrecord:
+            if isinstance(elem, tuple) and elem[0] == 'metadata':
+                yield elem[2]
+
+def oafrecords2oafheaders(oafrecords):
+    for oafrecord in oafrecords:
+        for elem in oafrecord:
+            if isinstance(elem, tuple) and elem[0] == 'header':
+                yield elem[2]
+
+def oafheaders2setSpec(oafheaders):
+    for oafheader in oafheaders:
+        for elem in oafheader:
+            if isinstance(elem, tuple) and elem[0] == 'setSpec':
+                yield elem[2][0]
+
+
+def oafmetadatas2realoafs(oafmetadatas):
+    for oafmetadata in oafmetadatas:
+        for elem in oafmetadata:
+            if isinstance(elem, tuple) and elem[0] == 'oaf:OAF':
+                yield elem[2]
+
+def realoafs2dicts(realoafs):
+    for realoaf in realoafs:
+        out = {}
+        for elem in realoaf:
+            out[elem[0][len("oaf:"):]] = elem[2] and elem[2][0] or ''
+        yield out
+
+def path2dicts(path):
+    xml = oaioaf2oafs(get_oaioaf(path))
+    setSpec = ""
+    for setSpec in oafheaders2setSpec(oafrecords2oafheaders(oafs2oafrecords(xml))):
+        break
+    return setSpec, list(realoafs2dicts(oafmetadatas2realoafs(oafrecords2oafmetadatas(oafs2oafrecords(xml)))))
+
+def merge_into_kbs(path):
+    table, data = path2dicts(path)
+    for row in data:
+        if table == 'organizations':
+            kb = 'institutes'
+            key = row.get('legal_name', "")
+            value = row.get('legal_name', "")
+        elif table == 'languages':
+            kb = 'languages'
+            key = row.get('languageid', "")
+            value = row.get('name', "")
+        elif table == 'projects_projectsubjects':
+            kb = 'project_subjects'
+            key = row.get('project', "")
+            value = row.get('project_subject', "")
+        elif table == 'projects':
+            kb = 'projects'
+            key = row.get('grant_agreement_number', "")
+            value = (row.get("acronym", "") or row.get("title", "")) + ' - ' + (row.get("title", "") or row.get("acronym", "")) + ' (' + row.get("grant_agreement_number", "") + ')'
+
+        if kb_mapping_exists(kb, key):
+            update_kb_mapping(kb, key, key, value)
+        else:
+            add_kb_mapping(kb, key, value)
+
+        if table == 'projects':
+            kb = 'json_projects'
+            key = row.get("projectid", "")
+            value = json.dumps(row)
+            if kb_mapping_exists(kb, key):
+                update_kb_mapping(kb, key, key, value)
+            else:
+                add_kb_mapping(kb, key, value)
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2:
+        merge_into_kbs(sys.argv[1])

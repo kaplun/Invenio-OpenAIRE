@@ -616,7 +616,7 @@ def call_plotextractor(active_file, extracted_file, harvested_identifier_list, \
     @param extracted_file: path to the file where the final results will be saved
     @param harvested_identifier_list: list of OAI identifiers for this active_file
     @param downloaded_files: dict of identifier -> dict mappings for downloaded material.
-    
+
     @return: exitcode and any error messages as: (exitcode, err_msg)
     """
     all_err_msg = []
@@ -669,7 +669,7 @@ def call_plotextractor(active_file, extracted_file, harvested_identifier_list, \
 
 def call_refextract(active_file, extracted_file, harvested_identifier_list,
                     downloaded_files):
-    """ 
+    """
     Function that calls refextractor to extract references and attach them to
     harvested records. It will download the fulltext-pdf for each identifier
     if necessary.
@@ -678,7 +678,7 @@ def call_refextract(active_file, extracted_file, harvested_identifier_list,
     @param extracted_file: path to the file where the final results will be saved
     @param harvested_identifier_list: list of OAI identifiers for this active_file
     @param downloaded_files: dict of identifier -> dict mappings for downloaded material.
-    
+
     @return: exitcode and any error messages as: (exitcode, all_err_msg)
     """
     all_err_msg = []
@@ -737,7 +737,7 @@ def call_refextract(active_file, extracted_file, harvested_identifier_list,
 
 def call_fulltext(active_file, extracted_file, harvested_identifier_list,
                   downloaded_files):
-    """ 
+    """
     Function that calls attach FFT tag for full-text pdf to harvested records.
     It will download the fulltext-pdf for each identifier if necessary.
 
@@ -745,8 +745,8 @@ def call_fulltext(active_file, extracted_file, harvested_identifier_list,
     @param extracted_file: path to the file where the final results will be saved
     @param harvested_identifier_list: list of OAI identifiers for this active_file
     @param downloaded_files: dict of identifier -> dict mappings for downloaded material.
-    
-    @return: exitcode and any error messages as: (exitcode, err_msg)    
+
+    @return: exitcode and any error messages as: (exitcode, err_msg)
     """
     all_err_msg = []
     exitcode = 0
