@@ -52,6 +52,7 @@ from invenio.urlutils import create_url
 from invenio.bibformat import format_record
 from invenio.openaire_deposit_config import CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, CFG_OPENAIRE_PROJECT_INFORMATION_KB, CFG_OPENAIRE_DEPOSIT_PATH, CFG_OPENAIRE_CURATORS
 from invenio.mailutils import send_email
+from invenio.errorlib import register_exception
 
 RE_AUTHOR_ROW = re.compile(u'^\w{2,}(\s+\w{2,})*,\s*\w{2,}\s*(:\s*\w{2,}.*)?$')
 RE_PAGES = re.compile('\d+(-\d+)?')
@@ -112,7 +113,10 @@ def get_project_information_from_projectid(projectid):
 def get_all_publications_for_project(uid, projectid, ln):
     ret = {}
     for publicationid in run_sql("SELECT publicationid FROM eupublication WHERE uid=%s AND projectid=%s", (uid, projectid)):
-        ret[publicationid[0]] = OpenAIREPublication(uid, publicationid[0], ln)
+        try:
+            ret[publicationid[0]] = OpenAIREPublication(uid, publicationid[0], ln)
+        except ValueError:
+            register_exception(alert_admin=True)
     return ret
 
 def get_favourite_authorships_for_user(uid, publicationid, term=''):
@@ -483,6 +487,7 @@ class OpenAIREPublication(object):
         if '__recid__' not in self._metadata:
             self._metadata['__recid__'] = run_sql("INSERT INTO bibrec(creation_date, modification_date) values(NOW(), NOW())")
             self.touch()
+        run_sql("UPDATE eupublication SET id_bibrec=%s WHERE uid=%s AND publicationid=%s", (self._metadata['__recid__'], self.uid, self.publicationid))
         return self._metadata['__recid__']
     def get_url(self):
         return "%s/record/%s" % (CFG_SITE_URL, self.recid)

@@ -3734,10 +3734,12 @@ CREATE TABLE IF NOT EXISTS eupublication (
   publicationid varchar(255) NOT NULL,
   projectid int(15) NOT NULL,
   uid int(15) NOT NULL,
+  id_bibrec int(15) NULL default NULL,
   UNIQUE KEY (publicationid, projectid, uid),
   KEY (publicationid),
   KEY (projectid),
-  KEY (uid)
+  KEY (uid),
+  KEY (id_bibrec)
 ) TYPE=MyISAM;
 
 CREATE TABLE IF NOT EXISTS pgreplayqueue (
