@@ -19,6 +19,7 @@ import os
 import shutil
 import tempfile
 import time
+import datetime
 import sys
 if sys.hexversion < 0x2060000:
     try:
@@ -53,6 +54,8 @@ from invenio.bibformat import format_record
 from invenio.openaire_deposit_config import CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, CFG_OPENAIRE_PROJECT_INFORMATION_KB, CFG_OPENAIRE_DEPOSIT_PATH, CFG_OPENAIRE_CURATORS
 from invenio.mailutils import send_email
 from invenio.errorlib import register_exception
+from invenio.bibformat_elements.bfe_fulltext import sort_alphanumerically
+from invenio.websubmit_functions.Report_Number_Generation import create_reference
 
 RE_AUTHOR_ROW = re.compile(u'^\w{2,}(\s+\w{2,})*,\s*\w{2,}\s*(:\s*\w{2,}.*)?$')
 RE_PAGES = re.compile('\d+(-\d+)?')
@@ -368,7 +371,7 @@ class OpenAIREPublication(object):
 
     def send_emails(self):
         _ = gettext_set_language(self.ln)
-        content = openaire_deposit_templates.tmpl_confirmation_email_body(title=self._metadata['title'], authors=self._metadata['authors'].splitlines(), url=self.url, ln=self.ln)
+        content = openaire_deposit_templates.tmpl_confirmation_email_body(title=self._metadata['title'], authors=self._metadata['authors'].splitlines(), url=self.url, report_numbers=self.report_numbers, ln=self.ln)
         send_email(CFG_SITE_ADMIN_EMAIL, get_email(self.uid), _("Successful deposition of a Publication into OpenAIRE"), content=content)
         bibedit_url = CFG_SITE_URL + "/record/edit/#state=edit&recid=%s" % self.recid
         content = openaire_deposit_templates.tmpl_curators_email_body(title=self._metadata['title'], authors=self._metadata['authors'].splitlines(), url=self.url, bibedit_url=bibedit_url)
@@ -489,6 +492,27 @@ class OpenAIREPublication(object):
             self.touch()
         run_sql("UPDATE eupublication SET id_bibrec=%s WHERE uid=%s AND publicationid=%s", (self._metadata['__recid__'], self.uid, self.publicationid))
         return self._metadata['__recid__']
+    def get_year(self):
+        if self._metadata.get('publication_date'):
+            return self._metadata['publication_date'][:4]
+        else:
+            return datetime.datetime.today().year
+    def get_report_numbers(self):
+        report_numbers = self._metadata.get('report_numbers', {})
+        year = self.year
+        for projectid in self.projectids:
+            project_information = get_project_information_from_projectid(projectid)
+            acronym = project_information.get('acronym', '')
+            if acronym not in report_numbers:
+                if acronym:
+                    report_number = create_reference(os.path.join("OpenAIRE", acronym, "lastid_%s" % year), "OpenAIRE-%s-%s" % (acronym, year))
+                else:
+                    report_number = create_reference(os.path.join("OpenAIRE", "lastid_%s" % year), "OpenAIRE-%s" % year)
+                report_numbers[acronym] = report_number
+        self._metadata['report_numbers'] = report_numbers
+        ret = report_numbers.values()
+        ret = sort_alphanumerically(ret)
+        return ret
     def get_url(self):
         return "%s/record/%s" % (CFG_SITE_URL, self.recid)
     def get_metadata(self):
@@ -515,6 +539,11 @@ class OpenAIREPublication(object):
                 else:
                     name = name.strip()
                     record_add_field(rec, '700', subfields=[('a', name)])
+        report_numbers = self.report_numbers
+        if report_numbers:
+            record_add_field(rec, '037', subfields=[('a', report_numbers[0])])
+            for report_number in report_numbers[1:]:
+                record_add_field(rec, '088', subfields=[('a', report_number)])
         record_add_field(rec, '041', subfields=[('a', self._metadata['language'])])
         record_add_field(rec, '245', subfields=[('a', self._metadata['title'])])
         if self._metadata.get('original_title'):
@@ -575,6 +604,8 @@ class OpenAIREPublication(object):
     metadata_status = property(get_metadata_status)
     marcxml = property(get_marcxml)
     url = property(get_url)
+    year = property(get_year)
+    report_numbers = property(get_report_numbers)
 
 
 def _check_title(metadata, ln, _):

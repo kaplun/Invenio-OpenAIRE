@@ -619,7 +619,7 @@ class Template:
             'site': CFG_SITE_URL,
             'release': "Invenio %s" % CFG_VERSION}
 
-    def tmpl_confirmation_email_body(self, title, authors, url, ln=CFG_SITE_LANG):
+    def tmpl_confirmation_email_body(self, title, authors, url, report_numbers, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         return _("""\
 this is to confirm that you successfully deposited a publication into OpenAIRE:
@@ -631,13 +631,20 @@ this is to confirm that you successfully deposited a publication into OpenAIRE:
 OpenAIRE Orphan Record Repository curators will soon review your deposition and
 eventually approve it.
 
+If approve it, you will be able to cite this publication using
+one of the following report numbers, that were automatically
+assigned to your document:
+
+    %(report_numbers)s
+
 If you wish to deposit other documents, please visit:
     <%(site)s/deposit>
 """) % {
         'title': title,
         'authors': ', '.join(authors),
         'url': url,
-        'site': CFG_SITE_URL
+        'site': CFG_SITE_URL,
+        'report_numbers': ', '.join(report_numbers)
         }
 
     def tmpl_curators_email_body(self, title, authors, url, bibedit_url):
