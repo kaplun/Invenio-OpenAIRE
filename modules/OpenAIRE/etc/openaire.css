@@ -1,4 +1,6 @@
-
+img {
+    border-style: none;
+}
 
 div.OpenAIRE div.metadata {
     height: 100%;
