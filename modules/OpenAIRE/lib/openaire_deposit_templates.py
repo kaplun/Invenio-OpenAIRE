@@ -53,6 +53,7 @@ CFG_OPENAIRE_FORM_TEMPLATE_PLACEMARKS = dict((placemark, '') for placemark in RE
 class Template:
     def tmpl_headers(self, ln):
         return """
+            <meta http-equiv="X-UA-Compatible" content="IE=8" />
             <script type="text/javascript">// <![CDATA[
                 var gSite = "%(site)s";
                 var gLn = "%(ln)s";
