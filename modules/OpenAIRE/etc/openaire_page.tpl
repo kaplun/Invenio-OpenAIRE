@@ -108,6 +108,9 @@ div.wrapper { width: 900px; }
 
 			<span class="logout-button">
 				<button type="submit" title="Logout">Logout</button>
+                <input type="hidden" name="option" value="com_openaire" />
+                <input type="hidden" name="view" value="logout" />
+                <input type="hidden" name="return" value="%(return)s" />
 			</span>
 		</span>
 

@@ -93,11 +93,10 @@ def portal_page(title, body, navtrail="", description="", keywords="",
         user_info = collect_user_info(req)
         username = user_info.get('nickname', user_info['email'])
         invenio_logouturl = "%s/youraccount/logout?ln=%s" % (CFG_SITE_SECURE_URL, language)
-        logouturl = create_url(CFG_OPENAIRE_PORTAL_URL, {"option": "com_openaire", "view": "logout", "return": encodestring(invenio_logouturl)})
     else:
         username = 'Guest'
-        logouturl = ''
-    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, logouturl=logouturl, ln=language)
+        invenio_logouturl = ''
+    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, portalurl=CFG_OPENAIRE_PORTAL_URL, return_value=encodestring(invenio_logouturl), ln=language)
 
 def get_project_description(projectid):
     info = get_kb_mapping(CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, str(projectid))
