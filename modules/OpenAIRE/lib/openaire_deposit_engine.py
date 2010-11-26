@@ -527,7 +527,7 @@ class OpenAIREPublication(object):
                 affil = affil.strip()
                 record_add_field(rec, '100', subfields=[('a', name), ('u', affil)])
             else:
-                name = name.strip()
+                name = authors[0].strip()
                 record_add_field(rec, '100', subfields=[('a', name)])
             for author in authors[1:]:
                 if ':' in author:
@@ -536,7 +536,7 @@ class OpenAIREPublication(object):
                     affil = affil.strip()
                     record_add_field(rec, '700', subfields=[('a', name), ('u', affil)])
                 else:
-                    name = name.strip()
+                    name = author.strip()
                     record_add_field(rec, '700', subfields=[('a', name)])
         report_numbers = self.report_numbers
         if report_numbers:
