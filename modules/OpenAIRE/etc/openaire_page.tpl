@@ -97,7 +97,7 @@ div.wrapper { width: 900px; }
 							<div class="box-3 deepest">
 																<h3 class="header"><span class="header-2"><span class="header-3">Consortium<span class="color"> members</span></span></span></h3>
 
-<form action="%(logouturl)s" method="get" name="login">
+<form action="%(portalurl)s" method="get" name="login">
 
 <span class="niftyquick" style="display: block;">
 	<span class="yoo-login">
