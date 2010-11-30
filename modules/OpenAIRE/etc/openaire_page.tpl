@@ -118,8 +118,8 @@ window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '
                                 <span class="logout">
                                   <span class="greeting">Hi %(username)s,</span>
                                   <span class="logout-button"><button value="Logout" name="Submit" type="submit" title="Logout">Logout</button></span>
-                                  <input type="hidden" name="option" value="com_user" />
-                                  <input type="hidden" name="task" value="logout" />
+                                  <input type="hidden" name="option" value="com_openaire" />
+                                  <input type="hidden" name="view" value="logout" />
                                   <input type="hidden" name="return" value="%(return)s" />
                                 </span>
                               </span>
