@@ -112,11 +112,11 @@ def get_project_information_from_projectid(projectid):
     else:
         return {}
 
-def get_all_publications_for_project(uid, projectid, ln):
+def get_all_publications_for_project(uid, projectid, ln, style):
     ret = {}
     for publicationid in run_sql("SELECT publicationid FROM eupublication WHERE uid=%s AND projectid=%s", (uid, projectid)):
         try:
-            ret[publicationid[0]] = OpenAIREPublication(uid, publicationid[0], ln)
+            ret[publicationid[0]] = OpenAIREPublication(uid, publicationid[0], ln, style)
         except ValueError:
             register_exception(alert_admin=True)
     return ret
@@ -149,15 +149,12 @@ def normalize_authorships(authorships):
         ret.append(authorship)
     return '\n'.join(ret)
 
-def page(title, body, navtrail="", description="", keywords="",
-         metaheaderadd="", uid=None,
-         cdspageheaderadd="", cdspageboxlefttopadd="",
-         cdspageboxleftbottomadd="", cdspageboxrighttopadd="",
-         cdspageboxrightbottomadd="", cdspagefooteradd="", lastupdated="",
-         language=CFG_SITE_LANG, verbose=1, titleprologue="",
-         titleepilogue="", secure_page_p=0, req=None, errors=[], warnings=[], navmenuid="admin",
-         navtrail_append_title_p=1, of="", rssurl=CFG_SITE_URL+"/rss", show_title_p=True,
-         body_css_classes=None):
+def get_openaire_style(req=None):
+    """
+    Return the chosen OpenAIRE style (either portal or invenio) by parsing
+    query argument or either reading this from the session of the user
+    or either defaulting to Invenio.
+    """
     if req is not None:
         form = req.form
         argd = wash_urlargd(form, {'style': (str, '')})
@@ -172,6 +169,19 @@ def page(title, body, navtrail="", description="", keywords="",
                 session_param_set(req, 'style', 'invenio')
     else:
         style = 'invenio'
+    return style
+
+def page(title, body, navtrail="", description="", keywords="",
+         metaheaderadd="", uid=None,
+         cdspageheaderadd="", cdspageboxlefttopadd="",
+         cdspageboxleftbottomadd="", cdspageboxrighttopadd="",
+         cdspageboxrightbottomadd="", cdspagefooteradd="", lastupdated="",
+         language=CFG_SITE_LANG, verbose=1, titleprologue="",
+         titleepilogue="", secure_page_p=0, req=None, errors=[], warnings=[], navmenuid="admin",
+         navtrail_append_title_p=1, of="", rssurl=CFG_SITE_URL+"/rss", show_title_p=True,
+         body_css_classes=None):
+    style = get_openaire_style(req)
+    argd = wash_urlargd(req.form, {})
     if not metaheaderadd:
         metaheaderadd = openaire_deposit_templates.tmpl_headers(argd['ln'])
     body = """<noscript>
@@ -208,10 +218,10 @@ def update_publication_projects_mapping(uid, publicationid, new_projectids):
     for projectid in old_projectids - new_projectids:
         run_sql("DELETE FROM eupublication WHERE uid=%s AND publicationid=%s AND projectid=%s", (uid, publicationid, projectid))
 
-def get_project_information(uid, projectid, deletable, linked, ln, global_projectid=None, publicationid=None):
+def get_project_information(uid, projectid, deletable, linked, ln, style, global_projectid=None, publicationid=None):
     project_information = get_project_information_from_projectid(projectid)
     existing_publications = run_sql("SELECT count(*) FROM eupublication WHERE uid=%s AND projectid=%s", (uid, projectid))
-    return openaire_deposit_templates.tmpl_project_information(global_projectid=global_projectid, projectid=projectid, ln=ln, existing_publications=existing_publications[0][0], deletable=deletable, linked=linked, publicationid=publicationid, **project_information)
+    return openaire_deposit_templates.tmpl_project_information(global_projectid=global_projectid, projectid=projectid, ln=ln, existing_publications=existing_publications[0][0], deletable=deletable, linked=linked, publicationid=publicationid, style=style, **project_information)
 
 def upload_file(form, uid, projectid=0, field='Filedata'):
     afile = form[field]
@@ -237,11 +247,12 @@ def sort_projectsid_by_acronym(projectids):
     return [row[1] for row in decorated_projectsid]
 
 class OpenAIREPublication(object):
-    def __init__(self, uid, publicationid=None, ln=CFG_SITE_LANG):
+    def __init__(self, uid, publicationid=None, ln=CFG_SITE_LANG, style='invenio'):
         self._metadata = {}
         self._metadata['__uid__'] = uid
         self._metadata['__publicationid__'] = publicationid
         self.__ln = ln
+        self.__style = style
         if publicationid is None:
             self.status = 'initialized'
             mymkdir(os.path.join(CFG_OPENAIRE_DEPOSIT_PATH, str(uid)))
@@ -379,7 +390,7 @@ class OpenAIREPublication(object):
     def get_projects_information(self, global_projectid=None):
         associated_projects = []
         for projectid in self.projectids:
-            associated_projects.append(get_project_information(self.uid, projectid, deletable=True, linked=False, ln=self.ln, global_projectid=global_projectid, publicationid=self.publicationid))
+            associated_projects.append(get_project_information(self.uid, projectid, deletable=True, linked=False, ln=self.ln, style=self.style,  global_projectid=global_projectid, publicationid=self.publicationid))
         return openaire_deposit_templates.tmpl_projects_box(publicationid=self.publicationid, associated_projects=associated_projects, ln=self.ln)
 
     def get_publication_information(self):
@@ -512,6 +523,8 @@ class OpenAIREPublication(object):
         ret = report_numbers.values()
         ret = sort_alphanumerically(ret)
         return ret
+    def get_style(self):
+        return self.__style
     def get_url(self):
         return "%s/record/%s" % (CFG_SITE_URL, self.recid)
     def get_metadata(self):
@@ -605,6 +618,7 @@ class OpenAIREPublication(object):
     url = property(get_url)
     year = property(get_year)
     report_numbers = property(get_report_numbers)
+    style = property(get_style)
 
 
 def _check_title(metadata, ln, _):

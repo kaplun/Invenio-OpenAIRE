@@ -13,22 +13,22 @@
 <link rel="stylesheet" href="%(portalurl)s/modules/mod_yoo_search/mod_yoo_search.css.php" type="text/css" />
 <link rel="stylesheet" href="%(portalurl)s/modules/mod_jflanguageselection/tmpl/mod_jflanguageselection.css" type="text/css" />
 <style type="text/css"><!--
-.social_bookmarker_top { float:left;text-align:center;margin:10px 10px 10px 0; }
+/*.social_bookmarker_top { float:left;text-align:center;margin:10px 10px 10px 0; } */
 div.wrapper { width: 900px; }
     --></style>
-<script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/mootools/mootools-release-1.12.js"></script>
-<script type="text/javascript" src="%(portalurl)s/plugins/system/mtupgrade/mootools.js"></script>
-<script type="text/javascript" src="%(portalurl)s/media/system/js/caption.js"></script>
-<script type="text/javascript" src="%(portalurl)s/media/system/js/modal.js"></script>
-<script type="text/javascript" src="%(portalurl)s/modules/mod_yoo_search/mod_yoo_search.js"></script>
-    <script type="text/javascript">
+<!-- <script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/mootools/mootools-release-1.12.js"></script> -->
+<!-- <script type="text/javascript" src="%(portalurl)s/plugins/system/mtupgrade/mootools.js"></script> -->
+<!-- <script type="text/javascript" src="%(portalurl)s/media/system/js/caption.js"></script> -->
+<!-- <script type="text/javascript" src="%(portalurl)s/media/system/js/modal.js"></script> -->
+<!-- <script type="text/javascript" src="%(portalurl)s/modules/mod_yoo_search/mod_yoo_search.js"></script> -->
+<!--    <script type="text/javascript">
 var YtSettings = { tplurl: '%(portalurl)s/templates/yoo_level', color: 'openaire2', itemColor: '', layout: 'left' };
-</script>
-<script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/addons/base.js"></script>
+</script>-->
+<!--<script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/addons/base.js"></script>
 <script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/addons/accordionmenu.js"></script>
 <script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/addons/fancymenu.js"></script>
 <script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/addons/dropdownmenu.js"></script>
-<script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/yoo_tools.js"></script>
+<script type="text/javascript" src="%(portalurl)s/templates/yoo_level/lib/js/yoo_tools.js"></script>-->
 
 <link rel="apple-touch-icon" href="%(portalurl)s/templates/yoo_level/apple_touch_icon.png" />
   </head>
@@ -56,11 +56,6 @@ var YtSettings = { tplurl: '%(portalurl)s/templates/yoo_level', color: 'openaire
                           <div class="resultbox" style="width: 400px;"></div>
                         </div>
                       </div>
-                      <script type="text/javascript">
-// <!--
-window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '%(portalurl)s/?option=com_search&tmpl=raw&type=json&ordering=&searchphrase=all&Itemid=21', 'fieldText': 'search...', 'msgResults': 'Search results', 'msgCategories': 'Search categories', 'msgNoResults': 'No results found', 'msgMoreResults': 'More results' }); });
-// -->
-</script>
                     </div>
                   </div>
                   <div class="mod-blank">

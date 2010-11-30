@@ -35,7 +35,7 @@ from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL
 from invenio.openaire_deposit_engine import page, get_project_information, \
     OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid, \
     get_all_projectsids, get_favourite_authorships_for_user, \
-    get_all_publications_for_project, upload_file
+    get_all_publications_for_project, upload_file, get_openaire_style
 from invenio.openaire_deposit_utils import simple_metadata2namespaced_metadata
 from invenio.access_control_engine import acc_authorize_action
 from invenio.bibknowledge import get_kbr_keys
@@ -49,7 +49,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
     _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships']
 
     def index(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, -1), 'delete': (str, ''), 'publicationid': (str, ''), 'plus': (int, -1), 'linkproject': (int, -1), 'unlinkproject': (int, -1)})
+        argd = wash_urlargd(form, {'projectid': (int, -1), 'delete': (str, ''), 'publicationid': (str, ''), 'plus': (int, -1), 'linkproject': (int, -1), 'unlinkproject': (int, -1), 'style': (str, None)})
         _ = gettext_set_language(argd['ln'])
         user_info = collect_user_info(req)
         auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
@@ -66,6 +66,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 return page(req=req, body=_("You are not authorized to use OpenAIRE deposition."), title=_("Authorization failure"))
         projectid = argd['projectid']
         plus = argd['plus']
+        style = get_openaire_style(req)
         if plus == -1:
             try:
                 plus = bool(session_param_get(req, 'plus'))
@@ -84,23 +85,23 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         ## No project selected
         ## Then let's display all the existing projects for the given user.
         ## And lets let the user to choose a project.
-        projects = [get_project_information(uid, projectid_, deletable=False, ln=argd['ln'], linked=True) for projectid_ in get_exisiting_projectids_for_uid(user_info['uid']) if projectid_ != projectid]
+        projects = [get_project_information(uid, projectid_, deletable=False, ln=argd['ln'], style=style, linked=True) for projectid_ in get_exisiting_projectids_for_uid(user_info['uid']) if projectid_ != projectid]
         if projectid < 0:
             selected_project = None
         else:
-            selected_project = get_project_information(uid, projectid, deletable=False, linked=False, ln=argd['ln'])
+            selected_project = get_project_information(uid, projectid, deletable=False, linked=False, ln=argd['ln'], style=style)
         body = openaire_deposit_templates.tmpl_choose_project(existing_projects=projects, selected_project=selected_project, ln=argd['ln'])
         if projectid < 0:
             upload_to_projectid = 0
-            upload_to_project_information = get_project_information(uid, 0, deletable=False, linked=False, ln=argd['ln'])
+            upload_to_project_information = get_project_information(uid, 0, deletable=False, linked=False, ln=argd['ln'], style=style)
         else:
             upload_to_projectid = projectid
             upload_to_project_information = selected_project
-        body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), ln=argd['ln'])
+        body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), style=style, ln=argd['ln'])
 
         if projectid >= 0:
             ## There is a project on which we are working good!
-            publications = get_all_publications_for_project(uid, projectid, ln=argd['ln'])
+            publications = get_all_publications_for_project(uid, projectid, ln=argd['ln'], style=style)
             if argd['publicationid'] in publications:
                 if argd['addproject'] in all_project_ids:
                     publications[argd['publicationid']].link_project(argd['linkproject'])

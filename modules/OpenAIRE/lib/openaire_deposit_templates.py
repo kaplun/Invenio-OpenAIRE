@@ -282,7 +282,7 @@ class Template:
                 }
         return out
 
-    def tmpl_upload_publications(self, projectid, project_information, session, ln=CFG_SITE_LANG):
+    def tmpl_upload_publications(self, projectid, project_information, session, style, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         data = {
                 'upload_publications': escape(_("Upload New Publications")),
@@ -301,11 +301,12 @@ class Template:
                 'buttontext': _("Upload"),
                 'ln': ln,
                 'filedescription': _("Publications"),
+                'style': style
             }
         prepare4js(data)
         return """
             <h3>%(upload_publications)s</h3>
-            <form action="%(site)s/deposit?ln=%(ln)s" method="POST">
+            <form action="%(site)s/deposit?ln=%(ln)s&style=%(style)s" method="POST">
                 <p>%(upload_publications_description)s</p>
                 <input id="fileInput" name="file" type="file" />
                 <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
@@ -329,7 +330,7 @@ class Template:
                         'scriptData': {'projectid': '%(js_projectid)s', 'session': '%(js_session)s'},
                         'onAllComplete': function(){
                             $('input.save').trigger('click');
-                            window.location="%(js_site)s/deposit?projectid=%(js_projectid)s";
+                            window.location="%(js_site)s/deposit?projectid=%(js_projectid)s&style=%(style)s";
                         },
                         'onOpen': function(){
                             $('#cancel_upload').show();
@@ -371,7 +372,7 @@ class Template:
                 });
             // ]]></script>""" % data
 
-    def tmpl_project_information(self, global_projectid, projectid, existing_publications, grant_agreement_number='', ec_project_website='', acronym='', call_identifier='', end_date='', start_date='', title='', fundedby='', deletable=True, linked=True, publicationid=None, ln=CFG_SITE_LANG):
+    def tmpl_project_information(self, global_projectid, projectid, existing_publications, grant_agreement_number='', ec_project_website='', acronym='', call_identifier='', end_date='', start_date='', title='', fundedby='', deletable=True, linked=True, publicationid=None, style='invenio', ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         if projectid == 0:
             acronym = _('NO PROJECT')
@@ -379,7 +380,7 @@ class Template:
             acronym = title
         out = """<span class="selectedproject" id="project_%(id)s_%(publicationid)s">"""
         if linked:
-            out += """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s">%(acronym)s (%(existing_publications)s)</a>"""
+            out += """<a href="%(site)s/deposit?projectid=%(id)s&amp;ln=%(ln)s&amp;style=%(style)s">%(acronym)s (%(existing_publications)s)</a>"""
         else:
             out += """<strong>%(acronym)s</strong>"""
         out += """</span>"""
@@ -397,7 +398,7 @@ class Template:
         if deletable:
             out += """
                 <noscript>
-                    <a href="%(site)s/deposit?projectid=%(global_projectid)s&amp;publicationid=%(publicationid)s&amp;unlinkproject=%(id)s&amp;ln=%(ln)s"><img src="%(site)s/img/smallbin.gif" alt="%(delete_project_label)s" /></a>
+                    <a href="%(site)s/deposit?projectid=%(global_projectid)s&amp;publicationid=%(publicationid)s&amp;unlinkproject=%(id)s&amp;ln=%(ln)s&amp;style=%(style)s"><img src="%(site)s/img/smallbin.gif" alt="%(delete_project_label)s" /></a>
                 </noscript>
                 <img src="%(site)s/img/smallbin.gif" alt="%(delete_project_label)s" id="delete_%(id)s_%(publicationid)s" class="hidden" />
                 <script type="text/javascript">// <![CDATA[
@@ -437,7 +438,8 @@ class Template:
             'call_identifier': escape(call_identifier, True),
             'global_projectid': escape(global_projectid, True),
             'confirm_delete_project': escape(_("Are you really sure you want to unlink this publication from the project %(acronym)s?") % {'acronym': acronym}, True),
-            'delete_project_label': escape(_("Unlink project %(acronym)s") % {'acronym': acronym}, True)
+            'delete_project_label': escape(_("Unlink project %(acronym)s") % {'acronym': acronym}, True),
+            'style': style,
         }
         prepare4js(data)
         return out % data
