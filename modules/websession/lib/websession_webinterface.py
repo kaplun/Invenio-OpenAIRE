@@ -690,6 +690,7 @@ class WebInterfaceYourAccountPages(WebInterfaceDirectory):
         """
         webuser.logoutUser(req)
         if CFG_OPENAIRE_SITE:
+            from invenio.config import CFG_OPENAIRE_PORTAL_URL
             redirect_to_url(req, CFG_OPENAIRE_PORTAL_URL)
         else:
             redirect_to_url(req, "%s/img/pix.png" % CFG_SITE_URL)
