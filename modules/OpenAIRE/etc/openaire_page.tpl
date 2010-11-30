@@ -112,7 +112,7 @@ window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '
                               <span class="header-3">Sign<span class="color"> In</span></span>
                             </span>
                           </h3>
-                          <form action="%(portalurl)s" method="post" name="login">
+                          <form action="%(portalurl)s/" method="post" name="login">
                             <span class="niftyquick" style="display: block;">
                               <span class="yoo-login">
                                 <span class="logout">
