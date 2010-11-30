@@ -112,7 +112,7 @@ class Template:
                 </noscript>
                 <span style="display: none;" class="yesscript">
                     <form>
-                        <label for="project">%(yesscript_description)s</label>
+                        <label for="project">%(yesscript_description)s</label><br />
                         <input type="text" id="project" name="project" size="75" />
                         <input type="hidden" id="projectid" name="projectid" />
                         <input type="submit" value="%(submit)s" />
