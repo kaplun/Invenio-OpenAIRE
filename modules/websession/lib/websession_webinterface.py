@@ -689,7 +689,10 @@ class WebInterfaceYourAccountPages(WebInterfaceDirectory):
         Implement logout method for external service providers.
         """
         webuser.logoutUser(req)
-        redirect_to_url(req, "%s/img/pix.png" % CFG_SITE_URL)
+        if CFG_OPENAIRE_SITE:
+            redirect_to_url(req, CFG_OPENAIRE_PORTAL_URL)
+        else:
+            redirect_to_url(req, "%s/img/pix.png" % CFG_SITE_URL)
 
     def robotlogin(self, req, form):
         """

@@ -92,7 +92,7 @@ def portal_page(title, body, navtrail="", description="", keywords="",
     if req is not None:
         user_info = collect_user_info(req)
         username = user_info.get('nickname', user_info['email'])
-        invenio_logouturl = "%s/youraccount/logout?ln=%s" % (CFG_SITE_SECURE_URL, language)
+        invenio_logouturl = "%s/youraccount/robotlogout" % CFG_SITE_SECURE_URL
     else:
         username = 'Guest'
         invenio_logouturl = ''
