@@ -577,7 +577,18 @@ class OpenAIREPublication(object):
                     subfields.append(('a', project_description))
                 subfields.append(('c', str(projectid)))
                 record_add_field(rec, '536', subfields=subfields)
-        record_add_field(rec, '856', ind1='0', subfields=[('f', get_email(self.uid))])
+        user_info = collect_user_info(self.uid)
+        if "email" in user_info:
+            email = user_info["email"]
+        else:
+            email = get_email(self.uid)
+        if "nickname" in user_info:
+            nickname = user_info["nickname"]
+        else:
+            nickname = ""
+        if nickname.strip():
+            email = "%s <%s>" % (nickname.strip(), email)
+        record_add_field(rec, '856', ind1='0', subfields=[('f', email)])
         if self._metadata.get('embargo_date'):
             record_add_field(rec, '942', subfields=[('a', self._metadata['embargo_date'])])
         fft_status = ''
