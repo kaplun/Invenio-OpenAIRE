@@ -196,6 +196,13 @@ except:
     register_exception(alert_admin=True, subject='EMERGENCY')
     WebInterfaceDocumentationPages = WebInterfaceDumbPages
 
+try:
+    from invenio.bibsword_webinterface import \
+         WebInterfaceSword
+except:
+    register_exception(alert_admin=True, subject='EMERGENCE')
+    WebInterfaceDocumentationPage = WebInterfaceDumbPages
+
 if CFG_OPENAIRE_SITE:
     try:
         from invenio.openaire_deposit_webinterface import \
@@ -243,7 +250,8 @@ class WebInterfaceInvenio(WebInterfaceSearchInterfacePages):
         'unapi',
         'exporter',
         'kb',
-        'batchuploader'
+        'batchuploader',
+        'bibsword'
         ] + test_exports + openaire_exports
 
     def __init__(self):
@@ -273,6 +281,7 @@ class WebInterfaceInvenio(WebInterfaceSearchInterfacePages):
     exporter = WebInterfaceFieldExporterPages()
     kb = WebInterfaceBibKnowledgePages()
     batchuploader = WebInterfaceBatchUploaderPages()
+    bibsword = WebInterfaceSword()
 
 # This creates the 'handler' function, which will be invoked directly
 # by mod_python.
