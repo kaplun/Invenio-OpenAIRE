@@ -39,7 +39,8 @@ from invenio.config import \
      CFG_SITE_NAME, \
      CFG_SITE_LANGS, \
      CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES, \
-     CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE
+     CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE, \
+     CFG_WEBSEARCH_STATIC_COLLECTIONS
 from invenio.messages import gettext_set_language, language_list_long
 from invenio.search_engine import HitSet, search_pattern, get_creation_date, get_field_i18nname, collection_restricted_p
 from invenio.dbquery import run_sql, Error, get_table_update_time
@@ -735,12 +736,16 @@ class Collection:
         else:
             # B - collection does have dbquery, so compute it:
             #     (note: explicitly remove DELETED records)
-            if CFG_CERN_SITE:
-                reclist = search_pattern(None, self.dbquery + \
-                                         ' -980__:"DELETED" -980__:"DUMMY"')
+            if self.name not in CFG_WEBSEARCH_STATIC_COLLECTIONS or self.name in task_get_option("collection"):
+                if CFG_CERN_SITE:
+                    reclist = search_pattern(None, self.dbquery + \
+                                            ' -980__:"DELETED" -980__:"DUMMY"')
+                else:
+                    reclist = search_pattern(None, self.dbquery + ' -980__:"DELETED"')
+                reclist_with_nonpublic_subcolls = HitSet(reclist)
             else:
-                reclist = search_pattern(None, self.dbquery + ' -980__:"DELETED"')
-            reclist_with_nonpublic_subcolls = copy.deepcopy(reclist)
+                ## The collection is blacklisted, but it has been explicitly requested.
+                reclist_with_nonpublic_subcolls = HitSet(run_sql("SELECT reclist FROM collection WHERE id=%s", (self.id, ))[0][0])
         # store the results:
         self.nbrecs = len(reclist_with_nonpublic_subcolls)
         self.reclist = reclist
@@ -938,7 +943,7 @@ def task_submit_elaborate_specific_parameter(key, value, opts, args):
     return False
     """
     if key in ("-c", "--collection"):
-        task_set_option("collection", value)
+        task_set_option("collection", task_get_option("collection", []).append(value))
     elif key in ("-r", "--recursive"):
         task_set_option("recursive", 1)
     elif key in ("-f", "--force"):
@@ -959,10 +964,11 @@ def task_submit_elaborate_specific_parameter(key, value, opts, args):
 
 def task_submit_check_options():
     if task_has_option('collection'):
-        coll = get_collection(task_get_option("collection"))
-        if coll.id is None:
-            print 'ERROR: Collection "%s" does not exist' % coll.name
-            return False
+        for name in task_get_option("collection"):
+            coll = get_collection(name)
+            if coll.id is None:
+                print 'ERROR: Collection "%s" does not exist' % coll.name
+                return False
     return True
 
 def task_run_core():
@@ -1003,8 +1009,8 @@ def task_run_core():
         ## either forced update was requested or cache is not up to date, so recreate it:
         # firstly, decide which collections to do:
         if task_has_option("collection"):
-            coll = get_collection(task_get_option("collection"))
-            colls.append(coll)
+            for name in task_get_option("collection"):
+                colls.append(get_collection(name))
             if task_has_option("recursive"):
                 r_type_descendants = coll.get_descendants(type='r')
                 colls += r_type_descendants
@@ -1013,7 +1019,8 @@ def task_run_core():
         else:
             res = run_sql("SELECT name FROM collection ORDER BY id")
             for row in res:
-                colls.append(get_collection(row[0]))
+                if row[0] not in CFG_WEBSEARCH_STATIC_COLLECTIONS:
+                    colls.append(get_collection(row[0]))
 
         # secondly, update collection reclist cache:
         if task_get_option('part', 1) == 1:

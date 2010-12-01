@@ -136,6 +136,7 @@ def convert_conf_option(option_name, option_value):
                        'CFG_BIBUPLOAD_FFT_ALLOWED_LOCAL_PATHS',
                        'CFG_BIBUPLOAD_CONTROLLED_PROVENANCE_TAGS',
                        'CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES',
+                       'CFG_WEBSEARCH_STATIC_COLLECTIONS',
                        'CFG_SITE_EMERGENCY_PHONE_NUMBERS',
                        'CFG_WEBSTYLE_HTTP_STATUS_ALERT_LIST',
                        'CFG_WEBSEARCH_RSS_I18N_COLLECTIONS',
