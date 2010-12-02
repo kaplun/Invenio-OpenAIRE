@@ -324,6 +324,7 @@ var YtSettings = { tplurl: '%(portalurl)s/templates/yoo_level', color: 'openaire
         </div>
       </div>
     </div>
+  <script type="text/javascript" src="/js/awstats_misc_tracker.js"></script>
+  <noscript><img src="/js/awstats_misc_tracker.js?nojs=y" height=0 width=0 border=0 style="display: none"></noscript>
   </body>
-<!-- JoomlaStatsActivated -->
 </html>

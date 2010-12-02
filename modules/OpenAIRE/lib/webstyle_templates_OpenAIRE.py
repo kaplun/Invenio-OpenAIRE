@@ -101,6 +101,8 @@ class Template(InvenioTemplate):
  </div>
 <!-- replaced page footer -->
 </div>
+<script type="text/javascript" src="/js/awstats_misc_tracker.js"></script>
+<noscript><img src="/js/awstats_misc_tracker.js?nojs=y" height=0 width=0 border=0 style="display: none"></noscript>
 </body>
 </html>
         """ % {
