@@ -228,7 +228,7 @@ var YtSettings = { tplurl: '%(portalurl)s/templates/yoo_level', color: 'openaire
                                     </a>
                                   </li>
                                   <li class="level1 item3 last">
-                                    <a href="%(portalurl)s/?option=com_openaire&amp;view=claimeddocuments&amp;Itemid=238&amp;lang=en" class="level1 item3 last">
+                                    <a href="%(portalurl)s/?option=com_openaire&amp;view=claimeddocuments&amp;Itemid=199&amp;lang=en" class="level1 item3 last">
                                       <span>My Depositions</span>
                                     </a>
                                   </li>
