@@ -51,7 +51,7 @@ from invenio.search_engine import record_empty
 from invenio.openaire_deposit_utils import wash_form, simple_metadata2namespaced_metadata, namespaced_metadata2simple_metadata, strip_publicationid
 from invenio.urlutils import create_url
 from invenio.bibformat import format_record
-from invenio.openaire_deposit_config import CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, CFG_OPENAIRE_PROJECT_INFORMATION_KB, CFG_OPENAIRE_DEPOSIT_PATH, CFG_OPENAIRE_CURATORS
+from invenio.openaire_deposit_config import CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, CFG_OPENAIRE_PROJECT_INFORMATION_KB, CFG_OPENAIRE_DEPOSIT_PATH, CFG_OPENAIRE_CURATORS, CFG_OPENAIRE_MANDATORY_PROJECTS
 from invenio.mailutils import send_email
 from invenio.errorlib import register_exception
 from invenio.bibformat_elements.bfe_fulltext import sort_alphanumerically
@@ -412,11 +412,17 @@ class OpenAIREPublication(object):
         body = format_record(recID=self.recid, xml_record=self.marcxml, ln=self.ln, of='hd')
         return openaire_deposit_templates.tmpl_publication_preview(body, self.recid, ln=self.ln)
 
-    def check_metadata(self):
+    def check_metadata(self, check_project=CFG_OPENAIRE_MANDATORY_PROJECTS):
+        _ = gettext_set_language(self.ln)
         self.errors, self.warnings = self.static_check_metadata(self._metadata, ln=self.ln)
         if self._metadata.get('authors') and not self.errors.get('authors'):
             self._metadata['authors'] = normalize_authorships(self._metadata['authors'])
             update_favourite_authorships_for_user(self.uid, self.projectids, self.publicationid, self._metadata['authors'])
+        if CFG_OPENAIRE_MANDATORY_PROJECTS:
+            if len(self.projectids) == 1 and self.projectids[0] == 0:
+                self.errors['projects'] = _("You must specify at least one FP7 Project within which your publication was created.")
+            else:
+                self.errors['projects'] = ""
 
     def static_check_metadata(metadata, publicationid=None, check_only_field=None, ln=CFG_SITE_LANG):
         """
@@ -717,6 +723,6 @@ CFG_METADATA_FIELDS_CHECKS = {
     'access_rights': _check_access_rights,
     'embargo_date': _check_embargo_date,
     'publication_date': _check_publication_date,
-    'pages': _check_pages
+    'pages': _check_pages,
 }
 

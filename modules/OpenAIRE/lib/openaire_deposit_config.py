@@ -40,3 +40,4 @@ CFG_METADATA_FIELDS = ('title', 'original_title', 'authors', 'abstract',
 
 CFG_METADATA_STATES = ('ok', 'error', 'warning', 'empty')
 CFG_PUBLICATION_STATES = ('initialized', 'edited', 'submitted', 'pendingapproval', 'approved', 'rejected')
+CFG_OPENAIRE_MANDATORY_PROJECTS = True

@@ -34,6 +34,8 @@
                 <img title="%(projects_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
                 <label class="mandatory">%(projects_description)s</label>
                 %(projects_information)s
+                <div id="error_projects_%(id)s" class="error">%(error_projects_value)s</div>
+                <div id="warning_projects_%(id)s" class="warning">%(warning_projects_value)s</div>
             </fieldset>
             <div class="clear"></div>
             <fieldset>
