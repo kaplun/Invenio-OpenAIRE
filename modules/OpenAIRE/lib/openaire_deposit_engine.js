@@ -210,6 +210,44 @@ $(document).ready(function(){
                 return false;
             }
         });
+        $('textarea.keywords').keydown(function(event) {
+            /* Thanks to: http://forum.jquery.com/topic/autocomplete-changing-key-bindings */
+            var isOpen = $( this ).autocomplete( "widget" ).is( ":visible" );
+            var keyCode = $.ui.keyCode;
+            if ( !isOpen && ( event.keyCode == keyCode.UP || event.keyCode == keyCode.DOWN ) ) {
+                    event.stopImmediatePropagation();
+            }
+          }).autocomplete({
+            source: function(request, response) {
+                // delegate back to autocomplete, but extract the last term
+                var publicationid = this.element[0].name; // FIXME: find a better
+                // way to retrieve the publicationid!
+                var term = extractLast(request.term);
+                if (term) {
+
+                    $.getJSON(gSite + "/deposit/keywords", {
+                        publicationid: publicationid,
+                        term: term
+                    }, function(data, status, xhr) {
+                        if (data) {
+                            response(data);
+                        }
+                    });
+                }
+            },
+            focus: function(event, ui){
+                return false;
+            },
+            select: function(event, ui) {
+                var terms = split(this.value);
+                // remove the current input
+                terms.pop();
+                // add the selected item
+                terms.push(ui.item.value);
+                this.value = terms.join("\n") + "\n";
+                return false;
+            }
+        });
     });
     $('*[title]').qtip(gTipDefault);
     $('div.error').filter(function(){

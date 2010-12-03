@@ -33,6 +33,7 @@ else:
 import re
 import copy
 from base64 import encodestring
+from cgi import escape
 
 from invenio.bibdocfile import generic_path2bidocfile
 from invenio.bibedit_utils import json_unicode_to_utf8
@@ -129,11 +130,26 @@ def get_favourite_authorships_for_user(uid, publicationid, term=''):
         ret = [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s and authorship LIKE %s ORDER BY authorship", (uid, '%%%s%%' % term))]
     return ret
 
+def get_favourite_keywords_for_user(uid, publicationid, term=''):
+    ret = [row[0] for row in run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE uid=%s and publicationid=%s and keyword LIKE %s ORDER BY keyword", (uid, publicationid, '%%%s%%' % term))]
+    if not ret:
+        ret = [row[0] for row in run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE publicationid=%s and keyword LIKE %s ORDER BY keyword", (publicationid, '%%%s%%' % term))]
+    if not ret:
+        ret = [row[0] for row in run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords WHERE uid=%s and keyword LIKE %s ORDER BY keyword", (uid, '%%%s%%' % term))]
+    return ret
+
+
 def update_favourite_authorships_for_user(uid, projectids, publicationid, authorships):
     run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%%s AND publicationid=%%s AND projectid IN (%s) " % ','.join([str(projectid) for projectid in projectids]), (uid, publicationid))
     for authorship in authorships.splitlines():
         for projectid in projectids:
             run_sql("INSERT INTO OpenAIREauthorships(uid, projectid, publicationid, authorship) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, authorship))
+
+def update_favourite_keywords_for_user(uid, projectids, publicationid, keywords):
+    run_sql("DELETE FROM OpenAIREkeywords WHERE uid=%%s AND publicationid=%%s AND projectid IN (%s) " % ','.join([str(projectid) for projectid in projectids]), (uid, publicationid))
+    for keyword in keywords.splitlines():
+        for projectid in projectids:
+            run_sql("INSERT INTO OpenAIREkeywords(uid, projectid, publicationid, keyword) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, keyword))
 
 def normalize_authorships(authorships):
     ret = []
@@ -147,6 +163,20 @@ def normalize_authorships(authorships):
         else:
             authorship = authorship[0].strip()
         ret.append(authorship)
+    return '\n'.join(ret)
+
+_RE_SPACES = re.compile(r'\s+')
+def normalize_acronym(acronym):
+    acronym = acronym.replace("-", "_")
+    return _RE_SPACES.sub('_', acronym)
+
+def normalize_keywords(keywords):
+    ret = []
+    for keyword in keywords.splitlines():
+        keyword = _RE_SPACES.sub(' ', keyword)
+        if keyword and keyword not in ret:
+            ret.append(keyword)
+    ret.sort()
     return '\n'.join(ret)
 
 def get_openaire_style(req=None):
@@ -418,6 +448,9 @@ class OpenAIREPublication(object):
         if self._metadata.get('authors') and not self.errors.get('authors'):
             self._metadata['authors'] = normalize_authorships(self._metadata['authors'])
             update_favourite_authorships_for_user(self.uid, self.projectids, self.publicationid, self._metadata['authors'])
+        if self._metadata.get('keywords') and not self.errors.get('keywords'):
+            self._metadata['keywords'] = normalize_keywords(self._metadata['keywords'])
+            update_favourite_keywords_for_user(self.uid, self.projectids, self.publicationid, self._metadata['keywords'])
         if CFG_OPENAIRE_MANDATORY_PROJECTS:
             if len(self.projectids) == 1 and self.projectids[0] == 0:
                 self.errors['projects'] = _("You must specify at least one FP7 Project within which your publication was created.")
@@ -457,14 +490,14 @@ class OpenAIREPublication(object):
                 assert(ret[0]) in CFG_METADATA_FIELDS
                 if ret[1] == 'error':
                     if ret[0] not in errors:
-                        errors[ret[0]] = [ret[2]]
+                        errors[ret[0]] = ret[2]
                     else:
-                        errors[ret[0]].append(ret[2])
+                        errors[ret[0]] += ret[2]
                 elif ret[1] == 'warning':
                     if ret[0] not in warnings:
-                        warnings[ret[0]] = [ret[2]]
+                        warnings[ret[0]] = ret[2]
                     else:
-                        warnings[ret[0]].append(ret[2])
+                        warnings[ret[0]] += ret[2]
         for errorid, error_lines in errors.items():
             errors[errorid] = '<br />'.join(error_lines)
         for warningid, warning_lines in warnings.items():
@@ -519,6 +552,7 @@ class OpenAIREPublication(object):
         for projectid in self.projectids:
             project_information = get_project_information_from_projectid(projectid)
             acronym = project_information.get('acronym', '')
+            acronym = normalize_acronym(acronym)
             if acronym not in report_numbers:
                 if acronym:
                     report_number = create_reference(os.path.join("OpenAIRE", acronym, "lastid_%s" % year), "OpenAIRE-%s-%s" % (acronym, year))
@@ -569,8 +603,13 @@ class OpenAIREPublication(object):
         record_add_field(rec, '520', subfields=[('a', self._metadata['abstract'])])
         if self._metadata.get('original_abstract'):
             record_add_field(rec, '560', subfields=[('a', self._metadata['original_abstract'])])
-        if self._metadata.get('note'):
-            record_add_field(rec, '500', subfields=[('a', self._metadata['note'])])
+        if self._metadata.get('notes'):
+            record_add_field(rec, '500', subfields=[('a', self._metadata['notes'])])
+        if self._metadata.get('keywords'):
+            for keyword in self._metadata['keywords'].splitlines():
+                keyword.strip()
+                if keyword:
+                    record_add_field(rec, '653', ind1="1", subfields=[('a', keyword)])
         record_add_field(rec, '542', subfields=[('l', self._metadata['access_rights'])])
         record_add_field(rec, '980', subfields=[('a', 'PROVISIONAL')])
         if self._metadata.get('publication_date'):
@@ -642,7 +681,7 @@ def _check_title(metadata, ln, _):
     title = metadata.get('title', '')
     title = title.strip()
     if not title:
-        return ('title', 'error', _('The title field of the Publication is mandatory but is currently empty'))
+        return ('title', 'error', [_('The title field of the Publication is mandatory but is currently empty')])
     elif title:
         title = title.decode('UTF8')
         uppers = 0
@@ -650,7 +689,9 @@ def _check_title(metadata, ln, _):
             if c.isupper():
                 uppers += 1
         if 1.0 * uppers / len(title) > 0.75:
-            return ('title', 'warning', _('The title field of the Publication seems to be written all in UPPERCASE'))
+            return ('title', 'warning', [_('The title field of the Publication seems to be written all in UPPERCASE')])
+        elif title.islower():
+            return ('title', 'warning', [_('The title field of the Publication seems to be written all in lowercase. Was this intentional?')])
 
 def _check_original_title(metadata, ln, _):
     title = metadata.get('original_title', '')
@@ -661,58 +702,80 @@ def _check_original_title(metadata, ln, _):
             if c.isupper():
                 uppers += 1
         if 1.0 * uppers / len(title) > 0.75:
-            return ('original_title', 'warning', _('The original title field of the Publication seems to be written all in UPPERCASE'))
+            return ('original_title', 'warning', [_('The original title field of the Publication seems to be written all in UPPERCASE')])
 
 def _check_authors(metadata, ln, _):
     authors = metadata.get('authors', '')
     authors = authors.decode('UTF8')
     if not authors.strip():
-        return ('authors', 'error', _('The authorship of the Publication is a mandatory field but is currently empty'))
+        return ('authors', 'error', [_('The authorship of the Publication is a mandatory field but is currently empty')])
+    errors = []
+    warnings = []
     for row in authors.split('\n'):
         row = row.strip()
         if row:
             if not RE_AUTHOR_ROW.match(row):
-                return ('authors', 'error', _('"%(row)s" is not a well formatted authorship') % {"row": row})
+                if not ',' in row:
+                    errors.append(_("""<strong>"%(row)s"</strong? is not a well formatted authorship (correct format is <em>"Last Names, First Names"</em> or <em>"Last Names, First Names: Affiliation"<em> but a <em>","</em> separating <em>"Last Names"</em> and <em>"First Names"</em> does not seem to exist).""" % {"row": escape(row)}))
+                else:
+                    errors.append(_("""<strong>"%(row)s"</strong> is not a well formatted authorship (correct format is <em>"Last Names, First Names"</em> or <em>"Last Names, First Names: Affiliation"</em>).""" % {"row": escape(row)}))
+            if not ':' in row:
+                warnings.append(_("""You have not specified an affiliation for <strong>"%(row)s"</strong> but an affiliation is recommended.""" % {"row": escape(row)}))
+                if row.islower():
+                    warnings.append(_("""It seems that the author name <strong>"%(row)s"</strong> has been written all lower case. Was this intentional?""") % {"row": escape(row)})
+            else:
+                name, affiliation = row.split(":", 1)
+                if name.islower():
+                    warnings.append(_("""It seems that the author name <strong>"%(name)s"</strong> for the authorship <strong>"%(row)s"</strong> has been written all lower case. Was this intentional?""") % {"name": escape(name), "row": escape(row)})
+                if affiliation.islower():
+                    warnings.append(_("""It seems that the affiliation <strong>"%(affiliation)s"</strong> for the authorship <strong>"%(row)s"</strong> has been written all lower case. Was this intentional?""") % {"affiliation": escape(affiliation), "row": escape(row)})
+                if name.isupper():
+                    warnings.append(_("""It seems that the author name <strong>"%(name)s"</strong> for the authorship <strong>"%(row)s"</strong> has been written all upper case. Was this intentional?""") % {"name": escape(name), "row": escape(row)})
+    if errors:
+        return ('authors', 'error', errors)
+    elif warnings:
+        return ('authors', 'warning', warnings)
+
 
 def _check_abstract(metadata, ln, _):
     abstract = metadata.get('abstract', '')
     if not abstract.strip():
-        return ('abstract', 'error', _('The abstract of the Publication is a mandatory field but is currently empty'))
+        return ('abstract', 'error', [_('The abstract of the Publication is a mandatory field but is currently empty')])
 
 def _check_language(metadata, ln, _):
     language = metadata.get('language', '')
     if not language.strip():
-        return ('language', 'error', _('The language of the Publication is a mandatory field but is currently empty'))
+        return ('language', 'error', [_('The language of the Publication is a mandatory field but is currently empty')])
 
 def _check_access_rights(metadata, ln, _):
     access_rights = metadata.get('access_rights', '')
     if not access_rights in CFG_ACCESS_RIGHTS(ln):
-        return ('access_rights', 'error', _('The access rights field of the Publication is not set to one of the expected values'))
+        return ('access_rights', 'error', [_('The access rights field of the Publication is not set to one of the expected values')])
 
 def _check_embargo_date(metadata, ln, _):
     access_rights = metadata.get('access_rights', '')
     embargo_date = metadata.get('embargo_date', '')
     if access_rights == 'embargoedAccess':
         if not embargo_date:
-            return ('embargo_date', 'error', _('The embargo end date is mandatory when the Access rights field of the Publication is set to Embargo access'))
+            return ('embargo_date', 'error', [_('The embargo end date is mandatory when the Access rights field of the Publication is set to Embargo access')])
         try:
             time.strptime(embargo_date, '%Y-%m-%d')
         except ValueError:
-            return ('embargo_date', 'error', _('The access rights of the Publication is set to Embargo access but a valid embargo end date is not set'))
+            return ('embargo_date', 'error', [_('The access rights of the Publication is set to Embargo access but a valid embargo end date is not set (correct format is YYYY-MM-DD)')])
 
 def _check_publication_date(metadata, ln, _):
     publication_date = metadata.get('publication_date', '')
     if not publication_date.strip():
-        return ('publication_date', 'error', _('The publication date is mandatory'))
+        return ('publication_date', 'error', [_('The publication date is mandatory')])
     try:
         time.strptime(publication_date, '%Y-%m-%d')
     except ValueError:
-        return ('publication_date', 'error', _('The publication date is not correctly typed'))
+        return ('publication_date', 'error', [_('The publication date is not correctly typed (correct format is YYYY-MM-DD)')])
 
 def _check_pages(metadata, ln, _):
     pages = metadata.get('pages', '').strip()
     if pages and not RE_PAGES.match(pages):
-        return ('pages', 'error', _("The pages are not specified correctly"))
+        return ('pages', 'error', [_("The pages are not specified correctly")])
 
 CFG_METADATA_FIELDS_CHECKS = {
     'title': _check_title,

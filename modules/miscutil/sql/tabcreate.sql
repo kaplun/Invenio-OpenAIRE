@@ -3730,6 +3730,17 @@ CREATE TABLE IF NOT EXISTS OpenAIREauthorships (
   KEY (projectid, authorship)
 ) TYPE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS OpenAIREkeywords (
+  uid int(15) NOT NULL,
+  projectid varchar(30) NOT NULL,
+  publicationid varchar(30) NOT NULL,
+  keyword varchar(255) NOT NULL,
+  KEY (uid, projectid, publicationid),
+  KEY (uid, projectid, keyword),
+  KEY (projectid, keyword)
+) TYPE=MyISAM;
+
+
 CREATE TABLE IF NOT EXISTS eupublication (
   publicationid varchar(255) NOT NULL,
   projectid int(15) NOT NULL,

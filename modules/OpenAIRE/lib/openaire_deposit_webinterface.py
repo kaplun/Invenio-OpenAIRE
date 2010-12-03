@@ -35,7 +35,8 @@ from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL
 from invenio.openaire_deposit_engine import page, get_project_information, \
     OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid, \
     get_all_projectsids, get_favourite_authorships_for_user, \
-    get_all_publications_for_project, upload_file, get_openaire_style
+    get_all_publications_for_project, upload_file, get_openaire_style, \
+    get_favourite_keywords_for_user
 from invenio.openaire_deposit_utils import simple_metadata2namespaced_metadata
 from invenio.access_control_engine import acc_authorize_action
 from invenio.bibknowledge import get_kbr_keys
@@ -46,7 +47,7 @@ import invenio.template
 openaire_deposit_templates = invenio.template.load('openaire_deposit')
 
 class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
-    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships']
+    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships', 'keywords']
 
     def index(self, req, form):
         argd = wash_urlargd(form, {'projectid': (int, -1), 'delete': (str, ''), 'publicationid': (str, ''), 'plus': (int, -1), 'linkproject': (int, -1), 'unlinkproject': (int, -1), 'style': (str, None)})
@@ -183,6 +184,21 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 institutes = [row[0] for row in get_kbr_keys('institutes', searchkey=institute, searchtype='s')]
                 institutes.sort()
                 return json.dumps(["%s: %s" % (name, institute) for institute in institutes[:100]])
+        return json.dumps([])
+
+    def keywords(self, req, form):
+        argd = wash_urlargd(form, {'publicationid': (str, ''), 'term': (str, '')})
+        user_info = collect_user_info(req)
+        uid = user_info['uid']
+        req.content_type = 'application/json'
+        term = argd['term']
+        publicationid = argd['publicationid']
+        ret = get_favourite_keywords_for_user(uid, publicationid, term)
+        if ret:
+            return json.dumps(ret)
+        ret = get_favourite_keywords_for_user(None, publicationid, term)
+        if ret:
+            return json.dumps(ret)
         return json.dumps([])
 
     def ajaxgateway(self, req, form):

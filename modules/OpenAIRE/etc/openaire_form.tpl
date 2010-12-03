@@ -143,6 +143,27 @@
                     <div id="warning_pages_%(id)s" class="warning">%(warning_pages_value)s</div>
                 </div>
             </fieldset>
+            <fieldset>
+                <legend>%(other_information_label)s</legend>
+                <div>
+                    <img title="%(keywords_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="keywords_%(id)s">%(keywords_label)s
+                    </label>
+                    <br />
+                    <textarea name="keywords_%(id)s" id="keywords_%(id)s" cols="60" rows="5" class="keywords">%(keywords_value)s</textarea>
+                    <div id="error_keywords_%(id)s" class="error">%(error_keywords_value)s</div>
+                    <div id="warning_keywords_%(id)s" class="warning">%(warning_keywords_value)s</div>
+                </div>
+                <div>
+                    <img title="%(notes_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
+                    <label for="notes_%(id)s">%(notes_label)s
+                    </label>
+                    <br />
+                    <textarea name="notes_%(id)s" id="notes_%(id)s" cols="60" rows="5" class="notes">%(notes_value)s</textarea>
+                    <div id="error_notes_%(id)s" class="error">%(error_notes_value)s</div>
+                    <div id="warning_notes_%(id)s" class="warning">%(warning_notes_value)s</div>
+                </div>
+            </fieldset>
             <div class="clear"></div>
             <input type="submit" value="%(save_label)s" name="save_%(id)s" id="save_%(id)s"/><input type="submit" value="%(submit_label)s" name="submit_%(id)s" id="submit_%(id)s"/>
         </div>
