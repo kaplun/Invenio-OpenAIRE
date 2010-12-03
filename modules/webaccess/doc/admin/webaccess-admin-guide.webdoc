@@ -196,8 +196,7 @@ I. Role area</a>
                                         <td class="admintdleft">3</td>
                                         <td class="admintdleft">webaccessadmin</td>
                                         <td class="admintdleft">WebAccess administrator</td>
-                                        <td class="admintdleft">allow apache_user 'jekyll'
-                                            de...</td>
+                                        <td class="admintdleft">allow nickname 'jekyll'</td>
                                         <td class="admintdleft"><a href="">add</a> / <a href="">delete</a></td>
                                         <td class="admintdleft"><a href="">add</a> / <a href="">modify</a> / <a href="">remove</a></td>
                                         <td class="admintdleft"><a href="">modify</a> / <a href="">delete</a></td>
@@ -1061,8 +1060,8 @@ II. Example - connecting role and user</a>
 
     The user describing dictionary (user_info) is built at runtime with all the informations
     that can be gathered about the current user (and its session).
-    Currently valid fields are: <em>uid, email, nickname, apache_user, remote_ip,
-    remote_host, groups, apache_groups</em> and all the external settings provided
+    Currently valid fields are: <em>uid, email, nickname, remote_ip,
+    remote_host, groups</em> and all the external settings provided
     by the external authentication systems (e.g. CERN SSO provides:
     external_authmethod, external_building, external_department, external_email,
     external_external, external_firstname, external_fullname, external_homdir,
