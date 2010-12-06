@@ -120,7 +120,8 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                     publication.merge_form(form, ln=argd['ln'])
                 if publication.status == 'edited':
                     publication.check_metadata()
-                    if 'submit_%s' % publicationid in form:
+                    publication.check_projects()
+                    if 'submit_%s' % publicationid in form and not "".join(out["errors"].values()).strip():
                         ## i.e. if the button submit for the corresponding publication has been pressed...
                         publication.upload_record()
                 if publication.status in ('initialized', 'edited'):
@@ -173,9 +174,6 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         ret = get_favourite_authorships_for_user(uid, publicationid, term)
         if ret:
             return json.dumps(ret)
-        ret = get_favourite_authorships_for_user(None, publicationid, term)
-        if ret:
-            return json.dumps(ret)
         if ':' in term:
             ## an institution is being typed
             name, institute = term.split(':', 1)
@@ -194,9 +192,6 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         term = argd['term']
         publicationid = argd['publicationid']
         ret = get_favourite_keywords_for_user(uid, publicationid, term)
-        if ret:
-            return json.dumps(ret)
-        ret = get_favourite_keywords_for_user(None, publicationid, term)
         if ret:
             return json.dumps(ret)
         return json.dumps([])
@@ -231,12 +226,35 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             if action == 'unlinkproject':
                 publication.unlink_project(projectid)
                 out["substitutions"]["#projectsbox_%s" % publicationid] = publication.get_projects_information()
+                publication.check_projects()
+                out["errors"], out["warnings"] = simple_metadata2namespaced_metadata(publication.errors, publicationid), simple_metadata2namespaced_metadata(publication.warnings, publicationid)
+                if "".join(out["errors"].values()).strip(): #FIXME bad hack, we need a cleaner way to discover if there are errors
+                    out['addclasses']['#status_%s' % publicationid] = 'error'
+                    out['delclasses']['#status_%s' % publicationid] = 'warning ok empty'
+                elif "".join(out["warnings"].values()).strip():
+                    out['addclasses']['#status_%s' % publicationid] = 'warning'
+                    out['delclasses']['#status_%s' % publicationid] = 'error ok empty'
+                else:
+                    out['addclasses']['#status_%s' % publicationid] = 'ok'
+                    out['delclasses']['#status_%s' % publicationid] = 'warning error empty'
             elif action == 'linkproject':
                 publication.link_project(projectid)
                 out["substitutions"]["#projectsbox_%s" % publicationid] = publication.get_projects_information()
+                publication.check_projects()
+                out["errors"], out["warnings"] = simple_metadata2namespaced_metadata(publication.errors, publicationid), simple_metadata2namespaced_metadata(publication.warnings, publicationid)
+                if "".join(out["errors"].values()).strip(): #FIXME bad hack, we need a cleaner way to discover if there are errors
+                    out['addclasses']['#status_%s' % publicationid] = 'error'
+                    out['delclasses']['#status_%s' % publicationid] = 'warning ok empty'
+                elif "".join(out["warnings"].values()).strip():
+                    out['addclasses']['#status_%s' % publicationid] = 'warning'
+                    out['delclasses']['#status_%s' % publicationid] = 'error ok empty'
+                else:
+                    out['addclasses']['#status_%s' % publicationid] = 'ok'
+                    out['delclasses']['#status_%s' % publicationid] = 'warning error empty'
             else:
                 publication.merge_form(form)
                 publication.check_metadata()
+                publication.check_projects()
                 out["errors"], out["warnings"] = simple_metadata2namespaced_metadata(publication.errors, publicationid), simple_metadata2namespaced_metadata(publication.warnings, publicationid)
                 if "".join(out["errors"].values()).strip(): #FIXME bad hack, we need a cleaner way to discover if there are errors
                     out['addclasses']['#status_%s' % publicationid] = 'error'

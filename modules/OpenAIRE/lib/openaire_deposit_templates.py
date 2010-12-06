@@ -245,11 +245,11 @@ class Template:
         if warnings:
             for key, value in warnings.iteritems():
                 if key.endswith('_%s' % publicationid):
-                    values['warning_%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
+                    values['warning_%s_value' % key[:-len('_%s' % publicationid)]] = value
         if errors:
             for key, value in errors.iteritems():
                 if key.endswith('_%s' % publicationid):
-                    values['error_%s_value' % key[:-len('_%s' % publicationid)]] = escape(value, True)
+                    values['error_%s_value' % key[:-len('_%s' % publicationid)]] = value
 
         return CFG_OPENAIRE_FORM_TEMPLATE % values
 

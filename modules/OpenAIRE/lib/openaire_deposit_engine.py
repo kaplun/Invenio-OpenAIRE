@@ -122,34 +122,39 @@ def get_all_publications_for_project(uid, projectid, ln, style):
             register_exception(alert_admin=True)
     return ret
 
-def get_favourite_authorships_for_user(uid, publicationid, term=''):
-    ret = [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE uid=%s and publicationid=%s and authorship LIKE %s ORDER BY authorship", (uid, publicationid, '%%%s%%' % term))]
-    if not ret:
-        ret = [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE publicationid=%s and authorship LIKE %s ORDER BY authorship", (publicationid, '%%%s%%' % term))]
-    if not ret:
-        ret = [row[0] for row in run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s and authorship LIKE %s ORDER BY authorship", (uid, '%%%s%%' % term))]
+def get_favourite_authorships_for_user(uid, projectids, publicationid, term='', limit=50):
+    ret = set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s AND publicationid=%s AND authorship LIKE %s ORDER BY authorship LIMIT %s", (uid, publicationid, '%%%s%%' % term, limit)))
+    if len(ret) < limit:
+       ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s AND authorship LIKE %s ORDER BY authorship LIMIT %s", (uid, '%%%s%%' % term, limit)))
+    if len(ret) < limit:
+       ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE uid=%%s AND projectid IN (%s) AND authorship LIKE %%s ORDER BY authorship LIMIT %%s" % ','.join(projectids), (uid, '%%%s%%' % term, limit)))
+    if len(ret) < limit:
+       ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE projectid IN (%s) AND authorship LIKE %%s ORDER BY authorship LIMIT %%s" % ','.join(projectids), ('%%%s%%' % term, limit)))
+    ret = [row[0] for row in ret]
+    ret.sort()
     return ret
 
-def get_favourite_keywords_for_user(uid, publicationid, term=''):
-    ret = [row[0] for row in run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE uid=%s and publicationid=%s and keyword LIKE %s ORDER BY keyword", (uid, publicationid, '%%%s%%' % term))]
-    if not ret:
-        ret = [row[0] for row in run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE publicationid=%s and keyword LIKE %s ORDER BY keyword", (publicationid, '%%%s%%' % term))]
-    if not ret:
-        ret = [row[0] for row in run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords WHERE uid=%s and keyword LIKE %s ORDER BY keyword", (uid, '%%%s%%' % term))]
+def get_favourite_keywords_for_user(uid, projectids, publicationid, term='', limit=50):
+    ret = set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords WHERE uid=%s AND publicationid=%s AND keyword LIKE %s ORDER BY keyword LIMIT %s", (uid, publicationid, '%%%s%%' % term, limit)))
+    if len(ret) < limit:
+       ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords WHERE uid=%s AND keyword LIKE %s ORDER BY keyword LIMIT %s", (uid, '%%%s%%' % term, limit)))
+    if len(ret) < limit:
+       ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE uid=%%s AND projectid IN (%s) AND keyword LIKE %%s ORDER BY keyword LIMIT %%s" % ','.join(projectids), (uid, '%%%s%%' % term, limit)))
+    if len(ret) < limit:
+       ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE projectid IN (%s) AND keyword LIKE %%s ORDER BY keyword LIMIT %%s" % ','.join(projectids), ('%%%s%%' % term, limit)))
+    ret = [row[0] for row in ret]
+    ret.sort()
     return ret
 
-
-def update_favourite_authorships_for_user(uid, projectids, publicationid, authorships):
-    run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%%s AND publicationid=%%s AND projectid IN (%s) " % ','.join([str(projectid) for projectid in projectids]), (uid, publicationid))
+def update_favourite_authorships_for_user(uid, publicationid, authorships):
+    run_sql("DELETE FROM OpenAIREauthorships WHERE uid=%s AND publicationid=%s", (uid, publicationid))
     for authorship in authorships.splitlines():
-        for projectid in projectids:
-            run_sql("INSERT INTO OpenAIREauthorships(uid, projectid, publicationid, authorship) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, authorship))
+        run_sql("INSERT INTO OpenAIREauthorships(uid, publicationid, authorship) VALUES(%s, %s, %s)", (uid, publicationid, authorship))
 
-def update_favourite_keywords_for_user(uid, projectids, publicationid, keywords):
-    run_sql("DELETE FROM OpenAIREkeywords WHERE uid=%%s AND publicationid=%%s AND projectid IN (%s) " % ','.join([str(projectid) for projectid in projectids]), (uid, publicationid))
+def update_favourite_keywords_for_user(uid, publicationid, keywords):
+    run_sql("DELETE FROM OpenAIREkeywords WHERE uid=%s AND publicationid=%s", (uid, publicationid))
     for keyword in keywords.splitlines():
-        for projectid in projectids:
-            run_sql("INSERT INTO OpenAIREkeywords(uid, projectid, publicationid, keyword) VALUES(%s, %s, %s, %s)", (uid, projectid, publicationid, keyword))
+        run_sql("INSERT INTO OpenAIREkeywords(uid, publicationid, keyword) VALUES(%s, %s, %s)", (uid, publicationid, keyword))
 
 def normalize_authorships(authorships):
     ret = []
@@ -442,20 +447,27 @@ class OpenAIREPublication(object):
         body = format_record(recID=self.recid, xml_record=self.marcxml, ln=self.ln, of='hd')
         return openaire_deposit_templates.tmpl_publication_preview(body, self.recid, ln=self.ln)
 
-    def check_metadata(self, check_project=CFG_OPENAIRE_MANDATORY_PROJECTS):
-        _ = gettext_set_language(self.ln)
-        self.errors, self.warnings = self.static_check_metadata(self._metadata, ln=self.ln)
-        if self._metadata.get('authors') and not self.errors.get('authors'):
-            self._metadata['authors'] = normalize_authorships(self._metadata['authors'])
-            update_favourite_authorships_for_user(self.uid, self.projectids, self.publicationid, self._metadata['authors'])
-        if self._metadata.get('keywords') and not self.errors.get('keywords'):
-            self._metadata['keywords'] = normalize_keywords(self._metadata['keywords'])
-            update_favourite_keywords_for_user(self.uid, self.projectids, self.publicationid, self._metadata['keywords'])
+    def check_projects(self, check_project=CFG_OPENAIRE_MANDATORY_PROJECTS):
         if CFG_OPENAIRE_MANDATORY_PROJECTS:
             if len(self.projectids) == 1 and self.projectids[0] == 0:
                 self.errors['projects'] = _("You must specify at least one FP7 Project within which your publication was created.")
             else:
                 self.errors['projects'] = ""
+        else:
+            if len(self.projectids) == 1 and self.projectids[0] == 0:
+                self.warnings['projects'] = _("No FP7 Projects are associated with your publication. Was this intentional.")
+            else:
+                self.warnings['projects'] = ""
+
+    def check_metadata(self):
+        _ = gettext_set_language(self.ln)
+        self.errors, self.warnings = self.static_check_metadata(self._metadata, ln=self.ln)
+        if self._metadata.get('authors') and not self.errors.get('authors'):
+            self._metadata['authors'] = normalize_authorships(self._metadata['authors'])
+            update_favourite_authorships_for_user(self.uid, self.publicationid, self._metadata['authors'])
+        if self._metadata.get('keywords') and not self.errors.get('keywords'):
+            self._metadata['keywords'] = normalize_keywords(self._metadata['keywords'])
+            update_favourite_keywords_for_user(self.uid, self.publicationid, self._metadata['keywords'])
 
     def static_check_metadata(metadata, publicationid=None, check_only_field=None, ln=CFG_SITE_LANG):
         """

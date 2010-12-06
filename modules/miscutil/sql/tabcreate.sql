@@ -3722,22 +3722,21 @@ CREATE TABLE IF NOT EXISTS user_expJOB (
 -- OpenAIRE specific tables
 CREATE TABLE IF NOT EXISTS OpenAIREauthorships (
   uid int(15) NOT NULL,
-  projectid varchar(30) NOT NULL,
   publicationid varchar(30) NOT NULL,
   authorship varchar(255) NOT NULL,
-  KEY (uid, projectid, publicationid),
-  KEY (uid, projectid, authorship),
-  KEY (projectid, authorship)
+  UNIQUE (uid, publicationid, authorship),
+  KEY (uid, publicationid),
+  KEY (uid, authorship),
+  KEY (authorship)
 ) TYPE=MyISAM;
 
 CREATE TABLE IF NOT EXISTS OpenAIREkeywords (
   uid int(15) NOT NULL,
-  projectid varchar(30) NOT NULL,
   publicationid varchar(30) NOT NULL,
   keyword varchar(255) NOT NULL,
-  KEY (uid, projectid, publicationid),
-  KEY (uid, projectid, keyword),
-  KEY (projectid, keyword)
+  KEY (uid, publicationid),
+  KEY (uid, keyword),
+  KEY (keyword)
 ) TYPE=MyISAM;
 
 
