@@ -640,7 +640,7 @@ this is to confirm that you successfully deposited a publication into OpenAIRE:
 OpenAIRE Orphan Record Repository curators will soon review your deposition and
 eventually approve it.
 
-If approve it, you will be able to cite this publication using
+If approved, you will be able to cite this publication using
 one of the following report numbers, that were automatically
 assigned to your document:
 

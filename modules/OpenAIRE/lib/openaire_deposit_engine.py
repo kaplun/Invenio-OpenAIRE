@@ -569,7 +569,7 @@ class OpenAIREPublication(object):
                 if acronym:
                     report_number = create_reference(os.path.join("OpenAIRE", acronym, "lastid_%s" % year), "OpenAIRE-%s-%s" % (acronym, year))
                 else:
-                    report_number = create_reference(os.path.join("OpenAIRE", "lastid_%s" % year), "OpenAIRE-%s" % year)
+                    report_number = create_reference(os.path.join("OpenAIRE", "lastid_%s" % year), "OpenAIRE-GENERAL-%s" % year)
                 report_numbers[acronym] = report_number
         self._metadata['report_numbers'] = report_numbers
         ret = report_numbers.values()
