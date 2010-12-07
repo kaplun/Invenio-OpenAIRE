@@ -54,7 +54,7 @@ from invenio.config import \
      CFG_WEBSEARCH_FIELDS_CONVERT, \
      CFG_WEBSEARCH_NB_RECORDS_TO_SORT, \
      CFG_WEBSEARCH_SEARCH_CACHE_SIZE, \
-     CFG_WEBSEARCH_USE_JSMATH_FOR_FORMATS, \
+     CFG_WEBSEARCH_USE_MATHJAX_FOR_FORMATS, \
      CFG_WEBSEARCH_USE_ALEPH_SYSNOS, \
      CFG_WEBSEARCH_DEF_RECORDS_IN_GROUPS, \
      CFG_WEBSEARCH_FULLTEXT_SNIPPETS, \
@@ -87,7 +87,7 @@ from invenio.intbitset import intbitset as HitSet
 from invenio.dbquery import DatabaseError, deserialize_via_marshal
 from invenio.access_control_engine import acc_authorize_action
 from invenio.errorlib import register_exception
-from invenio.textutils import encode_for_xml
+from invenio.textutils import encode_for_xml, wash_for_utf8
 
 import invenio.template
 webstyle_templates = invenio.template.load('webstyle')
@@ -783,16 +783,11 @@ def page_start(req, of, cc, aas, ln, uid, title_message=None,
             argd = cgi.parse_qs(req.args)
         rssurl = websearch_templates.build_rss_url(argd)
 
-        ## add jsmath if displaying single records (FIXME: find
+        ## add MathJax if displaying single records (FIXME: find
         ## eventual better place to this code)
-        if of.lower() in CFG_WEBSEARCH_USE_JSMATH_FOR_FORMATS:
+        if of.lower() in CFG_WEBSEARCH_USE_MATHJAX_FOR_FORMATS:
             metaheaderadd = """
-  <script type='text/javascript'>
-    jsMath = {
-        Controls: {cookie: {printwarn: 0}}
-    };
-  </script>
-  <script src='/jsMath/easy/invenio-jsmath.js' type='text/javascript'></script>
+  <script src='/MathJax/MathJax.js' type='text/javascript'></script>
 """
         else:
             metaheaderadd = ''
@@ -1490,6 +1485,8 @@ def wash_pattern(p):
     p = re_pattern_today.sub(time.strftime("%Y-%m-%d", time.localtime()), p)
     # remove unnecessary whitespace:
     p = string.strip(p)
+    # remove potentially wrong UTF-8 characters:
+    p = wash_for_utf8(p)
     return p
 
 def wash_field(f):

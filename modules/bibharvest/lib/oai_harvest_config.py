@@ -15,13 +15,17 @@
 ## along with Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-mathjaxwebdir=$(localstatedir)/www/MathJax/config
-mathjaxweb_DATA=MathJax.js
+"""OAI Harvest Configuration."""
 
-fckeditorwebdir=$(localstatedir)/www/fckeditor
-fckeditorweb_DATA=invenio-fckeditor-config.js journal-editor-config.js \
-                  journal-editor-styles.xml journal-editor-templates.xml
+__revision__ = "$Id$"
 
-EXTRA_DIST = $(mathjaxweb_DATA) $(fckeditorweb_DATA)
-
-CLEANFILES = *~ *.tmp
+## CFG_OAI_POSSIBLE_POSTMODES -- list of possible modes available for
+## OAI harvest post-processing
+CFG_OAI_POSSIBLE_POSTMODES = [\
+         ["h", "harvest only (h)"], \
+         ["h-c", "harvest and convert (h-c)"], \
+         ["h-u", "harvest and upload (h-u)"], \
+         ["h-c-u", "harvest, convert and upload (h-c-u)"], \
+         ["h-c-f-u", "harvest, convert, filter, upload (h-c-f-u)"], \
+         ["h-c-e-u", "harvest, convert, extract, upload (h-c-e-u)"], \
+         ["h-c-e-f-u", "harvest, convert, extract, filter, upload (h-c-e-f-u)"]]

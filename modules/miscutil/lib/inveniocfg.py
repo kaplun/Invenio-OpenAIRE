@@ -96,8 +96,7 @@ def convert_conf_option(option_name, option_value):
                        'CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG',
                        'CFG_BIBUPLOAD_EXTERNAL_OAIID_PROVENANCE_TAG',
                        'CFG_BIBUPLOAD_STRONG_TAGS',
-                       'CFG_BIBFORMAT_HIDDEN_TAGS',
-                       'CFG_SITE_EMERGENCY_PHONE_NUMBERS']:
+                       'CFG_BIBFORMAT_HIDDEN_TAGS',]:
         # some options are supposed be string even when they look like
         # numeric
         option_value = '"' + option_value + '"'
@@ -122,13 +121,15 @@ def convert_conf_option(option_name, option_value):
         option_value = option_value[1:-1]
 
     ## 3c) special cases: dicts
-    if option_name in ['CFG_WEBSEARCH_FIELDS_CONVERT', 'CFG_BATCHUPLOADER_WEB_ROBOT_RIGHTS']:
+    if option_name in ['CFG_WEBSEARCH_FIELDS_CONVERT',
+                       'CFG_BATCHUPLOADER_WEB_ROBOT_RIGHTS',
+                       'CFG_SITE_EMERGENCY_EMAIL_ADDRESSES']:
         option_value = option_value[1:-1]
 
     ## 3d) special cases: comma-separated lists
     if option_name in ['CFG_SITE_LANGS',
                        'CFG_WEBSUBMIT_ADDITIONAL_KNOWN_FILE_EXTENSIONS',
-                       'CFG_WEBSEARCH_USE_JSMATH_FOR_FORMATS',
+                       'CFG_WEBSEARCH_USE_MATHJAX_FOR_FORMATS',
                        'CFG_BIBUPLOAD_STRONG_TAGS',
                        'CFG_BIBFORMAT_HIDDEN_TAGS',
                        'CFG_BIBSCHED_GC_TASKS_TO_REMOVE',
@@ -136,7 +137,6 @@ def convert_conf_option(option_name, option_value):
                        'CFG_BIBUPLOAD_FFT_ALLOWED_LOCAL_PATHS',
                        'CFG_BIBUPLOAD_CONTROLLED_PROVENANCE_TAGS',
                        'CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES',
-                       'CFG_SITE_EMERGENCY_PHONE_NUMBERS',
                        'CFG_WEBSTYLE_HTTP_STATUS_ALERT_LIST',
                        'CFG_WEBSEARCH_RSS_I18N_COLLECTIONS',
                        'CFG_BATCHUPLOADER_FILENAME_MATCHING_POLICY',
@@ -843,7 +843,7 @@ WSGIRestrictStdout Off
         Alias /css/ %(webdir)s/css/
         Alias /flash/ %(webdir)s/flash/
         Alias /export/ %(webdir)s/export/
-        Alias /jsMath/ %(webdir)s/jsMath/
+        Alias /MathJax/ %(webdir)s/MathJax/
         Alias /jsCalendar/ %(webdir)s/jsCalendar/
         Alias /fckeditor/ %(webdir)s/fckeditor/
         AliasMatch /sitemap-(.*) %(webdir)s/sitemap-$1
@@ -914,7 +914,7 @@ WSGIRestrictStdout Off
         Alias /css/ %(webdir)s/css/
         Alias /flash/ %(webdir)s/flash/
         Alias /export/ %(webdir)s/export/
-        Alias /jsMath/ %(webdir)s/jsMath/
+        Alias /MathJax/ %(webdir)s/MathJax/
         Alias /jsCalendar/ %(webdir)s/jsCalendar/
         Alias /fckeditor/ %(webdir)s/fckeditor/
         AliasMatch /sitemap-(.*) %(webdir)s/sitemap-$1

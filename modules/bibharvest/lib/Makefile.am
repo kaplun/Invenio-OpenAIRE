@@ -31,7 +31,8 @@ pylib_DATA = oai_repository_server.py \
              oai_repository_admin.py \
              oai_repository_admin_regression_tests.py \
              oai_harvest_daemon.py \
-             oai_repository_updater.py
+             oai_repository_updater.py \
+             oai_harvest_config.py
 
 EXTRA_DIST = $(pylib_DATA)
 
