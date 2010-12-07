@@ -122,26 +122,26 @@ def get_all_publications_for_project(uid, projectid, ln, style):
             register_exception(alert_admin=True)
     return ret
 
-def get_favourite_authorships_for_user(uid, projectids, publicationid, term='', limit=50):
+def get_favourite_authorships_for_user(uid, publicationid, term='', limit=50):
     ret = set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s AND publicationid=%s AND authorship LIKE %s ORDER BY authorship LIMIT %s", (uid, publicationid, '%%%s%%' % term, limit)))
     if len(ret) < limit:
        ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships WHERE uid=%s AND authorship LIKE %s ORDER BY authorship LIMIT %s", (uid, '%%%s%%' % term, limit)))
     if len(ret) < limit:
-       ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE uid=%%s AND projectid IN (%s) AND authorship LIKE %%s ORDER BY authorship LIMIT %%s" % ','.join(projectids), (uid, '%%%s%%' % term, limit)))
+       ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE projectid IN (SELECT projectid FROM eupublication WHERE uid=%s AND publicationid=%s) AND authorship LIKE %s ORDER BY authorship LIMIT %s", (uid, publicationid, '%%%s%%' % term, limit)))
     if len(ret) < limit:
-       ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE projectid IN (%s) AND authorship LIKE %%s ORDER BY authorship LIMIT %%s" % ','.join(projectids), ('%%%s%%' % term, limit)))
+       ret |= set(run_sql("SELECT DISTINCT authorship FROM OpenAIREauthorships NATURAL JOIN eupublication WHERE authorship LIKE %s ORDER BY authorship LIMIT %s", ('%%%s%%' % term, limit)))
     ret = [row[0] for row in ret]
     ret.sort()
     return ret
 
-def get_favourite_keywords_for_user(uid, projectids, publicationid, term='', limit=50):
+def get_favourite_keywords_for_user(uid, publicationid, term='', limit=50):
     ret = set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords WHERE uid=%s AND publicationid=%s AND keyword LIKE %s ORDER BY keyword LIMIT %s", (uid, publicationid, '%%%s%%' % term, limit)))
     if len(ret) < limit:
        ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords WHERE uid=%s AND keyword LIKE %s ORDER BY keyword LIMIT %s", (uid, '%%%s%%' % term, limit)))
     if len(ret) < limit:
-       ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE uid=%%s AND projectid IN (%s) AND keyword LIKE %%s ORDER BY keyword LIMIT %%s" % ','.join(projectids), (uid, '%%%s%%' % term, limit)))
+       ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE projectid IN (SELECT projectid FROM eupublication WHERE uid=%s AND publicationid=%s) AND keyword LIKE %s ORDER BY keyword LIMIT %s", (uid, publicationid, '%%%s%%' % term, limit)))
     if len(ret) < limit:
-       ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE projectid IN (%s) AND keyword LIKE %%s ORDER BY keyword LIMIT %%s" % ','.join(projectids), ('%%%s%%' % term, limit)))
+       ret |= set(run_sql("SELECT DISTINCT keyword FROM OpenAIREkeywords NATURAL JOIN eupublication WHERE keyword LIKE %s ORDER BY keyword LIMIT %s", ('%%%s%%' % term, limit)))
     ret = [row[0] for row in ret]
     ret.sort()
     return ret
