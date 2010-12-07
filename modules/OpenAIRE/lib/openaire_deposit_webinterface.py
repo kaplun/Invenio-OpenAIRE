@@ -228,29 +228,11 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 out["substitutions"]["#projectsbox_%s" % publicationid] = publication.get_projects_information()
                 publication.check_projects()
                 out["errors"], out["warnings"] = simple_metadata2namespaced_metadata(publication.errors, publicationid), simple_metadata2namespaced_metadata(publication.warnings, publicationid)
-                if "".join(out["errors"].values()).strip(): #FIXME bad hack, we need a cleaner way to discover if there are errors
-                    out['addclasses']['#status_%s' % publicationid] = 'error'
-                    out['delclasses']['#status_%s' % publicationid] = 'warning ok empty'
-                elif "".join(out["warnings"].values()).strip():
-                    out['addclasses']['#status_%s' % publicationid] = 'warning'
-                    out['delclasses']['#status_%s' % publicationid] = 'error ok empty'
-                else:
-                    out['addclasses']['#status_%s' % publicationid] = 'ok'
-                    out['delclasses']['#status_%s' % publicationid] = 'warning error empty'
             elif action == 'linkproject':
                 publication.link_project(projectid)
                 out["substitutions"]["#projectsbox_%s" % publicationid] = publication.get_projects_information()
                 publication.check_projects()
                 out["errors"], out["warnings"] = simple_metadata2namespaced_metadata(publication.errors, publicationid), simple_metadata2namespaced_metadata(publication.warnings, publicationid)
-                if "".join(out["errors"].values()).strip(): #FIXME bad hack, we need a cleaner way to discover if there are errors
-                    out['addclasses']['#status_%s' % publicationid] = 'error'
-                    out['delclasses']['#status_%s' % publicationid] = 'warning ok empty'
-                elif "".join(out["warnings"].values()).strip():
-                    out['addclasses']['#status_%s' % publicationid] = 'warning'
-                    out['delclasses']['#status_%s' % publicationid] = 'error ok empty'
-                else:
-                    out['addclasses']['#status_%s' % publicationid] = 'ok'
-                    out['delclasses']['#status_%s' % publicationid] = 'warning error empty'
             else:
                 publication.merge_form(form)
                 publication.check_metadata()
