@@ -391,3 +391,25 @@ def parse_runtime_limit(value):
         raise
     except:
         raise ValueError, '"%s" does not seem to be correct format for parse_runtime_limit() [Wee[kday]] [hh[:mm][-hh[:mm]]]).' % value
+
+def guess_datetime(datetime_string):
+    """
+    Try to guess the datetime contained in a string of unknow format.
+    @param datetime_string: the datetime representation.
+    @type datetime_string: string
+    @return: the guessed time.
+    @rtype: L{time.struct_time}
+    @raises ValueError: in case it's not possible to guess the time.
+    """
+    if CFG_HAS_EGENIX_DATETIME:
+        try:
+            return Parser.DateTimeFromString(datetime_string).timetuple()
+        except ValueError:
+            pass
+    else:
+        for format in (None, '%x %X', '%X %x', '%Y-%M-%dT%h:%m:%sZ'):
+            try:
+                return strptime(datetime_string, format)
+            except ValueError:
+                pass
+    raise ValueError("It is not possible to guess the datetime format of %s" % datetime_string)
