@@ -35,6 +35,7 @@ import copy
 from base64 import encodestring
 from cgi import escape
 
+from invenio.webstat import register_customevent
 from invenio.bibdocfile import generic_path2bidocfile
 from invenio.bibedit_utils import json_unicode_to_utf8
 from invenio.webpage import page as invenio_page
@@ -48,7 +49,7 @@ from invenio.dbquery import run_sql
 from invenio.bibtask import task_low_level_submission
 from invenio.bibrecord import record_add_field, record_xml_output
 from invenio.bibknowledge import get_kb_mapping, get_kbr_keys
-from invenio.search_engine import record_empty
+from invenio.search_engine import record_empty, get_fieldvalues
 from invenio.openaire_deposit_utils import wash_form, simple_metadata2namespaced_metadata, namespaced_metadata2simple_metadata, strip_publicationid
 from invenio.urlutils import create_url
 from invenio.bibformat import format_record
@@ -77,7 +78,7 @@ CFG_METADATA_FIELDS = ('title', 'original_title', 'authors', 'abstract',
     'publication_date', 'journal_title', 'volume', 'pages', 'issue', 'keywords')
 
 CFG_METADATA_STATES = ('ok', 'error', 'warning', 'empty')
-CFG_PUBLICATION_STATES = ('initialized', 'edited', 'submitted', 'pendingapproval', 'approved', 'rejected')
+CFG_PUBLICATION_STATES = ('initialized', 'edited', 'submitted', 'pendingapproval', 'approved', 'rejected', 'deleted')
 
 openaire_deposit_templates = template.load('openaire_deposit')
 
@@ -547,13 +548,29 @@ class OpenAIREPublication(object):
     def get_status(self):
         if self._metadata['__status__'] == 'submitted':
             ## The record has been submitted into Invenio. Let's poll to see if it's actually there:
-            if not record_empty(self.recid):
-                ## FIXME: change this to pendingapproval once
-                ## approval workflow is implemented.
-                self._metadata['__status__'] = 'approved'
+            collections = get_fieldvalues(self.recid, '980__%')
+            if 'PROVISIONAL' in collections:
+                self.status = 'pendingapproval'
+            elif 'OPENAIRE' in collections:
+                self.status = 'approved'
+            elif 'REJECTED' in collections:
+                self.status = 'rejected'
+            if 'DELETED' in collections:
+                self.status = 'deleted'
         return self._metadata['__status__']
     def set_status(self, new_status):
         assert(new_status in CFG_PUBLICATION_STATES)
+        try:
+            if new_status != self._metadata.get('__status__'):
+                ## a status change cool! Let's log it!
+                for projectid in run_sql("SELECT projectid FROM eupublication WHERE uid=%s AND publicationid=%s", (self.uid, self.publicationid)):
+                    register_customevent("OpenAIRE", [new_status, get_email(self.uid), get_project_description(projectid[0]) or 'NO PROJECT'])
+                else:
+                    register_customevent("OpenAIRE", [new_status, get_email(self.uid), 'NO PROJECT'])
+        except:
+            ## If there's an error here, who cares :-) Let's just
+            ## warn the admin but let's continue...
+            register_exception(alert_admin=True)
         self._metadata['__status__'] = new_status
     def get_md(self):
         return self._metadata['__md__']
