@@ -61,6 +61,7 @@ from invenio.bibtask import task_init, write_message, get_datetime, \
 from invenio.intbitset import intbitset
 from invenio.errorlib import register_exception
 from invenio.htmlutils import remove_html_markup
+from invenio.textutils import wash_for_utf8
 
 if sys.hexversion < 0x2040000:
     # pylint: disable=W0622
@@ -85,6 +86,7 @@ re_block_punctuation_end = re.compile(CFG_BIBINDEX_CHARS_PUNCTUATION+"+$")
 re_punctuation = re.compile(CFG_BIBINDEX_CHARS_PUNCTUATION)
 re_separators = re.compile(CFG_BIBINDEX_CHARS_ALPHANUMERIC_SEPARATORS)
 re_datetime_shift = re.compile("([-\+]{0,1})([\d]+)([dhms])")
+re_arxiv = re.compile(r'^arxiv:\d\d\d\d\.\d\d\d\d')
 
 nb_char_in_line = 50  # for verbose pretty printing
 chunksize = 1000 # default size of chunks that the records will be treated by
@@ -409,11 +411,8 @@ def get_words_from_phrase(phrase, stemming_language=None):
         formulas = latex_formula_re.findall(phrase)
         phrase = remove_latex_markup(phrase)
         phrase = latex_formula_re.sub(' ', phrase)
-    try:
-        phrase = lower_index_term(phrase)
-    except UnicodeDecodeError:
-        # too bad the phrase is not UTF-8 friendly, continue...
-        phrase = phrase.lower()
+    phrase = wash_for_utf8(phrase)
+    phrase = lower_index_term(phrase)
     # 1st split phrase into blocks according to whitespace
     for block in strip_accents(phrase).split():
         # 2nd remove leading/trailing punctuation and add block:
@@ -424,6 +423,11 @@ def get_words_from_phrase(phrase, stemming_language=None):
                 block = apply_stemming_and_stopwords_and_length_check(block, stemming_language)
             if block:
                 words[block] = 1
+            if re_arxiv.match(block):
+                # special case for blocks like `arXiv:1007.5048' where
+                # we would like to index the part after the colon
+                # regardless of dot or other punctuation characters:
+                words[block.split(':', 1)[1]] = 1
             # 3rd break each block into subblocks according to punctuation and add subblocks:
             for subblock in re_punctuation.split(block):
                 if stemming_language:
@@ -451,11 +455,8 @@ def get_pairs_from_phrase(phrase, stemming_language=None):
     if CFG_BIBINDEX_REMOVE_LATEX_MARKUP:
         phrase = remove_latex_markup(phrase)
         phrase = latex_formula_re.sub(' ', phrase)
-    try:
-        phrase = lower_index_term(phrase)
-    except UnicodeDecodeError:
-        # too bad the phrase is not UTF-8 friendly, continue...
-        phrase = phrase.lower()
+    phrase = wash_for_utf8(phrase)
+    phrase = lower_index_term(phrase)
     # 1st split phrase into blocks according to whitespace
     last_word = ''
     for block in strip_accents(phrase).split():
@@ -487,6 +488,7 @@ def get_phrases_from_phrase(phrase, stemming_language=None):
        split into groups depending on the alphanumeric characters and
        punctuation characters definition present in the config file.
     """
+    phrase = wash_for_utf8(phrase)
     return [phrase]
     ## Note that we don't break phrases, they are used for exact style
     ## of searching.
