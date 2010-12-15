@@ -223,7 +223,7 @@ def run_process_with_timeout(args, filename_in=None, filename_out=None, filename
         stderr = open(filename_err, 'w')
     else:
         stderr = None
-    the_process = Process(args, shell=shell, stdin=stdin, cwd=cwd)
+    the_process = Process(args=args, shell=shell, stdin=stdin, cwd=cwd)
     try:
         return with_timeout(timeout, call_the_process, the_process, stdout, stderr)
     except Timeout:
