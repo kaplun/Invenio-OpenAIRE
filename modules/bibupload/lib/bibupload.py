@@ -109,7 +109,8 @@ from invenio.bibtask import task_init, write_message, \
 from invenio.bibdocfile import BibRecDocs, file_strip_ext, normalize_format, \
     get_docname_from_url, check_valid_url, download_url, \
     KEEP_OLD_VALUE, decompose_bibdocfile_url, InvenioWebSubmitFileError, \
-    bibdocfile_url_p, CFG_BIBDOCFILE_AVAILABLE_FLAGS, guess_format_from_url
+    bibdocfile_url_p, CFG_BIBDOCFILE_AVAILABLE_FLAGS, guess_format_from_url, \
+    normalize_bibdocfile_url
 
 from invenio.search_engine import search_pattern
 
@@ -1001,17 +1002,23 @@ def synchronize_8564(rec_id, record, record_had_FFT, pretend=False):
         if field[1] == '4' and field[2] == ' ':
             write_message('Analysing %s' % (field, ), verbose=9)
             for url in field_get_subfield_values(field, 'u') + field_get_subfield_values(field, 'q'):
-                if url in tags8564s_to_add:
-                    if record_had_FFT:
-                        merge_bibdocfile_into_marc(field, tags8564s_to_add[url])
-                    else:
-                        merge_marc_into_bibdocfile(field, pretend=pretend)
-                    del tags8564s_to_add[url]
-                    break
-                elif bibdocfile_url_p(url) and decompose_bibdocfile_url(url)[0] == rec_id:
-                    positions_tags8564s_to_remove.append(local_position)
-                    write_message("%s to be deleted and re-synchronized" % (field, ),  verbose=9)
-                    break
+                if bibdocfile_url_p(url):
+                    write_message('%s is a BibDocFile URL' % (url, ), verbose=9)
+                    url = normalize_bibdocfile_url(url)
+                    write_message('URL after normalization: %s' % (url, ), verbose=9)
+                    if url in tags8564s_to_add:
+                        if record_had_FFT:
+                            merge_bibdocfile_into_marc(field, tags8564s_to_add[url])
+                            write_message('Merging bibdocfile into MARC field %s' % (field, ), verbose=9)
+                        else:
+                            merge_marc_into_bibdocfile(field, pretend=pretend)
+                            write_message('Merging MARC field %s into bibdocfile' % (field, ), verbose=9)
+                        del tags8564s_to_add[url]
+                        break
+                    elif decompose_bibdocfile_url(url)[0] == rec_id:
+                        positions_tags8564s_to_remove.append(local_position)
+                        write_message("%s to be deleted and re-synchronized" % (field, ),  verbose=9)
+                        break
 
     record_delete_fields(record, '856', positions_tags8564s_to_remove)
 

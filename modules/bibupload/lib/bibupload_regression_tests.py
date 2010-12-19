@@ -3086,6 +3086,90 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
 
         self._test_bibdoc_status(recid, 'patata', '')
 
+    def test_non_normalized_url_fft_correct(self):
+        """bibupload - non-normalized FFT correct"""
+        # define the test case:
+        self.verbose = 9
+        setup_loggers()
+        task_set_task_param('verbose', self.verbose)
+        test_to_upload = """
+        <record>
+        <controlfield tag="003">SzGeCERN</controlfield>
+         <datafield tag="100" ind1=" " ind2=" ">
+          <subfield code="a">Test, John</subfield>
+          <subfield code="u">Test University</subfield>
+         </datafield>
+         <datafield tag="FFT" ind1=" " ind2=" ">
+          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="d">Try</subfield>
+          <subfield code="z">Comment</subfield>
+         </datafield>
+        </record>
+        """
+        test_to_correct = """
+        <record>
+        <controlfield tag="001">123456789</controlfield>
+        <datafield tag="856" ind1="4" ind2=" ">
+          <subfield code="u">%(siteurl)s/record/000123456789/files/cds.gif</subfield>
+          <subfield code="z">Next Comment</subfield>
+        </datafield>
+        </record>
+        """ % {'siteurl': CFG_SITE_URL}
+
+        testrec_expected_xm = """
+        <record>
+        <controlfield tag="001">123456789</controlfield>
+        <controlfield tag="003">SzGeCERN</controlfield>
+         <datafield tag="100" ind1=" " ind2=" ">
+          <subfield code="a">Test, John</subfield>
+          <subfield code="u">Test University</subfield>
+         </datafield>
+         <datafield tag="856" ind1="4" ind2=" ">
+          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="z">Next Comment</subfield>
+         </datafield>
+        </record>
+        """ % { 'siteurl': CFG_SITE_URL}
+        testrec_expected_hm = """
+        001__ 123456789
+        003__ SzGeCERN
+        100__ $$aTest, John$$uTest University
+        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif$$zNext Comment
+        """ % { 'siteurl': CFG_SITE_URL}
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" \
+            % {'siteurl': CFG_SITE_URL}
+
+        # insert test record:
+        recs = bibupload.xml_marc_to_records(test_to_upload)
+        err, recid = bibupload.bibupload(recs[0], opt_mode='insert')
+
+        # replace test buffers with real recid of inserted test record:
+        testrec_expected_xm = testrec_expected_xm.replace('123456789',
+                                                          str(recid))
+        testrec_expected_hm = testrec_expected_hm.replace('123456789',
+                                                          str(recid))
+        testrec_expected_url = testrec_expected_url.replace('123456789',
+                                                          str(recid))
+
+        test_to_correct = test_to_correct.replace('123456789',
+                                                          str(recid))
+        # correct test record with new FFT:
+        recs = bibupload.xml_marc_to_records(test_to_correct)
+        bibupload.bibupload(recs[0], opt_mode='correct')
+
+        # compare expected results:
+        inserted_xm = print_record(recid, 'xm')
+        inserted_hm = print_record(recid, 'hm')
+
+        self.failUnless(try_url_download(testrec_expected_url))
+        self.assertEqual(compare_xmbuffers(inserted_xm,
+                                          testrec_expected_xm), '')
+        self.assertEqual(compare_hmbuffers(inserted_hm,
+                                          testrec_expected_hm), '')
+
+        self._test_bibdoc_status(recid, 'cds', '')
+
+
     def test_new_icon_fft_append(self):
         """bibupload - new icon FFT append"""
         # define the test case:

@@ -3276,7 +3276,22 @@ def decompose_bibdocfile_url(url):
     if not recid and docname.isdigit():
         ## If the URL was something similar to CFG_SITE_URL/record/123
         return (int(docname), '', '')
+    if '?' in url:
+        params = urllib2.urlparse.parse_qs(urllib2.urlparse.urlparse(url)[4])
+        if params['subformat']:
+            format += ';%s' % params['subformat'][0]
     return (int(recid), docname, format)
+
+def normalize_bibdocfile_url(url):
+    """Return a canonical representation of the bibdocfile URL."""
+    recid, docname, format = decompose_bibdocfile_url(url)
+    superformat = get_superformat_from_format(format)
+    subformat = get_subformat_from_format(format)
+    if subformat:
+        params = {'subformat' : params}
+    else:
+        params = {}
+    return create_url('%s/record/%s/files/%s%s' % (CFG_SITE_URL, recid, docname, superformat), params)
 
 re_bibdocfile_old_url = re.compile(r'/record/(\d*)/files/')
 def decompose_bibdocfile_old_url(url):
