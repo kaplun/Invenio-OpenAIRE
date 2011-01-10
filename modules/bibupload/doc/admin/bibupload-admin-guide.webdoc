@@ -26,10 +26,11 @@
 <strong>2. <a href="#2">Configuring BibUpload</a></strong><br />
 <strong>3. <a href="#3">Running BibUpload</a></strong><br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.1. <a href="#3.1">Inserting new records</a><br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.2. <a href="#3.2">Updating existing records</a><br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.3. <a href="#3.3">Inserting and updating at the same time</a><br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.4. <a href="#3.4">Updating preformatted output formats</a><br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.5. <a href="#3.5">Uploading fulltext files</a><br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.2. <a href="#3.2">Inserting records into the Holding Pen</a><br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.3. <a href="#3.3">Updating existing records</a><br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.4. <a href="#3.4">Inserting and updating at the same time</a><br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.5. <a href="#3.5">Updating preformatted output formats</a><br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.6. <a href="#3.6">Uploading fulltext files</a><br />
 <strong>4. <a href="#4">Batch Uploader</a></strong><br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4.1. <a href="#4.1">Web interface - Cataloguers</a><br />
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 4.1. <a href="#4.2">Web interface - Robots</a><br />
@@ -106,7 +107,27 @@ will refuse to continue.
 </pre>
 </p>
 
-<a name="3.2"></a><h3>3.2 Updating existing records</h3>
+<a name="3.2"></a><h3>3.2 Inserting records into the Holding Pen</h3>
+
+<p>A special mode of BibUpload that is thigthly connected with BibEdit is the
+<em>Holding Pen</em> mode.</p>
+
+<p>When you insert a record using the holding pen mode such as in the following
+example:
+
+<blockquote>
+<pre>
+$ bibupload -o file.xml
+</pre>
+</blockquote>
+
+the records are not actually integrated into the database, but are instead put
+into an intermediate space called holding pen, where authorized curators can
+review them, manipulate them and eventually approve them.</p>
+
+<p>The holding pen is integrated with <a href="/help/admin/bibedit-admin-guide" alt="BibEdit">BibEdit</a>.</p>
+
+<a name="3.3"></a><h3>3.3 Updating existing records</h3>
 
 <p>When you want to update existing records, with the new content from
 your input MARCXML file, then your input file should contain either
@@ -174,7 +195,7 @@ input file should contain record ID in the 001 tag and the title in
 
 <p>If you combine the <code>--pretend</code> parameter with the above updating modes you can actually test what would be executed without modifying the database or altering the system status.</p>
 
-<a name="3.3"></a><h3>3.3 Inserting and updating at the same time</h3>
+<a name="3.4"></a><h3>3.4 Inserting and updating at the same time</h3>
 
 <p>Note that the insert/update modes can be combined together.  For
 example, if you have a file that contains a mixture of new records
@@ -190,7 +211,7 @@ In this case BibUpload will try to do an update (for records having
 either 001 or 970 identifiers), or an insert (for the other ones).
 </p>
 
-<a name="3.4"></a><h3>3.4 Updating preformatted output formats</h3>
+<a name="3.5"></a><h3>3.5 Updating preformatted output formats</h3>
 
 <p>BibFormat can use this special upload mode during which metadata will
 not be updated, only the preformatted output formats for records:
@@ -204,7 +225,7 @@ This is useful for <code>bibreformat</code> daemon only; human
 administrators don't need to explicitly know about this mode.
 </p>
 
-<a name="3.5"></a><h3>3.5 Uploading fulltext files</h3>
+<a name="3.6"></a><h3>3.6 Uploading fulltext files</h3>
 
 <p>The fulltext files can be uploaded and revised via a special FFT
 ("fulltext file transfer") tag with the following
@@ -212,15 +233,16 @@ semantic:
 
 <pre>
     FFT $a  ...  location of the docfile to upload (a filesystem path or a URL)
-        $n  ...  docfile name (optional; if not set, deduced from $a)
-        $m  ...  new desired docfile name (optional; used for renaming files)
-        $t  ...  docfile type (e.g. Main, Additional)
         $d  ...  docfile description (optional)
         $f  ...  format (optional; if not set, deduced from $a)
-        $z  ...  comment (optional)
+        $m  ...  new desired docfile name (optional; used for renaming files)
+        $n  ...  docfile name (optional; if not set, deduced from $a)
+        $o  ...  flag (repeatable subfield)
         $r  ...  restriction (optional, see below)
+        $t  ...  docfile type (e.g. Main, Additional)
         $v  ...  version (used only with REVERT and DELETE-FILE, see below)
         $x  ...  url/path for an icon (optional)
+        $z  ...  comment (optional)
 </pre>
 </p>
 
@@ -371,6 +393,22 @@ will be authorized (that is exactly like setting $r to <tt>example</tt>).</li>
 </ul>
 Note, that authors (as defined in the record MARC) and superadmin are always
 authorized to access a document, no matter what is the given value of the status.
+</p>
+
+<p>Some special flags might be set via FFT and associated with the current
+document by using the $o subfield. This feature is experimental. Currently only
+two flags are actively considered:
+    <ul>
+        <li><strong>HIDDEN</strong>: used to specify that the file that is
+        currently added (via revision or append) must be hidden, i.e. must
+        not be visible to the world but only known by the system (e.g. to
+        allow for fulltext indexing). This flag is permanently associated
+        with the specific revision and format of the file being added.</li>
+        <li><strong>PERFORM_HIDE_PREVIOUS</strong>: used to specify that, although
+        the current file should be visible (unless the HIDDEN flag is also
+        specified), any other previous revision of the document should receive
+        the HIDDEN flag, and should thus be hidden to the world.</li>
+    </ul>
 </p>
 
 <p>Note that each time bibupload is called on a record, the 8564 tags
