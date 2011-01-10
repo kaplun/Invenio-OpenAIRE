@@ -326,5 +326,17 @@ var YtSettings = { tplurl: '%(portalurl)s/templates/yoo_level', color: 'openaire
     </div>
   <script type="text/javascript" src="/js/awstats_misc_tracker.js"></script>
   <noscript><img src="/js/awstats_misc_tracker.js?nojs=y" height=0 width=0 border=0 style="display: none"></noscript>
+    <!-- Piwik -->
+    <script type="text/javascript">
+    var pkBaseURL = (("https:" == document.location.protocol) ? "https://gronik.icm.edu.pl/piwik/" : "http://gronik.icm.edu.pl/piwik/");
+    document.write(unescape("%%3Cscript src='" + pkBaseURL + "piwik.js' type='text/javascript'%%3E%%3C/script%%3E"));
+    </script><script type="text/javascript">
+    try {
+    var piwikTracker = Piwik.getTracker(pkBaseURL + "piwik.php", 1);
+    piwikTracker.trackPageView();
+    piwikTracker.enableLinkTracking();
+    } catch( err ) {}
+    </script><noscript><p><img src="http://gronik.icm.edu.pl/piwik/piwik.php?idsite=1" style="border:0" alt="" /></p></noscript>
+    <!-- End Piwik Tag -->
   </body>
 </html>
