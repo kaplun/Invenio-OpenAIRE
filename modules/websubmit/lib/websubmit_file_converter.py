@@ -28,6 +28,10 @@ import shutil
 import tempfile
 import HTMLParser
 import time
+import subprocess
+import atexit
+import signal
+import threading
 
 from logging import DEBUG, getLogger
 from htmlentitydefs import entitydefs
@@ -451,6 +455,48 @@ def check_openoffice_tmpdir():
     except:
         raise InvenioWebSubmitFileConverterError("%s can't be properly written by OpenOffice.org or read by Apache" % CFG_OPENOFFICE_TMPDIR)
 
+try:
+    _UNOCONV_DAEMON
+except NameError:
+    _UNOCONV_DAEMON = None
+
+_UNOCONV_DAEMON_LOCK = threading.Lock()
+
+def _register_unoconv():
+    global _UNOCONV_DAEMON
+    if CFG_OPENOFFICE_SERVER_HOST != 'localhost':
+        return
+    _UNOCONV_DAEMON_LOCK.acquire()
+    try:
+        if not _UNOCONV_DAEMON:
+            _UNOCONV_DAEMON = subprocess.Popen(['sudo', '-u', CFG_OPENOFFICE_USER, 'HOME=%s' % CFG_OPENOFFICE_TMPDIR, CFG_PATH_OPENOFFICE_PYTHON, os.path.join(CFG_PYLIBDIR, 'invenio', 'unoconv.py'), '-s', CFG_OPENOFFICE_SERVER_HOST, '-p', str(CFG_OPENOFFICE_SERVER_PORT), '-l'])
+            time.sleep(3)
+    finally:
+        _UNOCONV_DAEMON_LOCK.release()
+
+@atexit.register
+def _unregister_unoconv():
+    global _UNOCONV_DAEMON
+    if CFG_OPENOFFICE_SERVER_HOST != 'localhost':
+        return
+    _UNOCONV_DAEMON_LOCK.acquire()
+    try:
+        if _UNOCONV_DAEMON:
+            pid = _UNOCONV_DAEMON.pid
+            if pid:
+                pgid = os.getpgid(pid)
+            if pid and pgid:
+                ## We need to kill unoconv in this awkward way because it is running as CFG_OPENOFFICE_USER, and only
+                ## python should be authorized (on behalf of Apache) to run as CFG_OPENOFFICE_USER
+                old_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
+                try:
+                    subprocess.call(['sudo', '-u', CFG_OPENOFFICE_USER, CFG_PATH_OPENOFFICE_PYTHON, '-c', 'import os, time; os.killpg(%s, %s)' % (pgid, signal.SIGINT)])
+                finally:
+                    signal.signal(signal.SIGINT, old_sigint)
+            _UNOCONV_DAEMON.wait()
+            _UNOCONV_DAEMON = None
+    finally:
+        _UNOCONV_DAEMON_LOCK.release()
 
 def unoconv(input_file, output_file=None, output_format='txt', pdfopt=True, **dummy):
     """Use unconv to convert among OpenOffice understood documents."""
@@ -461,6 +507,7 @@ def unoconv(input_file, output_file=None, output_format='txt', pdfopt=True, **du
         register_exception(alert_admin=True, prefix='ERROR: it\'s impossible to properly execute OpenOffice.org conversions: %s' % err)
         raise
 
+    _register_unoconv()
     input_file, output_file, dummy = prepare_io(input_file, output_file, output_format, need_working_dir=False)
     if output_format == 'txt':
         unoconv_format = 'text'
