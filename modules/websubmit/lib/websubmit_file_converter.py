@@ -1080,8 +1080,9 @@ def execute_command(*args, **argd):
     args = [str(arg) for arg in args]
     res, stdout, stderr = run_process_with_timeout(args, cwd=argd.get('cwd'), filename_out=argd.get('filename_out'), filename_err=argd.get('filename_err'))
     if res != 0:
-        get_file_converter_logger().error("Error when executing %s" % (args, ))
-        raise InvenioWebSubmitFileConverterError("Error in running %s\n stdout:\n%s\nstderr:\n%s\n" % (args, stdout, stderr))
+        message = "ERROR: Error in running %s\n stdout:\n%s\nstderr:\n%s\n" % (args, stdout, stderr)
+        get_file_converter_logger().error(message)
+        raise InvenioWebSubmitFileConverterError(message)
     return stdout
 
 
@@ -1090,8 +1091,9 @@ def execute_command_with_stderr(*args, **argd):
     get_file_converter_logger().debug("Executing: %s" % (args, ))
     res, stdout, stderr = run_process_with_timeout(args, cwd=argd.get('cwd'), filename_out=argd.get('filename_out'))
     if res != 0:
-        get_file_converter_logger().error("Error when executing %s" % (args, ))
-        raise InvenioWebSubmitFileConverterError("Error in running %s\n stdout:\n%s\nstderr:\n%s\n" % (args, stdout, stderr))
+        message = "ERROR: Error in running %s\n stdout:\n%s\nstderr:\n%s\n" % (args, stdout, stderr)
+        get_file_converter_logger().error(message)
+        raise InvenioWebSubmitFileConverterError(message)
     return stdout, stderr
 
 __CONVERSION_MAP = get_conversion_map()
