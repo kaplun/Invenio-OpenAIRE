@@ -488,11 +488,7 @@ def _unregister_unoconv():
             if pid and pgid:
                 ## We need to kill unoconv in this awkward way because it is running as CFG_OPENOFFICE_USER, and only
                 ## python should be authorized (on behalf of Apache) to run as CFG_OPENOFFICE_USER
-                old_sigint = signal.signal(signal.SIGINT, signal.SIG_IGN)
-                try:
-                    subprocess.call(['sudo', '-u', CFG_OPENOFFICE_USER, CFG_PATH_OPENOFFICE_PYTHON, '-c', 'import os, time; os.killpg(%s, %s)' % (pgid, signal.SIGINT)])
-                finally:
-                    signal.signal(signal.SIGINT, old_sigint)
+                subprocess.call(['sudo', '-u', CFG_OPENOFFICE_USER, CFG_PATH_OPENOFFICE_PYTHON, '-c', 'import os; os.killpg(%s, %s)' % (pgid, signal.SIGINT)])
             _UNOCONV_DAEMON.wait()
             _UNOCONV_DAEMON = None
     finally:

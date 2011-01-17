@@ -775,6 +775,11 @@ def main():
     global convertor, exitcode
     convertor = None
 
+    ### BEG Invenio customizations
+    ## This is so we can kill by using gpid so that we can kill unoconv,
+    ## and the corresponding OpenOffice.
+    os.setpgrp()
+    ### END Invenio customizations
     try:
         if op.listener:
             listener = Listener()
