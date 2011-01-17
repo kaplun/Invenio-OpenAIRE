@@ -520,6 +520,9 @@ def unoconv(input_file, output_file=None, output_format='txt', pdfopt=True, **du
         tmpoutputfile = tempfile.mktemp(dir=CFG_OPENOFFICE_TMPDIR, suffix=normalize_format(output_format))
         execute_command('sudo', '-u', CFG_OPENOFFICE_USER, 'HOME=%s' % CFG_OPENOFFICE_TMPDIR, CFG_PATH_OPENOFFICE_PYTHON, os.path.join(CFG_PYLIBDIR, 'invenio', 'unoconv.py'), '-v', '-s', CFG_OPENOFFICE_SERVER_HOST, '-p', CFG_OPENOFFICE_SERVER_PORT, '--output', tmpoutputfile, '-f', unoconv_format, tmpinputfile)
     except InvenioWebSubmitFileConverterError:
+        ## Ok maybe OpenOffice hanged. Let's better kill it and restarted!
+        _unregister_unoconv()
+        _register_unoconv()
         time.sleep(5)
         try:
             execute_command('sudo', '-u', CFG_OPENOFFICE_USER, 'HOME=%s' % CFG_OPENOFFICE_TMPDIR, CFG_PATH_OPENOFFICE_PYTHON, os.path.join(CFG_PYLIBDIR, 'invenio', 'unoconv.py'), '-v', '-s', CFG_OPENOFFICE_SERVER_HOST, '-p', CFG_OPENOFFICE_SERVER_PORT, '--output', tmpoutputfile, '-f', unoconv_format, tmpinputfile)
