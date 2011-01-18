@@ -53,7 +53,8 @@ from invenio.urlutils import make_canonical_urlargd, redirect_to_url
 from invenio.messages import gettext_set_language
 from invenio.search_engine import \
      guess_primary_collection_of_a_record, get_colID, record_exists, \
-     create_navtrail_links, check_user_can_view_record, record_empty
+     create_navtrail_links, check_user_can_view_record, record_empty, \
+     get_fieldvalues
 from invenio.bibdocfile import BibRecDocs, normalize_format, file_strip_ext, \
     stream_restricted_icon, BibDoc, InvenioWebSubmitFileError, stream_file, \
     decompose_file, propose_next_docname, get_subformat_from_format
@@ -125,6 +126,20 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                 return page_not_authorized(req, "../", \
                     text = auth_message)
 
+            if args['external']:
+                ## Let's handle redirections to external URLs
+                external_url = args['external']
+                urls = get_fieldvalues(self.recid, '8564_u')
+                if external_url in urls:
+                    ip_address = str(req.remote_ip)
+                    run_sql("INSERT INTO rnkDOWNLOADS "
+                        "(id_bibrec,id_bibdoc,id_user,client_host,download_time) VALUES "
+                        "(%s,0,%s,INET_ATON(%s),NOW())",
+                        (self.recid, uid, ip_address,))
+                    redirect_to_url(req, external_url)
+                else:
+                    msg = "<p>%s</p>" % (_("Requested external URL %s is not referenced by record %s.") % (cgi.escape(external_url), self.recid))
+                    return warningMsg(msg, req, CFG_SITE_NAME, ln)
 
             readonly = CFG_ACCESS_CONTROL_LEVEL_SITE == 1
 

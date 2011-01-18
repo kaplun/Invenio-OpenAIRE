@@ -24,6 +24,7 @@ import re
 from invenio.bibdocfile import BibRecDocs, file_strip_ext
 from invenio.messages import gettext_set_language
 from invenio.config import CFG_SITE_URL, CFG_CERN_SITE
+from invenio.urlutils import create_url
 from cgi import escape
 from urlparse import urlparse
 from os.path import basename
@@ -246,12 +247,12 @@ def get_files(bfo, distinguish_main_and_additional_files=True):
                                   {'format': file_format,
                                    'category': url_params_dict['categ'],
                                    'id': url_params_dict['id']}
-                            parsed_urls['others_urls'].append((url, "%s/%s %s" % \
+                            parsed_urls['others_urls'].append((serve_external_url_through_invenio(bfo.recID, url), "%s/%s %s" % \
                                                                (url_params_dict['categ'],
                                                                 url_params_dict['id'],
                                                                 label)))
                 else:
-                    parsed_urls['others_urls'].append((url, descr)) # external url
+                    parsed_urls['others_urls'].append((serve_external_url_through_invenio(bfo.recID, url), descr)) # external url
             else: # It's a bibdoc!
                 assigned = False
                 for doc in bibarchive.list_bibdocs():
@@ -276,7 +277,7 @@ def get_files(bfo, distinguish_main_and_additional_files=True):
                 if not assigned: # Url is not a bibdoc :-S
                     if not descr:
                         descr = filename
-                    parsed_urls['others_urls'].append((url, descr)) # Let's put it in a general other url
+                    parsed_urls['others_urls'].append((serve_external_url_through_invenio(bfo.recID, url), descr)) # Let's put it in a general other url
 
     return (parsed_urls, old_versions, additionals)
 
@@ -285,3 +286,10 @@ def sort_alphanumerically(elements):
     elements = [([not token.isdigit() and token or int(token) for token in _RE_SPLIT.findall(element)], element) for element in elements]
     elements.sort()
     return [element[1] for element in elements]
+
+def serve_external_url_through_invenio(recid, externalurl):
+    """
+    @return: a URL that, if followed will serve the C{externalurl}
+        via Invenio thus logging the download to the corresponding C{recid}
+    """
+    return create_url("%s/record/%s/files/" % (CFG_SITE_URL, recid), {'external': externalurl})

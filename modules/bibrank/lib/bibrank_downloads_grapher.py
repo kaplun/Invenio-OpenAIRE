@@ -57,6 +57,7 @@ def create_download_history_graph_and_box(id_bibrec, ln=CFG_SITE_LANG):
         id_bibdocs = intbitset(run_sql("select distinct id_bibdoc from rnkDOWNLOADS where id_bibrec=%s", (id_bibrec, )))
 
         id_existing_bibdocs = intbitset(run_sql("SELECT id_bibdoc FROM bibrec_bibdoc JOIN bibdoc ON id_bibdoc=id WHERE id_bibrec=%s AND status<>'DELETED'", (id_bibrec, )))
+        id_existing_bibdocs.add(0) ## 0 is an alias for external URLs
 
         ## FIXME: when bibdocs are deleted we loose the stats. What shall we do with them?
         id_bibdocs &= id_existing_bibdocs

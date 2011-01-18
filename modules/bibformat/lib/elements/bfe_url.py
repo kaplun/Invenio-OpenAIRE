@@ -20,6 +20,11 @@
 """
 __revision__ = "$Id$"
 
+import cgi
+
+from invenio.bibdocfile import bibdocfile_url_p
+from invenio.bibformat_elements.bfe_fulltext import serve_external_url_through_invenio
+
 def format_element(bfo, style, separator='; '):
     """
     This is the default format for formatting full-text URLs.
@@ -31,9 +36,20 @@ def format_element(bfo, style, separator='; '):
     if style != "":
         style = 'class="'+style+'"'
 
-    urls = ['<a '+ style + \
-            'href="' + url + '">' + url +'</a>'
-            for url in urls_u]
+    if not bibdocfile_url_p(url):
+        final_url = serve_external_url_through_invenio(url)
+    else:
+        final_url = url
+
+    urls = []
+
+    for url in urls_u:
+        if not bibdocfile_url_p(url):
+            final_url = serve_external_url_through_invenio(url)
+        else:
+            final_url = url
+        urls.append('<a '+ style + \
+            'href="' + cgi.escape(final_url, True) + '">' + cgi.escape(url) +'</a>')
     return separator.join(urls)
 
 def escape_values(bfo):
