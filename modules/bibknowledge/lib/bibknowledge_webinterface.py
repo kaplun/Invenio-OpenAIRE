@@ -94,7 +94,6 @@ class WebInterfaceBibKnowledgePages(WebInterfaceDirectory):
         #check if this is "export"
         if self.extrapath == "export":
             return bibknowledgeadmin.kb_export(req, kbname=kbname, format=format, ln=ln, searchvalue=term, limit=limit)
-s
         #first check if this is a specific action
         if action == "new":
             return bibknowledgeadmin.kb_add(req, kbtype=kbtype, sortby=sortby, ln=ln)
