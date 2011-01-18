@@ -2,7 +2,7 @@
 ## $Id: bfe_webjournal_widget_whatsNew.py,v 1.24 2009/01/27 07:25:12 jerome Exp $
 ##
 ## This file is part of Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2009, 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -104,11 +104,10 @@ def format_element(bfo, latest_issue_only='yes', newest_articles_only='yes',
                 whats_new_articles[category] = {}
 
     # 2. Build the HTML
-    html_out = u''
-    html_out += _get_breaking_news(ln, journal_name)
+    html_out = _get_breaking_news(ln, journal_name)
     for category in journal_categories:
         articles_in_category = whats_new_articles[category]
-        html_articles_in_category = u""
+        html_articles_in_category = ""
         # Generate the list of articles in this category
         order_numbers = articles_in_category.keys()
         order_numbers.sort()
@@ -133,7 +132,7 @@ def format_element(bfo, latest_issue_only='yes', newest_articles_only='yes',
                     except:
                         continue
                 try:
-                    html_articles_in_category += u'<li><a href="%s">%s</a></li>' % \
+                    html_articles_in_category += '<li><a href="%s">%s</a></li>' % \
                                                  (link, title)
                 except:
                     pass

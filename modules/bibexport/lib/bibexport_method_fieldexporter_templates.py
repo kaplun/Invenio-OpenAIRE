@@ -4,7 +4,7 @@
 ## handles rendering of webmessage module
 ##
 ## This file is part of Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2009, 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -660,7 +660,7 @@ function SetAllCheckBoxes(FormName, FieldName, CheckValue)
 
     def _get_frequency_text(self, frequency, language = CFG_SITE_LANG):
         """
-        Returns text representation of the frequency: Manualy, Daily, Weekly, Monthly
+        Returns text representation of the frequency: Manually, Daily, Weekly, Monthly
 
         @param frequency: integer containg the number of hours between every execution.
 
@@ -669,7 +669,7 @@ function SetAllCheckBoxes(FormName, FieldName, CheckValue)
         _ = gettext_set_language(language)
 
         if 0 == frequency:
-            frequency_text = _("Manualy")
+            frequency_text = _("Manually")
         elif 24 == frequency:
             frequency_text = _("Daily")
         elif 168 == frequency:

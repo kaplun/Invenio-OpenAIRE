@@ -1,4 +1,4 @@
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2009, 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -36,11 +36,12 @@ base class.
 
 __revision__ = "$Id"
 
+import cgi
 from invenio import search_engine
 from invenio import bibrecord
 from invenio import bibformat
 
-from invenio.config import CFG_TMPDIR, CFG_BIBEDITMULTI_LIMIT_INSTANT_PROCESSING,\
+from invenio.config import CFG_TMPSHAREDDIR, CFG_BIBEDITMULTI_LIMIT_INSTANT_PROCESSING,\
                            CFG_BIBEDITMULTI_LIMIT_DELAYED_PROCESSING,\
                            CFG_BIBEDITMULTI_LIMIT_DELAYED_PROCESSING_TIME
 from time import strftime
@@ -354,7 +355,7 @@ def _get_formated_record(record_id, output_format, update_commands, language, ou
 
     if "hm" == output_format:
         result = "<pre>\n"
-        marc_record = _create_marc(xml_record)
+        marc_record = cgi.escape(_create_marc(xml_record))
         if "All tags" not in outputTags or not outputTags:
             for line in marc_record.split('\n')[:-1]:
                 for tag in outputTags:
@@ -480,7 +481,7 @@ def _get_file_path_for_bibupload():
     """Returns file path for saving a file for bibupload """
 
     current_time = strftime("%Y%m%d%H%M%S")
-    return "%s/%s_%s%s" % (CFG_TMPDIR, "multiedit_", current_time, ".xml")
+    return "%s/%s_%s%s" % (CFG_TMPSHAREDDIR, "multiedit", current_time, ".xml")
 
 def _save_records_xml(records, file_path, upload_mode, tag_list):
     """Saves records in a file in XML format

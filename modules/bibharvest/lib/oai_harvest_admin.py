@@ -1,6 +1,6 @@
 ## Administrator interface for BibIndex
 ## This file is part of Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2009, 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -1129,7 +1129,7 @@ def perform_request_viewhprecord(hpupdate_id, ln = CFG_SITE_LANG, confirm=0):
         hp_label = bibharvest_templates.tmpl_print_brs(ln, 2) + "Holdingpen version of record"\
             + bibharvest_templates.tmpl_print_brs(ln, 1)
     except:
-        return _("Error when formatting the Holding Pen entry. Probably it's content is broken")
+        return _("Error when formatting the Holding Pen entry. Probably its content is broken")
     submit_link = create_html_link(urlbase=oai_harvest_admin_url + \
                                        "/accepthprecord",
                                    urlargd={'ln': ln,

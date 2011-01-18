@@ -1,5 +1,5 @@
 ## This file is part of Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2009, 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -38,9 +38,9 @@ class Template(DefaultTemplate):
 
         tickets = bibcatalog_system.ticket_search(uid, owner=uid) #get ticket id's
         lines = "" #put result here
-        iter = 1
+        i = 1
 
-        lines += _("You have ")+str(len(tickets))+" "+_("tickets")+".<br/>"
+        lines += (_("You have %i tickets.") % len(tickets)) + "<br/>"
 
         #make a prev link if needed
         if (start > 1):
@@ -52,7 +52,7 @@ class Template(DefaultTemplate):
         lastshown = len(tickets) #what was the number of the last shown ticket?
         for ticket in tickets:
             #get info and show only for those that within the show range
-            if (iter >= start) and (iter < start+self.SHOW_MAX_TICKETS):
+            if (i >= start) and (i < start+self.SHOW_MAX_TICKETS):
                 ticket_info = bibcatalog_system.ticket_get_info(uid, ticket)
                 subject = ticket_info['subject']
                 status = ticket_info['status']
@@ -62,8 +62,8 @@ class Template(DefaultTemplate):
                 display = '<a href="'+ticket_info['url_display']+'">'+_("show")+'</a>'
                 close = '<a href="'+ticket_info['url_close']+'">'+_("close")+'</a>'
                 lines += "<tr><td>"+str(ticket)+"</td><td>"+subject+" "+text+"</td><td>"+status+"</td><td>"+display+"</td><td>"+close+"</td></tr>\n"
-                lastshown = iter
-            iter = iter+1
+                lastshown = i
+            i = i+1
         lines += "</table>"
 
         #make next link if needed

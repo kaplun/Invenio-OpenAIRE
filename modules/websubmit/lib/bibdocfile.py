@@ -1,5 +1,5 @@
 ## This file is part of Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2007, 2008, 2009, 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -103,7 +103,7 @@ from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, \
     CFG_WEBSUBMIT_ADDITIONAL_KNOWN_FILE_EXTENSIONS, \
     CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT, CFG_SITE_SECURE_URL, \
     CFG_BIBUPLOAD_FFT_ALLOWED_LOCAL_PATHS, \
-    CFG_TMPDIR, CFG_PATH_MD5SUM, \
+    CFG_TMPDIR, CFG_TMPSHAREDDIR, CFG_PATH_MD5SUM, \
     CFG_WEBSUBMIT_STORAGEDIR, \
     CFG_BIBDOCFILE_USE_XSENDFILE, \
     CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY
@@ -3375,7 +3375,7 @@ def check_valid_url(url):
             path = urllib2.urlparse.urlsplit(urllib.unquote(url))[2]
             if os.path.abspath(path) != path:
                 raise StandardError, "%s is not a normalized path (would be %s)." % (path, os.path.normpath(path))
-            for allowed_path in CFG_BIBUPLOAD_FFT_ALLOWED_LOCAL_PATHS + [CFG_TMPDIR, CFG_WEBSUBMIT_STORAGEDIR]:
+            for allowed_path in CFG_BIBUPLOAD_FFT_ALLOWED_LOCAL_PATHS + [CFG_TMPDIR, CFG_TMPSHAREDDIR, CFG_WEBSUBMIT_STORAGEDIR]:
                 if path.startswith(allowed_path):
                     dummy_fd = open(path)
                     dummy_fd.close()
@@ -3414,7 +3414,7 @@ def download_url(url, format=None, sleep=2):
                 path = urllib2.urlparse.urlsplit(urllib.unquote(url))[2]
                 if os.path.abspath(path) != path:
                     raise StandardError, "%s is not a normalized path (would be %s)." % (path, os.path.normpath(path))
-                for allowed_path in CFG_BIBUPLOAD_FFT_ALLOWED_LOCAL_PATHS + [CFG_TMPDIR, CFG_WEBSUBMIT_STORAGEDIR]:
+                for allowed_path in CFG_BIBUPLOAD_FFT_ALLOWED_LOCAL_PATHS + [CFG_TMPDIR, CFG_TMPSHAREDDIR, CFG_WEBSUBMIT_STORAGEDIR]:
                     if path.startswith(allowed_path):
                         shutil.copy(path, tmppath)
                         if os.path.getsize(tmppath) > 0:

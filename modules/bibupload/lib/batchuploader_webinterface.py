@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 ##
 ## This file is part of Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -102,7 +102,8 @@ def user_authorization(req, ln):
         auth_code, auth_message = acc_authorize_action(req, 'runbatchuploader')
         if auth_code != 0:
             referer = '/batchuploader/'
-            error_msg = _("The user '%s' is not authorized to run batchuploader" % (user_info['nickname']))
+            error_msg = _("The user '%s' is not authorized to run batchuploader" % \
+                          (cgi.escape(user_info['nickname'])))
             return page_not_authorized(req=req, referer=referer,
                                        text=error_msg, navmenuid="batchuploader")
 
@@ -295,8 +296,8 @@ class WebInterfaceBatchUploaderPages(WebInterfaceDirectory):
         else:
             uid = getUid(req)
             body = batchuploader_templates.tmpl_display_menu(argd['ln'])
-            body += batchuploader_templates.tmpl_upload_succesful(argd['ln'])
-            title = _("Upload succesful")
+            body += batchuploader_templates.tmpl_upload_successful(argd['ln'])
+            title = _("Upload successful")
             navtrail = '''<a class="navtrail" href="%s/batchuploader/metadata">%s</a>''' % \
                             (CFG_SITE_URL, _("Metadata batch upload"))
             return page(title = title,

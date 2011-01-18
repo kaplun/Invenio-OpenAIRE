@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 ## This file is part of Invenio.
-## Copyright (C) 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 CERN.
+## Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011 CERN.
 ##
 ## Invenio is free software; you can redistribute it and/or
 ## modify it under the terms of the GNU General Public License as
@@ -187,21 +187,21 @@ try:
     from invenio.bibknowledge_webinterface import WebInterfaceBibKnowledgePages
 except:
     register_exception(alert_admin=True, subject='EMERGENCY')
-    WebInterfaceBibKnowedgePages = WebInterfaceDumbPages
+    WebInterfaceBibKnowledgePages = WebInterfaceDumbPages
 
 try:
     from invenio.batchuploader_webinterface import \
          WebInterfaceBatchUploaderPages
 except:
     register_exception(alert_admin=True, subject='EMERGENCY')
-    WebInterfaceDocumentationPages = WebInterfaceDumbPages
+    WebInterfaceBatchUploaderPages = WebInterfaceDumbPages
 
 try:
     from invenio.bibsword_webinterface import \
          WebInterfaceSword
 except:
     register_exception(alert_admin=True, subject='EMERGENCE')
-    WebInterfaceDocumentationPage = WebInterfaceDumbPages
+    WebInterfaceSword = WebInterfaceDumbPages
 
 if CFG_OPENAIRE_SITE:
     try:
