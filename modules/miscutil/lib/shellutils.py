@@ -239,6 +239,7 @@ def run_process_with_timeout(args, filename_in=None, filename_out=None, filename
         the_process.kill(signal.SIGTERM)
         time.sleep(1)
         the_process.kill(signal.SIGKILL)
+        the_process.wait()
         raise
 
 def escape_shell_arg(shell_arg):

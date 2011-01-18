@@ -59,19 +59,22 @@ CFG_WEBSUBMIT_BEST_FORMATS_TO_EXTRACT_TEXT_FROM = ('txt', 'html', 'xml', 'odt', 
 ## a format and as values the corresponding list of desired converted
 ## formats.
 CFG_WEBSUBMIT_DESIRED_CONVERSIONS = {
-    'pdf' : ('ps.gz', ),
+    'pdf' : ('ps.gz', 'pdf;pdfa'),
     'ps.gz' : ('pdf;pdfa', ),
     'djvu' : ('ps.gz', 'pdf'),
+    'sxw': ('doc', 'odt', 'pdf;pdfa', 'ps.gz'),
     'docx' : ('doc', 'odt', 'pdf;pdfa', 'ps.gz'),
-    'doc' : ('odt', 'pdf;pdfa', 'ps.gz'),
+    'doc' : ('odt', 'pdf;pdfa', 'ps.gz', 'docx'),
     'rtf' : ('pdf;pdfa', 'odt', 'ps.gz'),
     'odt' : ('pdf;pdfa', 'doc', 'ps.gz'),
     'pptx' : ('ppt', 'odp', 'pdf;pdfa', 'ps.gz'),
-    'ppt' : ('odp', 'pdf;pdfa', 'ps.gz'),
+    'ppt' : ('odp', 'pdf;pdfa', 'ps.gz', 'pptx'),
+    'sxi': ('odp', 'pdf;pdfa', 'ps.gz'),
     'odp' : ('pdf;pdfa', 'ppt', 'ps.gz'),
     'xlsx' : ('xls', 'ods', 'csv'),
     'xls' : ('ods', 'csv'),
-    'ods' : ('xls', 'csv'),
+    'ods' : ('xls', 'xlsx', 'csv'),
+    'sxc': ('xls', 'xlsx', 'csv'),
     'tiff' : ('pdf;pdfa', 'ps.gz'),
     'tif' : ('pdf;pdfa', 'ps.gz')
 }

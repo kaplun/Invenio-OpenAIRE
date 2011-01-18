@@ -775,6 +775,11 @@ def main():
     global convertor, exitcode
     convertor = None
 
+    ### BEG Invenio customizations
+    ## This is so we can kill by using gpid so that we can kill unoconv,
+    ## and the corresponding OpenOffice.
+    os.setpgrp()
+    ### END Invenio customizations
     try:
         if op.listener:
             listener = Listener()
@@ -806,4 +811,7 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt, e:
         die(6, 'Exiting on user request')
+    except:
+        from invenio.errorlib import register_exception
+        register_exception(alert_admin=True)
     die(exitcode)

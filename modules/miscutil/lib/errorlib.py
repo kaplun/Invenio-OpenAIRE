@@ -175,7 +175,7 @@ def find_all_values_to_hide(local_variables, analyzed_stack=None):
         ret.remove('')
     return ret
 
-def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
+def get_pretty_traceback(req=None, exc_info=None):
     """
     Given an optional request object and an optional exc_info,
     returns a text string representing many details about an exception.
@@ -204,6 +204,7 @@ def get_pretty_traceback(req=None, exc_info=None, force_stack=True):
             client_data = "Error in retrieving " \
                 "contextual information: %s" % err
 
+        ## Let's extract the traceback:
         tracestack_data_stream = StringIO()
         tb = sys.exc_info()[2]
         while 1:
@@ -333,8 +334,7 @@ def get_pretty_notification_info(name, filename, line):
     else:
         return "It is the first time this exception has been seen.\n"
 
-def register_exception(force_stack=False,
-                       stream='error',
+def register_exception(stream='error',
                        req=None,
                        prefix='',
                        suffix='',
@@ -348,8 +348,6 @@ def register_exception(force_stack=False,
     Note:   For sanity reasons, dynamic params such as PREFIX, SUFFIX and
             local stack variables are checked for length, and only first 500
             chars of their values are printed.
-
-    @param force_stack: ignored
 
     @param stream: 'error' or 'warning'
 
