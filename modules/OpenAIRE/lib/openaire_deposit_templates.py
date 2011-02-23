@@ -311,14 +311,30 @@ class Template:
         prepare4js(data)
         return """
             <h3>%(upload_publications)s</h3>
-            <form action="%(site)s/deposit?ln=%(ln)s&style=%(style)s" method="POST">
+            <div id="noFlash">
+                <form action="%(site)s/deposit/?ln=%(ln)s&style=%(style)s&projectid=%(projectid)s" method="POST" enctype="multipart/form-data">
                 <p>%(upload_publications_description)s</p>
-                <input id="fileInput" name="file" type="file" />
-                <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
-                <input type="hidden" value="%(projectid)s" name="projectid" />
-                <input type="hidden" value="%(session)s" name="session" />
-            </form>
+                <input type="file" name="Filedata" />
+                <input type="submit" name="upload" value="%(buttontext)s" />
+                </form>
+            </div>
+            <div id="yesFlash">
+                <form action="%(site)s/deposit/?ln=%(ln)s&style=%(style)s" method="POST">
+                    <p>%(upload_publications_description)s</p>
+                    <input id="fileInput" name="file" type="file" />
+                    <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
+                    <input type="hidden" value="%(projectid)s" name="projectid" />
+                    <input type="hidden" value="%(session)s" name="session" />
+                </form>
+            </div>
             <script type="text/javascript">// <![CDATA[
+                if (swfobject.hasFlashPlayerVersion("9.0.24")) {
+                    $('#noFlash').hide();
+                    $('#yesFlash').show();
+                } else {
+                    $('#noFlash').show();
+                    $('#yesFlash').hide();
+                }
                 $(document).ready(function() {
                     $('#cancel_upload').hide();
                     $('#fileInput').uploadify({
@@ -336,7 +352,7 @@ class Template:
                         'scriptData': {'projectid': '%(js_projectid)s', 'session': '%(js_session)s'},
                         'onAllComplete': function(){
                             $('input.save').trigger('click');
-                            window.location="%(js_site)s/deposit?projectid=%(js_projectid)s&style=%(style)s";
+                            window.location="%(js_site)s/deposit/?projectid=%(js_projectid)s&style=%(style)s";
                         },
                         'onOpen': function(){
                             $('#cancel_upload').show();

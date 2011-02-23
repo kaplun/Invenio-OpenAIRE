@@ -50,7 +50,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
     _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships', 'keywords']
 
     def index(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, -1), 'delete': (str, ''), 'publicationid': (str, ''), 'plus': (int, -1), 'linkproject': (int, -1), 'unlinkproject': (int, -1), 'style': (str, None)})
+        argd = wash_urlargd(form, {'projectid': (int, -1), 'delete': (str, ''), 'publicationid': (str, ''), 'plus': (int, -1), 'linkproject': (int, -1), 'unlinkproject': (int, -1), 'style': (str, None), 'upload': (str, '')})
         _ = gettext_set_language(argd['ln'])
         user_info = collect_user_info(req)
         auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
@@ -83,9 +83,10 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         if projectid not in all_project_ids:
             projectid = -1
         uid = user_info['uid']
-        ## No project selected
-        ## Then let's display all the existing projects for the given user.
-        ## And lets let the user to choose a project.
+        if argd['upload']:
+            if projectid < 0:
+                projectid = 0
+            upload_file(form, uid, projectid)
         projects = [get_project_information(uid, projectid_, deletable=False, ln=argd['ln'], style=style, linked=True) for projectid_ in get_exisiting_projectids_for_uid(user_info['uid']) if projectid_ != projectid]
         if projectid < 0:
             selected_project = None
@@ -121,7 +122,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 if publication.status == 'edited':
                     publication.check_metadata()
                     publication.check_projects()
-                    if 'submit_%s' % publicationid in form and not "".join(out["errors"].values()).strip():
+                    if 'submit_%s' % publicationid in form and not "".join(publication.errors.values()).strip():
                         ## i.e. if the button submit for the corresponding publication has been pressed...
                         publication.upload_record()
                 if publication.status in ('initialized', 'edited'):
