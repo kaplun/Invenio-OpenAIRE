@@ -323,6 +323,7 @@ class Template:
                     $('#cancel_upload').hide();
                     $('#fileInput').uploadify({
                         'uploader'  : '%(js_site)s/flash/uploadify.swf',
+                        'expressInstall' : '%(js_site)s/flash/expressInstall.swf',
                         'script'    : '%(js_site)s/deposit/uploadifybackend',
                         'cancelImg' : '%(js_site)s/img/cancel.png',
                         'auto'      : true,

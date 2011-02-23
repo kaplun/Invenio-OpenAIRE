@@ -17,7 +17,7 @@
 
 flashdir = $(localstatedir)/www/flash
 
-flash_DATA = uploadify.swf
+flash_DATA = uploadify.swf expressInstall.swf
 
 EXTRA_DIST = $(flash_DATA)
 
