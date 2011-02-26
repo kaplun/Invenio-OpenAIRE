@@ -24,7 +24,7 @@ __revision__ = \
 
 from invenio.config import CFG_SITE_NAME, CFG_SITE_URL, CFG_SITE_LANG, \
      CFG_SITE_SECURE_URL, CFG_SITE_SUPPORT_EMAIL, CFG_CERN_SITE, \
-     CFG_OPENAIRE_SITE
+     CFG_OPENAIRE_SITE, CFG_INSPIRE_SITE
 from invenio.messages import gettext_set_language
 
 
@@ -102,8 +102,14 @@ elif CFG_OPENAIRE_SITE:
     CFG_EXTERNAL_AUTH_LOGOUT_SSO = None
     CFG_EXTERNAL_AUTHENTICATION = {
     "Local": None,
-    "OpenAIRE": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=False),
-    "ZOpenAIRE": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=True)
+    "OpenAIRE": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=False, external_id_attribute_name="id"),
+    }
+elif CFG_INSPIRE_SITE:
+    CFG_EXTERNAL_AUTH_DEFAULT = 'arXiv'
+    CFG_EXTERNAL_AUTH_USING_SSO = False
+    CFG_EXTERNAL_AUTH_LOGOUT_SSO = None
+    CFG_EXTERNAL_AUTHENTICATION = {
+        "arXiv": ExternalAuthRobot(enforce_external_nicknames=True, use_zlib=True)
     }
 else:
     CFG_EXTERNAL_AUTH_DEFAULT = 'Local'

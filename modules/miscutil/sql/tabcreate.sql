@@ -2867,6 +2867,16 @@ CREATE TABLE IF NOT EXISTS user (
   KEY nickname (nickname)
 ) ENGINE=MyISAM;
 
+CREATE TABLE IF NOT EXISTS userEXT (
+  id varbinary(255) NOT NULL,
+  method varchar(50) NOT NULL,
+  id_user int(15) unsigned NOT NULL,
+  PRIMARY KEY (id, method),
+  UNIQUE KEY (id_user, method),
+  KEY (id_user)
+) ENGINE=MyISAM;
+
+
 -- tables for usergroups
 
 CREATE TABLE IF NOT EXISTS usergroup (
