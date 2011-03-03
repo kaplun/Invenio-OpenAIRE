@@ -347,6 +347,65 @@ def swap_temporary_reindex_tables(index_id, reindex_prefix="tmp_"):
     run_sql("DROP TABLE old_idxWORD%02dR, old_idxWORD%02dF, old_idxPAIR%02dR, old_idxPAIR%02dF, old_idxPHRASE%02dR, old_idxPHRASE%02dF" % (index_id, index_id, index_id, index_id, index_id, index_id)
     )
 
+def missing_index_tables(index_id, index_type):
+    """
+    Returns True if either the forward or reverse tables are missing for the
+    givend index_id and index_type.
+    """
+    idxf = 'idx%s%02dF' % (index_type, index_id)
+    idxr = 'idx%s%02dR' % (index_type, index_id)
+    res = (idxf, ) not in run_sql("SHOW TABLES LIKE %s", (idxf, )) or (idxr, ) not in run_sql("SHOW TABLES LIKE %s", (idxr, ))
+    if res:
+        write_message("WARNING: %s and/or %s tables are missing" % (idxf, idxr))
+    return res
+
+def create_missing_index_tables(index_id, index_type):
+    """Create missing index tables, in case of upgrade."""
+    write_message("WARNING: Creating new index tables for id %s of type %s" % (index_id, index_type))
+    if index_type == 'WORD':
+        run_sql("""CREATE TABLE IF NOT EXISTS idx%s%02dF (
+                        id mediumint(9) unsigned NOT NULL auto_increment,
+                        term varchar(50) default NULL,
+                        hitlist longblob,
+                        PRIMARY KEY  (id),
+                        UNIQUE KEY term (term)
+                        ) ENGINE=MyISAM""" % (index_type, index_id))
+        run_sql("""CREATE TABLE IF NOT EXISTS idx%s%02dR (
+                        id_bibrec mediumint(9) unsigned NOT NULL,
+                        termlist longblob,
+                        type enum('CURRENT','FUTURE','TEMPORARY') NOT NULL default 'CURRENT',
+                        PRIMARY KEY (id_bibrec,type)
+                        ) ENGINE=MyISAM""" % (index_type, index_id))
+    elif index_type == 'PAIR':
+        run_sql("""CREATE TABLE IF NOT EXISTS idx%s%02dF (
+                        id mediumint(9) unsigned NOT NULL auto_increment,
+                        term varchar(100) default NULL,
+                        hitlist longblob,
+                        PRIMARY KEY  (id),
+                        UNIQUE KEY term (term)
+                        ) ENGINE=MyISAM""" % (index_type, index_id))
+        run_sql("""CREATE TABLE IF NOT EXISTS idx%s%02dR (
+                        id_bibrec mediumint(9) unsigned NOT NULL,
+                        termlist longblob,
+                        type enum('CURRENT','FUTURE','TEMPORARY') NOT NULL default 'CURRENT',
+                        PRIMARY KEY (id_bibrec,type)
+                        ) ENGINE=MyISAM""" % (index_type, index_id))
+    elif index_type == 'PHRASE':
+        run_sql("""CREATE TABLE IF NOT EXISTS idx%s%02dF (
+                        id mediumint(9) unsigned NOT NULL auto_increment,
+                        term text default NULL,
+                        hitlist longblob,
+                        PRIMARY KEY  (id),
+                        KEY term (term(50))
+                        ) ENGINE=MyISAM""" % (index_type, index_id))
+
+        run_sql("""CREATE TABLE IF NOT EXISTS idx%s%02dR (
+                        id_bibrec mediumint(9) unsigned NOT NULL default '0',
+                        termlist longblob,
+                        type enum('CURRENT','FUTURE','TEMPORARY') NOT NULL default 'CURRENT',
+                        PRIMARY KEY  (id_bibrec,type)
+                        ) ENGINE=MyISAM""" % (index_type, index_id))
+
 def init_temporary_reindex_tables(index_id, reindex_prefix="tmp_"):
     """Create reindexing temporary tables."""
     write_message("Creating new tmp index tables for id %s" % index_id)
@@ -1513,6 +1572,9 @@ def task_run_core():
             fnc_get_words_from_phrase = get_author_family_name_words_from_phrase
         else:
             fnc_get_words_from_phrase = get_words_from_phrase
+        first_time_table = missing_index_tables(index_id, 'WORD')
+        if first_time_table:
+            create_missing_index_tables(index_id, 'WORD')
         wordTable = WordTable(index_id=index_id,
                               fields_to_index=index_tags,
                               table_name_pattern=reindex_prefix + 'idxWORD%02dF',
@@ -1552,8 +1614,13 @@ def task_run_core():
                         recIDs_range.append([recID,recID])
                     wordTable.add_recIDs(recIDs_range, task_get_option("flush"))
                     task_sleep_now_if_required(can_stop_too=True)
-                else:
+                elif not first_time_table:
                     wordTable.add_recIDs_by_date(task_get_option("modified"), task_get_option("flush"))
+                    ## here we used to update last_updated info, if run via automatic mode;
+                    ## but do not update here anymore, since idxPHRASE will be acted upon later
+                    task_sleep_now_if_required(can_stop_too=True)
+                else:
+                    wordTable.add_recIDs_by_date(("0000-00-00", None), task_get_option("flush"))
                     ## here we used to update last_updated info, if run via automatic mode;
                     ## but do not update here anymore, since idxPHRASE will be acted upon later
                     task_sleep_now_if_required(can_stop_too=True)
@@ -1582,6 +1649,9 @@ def task_run_core():
             fnc_get_pairs_from_phrase = get_pairs_from_phrase # FIXME
         else:
             fnc_get_pairs_from_phrase = get_pairs_from_phrase
+        first_time_table = missing_index_tables(index_id, 'PAIR')
+        if first_time_table:
+            create_missing_index_tables(index_id, 'PAIR')
         wordTable = WordTable(index_id=index_id,
                               fields_to_index=index_tags,
                               table_name_pattern=reindex_prefix + 'idxPAIR%02dF',
@@ -1620,8 +1690,12 @@ def task_run_core():
                         recIDs_range.append([recID,recID])
                     wordTable.add_recIDs(recIDs_range, task_get_option("flush"))
                     task_sleep_now_if_required(can_stop_too=True)
-                else:
+                elif not first_time_table:
                     wordTable.add_recIDs_by_date(task_get_option("modified"), task_get_option("flush"))
+                    # let us update last_updated timestamp info, if run via automatic mode:
+                    task_sleep_now_if_required(can_stop_too=True)
+                else:
+                    wordTable.add_recIDs_by_date(("0000-00-00", None), task_get_option("flush"))
                     # let us update last_updated timestamp info, if run via automatic mode:
                     task_sleep_now_if_required(can_stop_too=True)
             elif task_get_option("cmd") == "repair":
@@ -1650,6 +1724,9 @@ def task_run_core():
             fnc_get_phrases_from_phrase = get_exact_authors_from_phrase
         else:
             fnc_get_phrases_from_phrase = get_phrases_from_phrase
+        first_time_table = missing_index_tables(index_id, 'PHRASE')
+        if first_time_table:
+            create_missing_index_tables(index_id, 'PHRASE')
         wordTable = WordTable(index_id=index_id,
                               fields_to_index=index_tags,
                               table_name_pattern=reindex_prefix + 'idxPHRASE%02dF',
@@ -1688,8 +1765,13 @@ def task_run_core():
                         recIDs_range.append([recID,recID])
                     wordTable.add_recIDs(recIDs_range, task_get_option("flush"))
                     task_sleep_now_if_required(can_stop_too=True)
-                else:
+                elif not first_time_table:
                     wordTable.add_recIDs_by_date(task_get_option("modified"), task_get_option("flush"))
+                    # let us update last_updated timestamp info, if run via automatic mode:
+                    update_index_last_updated(index_id, task_get_task_param('task_starting_time'))
+                    task_sleep_now_if_required(can_stop_too=True)
+                else:
+                    wordTable.add_recIDs_by_date(("0000-00-00", None), task_get_option("flush"))
                     # let us update last_updated timestamp info, if run via automatic mode:
                     update_index_last_updated(index_id, task_get_task_param('task_starting_time'))
                     task_sleep_now_if_required(can_stop_too=True)
