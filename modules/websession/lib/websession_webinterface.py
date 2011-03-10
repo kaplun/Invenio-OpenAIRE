@@ -734,6 +734,9 @@ class WebInterfaceYourAccountPages(WebInterfaceDirectory):
 
             # login successful!
             if args['referer']:
+                ## HACK for OpenAIRE
+                if args['referer'].startswith('https://openaire.cern.ch/deposit'):
+                    args['referer'] = args['referer'].replace('https://openaire.cern.ch/deposit', 'http://openaire.cern.ch/deposit')
                 redirect_to_url(req, args['referer'])
             else:
                 return self.display(req, form)
