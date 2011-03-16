@@ -531,7 +531,7 @@ class Template:
 
         out = ""
         if publication_forms:
-            publication_forms = """<form method="POST" id="publication_forms">
+            publication_forms = """<form method="POST" id="publication_forms" accept-charset="UTF-8">
             <div class="note OpenAIRE">
             <table>
             %(publication_forms)s
