@@ -158,6 +158,29 @@ def bibupload_pending_recids():
             continue
     return ret
 
+def clean_empty_values(record):
+    """Remove empty subfields and empty fields."""
+    res = {}
+    line = 0
+    for tag, old_fields in record.iteritems():
+        if old_fields:
+            new_fields = []
+            for old_field in old_fields:
+                if old_field[3] and old_field[3].strip():
+                    line += 1
+                    new_fields.append((old_field[0], old_field[1], old_field[2], old_field[3].strip(), line))
+                else:
+                    new_subfields = []
+                    for code, value in old_field[0]:
+                        if value.strip():
+                            new_subfields.append((code, value.strip()))
+                    if new_subfields:
+                        line += 1
+                        new_fields.append((new_subfields, old_field[1], old_field[2], old_field[3], line))
+            if new_fields:
+                res[tag] = new_fields
+    return res
+
 ### bibupload engine functions:
 def bibupload(record, opt_tag=None, opt_mode=None,
         opt_stage_to_start_from=1, opt_notimechange=0, oai_rec_id = "", pretend=False):
@@ -271,6 +294,10 @@ def bibupload(record, opt_tag=None, opt_mode=None,
 
         record_deleted_p = True
         write_message("   -Clean bibrec_bibxxx: DONE", verbose=2)
+
+    record = clean_empty_values(record)
+    write_message("    -Clean empty values: DONE", verbose=2)
+
     write_message("   -Stage COMPLETED", verbose=2)
 
     try:
