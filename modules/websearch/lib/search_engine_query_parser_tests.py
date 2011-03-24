@@ -21,6 +21,7 @@
 
 
 import unittest
+import datetime
 
 from invenio import search_engine_query_parser
 
@@ -408,6 +409,12 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         spi_search = 'find a j ellis and (t report or k "cross section")'
         self._compare_searches(inv_search, spi_search)
 
+    def test_find_first_author(self):
+        """SPIRES search syntax - find fa ellis"""
+        inv_search = 'firstauthor:ellis'
+        spi_search = 'find fa ellis'
+        self._compare_searches(inv_search, spi_search)
+
     def test_irn_processing(self):
         """SPIRES search syntax - find irn 1360337 == find irn SPIRES-1360337"""
         # Added for trac-130
@@ -419,6 +426,12 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         # Uncovered corner case: parsing could be broken and also happen to
         # return [] twice.  Unlikely though.
         self.assertEqual(with_result, without_result)
+
+    def test_topcite(self):
+        """SPIRES search syntax - find topcite 50+"""
+        inv_search = "cited:50->999999999"
+        spi_search = "find topcite 50+"
+        self._compare_searches(inv_search, spi_search)
 
     def test_quotes(self):
         """SPIRES search syntax - find t 'compton scattering' and a mele"""
@@ -460,6 +473,12 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         """SPIRES search syntax - find dk "B --> pi pi" """
         spi_search = "find dk \"B --> pi pi\""
         inv_search = "695__a:\"B --> pi pi\""
+        self._compare_searches(inv_search, spi_search)
+
+    def test_journal_section_joining(self):
+        """SPIRES search syntax - journal Phys.Lett, 0903, 024 -> journal:Phys.Lett,0903,024"""
+        spi_search = "find j Phys.Lett, 0903, 024"
+        inv_search = "journal:Phys.Lett,0903,024"
         self._compare_searches(inv_search, spi_search)
 
     def test_distribution_of_search_terms(self):
@@ -571,6 +590,106 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
             inv_search = 'year:1960-06-12->9999'
             self._compare_searches(inv_search, spi_search)
 
+        def test_date_accept_today(self):
+            """SPIRES search syntax - searching by today"""
+            spi_search = "find date today"
+            inv_search = "year:" + datetime.datetime.strftime(datetime.datetime.today(), '%Y-%m-%d')
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_yesterday(self):
+            """SPIRES search syntax - searching by yesterday"""
+            import dateutil.relativedelta
+            spi_search = "find date yesterday"
+            inv_search = "year:" + datetime.datetime.strftime(datetime.datetime.today()+dateutil.relativedelta.relativedelta(days=-1), '%Y-%m-%d')
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_this_month(self):
+            """SPIRES search syntax - searching by this month"""
+            spi_search = "find date this month"
+            inv_search = "year:" + datetime.datetime.strftime(datetime.datetime.today(), '%Y-%m')
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_last_month(self):
+            """SPIRES search syntax - searching by last month"""
+            spi_search = "find date last month"
+            inv_search = "year:" + datetime.datetime.strftime(datetime.datetime.today()\
+                                                +dateutil.relativedelta.relativedelta(months=-1), '%Y-%m')
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_this_week(self):
+            """SPIRES search syntax - searching by this week"""
+            spi_search = "find date this week"
+            inv_search = "year:" + datetime.datetime.strftime(datetime.datetime.today()\
+                         +dateutil.relativedelta.relativedelta(days=-(datetime.datetime.today().isoweekday()%7)), '%Y-%m-%d')
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_last_week(self):
+            """SPIRES search syntax - searching by last week"""
+            spi_search = "find date last week"
+            inv_search = "year:" + datetime.datetime.strftime(datetime.datetime.today()\
+                         +dateutil.relativedelta.relativedelta(days=-(7+(datetime.datetime.today().isoweekday()%7))), '%Y-%m-%d')
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_minus_days(self):
+            """SPIRES search syntax - searching by 2011-01-03 - 2"""
+            spi_search = "find date 2011-01-03 - 2"
+            inv_search = "year:2011-01"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_minus_days_with_month_wrap(self):
+            """SPIRES search syntax - searching by 2011-03-01 - 1"""
+            spi_search = "find date 2011-03-01 - 1"
+            inv_search = "year:2011-02-28"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_minus_days_with_year_wrap(self):
+            """SPIRES search syntax - searching by 2011-01-01 - 1"""
+            spi_search = "find date 2011-01-01 - 1"
+            inv_search = "year:2010-12-31"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_minus_days_with_leapyear_february(self):
+            """SPIRES search syntax - searching by 2008-03-01 - 1"""
+            spi_search = "find date 2008-03-01 - 1"
+            inv_search = "year:2008-02-29"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_minus_many_days(self):
+            """SPIRES search syntax - searching by 2011-02-24 - 946"""
+            spi_search = "find date 2011-02-24 - 946"
+            inv_search = "year:2008-07-23"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_plus_days(self):
+            """SPIRES search syntax - searching by 2011-01-03 + 2"""
+            spi_search = "find date 2011-01-01 + 2"
+            inv_search = "year:2011-01-03"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_plus_days_with_month_wrap(self):
+            """SPIRES search syntax - searching by 2011-03-31 + 2"""
+            spi_search = "find date 2011-03-31 + 2"
+            inv_search = "year:2011-04-02"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_plus_days_with_year_wrap(self):
+            """SPIRES search syntax - searching by 2011-12-31 + 1"""
+            spi_search = "find date 2011-12-31 + 1"
+            inv_search = "year:2012-01"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_plus_days_with_leapyear_february(self):
+            """SPIRES search syntax - searching by 2008-02-29 + 2"""
+            spi_search = "find date 2008-02-28 + 2"
+            inv_search = "year:2008-03"
+            self._compare_searches(inv_search, spi_search)
+
+        def test_date_accept_date_plus_many_days(self):
+            """SPIRES search syntax - searching by 2011-02-24 + 666"""
+            spi_search = "find date 2011-02-24 + 666"
+            inv_search = "year:2012-12-21"
+            self._compare_searches(inv_search, spi_search)
+
     def test_spires_syntax_detected_f(self):
         """SPIRES search syntax - test detection f t p"""
         # trac #261
@@ -599,6 +718,13 @@ class TestSpiresToInvenioSyntaxConverter(unittest.TestCase):
         inv_search = converter.is_applicable("t:p a:c")
         self.assertEqual(inv_search, False)
 
+    def test_spires_keyword_distribution_before_conjunctions(self):
+        """SPIRES search syntax - test find journal phys.lett 0903 024 => journal:phys.lett and journal:0903 and journal:024"""
+        # trac 113
+        converter = search_engine_query_parser.SpiresToInvenioSyntaxConverter()
+        spi_search = 'find journal phys.lett 0903 024'
+        inv_search = '(journal:phys.lett and journal:0903 and journal:024)'
+        self._compare_searches(inv_search, spi_search)
 
 TEST_SUITE = make_test_suite(TestSearchQueryParenthesisedParser,
                              TestSpiresToInvenioSyntaxConverter,

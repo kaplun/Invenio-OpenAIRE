@@ -25,6 +25,8 @@ __revision__ = "$Id$"
 import time
 import math
 import os
+import cgi
+import re
 from datetime import datetime, timedelta
 
 # Invenio imports:
@@ -52,6 +54,7 @@ from invenio.dateutils import convert_datetext_to_dategui, \
                               datetext_default, \
                               convert_datestruct_to_datetext
 from invenio.mailutils import send_email
+from invenio.errorlib import register_exception
 from invenio.messages import wash_language, gettext_set_language
 from invenio.urlutils import wash_url_argument
 from invenio.webcomment_config import CFG_WEBCOMMENT_ACTION_CODE, \
@@ -123,6 +126,22 @@ def perform_request_display_comments_or_remarks(req, recID, display_order='od', 
     (valid, error_body) = check_recID_is_in_range(recID, warnings, ln)
     if not(valid):
         return (error_body, errors, warnings)
+
+    # CERN hack begins: filter out ATLAS comments
+    from invenio.config import CFG_CERN_SITE
+    if CFG_CERN_SITE:
+        restricted_comments_p = False
+        for report_number in  get_fieldvalues(recID, '088__a'):
+            if report_number.startswith("ATL-"):
+                restricted_comments_p = True
+                break
+        if restricted_comments_p:
+            err_code, err_msg = acc_authorize_action(uid, 'viewrestrcoll',
+                                                     collection='ATLAS Communications')
+            if err_code:
+                return (err_msg, errors, warnings)
+    # CERN hack ends
+
     # Query the database and filter results
     user_info = collect_user_info(uid)
     res = query_retrieve_comments_or_remarks(recID, display_order, display_since, reviews, user_info=user_info)
@@ -800,7 +819,19 @@ def query_add_comment_or_remark(reviews=0, recID=0, uid=-1, msg="",
         # would be done without the FCKeditor. That's much better if a
         # reply to a comment is made with a browser that does not
         # support FCKeditor.
-        msg = msg.replace('\n', '').replace('\r', '').replace('<br />', '\n')
+        msg = msg.replace('\n', '').replace('\r', '')
+        msg = re.sub('<br .*?(/>)', '\n', msg)
+        # We clean the quotes that could have been introduced by
+        # FCKeditor when clicking the 'quote' button, as well as those
+        # that we have introduced when quoting the original message
+        msg = re.sub('<blockquote\s*>\s*<div.*?>', '>>', msg)
+        msg = re.sub('</div>\s*</blockquote>', '\n', msg)
+        msg = msg.replace('&nbsp;', ' ')
+        # In case additional <p> or <div> got inserted, interpret
+        # these as new lines (with a sad trick to do it only once)
+        msg = msg.replace('</div><', '</div>\n<')
+        msg = msg.replace('</p><', '</p>\n<')
+
     query = """INSERT INTO cmtRECORDCOMMENT (id_bibrec,
                                            id_user,
                                            body,
@@ -1073,6 +1104,7 @@ def email_subscribers_about_new_comment(recID, reviews, emails1,
 
     washer = EmailWasher()
     msg = washer.wash(msg)
+    msg = msg.replace('&gt;&gt;', '>')
     email_content = msg
     if note:
         email_content = note + email_content
@@ -1191,6 +1223,8 @@ def calculate_start_date(display_since):
             datetext_default is defined in miscutils/lib/dateutils and
             equals 0000-00-00 00:00:00 => MySQL format
             If bad arguement given, will return datetext_default
+            If library 'dateutil' is not found return datetext_default
+            and register exception.
     """
     time_types = {'d':0, 'w':0, 'm':0, 'y':0}
     today = datetime.today()
@@ -1214,16 +1248,17 @@ def calculate_start_date(display_since):
             yesterday = today.replace(year=final_nb_year)
     # month
     elif time_type == 'm':
-        # to convert nb of months in years
-        nb_year = nb / 12                        # nb_year = number of year to substract
-        nb = nb % 12
-        if nb > today.month-1:                    # ex: july(07)-9 months = -1year -3months
-            nb_year += 1
-            nb_month = 12 - (today.month % nb)
-        else:
-            nb_month = today.month - nb
-        final_nb_year = today.year - nb_year      # final_nb_year = number of year to print
-        yesterday = today.replace(year=final_nb_year, month=nb_month)
+        try:
+            from dateutil.relativedelta import relativedelta
+        except ImportError:
+            # The dateutil library is only recommended: if not
+            # available, then send warning about this.
+            register_exception(alert_admin=True)
+            return datetext_default
+        # obtain only the date: yyyy-mm-dd
+        date_today = datetime.now().date()
+        final_date = date_today - relativedelta(months=nb)
+        yesterday = today.replace(year=final_date.year, month=final_date.month, day=final_date.day)
     # week
     elif time_type == 'w':
         delta = timedelta(weeks=nb)
@@ -1378,7 +1413,7 @@ def perform_request_add_comment_or_remark(recID=0,
                                           note=None,
                                           priority=None,
                                           reviews=0,
-                                          comID=-1,
+                                          comID=0,
                                           client_ip_address=None,
                                           editor_type='textarea',
                                           can_attach_files=False,
@@ -1400,7 +1435,7 @@ def perform_request_add_comment_or_remark(recID=0,
     @param note: title of the review
     @param priority: priority of remark (int)
     @param reviews: boolean, if enabled will add a review, if disabled will add a comment
-    @param comID: if replying, this is the comment id of the commetn are replying to
+    @param comID: if replying, this is the comment id of the comment we are replying to
     @param editor_type: the kind of editor/input used for the comment: 'textarea', 'fckeditor'
     @param can_attach_files: if user can attach files to comments or not
     @param subscribe: if True, subscribe user to receive new comments by email
@@ -1460,11 +1495,23 @@ def perform_request_add_comment_or_remark(recID=0,
                         msg = _("%(x_name)s wrote on %(x_date)s:")% {'x_name': user_info[2], 'x_date': date_creation}
                         textual_msg = msg
                         # 1 For FCKeditor input
-                        msg += '<br /><br />'
+                        msg += '\n\n'
                         msg += comment[3]
                         msg = email_quote_txt(text=msg)
-                        msg = email_quoted_txt2html(text=msg)
+                        # Now that we have a text-quoted version, transform into
+                        # something that FCKeditor likes, using <blockquote> that
+                        # do still enable users to insert comments inline
+                        msg = email_quoted_txt2html(text=msg,
+                                                    indent_html=('<blockquote><div>', '&nbsp;</div></blockquote>'),
+                                                    linebreak_html="&nbsp;<br/>",
+                                                    indent_block=False)
+                        # Add some space for users to easily add text
+                        # around the quoted message
                         msg = '<br/>' + msg + '<br/>'
+                        # Due to how things are done, we need to
+                        # escape the whole msg again for the editor
+                        msg = cgi.escape(msg)
+
                         # 2 For textarea input
                         textual_msg += "\n\n"
                         textual_msg += comment[3]
@@ -1558,7 +1605,10 @@ def notify_admin_of_new_comment(comID):
     Title       = %s''' % (star_score, title)
 
     washer = EmailWasher()
-    body = washer.wash(body)
+    try:
+        body = washer.wash(body)
+    except:
+        body = cgi.escape(body)
 
     record_info = webcomment_templates.tmpl_email_new_comment_admin(id_bibrec)
     out = '''

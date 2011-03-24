@@ -40,7 +40,8 @@ from invenio.config import \
      CFG_BIBINDEX_AUTHOR_WORD_INDEX_EXCLUDE_FIRST_NAMES, \
      CFG_CERN_SITE, CFG_INSPIRE_SITE, \
      CFG_BIBINDEX_PERFORM_OCR_ON_DOCNAMES, \
-     CFG_BIBINDEX_SPLASH_PAGES
+     CFG_BIBINDEX_SPLASH_PAGES, \
+     CFG_SOLR_URL
 from invenio.websubmit_config import CFG_WEBSUBMIT_BEST_FORMATS_TO_EXTRACT_TEXT_FROM
 from invenio.bibindex_engine_config import CFG_MAX_MYSQL_THREADS, \
     CFG_MYSQL_THREAD_TIMEOUT, \
@@ -216,6 +217,20 @@ def get_words_from_journal_tag(recID, tag):
     # return list of words and pubinfos:
     return lwords
 
+def get_author_canonical_ids_for_recid(recID):
+    """
+    Return list of author canonical IDs (e.g. `J.Ellis.1') for the
+    given record.  Done by consulting BibAuthorID module.
+    """
+    from invenio.bibauthorid_personid_tables_utils import get_persons_from_recids
+    lwords = []
+    dpersons, dpersoninfos = get_persons_from_recids([recID])
+    for aid in dpersoninfos.keys():
+        author_canonical_id = dpersoninfos[aid].get('canonical_id', '')
+        if author_canonical_id:
+            lwords.append(author_canonical_id)
+    return lwords
+
 def get_words_from_date_tag(datestring, stemming_language=None):
     """
     Special procedure to index words from tags storing date-like
@@ -255,7 +270,12 @@ def get_words_from_fulltext(url_direct_or_indirect, stemming_language=None):
             write_message("... will extract words from %s (docid: %s) %s" % (bibdoc.get_docname(), bibdoc.get_id(), perform_ocr and 'with OCR' or ''), verbose=2)
             if not bibdoc.has_text(require_up_to_date=True):
                 bibdoc.extract_text(perform_ocr=perform_ocr)
-            return get_words_from_phrase(bibdoc.get_text(), stemming_language)
+            if CFG_SOLR_URL:
+                # we are relying on Solr to provide full-text indexing, so do
+                # nothing here (FIXME: dispatch indexing to Solr)
+                return []
+            else:
+                return get_words_from_phrase(bibdoc.get_text(), stemming_language)
         else:
             if CFG_BIBINDEX_FULLTEXT_INDEX_LOCAL_FILES_ONLY:
                 write_message("... %s is external URL but indexing only local files" % url_direct_or_indirect, verbose=2)
@@ -289,7 +309,12 @@ def get_words_from_fulltext(url_direct_or_indirect, stemming_language=None):
                         tmptext = convert_file(tmpdoc, output_format='.txt')
                         text = open(tmptext).read()
                         os.remove(tmptext)
-                        tmpwords = get_words_from_phrase(text, stemming_language)
+                        if CFG_SOLR_URL:
+                            # we are relying on Solr to provide full-text indexing, so do
+                            # nothing here (FIXME: dispatch indexing to Solr)
+                            tmpwords = []
+                        else:
+                            tmpwords = get_words_from_phrase(text, stemming_language)
                         words.update(dict(map(lambda x: (x, 1), tmpwords)))
                     except Exception, e:
                         message = 'ERROR: it\'s impossible to correctly extract words from %s referenced by %s: %s' % (url, url_direct_or_indirect, e)
@@ -542,9 +567,14 @@ def get_author_family_name_words_from_phrase(phrase, stemming_language=None):
     useful for CFG_BIBINDEX_AUTHOR_WORD_INDEX_EXCLUDE_FIRST_NAMES.
     """
     d_family_names = {}
+    # first, treat everything before first comma as surname:
+    if ',' in phrase:
+        d_family_names[phrase.split(',', 1)[0]] = 1
+    # second, try fuzzy author tokenizer to find surname variants:
     for name in get_fuzzy_authors_from_phrase(phrase, stemming_language):
         if ',' in name:
             d_family_names[name.split(',', 1)[0]] = 1
+    # now extract words from these surnames:
     d_family_names_words = {}
     for family_name in d_family_names.keys():
         for word in get_words_from_phrase(family_name, stemming_language):
@@ -728,8 +758,9 @@ def update_index_last_updated(index_id, starting_time=None):
 class WordTable:
     "A class to hold the words table."
 
-    def __init__(self, index_id, fields_to_index, table_name_pattern, default_get_words_fnc, tag_to_words_fnc_map, wash_index_terms=50, is_fulltext_index=False):
+    def __init__(self, index_name, index_id, fields_to_index, table_name_pattern, default_get_words_fnc, tag_to_words_fnc_map, wash_index_terms=50, is_fulltext_index=False):
         """Creates words table instance.
+        @param index_name: the index name
         @param index_id: the index integer identificator
         @param fields_to_index: a list of fields to index
         @param table_name_pattern: i.e. idxWORD%02dF or idxPHRASE%02dF
@@ -740,6 +771,7 @@ class WordTable:
             how many characters do we keep in the index terms; see
             max_char_length parameter of wash_index_term()
         """
+        self.index_name = index_name
         self.index_id = index_id
         self.tablename = table_name_pattern % index_id
         self.recIDs_in_mem = []
@@ -1027,7 +1059,15 @@ class WordTable:
         """Add records from RECID1 to RECID2."""
         wlist = {}
         self.recIDs_in_mem.append([recID1,recID2])
-        # secondly fetch all needed tags:
+        # special case of author indexes where we also add author
+        # canonical IDs:
+        if self.index_name in ('author', 'firstauthor', 'exactauthor'):
+            for recID in range(recID1, recID2 + 1):
+                if not wlist.has_key(recID):
+                    wlist[recID] = []
+                wlist[recID] = list_union(get_author_canonical_ids_for_recid(recID),
+                                          wlist[recID])
+        # special case of journal index:
         if self.fields_to_index == [CFG_JOURNAL_TAG]:
             # FIXME: quick hack for the journal index; a special
             # treatment where we need to associate more than one
@@ -1456,7 +1496,8 @@ def task_run_core():
                 fnc_get_words_from_phrase = get_author_family_name_words_from_phrase
             else:
                 fnc_get_words_from_phrase = get_words_from_phrase
-            wordTable = WordTable(index_id=index_id,
+            wordTable = WordTable(index_name=index_name,
+                                  index_id=index_id,
                                   fields_to_index=index_tags,
                                   table_name_pattern='idxWORD%02dF',
                                   default_get_words_fnc=fnc_get_words_from_phrase,
@@ -1471,7 +1512,8 @@ def task_run_core():
                 fnc_get_pairs_from_phrase = get_pairs_from_phrase # FIXME
             else:
                 fnc_get_pairs_from_phrase = get_pairs_from_phrase
-            wordTable = WordTable(index_id=index_id,
+            wordTable = WordTable(index_name=index_name,
+                                  index_id=index_id,
                                   fields_to_index=index_tags,
                                   table_name_pattern='idxPAIR%02dF',
                                   default_get_words_fnc=fnc_get_pairs_from_phrase,
@@ -1487,7 +1529,8 @@ def task_run_core():
                 fnc_get_phrases_from_phrase = get_exact_authors_from_phrase
             else:
                 fnc_get_phrases_from_phrase = get_phrases_from_phrase
-            wordTable = WordTable(index_id=index_id,
+            wordTable = WordTable(index_name=index_name,
+                                  index_id=index_id,
                                   fields_to_index=index_tags,
                                   table_name_pattern='idxPHRASE%02dF',
                                   default_get_words_fnc=fnc_get_phrases_from_phrase,
@@ -1514,7 +1557,8 @@ def task_run_core():
             fnc_get_words_from_phrase = get_author_family_name_words_from_phrase
         else:
             fnc_get_words_from_phrase = get_words_from_phrase
-        wordTable = WordTable(index_id=index_id,
+        wordTable = WordTable(index_name=index_name,
+                              index_id=index_id,
                               fields_to_index=index_tags,
                               table_name_pattern=reindex_prefix + 'idxWORD%02dF',
                               default_get_words_fnc=fnc_get_words_from_phrase,
@@ -1583,7 +1627,8 @@ def task_run_core():
             fnc_get_pairs_from_phrase = get_pairs_from_phrase # FIXME
         else:
             fnc_get_pairs_from_phrase = get_pairs_from_phrase
-        wordTable = WordTable(index_id=index_id,
+        wordTable = WordTable(index_name=index_name,
+                              index_id=index_id,
                               fields_to_index=index_tags,
                               table_name_pattern=reindex_prefix + 'idxPAIR%02dF',
                               default_get_words_fnc=fnc_get_pairs_from_phrase,
@@ -1651,7 +1696,8 @@ def task_run_core():
             fnc_get_phrases_from_phrase = get_exact_authors_from_phrase
         else:
             fnc_get_phrases_from_phrase = get_phrases_from_phrase
-        wordTable = WordTable(index_id=index_id,
+        wordTable = WordTable(index_name=index_name,
+                              index_id=index_id,
                               fields_to_index=index_tags,
                               table_name_pattern=reindex_prefix + 'idxPHRASE%02dF',
                               default_get_words_fnc=fnc_get_phrases_from_phrase,

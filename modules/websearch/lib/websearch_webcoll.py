@@ -40,7 +40,7 @@ from invenio.config import \
      CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES, \
      CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE
 from invenio.messages import gettext_set_language, language_list_long
-from invenio.search_engine import HitSet, search_pattern, get_creation_date, get_field_i18nname, collection_restricted_p
+from invenio.search_engine import HitSet, search_pattern, get_creation_date, get_field_i18nname, collection_restricted_p, sort_records
 from invenio.dbquery import run_sql, Error, get_table_update_time
 from invenio.bibrank_record_sorter import get_bibrank_methods
 from invenio.dateutils import convert_datestruct_to_dategui
@@ -61,27 +61,32 @@ from invenio.websearch_external_collections_config import CFG_EXTERNAL_COLLECTIO
 from invenio.websearch_external_collections_config import CFG_HOSTED_COLLECTION_TIMEOUT_NBRECS
 
 ## global vars
-collection_house = {} # will hold collections we treat in this run of the program; a dict of {collname2, collobject1}, ...
+COLLECTION_HOUSE = {} # will hold collections we treat in this run of the program; a dict of {collname2, collobject1}, ...
 
-# cfg_cache_last_updated_timestamp_tolerance -- cache timestamp
+# CFG_CACHE_LAST_UPDATED_TIMESTAMP_TOLERANCE -- cache timestamp
 # tolerance (in seconds), to account for the fact that an admin might
 # accidentally happen to edit the collection definitions at exactly
 # the same second when some webcoll process was about to be started.
 # In order to be safe, let's put an exaggerated timestamp tolerance
 # value such as 20 seconds:
-cfg_cache_last_updated_timestamp_tolerance = 20
+CFG_CACHE_LAST_UPDATED_TIMESTAMP_TOLERANCE = 20
 
-# cfg_cache_last_updated_timestamp_file -- location of the cache
+# CFG_CACHE_LAST_UPDATED_TIMESTAMP_FILE -- location of the cache
 # timestamp file:
-cfg_cache_last_updated_timestamp_file = "%s/collections/last_updated" % CFG_CACHEDIR
+CFG_CACHE_LAST_UPDATED_TIMESTAMP_FILE = "%s/collections/last_updated" % CFG_CACHEDIR
+
+# CFG_CACHE_LAST_FAST_UPDATED_TIMESTAMP_FILE -- location of the cache
+# timestamp file usef when running webcoll in the fast-mode.
+CFG_CACHE_LAST_FAST_UPDATED_TIMESTAMP_FILE = "%s/collections/last_fast_updated" % CFG_CACHEDIR
+
 
 def get_collection(colname):
     """Return collection object from the collection house for given colname.
        If does not exist, then create it."""
-    if not collection_house.has_key(colname):
+    if not COLLECTION_HOUSE.has_key(colname):
         colobject = Collection(colname)
-        collection_house[colname] = colobject
-    return collection_house[colname]
+        COLLECTION_HOUSE[colname] = colobject
+    return COLLECTION_HOUSE[colname]
 
 ## auxiliary functions:
 def is_selected(var, fld):
@@ -235,7 +240,7 @@ class Collection:
             col_desc = get_collection(row[1])
             # looking for loops
             if col_desc in descendants:
-                write_message("Loop found in collection %s" % self.namee, stream=sys.stderr)
+                write_message("Loop found in collection %s" % self.name, stream=sys.stderr)
                 raise OverflowError
             else:
                 descendants.append(col_desc)
@@ -402,20 +407,45 @@ class Collection:
             # firstly, get last 'rg' records:
             recIDs = list(self.reclist)
 
-            # FIXME: temporary hack in order to display tweaked latest
-            # additions box for some CERN collections:
+            # CERN hack begins: tweak latest additions for selected collections:
             if CFG_CERN_SITE:
+                # alter recIDs list for some CERN collections:
                 this_year = time.strftime("%Y", time.localtime())
-                if self.name in ['CERN Yellow Reports']:
+                if self.name in ['CERN Yellow Reports','Videos']:
                     last_year = str(int(this_year) - 1)
                     # detect recIDs only from this and past year:
                     recIDs = list(self.reclist & \
                                   search_pattern(p='year:%s or year:%s' % \
                                                  (this_year, last_year)))
-                elif self.name in ['Videos']:
+                elif self.name in ['VideosXXX']:
                     # detect recIDs only from this year:
                     recIDs = list(self.reclist & \
                                   search_pattern(p='year:%s' % this_year))
+                elif self.name == 'CMS Physics Analysis Summaries' and \
+                         1281585 in self.reclist:
+                    # REALLY, REALLY temporary hack
+                    recIDs = list(self.reclist)
+                    recIDs.remove(1281585)
+                # apply special filters:
+                if self.name in ['Videos']:
+                    # select only videos with movies:
+                    from invenio.intbitset import intbitset
+                    recIDs = list(intbitset(recIDs) & \
+                                  search_pattern(p='collection:"PUBLVIDEOMOVIE"'))
+                # sort some CERN collections specially:
+                if self.name in ['Videos',
+                                 'Video Clips',
+                                 'Video Movies',
+                                 'Video News',
+                                 'Video Rushes',
+                                 'Webcast',
+                                 'ATLAS Videos',
+                                 'Restricted Video Movies',
+                                 'Restricted Video Rushes',
+                                 'LHC First Beam Videos',
+                                 'CERN openlab Videos']:
+                    recIDs = sort_records(None, recIDs, '269__c')
+            # CERN hack ends.
 
             total = len(recIDs)
             to_display = min(rg, total)
@@ -440,9 +470,10 @@ class Collection:
             # do not show latest additions box
             return ""
 
-        # FIXME: temporary hack in order not to display latest
-        # additions box for some CERN collections:
-        if CFG_CERN_SITE and self.name in ['Periodicals', 'Electronic Journals']:
+        # CERN hack: do not display latest additions for some CERN collections:
+        if CFG_CERN_SITE and self.name in ['Periodicals', 'Electronic Journals',
+                                           'Press Office Photo Selection',
+                                           'Press Office Video Selection']:
             return ""
 
         try:
@@ -846,7 +877,7 @@ def get_database_last_updated_timestamp():
 def get_cache_last_updated_timestamp():
     """Return last updated cache timestamp."""
     try:
-        f = open(cfg_cache_last_updated_timestamp_file, "r")
+        f = open(CFG_CACHE_LAST_UPDATED_TIMESTAMP_FILE, "r")
     except:
         return "1970-01-01 00:00:00"
     timestamp = f.read()
@@ -856,7 +887,7 @@ def get_cache_last_updated_timestamp():
 def set_cache_last_updated_timestamp(timestamp):
     """Set last updated cache timestamp to TIMESTAMP."""
     try:
-        f = open(cfg_cache_last_updated_timestamp_file, "w")
+        f = open(CFG_CACHE_LAST_UPDATED_TIMESTAMP_FILE, "w")
     except:
         pass
     f.write(timestamp)
@@ -967,7 +998,7 @@ def task_run_core():
     if check_nbrecs_for_all_external_collections() or task_has_option("force") or \
     compare_timestamps_with_tolerance(get_database_last_updated_timestamp(),
                                         get_cache_last_updated_timestamp(),
-                                        cfg_cache_last_updated_timestamp_tolerance) >= 0:
+                                        CFG_CACHE_LAST_UPDATED_TIMESTAMP_TOLERANCE) >= 0:
         ## either forced update was requested or cache is not up to date, so recreate it:
         # firstly, decide which collections to do:
         if task_has_option("collection"):

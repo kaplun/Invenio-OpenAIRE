@@ -51,6 +51,7 @@ INSERT INTO collection VALUES (21,'Atlantis Times Science','collection:ATLANTIST
 INSERT INTO collection VALUES (22,'Atlantis Times',NULL,NULL,NULL);
 INSERT INTO collection VALUES (23,'Atlantis Institute Books','hostedcollection:',NULL,NULL);
 INSERT INTO collection VALUES (24,'Atlantis Institute Articles','hostedcollection:',NULL,NULL);
+INSERT INTO collection VALUES (25,'Atlantis Times Drafts','collection:ATLANTISTIMESSCIENCEDRAFT or collection:ATLANTISTIMESARTSDRAFT or collection:ATLANTISTIMESNEWSDRAFT',NULL,NULL);
 
 INSERT INTO clsMETHOD VALUES (1,'HEP','http://invenio-software.org/download/invenio-demo-site-files/HEP.rdf','High Energy Physics Taxonomy','0000-00-00 00:00:00');
 INSERT INTO clsMETHOD VALUES (2,'NASA-subjects','http://invenio-software.org/download/invenio-demo-site-files/NASA-subjects.rdf','NASA Subjects','0000-00-00 00:00:00');
@@ -507,6 +508,9 @@ INSERT INTO collectionname VALUES (23,'fr','ln','Atlantis Institute Books');
 
 INSERT INTO collectionname VALUES (24,'en','ln','Atlantis Institute Articles');
 INSERT INTO collectionname VALUES (24,'fr','ln','Atlantis Institute Articles');
+
+INSERT INTO collectionname VALUES (25,'en','ln','Atlantis Times Drafts');
+INSERT INTO collectionname VALUES (25,'fr','ln','Atlantis Times Ébauches');
 
 INSERT INTO collection_collection VALUES (1,15,'r',60);
 INSERT INTO collection_collection VALUES (1,16,'r',40);
@@ -2375,5 +2379,14 @@ INSERT INTO expJOB (jobname) VALUES ('marcxml');
 INSERT INTO jrnJOURNAL (id,name) VALUES(1,'AtlantisTimes');
 INSERT INTO jrnISSUE (id_jrnJOURNAL,issue_number,issue_display,date_released,date_announced) VALUES (1,'02/2009','02-03/2009','2009-01-09','2009-01-09');
 INSERT INTO jrnISSUE (id_jrnJOURNAL,issue_number,issue_display,date_released) VALUES (1,'03/2009','02-03/2009','2009-01-16');
+
+-- BibAuthorID demo person assignment:
+INSERT INTO aidPERSONID VALUES (NULL,1,'uid','2','0','0');
+INSERT INTO aidPERSONID VALUES (NULL,2,'uid','1','0','0');
+INSERT INTO aidPERSONID VALUES (NULL,3,'uid','4','0','0');
+INSERT INTO aidPERSONID VALUES (NULL,4,'uid','5','0','0');
+INSERT INTO aidPERSONID VALUES (NULL,5,'uid','6','0','0');
+INSERT INTO aidPERSONID VALUES (NULL,6,'uid','7','0','0');
+INSERT INTO aidPERSONID VALUES (NULL,7,'uid','8','0','0');
 
 -- end of file

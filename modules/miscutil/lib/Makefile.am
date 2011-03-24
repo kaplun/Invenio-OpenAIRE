@@ -56,11 +56,16 @@ pylib_DATA = __init__.py \
              plotextractor_getter.py \
              plotextractor_output_utils.py \
              plotextractor_tests.py \
-             plotextractor_config.py
+             plotextractor_config.py \
+             solrutils.py
 
 noinst_DATA = testimport.py \
               kwalitee.py \
               pep8.py
+
+tmpdir = $(prefix)/var/tmp
+
+tmp_DATA = intbitset_example.int
 
 EXTRA_DIST = $(pylib_DATA) \
              testimport.py \
@@ -71,7 +76,9 @@ EXTRA_DIST = $(pylib_DATA) \
              intbitset.h \
              intbitset_impl.c \
              intbitset_setup.py \
-             intbitset.pyx
+             intbitset.pyx \
+             $(tmp_DATA)
+
 
 all:
 	$(PYTHON) $(srcdir)/intbitset_setup.py build_ext

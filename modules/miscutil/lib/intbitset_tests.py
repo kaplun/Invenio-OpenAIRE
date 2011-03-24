@@ -24,6 +24,7 @@ __revision__ = "$Id$"
 import unittest
 import sys
 import zlib
+import os
 
 if sys.hexversion < 0x2040000:
     # pylint: disable=W0622
@@ -32,6 +33,9 @@ if sys.hexversion < 0x2040000:
 
 from invenio.intbitset import intbitset
 from invenio.testutils import make_test_suite, run_test_suite
+from invenio.config import CFG_TMPDIR
+
+CFG_INTBITSET_BIG_EXAMPLE = open(os.path.join(CFG_TMPDIR, "intbitset_example.int")).read()
 
 class IntBitSetTest(unittest.TestCase):
     """Test functions related to intbitset data structure."""
@@ -68,11 +72,17 @@ class IntBitSetTest(unittest.TestCase):
             (intbitset.__ne__, set.__ne__, lambda x, y: cmp(x, y) != 0),
         ]
 
+        self.big_examples = [list(intbitset(CFG_INTBITSET_BIG_EXAMPLE))]
+
         self.corrupted_strdumps = [
             "ciao",
             intbitset([2, 6000000]).strbits(),
             "djflsdkfjsdljfsldkfjsldjlfk",
         ]
+
+    def tearDown(self):
+        del self.big_examples
+        del self.corrupted_strdumps
 
     def _helper_sanity_test(self, intbitset1, msg=''):
         wordbitsize = intbitset1.get_wordbitsize()
@@ -340,10 +350,10 @@ class IntBitSetTest(unittest.TestCase):
 
     def test_set_repr(self):
         """intbitset - Pythonic representation"""
-        for set1 in self.sets + [[]]:
+        for set1 in self.sets + [[]] + self.big_examples:
             intbitset1 = intbitset(set1)
             self.assertEqual(intbitset1, eval(repr(intbitset1)))
-        for set1 in self.sets + [[]]:
+        for set1 in self.sets + [[]] + self.big_examples:
             intbitset1 = intbitset(set1, trailing_bits=True)
             self.assertEqual(intbitset1, eval(repr(intbitset1)))
 
@@ -353,7 +363,6 @@ class IntBitSetTest(unittest.TestCase):
             for set2 in self.sets + [[]]:
                 for op in self.cmp_list:
                     self.assertEqual(op[0](intbitset(set1), intbitset(set2)), op[1](set(set1), set(set2)), "Error in comparing %s %s with comparing function %s" % (set1, set2, op[0].__name__))
-
 
     def test_set_update_with_signs(self):
         """intbitset - set update with signs"""

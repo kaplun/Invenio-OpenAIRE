@@ -209,6 +209,16 @@ div .boxleft_2 {
     text-align:center;
 }
 
+.modify-list{
+    border:solid 1px #0033cc;
+    background:#e0ecff;
+    color:#000000;
+    font-size:14px;
+    font-weight:bold;
+    padding:4px;
+    text-align:left;
+}
+
 .inputValueGrey{
     color:#000000;
 }
@@ -288,6 +298,7 @@ div .boxleft_2 {
 </table>
 
 <br/>
+<div id="info_area"></div>
 <div id="preview_area"></div>
 
 </div>
@@ -428,6 +439,7 @@ div .boxleft_2 {
         <span class="newValue newValueParameters">new value</span>
 
         <span class="conditionParameters"><strong> %(text_with_condition)s </strong></span>
+        <span class="conditionExact conditionParameters"></span>
         <span class="condition conditionParameters"></span>
 
         <span class="conditionSubfieldParameters"><strong> %(text_with_condition_subfield)s </strong></span>
@@ -457,7 +469,7 @@ div .boxleft_2 {
     <tr class="valueParameters">
         <td /><td /><td /><td />
         <td colspan="3">
-            <input id="textBoxValue" class="txtValue textBoxValue" type="text" value="%(text_value)s" maxlength="50"/>
+            <input id="textBoxValue" class="txtValue textBoxValue" type="text" value="%(text_value)s"/>
         </td>
     </tr>
     <tr class="newValueParameters">
@@ -469,7 +481,10 @@ div .boxleft_2 {
     <tr class="conditionParameters">
         <td /> <td /> <td /> <td /><td colspan="3">when other subfield
         <input class="txtValue textBoxConditionSubfield" type="text"/>
-        is equal to
+        <select class="selectConditionExactMatch">
+            <option value="0">%(text_equal_to)s</option>
+            <option value="1">%(text_contains)s</option>
+        </select>
         <input id="textBoxCondition" class="txtValue textBoxCondition" type="text" value="%(text_condition)s"/>
         </td>
     </tr>
@@ -518,9 +533,11 @@ div .boxleft_2 {
               "text_replace_text" : _("Replace substring"),
               "text_replace_content" : _("Replace full content"),
               "text_with" : _("with"),
-              "text_with_condition": _("when field equals"),
+              "text_with_condition": _("when field"),
               "text_with_condition_subfield" : _("on subfield"),
               "text_new_value" : _("new value"),
+              "text_equal_to" : _("is equal to"),
+              "text_contains" : _("contains"),
               "text_condition" : _("condition"),
               "text_filter_fields": _("Apply only to specific field instances"),
               "text_value" : _("value")
@@ -556,6 +573,36 @@ div .boxleft_2 {
              }
 
         return result
+
+    def info_box(self, language, total_modifications):
+        """Returns list with a summary of the number of modifications
+           made to records
+
+           @param language: language used to display the content
+           @param total_modifications: list of modifications to records, fields
+                                      and subfields
+        """
+        _ = gettext_set_language(language)
+
+        modifications_html = " "
+        if total_modifications:
+            modification_display_list= """<ul>
+                                              <li>Records: %(records_modified)s</li>
+                                              <li>Fields: %(fields_modified)s</li>
+                                              <li>Subfields: %(subfields_modified)s</li>
+                                          </ul>
+                                       """ % {
+                                              "records_modified": str(total_modifications[0]),
+                                              "fields_modified": str(total_modifications[1]),
+                                              "subfields_modified": str(total_modifications[2])
+                                             }
+            modifications_html = """<div class="modify-list"> %(modify_text)s <br /> %(modification_display)s </div>
+                                """ % {"modify_text": "The actions defined will affect:",
+                                       "modification_display": modification_display_list}
+
+        return modifications_html
+
+
 
     def _build_navigation_image(self, class_name, image_file_name, alt_text):
         """Creates html for image from the page navigation line """

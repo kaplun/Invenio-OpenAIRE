@@ -122,7 +122,9 @@ def convert_conf_option(option_name, option_value):
     ## 3c) special cases: dicts
     if option_name in ['CFG_WEBSEARCH_FIELDS_CONVERT',
                        'CFG_BATCHUPLOADER_WEB_ROBOT_RIGHTS',
-                       'CFG_SITE_EMERGENCY_EMAIL_ADDRESSES']:
+                       'CFG_SITE_EMERGENCY_EMAIL_ADDRESSES',
+                       'CFG_BIBMATCH_FUZZY_WORDLIMITS',
+                       'CFG_BIBMATCH_QUERY_TEMPLATES']:
         option_value = option_value[1:-1]
 
     ## 3cbis) very special cases: dicts with backward compatible string
@@ -146,7 +148,8 @@ def convert_conf_option(option_name, option_value):
                        'CFG_WEBSTYLE_HTTP_STATUS_ALERT_LIST',
                        'CFG_WEBSEARCH_RSS_I18N_COLLECTIONS',
                        'CFG_BATCHUPLOADER_FILENAME_MATCHING_POLICY',
-                       'CFG_BATCHUPLOADER_WEB_ROBOT_AGENT']:
+                       'CFG_BATCHUPLOADER_WEB_ROBOT_AGENT',
+                       'CFG_BIBAUTHORID_EXTERNAL_CLAIMED_RECORDS_KEY']:
         out = "["
         for elem in option_value[1:-1].split(","):
             if elem:
@@ -170,7 +173,13 @@ def convert_conf_option(option_name, option_value):
         return
 
     ## 3g) special cases: float
-    if option_name == 'CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY':
+    if option_name in ['CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY',
+                       'CFG_BIBMATCH_LOCAL_SLEEPTIME',
+                       'CFG_BIBMATCH_REMOTE_SLEEPTIME',
+                       'CFG_BIBAUTHORID_PERSONID_MIN_P_FROM_BCTKD_RA',
+                       'CFG_BIBAUTHORID_PERSONID_MIN_P_FROM_NEW_RA',
+                       'CFG_BIBAUTHORID_PERSONID_MAX_COMP_LIST_MIN_TRSH',
+                       'CFG_BIBAUTHORID_PERSONID_MAX_COMP_LIST_MIN_TRSH_P_N']:
         option_value = float(option_value[1:-1])
 
     ## 4) finally, return output line:
@@ -785,7 +794,26 @@ def cli_cmd_create_apache_conf(conf):
     from invenio.textutils import wrap_text_in_a_box
     apache_conf_dir = conf.get("Invenio", 'CFG_ETCDIR') + \
                       os.sep + 'apache'
+
+    ## Preparation of XSendFile directive
     xsendfile_directive_needed = int(conf.get("Invenio", 'CFG_BIBDOCFILE_USE_XSENDFILE')) != 0
+    if xsendfile_directive_needed:
+        xsendfile_directive = "XSendFile On\n"
+    else:
+        xsendfile_directive = "#XSendFile On\n"
+    for path in (conf.get('Invenio', 'CFG_WEBSUBMIT_FILEDIR'), # BibDocFile
+            conf.get('Invenio', 'CFG_WEBDIR'),
+            conf.get('Invenio', 'CFG_WEBSUBMIT_STORAGEDIR'), # WebSubmit
+            conf.get('Invenio', 'CFG_TMPDIR'),
+            os.path.join(conf.get('Invenio', 'CFG_PREFIX'), 'var', 'tmp', 'attachfile'),
+            os.path.join(conf.get('Invenio', 'CFG_PREFIX'), 'var', 'data', 'comments'),
+            os.path.join(conf.get('Invenio', 'CFG_PREFIX'), 'var', 'data', 'baskets', 'comments'),
+            '/tmp'): # BibExport
+        if xsendfile_directive_needed:
+            xsendfile_directive += '        XSendFilePath %s\n' % path
+        else:
+            xsendfile_directive += '        #XSendFilePath %s\n' % path
+    xsendfile_directive = xsendfile_directive.strip()
     ## Apache vhost conf file is distro specific, so analyze needs:
     # Gentoo (and generic defaults):
     listen_directive_needed = True
@@ -820,7 +848,6 @@ ServerTokens Prod
 NameVirtualHost %(vhost_ip_address)s:80
 %(listen_directive)s
 %(wsgi_socket_directive)s
-%(xsendfile_directive)s
 WSGIRestrictStdout Off
 #WSGIImportScript %(wsgidir)s/invenio.wsgi process-group=invenio application-group=%%{GLOBAL}
 <Files *.pyc>
@@ -858,6 +885,7 @@ WSGIRestrictStdout Off
         WSGIDaemonProcess invenio processes=5 threads=1 display-name=%%{GROUP} inactivity-timeout=3600 maximum-requests=10000
         WSGIScriptAlias / %(wsgidir)s/invenio.wsgi
         WSGIPassAuthorization On
+        %(xsendfile_directive)s
         <Directory %(wsgidir)s>
            WSGIProcessGroup invenio
            WSGIApplicationGroup %%{GLOBAL}
@@ -879,9 +907,7 @@ WSGIRestrictStdout Off
        'wsgi_socket_directive': (wsgi_socket_directive_needed and \
                                 'WSGISocketPrefix ' or '#WSGISocketPrefix ') + \
               conf.get('Invenio', 'CFG_PREFIX') + os.sep + 'var' + os.sep + 'run',
-       'xsendfile_directive' : xsendfile_directive_needed and \
-                               "XSendFile On\nXSendFileAllowAbove On" or \
-                               "#XSendFile On\n#XSendFileAllowAbove On",
+       'xsendfile_directive' : xsendfile_directive,
        }
     apache_vhost_ssl_body = """\
 ServerSignature Off
@@ -891,7 +917,6 @@ NameVirtualHost %(vhost_ip_address)s:443
 %(ssl_pem_directive)s
 %(ssl_crt_directive)s
 %(ssl_key_directive)s
-%(xsendfile_directive)s
 WSGIRestrictStdout Off
 <Files *.pyc>
    deny from all
@@ -928,6 +953,7 @@ WSGIRestrictStdout Off
         Alias /favicon.ico %(webdir)s/favicon.ico
         WSGIScriptAlias / %(wsgidir)s/invenio.wsgi
         WSGIPassAuthorization On
+        %(xsendfile_directive)s
         <Directory %(wsgidir)s>
            WSGIProcessGroup invenio
            WSGIApplicationGroup %%{GLOBAL}
@@ -955,9 +981,7 @@ WSGIRestrictStdout Off
        'ssl_key_directive': ssl_pem_directive_needed and \
                             '#SSLCertificateKeyFile %s' % ssl_key_path or \
                             'SSLCertificateKeyFile %s' % ssl_key_path,
-       'xsendfile_directive' : xsendfile_directive_needed and \
-                               "XSendFile On\nXSendFileAllowAbove On" or \
-                               "#XSendFile On\n#XSendFileAllowAbove On",
+       'xsendfile_directive' : xsendfile_directive,
        }
     # write HTTP vhost snippet:
     if os.path.exists(apache_vhost_file):

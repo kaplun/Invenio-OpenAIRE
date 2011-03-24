@@ -27,6 +27,25 @@ img_DATA = add-small.png \
            arrow_up2.png \
            asterisk.png \
            at.gif \
+           aid_90low_right.png \
+           aid_btn_blue.png \
+           aid_btn_green.png \
+           aid_btn_red.png \
+           aid_denied.png \
+           aid_granted.png \
+           aid_info.gif \
+           aid_minus_16.png \
+           aid_plus_16.png \
+           aid_warning_denied.png \
+           aid_warning_granted.png \
+           aid_check_gray.png \
+           aid_check.png \
+           aid_reject_gray.png \
+           aid_reject.png \
+           aid_reset_gray.png \
+           aid_reset.png \
+           aid_to_other.png \
+           aid_to_other_gray.png \
            balloon_arrow_left_shadow.png \
            balloon_bottom_left_shadow.png \
            balloon_bottom_shadow.png \
@@ -234,7 +253,8 @@ img_DATA = add-small.png \
            white_field.gif \
            white_arrow_big.png \
            wsignout.gif \
-           compare.png
+           compare.png \
+           document-preview.png
 
 tmpdir=$(localstatedir)/tmp
 

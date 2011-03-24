@@ -2326,24 +2326,6 @@ textualment:</p>
       <input class="formbutton" type="submit" name="action" value="_(Search)_" />
       </blockquote>
       </form>
-
-   <table class="errorbox">
-   <thead>
-   <tr>
-   <th class="errorboxheader">
-   IMPORTANT NOTE
-   </th>
-   </tr>
-   </thead>
-   <tbody>
-   <tr>
-   <td class="errorboxbody">
-      Currently, words that include accented characters can only be retrieved by entering
-      accented characters in the query.
-   </td>
-   </tr>
-   </tbody>
-   </table>
 </en>
 <fr>
 <p> Le moteur de recherche prend en compte les caractères Unicode
@@ -2374,24 +2356,6 @@ Notez que les accents sont optionnels. Par exemple, saisissez <code>Lemaitre</co
       <input class="formbutton" type="submit" name="action" value="_(Search)_" />
       </blockquote>
       </form>
-
-   <table class="errorbox">
-   <thead>
-   <tr>
-   <th class="errorboxheader">
-   NOTE IMPORTANTE
-   </th>
-   </tr>
-   </thead>
-   <tbody>
-   <tr>
-   <td class="errorboxbody">
-      Actuellement, les mots qui contiennent des accents ne peuvent
-      être retrouvés qu'en entrant les accents dans la requête.
-   </td>
-   </tr>
-   </tbody>
-   </table>
 </fr>
 <es>
 <p>El motor de búsqueda se basa en el estandar Unicode UTF-8, lo que
@@ -2423,24 +2387,6 @@ escritos por (o sobre) Пушкин, debemos escribir:</p>
       <input class="formbutton" type="submit" name="action" value="_(Search)_" />
       </blockquote>
       </form>
-
-   <table class="errorbox">
-   <thead>
-   <tr>
-   <th class="errorboxheader">
-   NOTA IMPORTANTE
-   </th>
-   </tr>
-   </thead>
-   <tbody>
-   <tr>
-   <td class="errorboxbody">
-En estos momentos, las palabras que incluyen caracteres acentuados sólo pueden
-recuperarse entrando los caracteres acentuados en la consulta.
-   </td>
-   </tr>
-   </tbody>
-   </table>
 </es>
 
 <ca>
@@ -2473,24 +2419,6 @@ que contenen paraules accentuades.  Per exemple, escriurem <code>Lemaitre</code>
       <input class="formbutton" type="submit" name="action" value="_(Search)_" />
       </blockquote>
       </form>
-
-   <table class="errorbox">
-   <thead>
-   <tr>
-   <th class="errorboxheader">
-   NOTA IMPORTANT
-   </th>
-   </tr>
-   </thead>
-   <tbody>
-   <tr>
-   <td class="errorboxbody">
-En aquests moments, les paraules que inclouen caràcters accentuats només es poden
-recuperar entrant els caràcters accentuats a la consulta.
-   </td>
-   </tr>
-   </tbody>
-   </table>
 </ca>
 </lang>
 
@@ -3665,7 +3593,7 @@ cal escriure:
    <p>Note also that these operators can be freely combined with
    regular metadata search.  For example, to find papers authored by
    Klebanov that are cited by Papadimitriou but that do not cite any
-   of Papadimitriou's papers themselves, type:</p>
+   of Papadimitriou's papers themselves, you can type:</p>
 
       <form action="<CFG_SITE_URL>/search" method="get">
       <input type="hidden" name="ln" value="<lang:current />" />
@@ -3678,6 +3606,22 @@ cal escriure:
       </blockquote>
       </form>
 
+   <p>Finally, you can make use of regexp-style quoting or
+   phrase-style quoting to combine search expressions in the same
+   refersto/citedby operand.  For example, to find papers that are
+   referring to only those I. Klebanov's papers that mention O(N) in
+   the title, you can type:</p>
+
+      <form action="<CFG_SITE_URL>/search" method="get">
+      <input type="hidden" name="ln" value="<lang:current />" />
+      <blockquote>
+      <input size="40" type="text" name="p" value="refersto:/author:&quot;Klebanov, I&quot; title:O(N)/" />
+      <select name="f"><option value="">_(any field)_</option>
+                       <option value="title">_(title)_</option>
+                       <option value="author">_(author)_</option></select>
+      <input class="formbutton" type="submit" name="action" value="_(Search)_" />
+      </blockquote>
+      </form>
 </en>
 </lang>
 

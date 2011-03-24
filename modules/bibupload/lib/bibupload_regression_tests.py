@@ -41,11 +41,12 @@ from invenio.config import CFG_OAI_ID_FIELD, CFG_PREFIX, CFG_SITE_URL, CFG_TMPDI
      CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG, \
      CFG_BIBUPLOAD_EXTERNAL_OAIID_PROVENANCE_TAG, \
      CFG_WEBDIR
+from invenio.access_control_config import CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS
 from invenio import bibupload
 from invenio.search_engine import print_record
 from invenio.dbquery import run_sql, get_table_status_info
 from invenio.dateutils import convert_datestruct_to_datetext
-from invenio.testutils import make_test_suite, run_test_suite
+from invenio.testutils import make_test_suite, run_test_suite, test_web_page_content
 from invenio.bibdocfile import BibRecDocs
 from invenio.bibtask import task_set_task_param, setup_loggers
 
@@ -155,6 +156,17 @@ def try_url_download(url):
         raise StandardError("Downloading %s is impossible because of %s"
             % (url, str(e)))
     return True
+
+def force_webcoll(recid):
+    from invenio import bibindex_engine
+    reload(bibindex_engine)
+    from invenio import websearch_webcoll
+    reload(websearch_webcoll)
+    index_id, index_name, index_tags = bibindex_engine.get_word_tables("collection")[0]
+    bibindex_engine.WordTable(index_id, index_tags, "idxWORD%02dF", default_get_words_fnc=bibindex_engine.get_words_from_phrase, tag_to_words_fnc_map={'8564_u': bibindex_engine.get_words_from_fulltext}).add_recIDs([[recid, recid]], 1)
+    c = websearch_webcoll.Collection()
+    c.calculate_reclist()
+    c.update_reclist()
 
 class GenericBibUploadTest(unittest.TestCase):
     """Generic BibUpload testing class with predefined
@@ -2242,10 +2254,12 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         testrec_expected_xm = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2255,7 +2269,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
          </datafield>
         </record>
         """ % {'siteurl': CFG_SITE_URL}
@@ -2263,9 +2277,9 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
         """ % {'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" \
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" \
             % {'siteurl': CFG_SITE_URL}
         # insert test record:
         recs = bibupload.xml_marc_to_records(test_to_upload)
@@ -2286,11 +2300,11 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
                                           testrec_expected_hm), '')
         self.failUnless(try_url_download(testrec_expected_url))
 
-    def test_exotic_format_fft_append(self):
-        """bibupload - exotic format FFT append"""
+    def test_fft_insert_with_valid_embargo(self):
+        """bibupload - FFT insert with valid embargo"""
         # define the test case:
-        testfile = os.path.join(CFG_TMPDIR, 'test.ps.Z')
-        open(testfile, 'w').write('TEST')
+        import time
+        future_date = time.strftime('%Y-%m-%d', time.gmtime(time.time() + 24 * 3600 * 2))
         test_to_upload = """
         <record>
         <controlfield tag="003">SzGeCERN</controlfield>
@@ -2298,8 +2312,159 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="FFT" ind1=" " ind2=" ">
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
+          <subfield code="r">firerole: deny until '%(future_date)s'
+allow any</subfield>
+         </datafield>
         </record>
-        """
+        """ % {
+            'future_date': future_date,
+            'siteurl': CFG_SITE_URL
+        }
+        testrec_expected_xm = """
+        <record>
+        <controlfield tag="001">123456789</controlfield>
+        <controlfield tag="003">SzGeCERN</controlfield>
+         <datafield tag="100" ind1=" " ind2=" ">
+          <subfield code="a">Test, John</subfield>
+          <subfield code="u">Test University</subfield>
+         </datafield>
+         <datafield tag="856" ind1="4" ind2=" ">
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
+         </datafield>
+        </record>
+        """ % {'siteurl': CFG_SITE_URL}
+        testrec_expected_hm = """
+        001__ 123456789
+        003__ SzGeCERN
+        100__ $$aTest, John$$uTest University
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
+        """ % {'siteurl': CFG_SITE_URL}
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" \
+            % {'siteurl': CFG_SITE_URL}
+        # insert test record:
+        recs = bibupload.xml_marc_to_records(test_to_upload)
+        err, recid = bibupload.bibupload(recs[0], opt_mode='insert')
+        # replace test buffers with real recid of inserted test record:
+        testrec_expected_xm = testrec_expected_xm.replace('123456789',
+                                                          str(recid))
+        testrec_expected_hm = testrec_expected_hm.replace('123456789',
+                                                          str(recid))
+        testrec_expected_url = testrec_expected_url.replace('123456789',
+                                                          str(recid))
+        # compare expected results:
+        inserted_xm = print_record(recid, 'xm')
+        inserted_hm = print_record(recid, 'hm')
+        self.assertEqual(compare_xmbuffers(inserted_xm,
+                                          testrec_expected_xm), '')
+        self.assertEqual(compare_hmbuffers(inserted_hm,
+                                          testrec_expected_hm), '')
+        result = urlopen(testrec_expected_url).read()
+        self.failUnless("This file is restricted." in result, result)
+
+    def test_fft_insert_with_expired_embargo(self):
+        """bibupload - FFT insert with expired embargo"""
+        # define the test case:
+        import time
+        past_date = time.strftime('%Y-%m-%d', time.gmtime(time.time() - 24 * 3600 * 2))
+        test_to_upload = """
+        <record>
+        <controlfield tag="003">SzGeCERN</controlfield>
+         <datafield tag="100" ind1=" " ind2=" ">
+          <subfield code="a">Test, John</subfield>
+          <subfield code="u">Test University</subfield>
+         </datafield>
+         <datafield tag="980" ind1=" " ind2=" ">
+          <subfield code="a">ARTICLE</subfield>
+         </datafield>
+         <datafield tag="FFT" ind1=" " ind2=" ">
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
+          <subfield code="r">firerole: deny until '%(past_date)s'
+allow any</subfield>
+         </datafield>
+        </record>
+        """ % {
+            'past_date': past_date,
+            'siteurl': CFG_SITE_URL
+        }
+        testrec_expected_xm = """
+        <record>
+        <controlfield tag="001">123456789</controlfield>
+        <controlfield tag="003">SzGeCERN</controlfield>
+         <datafield tag="100" ind1=" " ind2=" ">
+          <subfield code="a">Test, John</subfield>
+          <subfield code="u">Test University</subfield>
+         </datafield>
+         <datafield tag="856" ind1="4" ind2=" ">
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
+         </datafield>
+         <datafield tag="980" ind1=" " ind2=" ">
+          <subfield code="a">ARTICLE</subfield>
+         </datafield>
+        </record>
+        """ % {'siteurl': CFG_SITE_URL}
+        testrec_expected_hm = """
+        001__ 123456789
+        003__ SzGeCERN
+        100__ $$aTest, John$$uTest University
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
+        980__ $$aARTICLE
+        """ % {'siteurl': CFG_SITE_URL}
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" \
+            % {'siteurl': CFG_SITE_URL}
+        # insert test record:
+        recs = bibupload.xml_marc_to_records(test_to_upload)
+        err, recid = bibupload.bibupload(recs[0], opt_mode='insert')
+        # replace test buffers with real recid of inserted test record:
+        testrec_expected_xm = testrec_expected_xm.replace('123456789',
+                                                          str(recid))
+        testrec_expected_hm = testrec_expected_hm.replace('123456789',
+                                                          str(recid))
+        testrec_expected_url = testrec_expected_url.replace('123456789',
+                                                          str(recid))
+        # compare expected results:
+        inserted_xm = print_record(recid, 'xm')
+        inserted_hm = print_record(recid, 'hm')
+        self.assertEqual(compare_xmbuffers(inserted_xm,
+                                          testrec_expected_xm), '')
+        self.assertEqual(compare_hmbuffers(inserted_hm,
+                                          testrec_expected_hm), '')
+        result = urlopen(testrec_expected_url).read()
+        self.failIf("If you already have an account, please login using the form below." in result, result)
+        self.assertEqual(test_web_page_content(testrec_expected_url, 'hyde', 'h123yde', expected_text='Authorization failure'), [])
+        force_webcoll(recid)
+        self.assertEqual(test_web_page_content(testrec_expected_url, 'hyde', 'h123yde', expected_text=urlopen("%(siteurl)s/img/site_logo.gif" % {
+            'siteurl': CFG_SITE_URL
+        }).read()), [])
+
+
+
+    def test_exotic_format_fft_append(self):
+        """bibupload - exotic format FFT append"""
+        # define the test case:
+        testfile = os.path.join(CFG_TMPDIR, 'test.ps.Z')
+        open(testfile, 'w').write('TEST')
+        email_tag = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][0:3]
+        email_ind1 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][3]
+        email_ind2 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][4]
+        email_code = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][5]
+        test_to_upload = """
+        <record>
+        <controlfield tag="003">SzGeCERN</controlfield>
+         <datafield tag="100" ind1=" " ind2=" ">
+          <subfield code="a">Test, John</subfield>
+          <subfield code="u">Test University</subfield>
+         </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
+        </record>
+        """ % {
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
         testrec_to_append = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2317,17 +2482,30 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
           <subfield code="u">%(siteurl)s/record/123456789/files/test.ps.Z</subfield>
          </datafield>
         </record>
-        """ % {'siteurl': CFG_SITE_URL}
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
+
         testrec_expected_hm = """
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
+        %(email_tag)s%(email_ind1)s%(email_ind2)s $$%(email_code)sjekyll@cds.cern.ch
         8564_ $$u%(siteurl)s/record/123456789/files/test.ps.Z
-        """ % {'siteurl': CFG_SITE_URL}
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == ' ' and '_' or email_ind1,
+            'email_ind2': email_ind2 == ' ' and '_' or email_ind2,
+            'email_code': email_code}
         testrec_expected_url = "%(siteurl)s/record/123456789/files/test.ps.Z" \
                % {'siteurl': CFG_SITE_URL}
         testrec_expected_url2 = "%(siteurl)s/record/123456789/files/test?format=ps.Z" \
@@ -2355,8 +2533,8 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
                                           testrec_expected_xm), '')
         self.assertEqual(compare_hmbuffers(inserted_hm,
                                           testrec_expected_hm), '')
-        self.assertEqual(urlopen(testrec_expected_url).read(), 'TEST')
-        self.assertEqual(urlopen(testrec_expected_url2).read(), 'TEST')
+        self.assertEqual(test_web_page_content(testrec_expected_url, 'jekyll', 'j123ekyll', expected_text='TEST'), [])
+        self.assertEqual(test_web_page_content(testrec_expected_url2, 'jekyll', 'j123ekyll', expected_text='TEST'), [])
 
 
     def test_fft_check_md5_through_bibrecdoc_str(self):
@@ -2402,14 +2580,14 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="t">SuperMain</subfield>
           <subfield code="d">This is a description</subfield>
           <subfield code="z">This is a comment</subfield>
           <subfield code="n">CIDIESSE</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="t">SuperMain</subfield>
           <subfield code="f">.jpeg</subfield>
           <subfield code="d">This is a description</subfield>
@@ -2417,7 +2595,9 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="n">CIDIESSE</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         testrec_expected_xm = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2473,6 +2653,10 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
     def test_simple_fft_insert_with_restriction(self):
         """bibupload - simple FFT insert with restriction"""
         # define the test case:
+        email_tag = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][0:3]
+        email_ind1 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][3]
+        email_ind2 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][4]
+        email_code = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][5]
         test_to_upload = """
         <record>
         <controlfield tag="003">SzGeCERN</controlfield>
@@ -2480,13 +2664,24 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
+         <datafield tag="980" ind1=" " ind2=" ">
+          <subfield code="a">ARTICLE</subfield>
+         </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="r">thesis</subfield>
-          <subfield code="x">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="x">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code,
+            'siteurl': CFG_SITE_URL}
+
         testrec_expected_xm = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2495,25 +2690,42 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
-         <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif?subformat=icon</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
+         </datafield>
+         <datafield tag="856" ind1="4" ind2=" ">
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon</subfield>
           <subfield code="x">icon</subfield>
          </datafield>
+         <datafield tag="980" ind1=" " ind2=" ">
+          <subfield code="a">ARTICLE</subfield>
+         </datafield>
         </record>
-        """ % {'siteurl': CFG_SITE_URL}
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
+
         testrec_expected_hm = """
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif?subformat=icon$$xicon
-        """ % {'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" \
+        %(email_tag)s%(email_ind1)s%(email_ind2)s $$%(email_code)sjekyll@cds.cern.ch
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon$$xicon
+        980__ $$aARTICLE
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == ' ' and '_' or email_ind1,
+            'email_ind2': email_ind2 == ' ' and '_' or email_ind2,
+            'email_code': email_code}
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" \
             % {'siteurl': CFG_SITE_URL}
-        testrec_expected_icon = "%(siteurl)s/record/123456789/files/cds.gif?subformat=icon" \
+        testrec_expected_icon = "%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon" \
             % {'siteurl': CFG_SITE_URL}
         # insert test record:
         recs = bibupload.xml_marc_to_records(test_to_upload)
@@ -2535,7 +2747,14 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         self.assertEqual(compare_hmbuffers(inserted_hm,
                                           testrec_expected_hm), '')
 
-        self.assertEqual(urlopen(testrec_expected_icon).read(), open('%s/img/restricted.gif' % CFG_WEBDIR).read())
+        self.assertEqual(test_web_page_content(testrec_expected_icon, 'jekyll', 'j123ekyll', expected_text=urlopen('%(siteurl)s/img/site_logo.gif' % {
+            'siteurl': CFG_SITE_URL
+        }).read()), [])
+        self.assertEqual(test_web_page_content(testrec_expected_icon, 'hyde', 'h123yde', expected_text='Authorization failure'), [])
+        force_webcoll(recid)
+        self.assertEqual(test_web_page_content(testrec_expected_icon, 'hyde', 'h123yde', expected_text=urlopen('%(siteurl)s/img/restricted.gif' % {'siteurl': CFG_SITE_URL}).read()), [])
+
+        self.failUnless("HTTP Error 401: Unauthorized" in test_web_page_content(testrec_expected_url, 'hyde', 'h123yde')[0])
         self.failUnless("This file is restricted." in urlopen(testrec_expected_url).read())
 
     def test_simple_fft_insert_with_icon(self):
@@ -2549,11 +2768,13 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
-          <subfield code="x">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
+          <subfield code="x">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         testrec_expected_xm = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2563,10 +2784,10 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif?subformat=icon</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon</subfield>
           <subfield code="x">icon</subfield>
          </datafield>
         </record>
@@ -2575,12 +2796,12 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif?subformat=icon$$xicon
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon$$xicon
         """ % {'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" \
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" \
             % {'siteurl': CFG_SITE_URL}
-        testrec_expected_icon = "%(siteurl)s/record/123456789/files/cds.gif?subformat=icon" \
+        testrec_expected_icon = "%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon" \
             % {'siteurl': CFG_SITE_URL}
         # insert test record:
         recs = bibupload.xml_marc_to_records(test_to_upload)
@@ -2617,19 +2838,22 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cdsweb.cern.ch/img/head.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/head.gif</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://doc.cern.ch/archive/electronic/hep-th/0101/0101001.pdf</subfield>
+          <subfield code="a">%(siteurl)s/record/95/files/9809057.pdf</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
           <subfield code="a">%(prefix)s/var/tmp/demobibdata.xml</subfield>
          </datafield>
         </record>
-        """ % { 'prefix': CFG_PREFIX }
+        """ % {
+            'prefix': CFG_PREFIX,
+            'siteurl': CFG_SITE_URL
+        }
         testrec_expected_xm = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2639,10 +2863,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/0101001.pdf</subfield>
-         </datafield>
-         <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/9809057.pdf</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
           <subfield code="u">%(siteurl)s/record/123456789/files/demobibdata.xml</subfield>
@@ -2650,20 +2871,23 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
          <datafield tag="856" ind1="4" ind2=" ">
           <subfield code="u">%(siteurl)s/record/123456789/files/head.gif</subfield>
          </datafield>
+         <datafield tag="856" ind1="4" ind2=" ">
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
+         </datafield>
         </record>
         """ % { 'siteurl': CFG_SITE_URL}
         testrec_expected_hm = """
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/0101001.pdf
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif
+        8564_ $$u%(siteurl)s/record/123456789/files/9809057.pdf
         8564_ $$u%(siteurl)s/record/123456789/files/demobibdata.xml
         8564_ $$u%(siteurl)s/record/123456789/files/head.gif
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
         """ % { 'siteurl': CFG_SITE_URL}
         # insert test record:
         testrec_expected_urls = []
-        for files in ('cds.gif', 'head.gif', '0101001.pdf', 'demobibdata.xml'):
+        for files in ('site_logo.gif', 'head.gif', '9809057.pdf', 'demobibdata.xml'):
             testrec_expected_urls.append('%(siteurl)s/record/123456789/files/%(files)s' % {'siteurl' : CFG_SITE_URL, 'files' : files})
         recs = bibupload.xml_marc_to_records(test_to_upload)
         err, recid = bibupload.bibupload(recs[0], opt_mode='insert')
@@ -2673,7 +2897,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         testrec_expected_hm = testrec_expected_hm.replace('123456789',
                                                           str(recid))
         testrec_expected_urls = []
-        for files in ('cds.gif', 'head.gif', '0101001.pdf', 'demobibdata.xml'):
+        for files in ('site_logo.gif', 'head.gif', '9809057.pdf', 'demobibdata.xml'):
             testrec_expected_urls.append('%(siteurl)s/record/%(recid)s/files/%(files)s' % {'siteurl' : CFG_SITE_URL, 'files' : files, 'recid' : recid})
         # compare expected results:
         inserted_xm = print_record(recid, 'xm')
@@ -2687,8 +2911,8 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
             self.failUnless(try_url_download(url))
 
         self._test_bibdoc_status(recid, 'head', '')
-        self._test_bibdoc_status(recid, '0101001', '')
-        self._test_bibdoc_status(recid, 'cds', '')
+        self._test_bibdoc_status(recid, '9809057', '')
+        self._test_bibdoc_status(recid, 'site_logo', '')
         self._test_bibdoc_status(recid, 'demobibdata', '')
 
     def test_simple_fft_correct(self):
@@ -2702,18 +2926,22 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_correct = """
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
 
         testrec_expected_xm = """
         <record>
@@ -2724,7 +2952,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
          </datafield>
         </record>
         """ % { 'siteurl': CFG_SITE_URL}
@@ -2732,9 +2960,9 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
         """ % { 'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" \
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" \
             % {'siteurl': CFG_SITE_URL}
         # insert test record:
         recs = bibupload.xml_marc_to_records(test_to_upload)
@@ -2761,7 +2989,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         self.assertEqual(compare_hmbuffers(inserted_hm,
                                           testrec_expected_hm), '')
 
-        self._test_bibdoc_status(recid, 'cds', '')
+        self._test_bibdoc_status(recid, 'site_logo', '')
 
     def test_fft_implicit_fix_marc(self):
         """bibupload - FFT implicit FIX-MARC"""
@@ -2776,10 +3004,12 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="f">foo@bar.com</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="f">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="f">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_correct = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2787,10 +3017,10 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="f">foo@bar.com</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
          </datafield>
         </record>
         """ % { 'siteurl': CFG_SITE_URL}
@@ -2806,17 +3036,21 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="f">foo@bar.com</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         testrec_expected_hm = """
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
         8560_ $$ffoo@bar.com
-        8564_ $$uhttp://cds.cern.ch/img/cds.gif
-        """
+        8564_ $$u%(siteurl)s/img/site_logo.gif
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         recs = bibupload.xml_marc_to_records(test_to_upload)
         err, recid = bibupload.bibupload(recs[0], opt_mode='insert')
         # replace test buffers with real recid of inserted test record:
@@ -2848,10 +3082,12 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_replace = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -2865,7 +3101,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
           <subfield code="z">BibEdit Comment</subfield>
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
           <subfield code="y">BibEdit Description</subfield>
           <subfield code="x">01</subfield>
          </datafield>
@@ -2881,10 +3117,10 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
         8564_ $$uhttp://www.google.com/
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif$$x01$$yBibEdit Description$$zBibEdit Comment
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif$$x01$$yBibEdit Description$$zBibEdit Comment
         8564_ $$uhttp://cern.ch/
         """ % { 'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" \
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" \
             % {'siteurl': CFG_SITE_URL}
         # insert test record:
         recs = bibupload.xml_marc_to_records(test_to_upload)
@@ -2911,10 +3147,10 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         self.assertEqual(compare_hmbuffers(inserted_hm,
                                           testrec_expected_hm), '')
 
-        self._test_bibdoc_status(recid, 'cds', '')
+        self._test_bibdoc_status(recid, 'site_logo', '')
 
         bibrecdocs = BibRecDocs(recid)
-        bibdoc = bibrecdocs.get_bibdoc('cds')
+        bibdoc = bibrecdocs.get_bibdoc('site_logo')
         self.assertEqual(bibdoc.get_description('.gif'), 'BibEdit Description')
 
 
@@ -2929,24 +3165,28 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="d">Try</subfield>
           <subfield code="z">Comment</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_correct = """
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cdsweb.cern.ch/img/head.gif</subfield>
-          <subfield code="n">cds</subfield>
+          <subfield code="a">%(siteurl)s/img/head.gif</subfield>
+          <subfield code="n">site_logo</subfield>
           <subfield code="m">patata</subfield>
           <subfield code="d">Next Try</subfield>
           <subfield code="z">KEEP-OLD-VALUE</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
 
         testrec_expected_xm = """
         <record>
@@ -3013,17 +3253,19 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="d">Try</subfield>
           <subfield code="z">Comment</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_correct = """
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="n">cds</subfield>
+          <subfield code="n">site_logo</subfield>
           <subfield code="m">patata</subfield>
           <subfield code="f">.gif</subfield>
           <subfield code="d">KEEP-OLD-VALUE</subfield>
@@ -3102,11 +3344,13 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="n">cds</subfield>
-          <subfield code="x">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="n">site_logo</subfield>
+          <subfield code="x">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
 
         testrec_expected_xm = """
         <record>
@@ -3117,7 +3361,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif?subformat=icon</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon</subfield>
           <subfield code="x">icon</subfield>
          </datafield>
         </record>
@@ -3126,9 +3370,9 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif?subformat=icon$$xicon
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon$$xicon
         """ % { 'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif?subformat=icon" \
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif?subformat=icon" \
             % {'siteurl': CFG_SITE_URL}
 
         # insert test record:
@@ -3159,7 +3403,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         self.assertEqual(compare_hmbuffers(inserted_hm,
                                           testrec_expected_hm), '')
 
-        self._test_bibdoc_status(recid, 'cds', '')
+        self._test_bibdoc_status(recid, 'site_logo', '')
 
 
     def test_multiple_fft_correct(self):
@@ -3173,31 +3417,35 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="d">Try</subfield>
           <subfield code="z">Comment</subfield>
           <subfield code="r">Restricted</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="f">.jpeg</subfield>
           <subfield code="d">Try jpeg</subfield>
           <subfield code="z">Comment jpeg</subfield>
           <subfield code="r">Restricted</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_correct = """
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="m">patata</subfield>
           <subfield code="f">.gif</subfield>
           <subfield code="r">New restricted</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
 
         testrec_expected_xm = """
         <record>
@@ -3262,30 +3510,36 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cdsweb.cern.ch/img/head.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/head.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_correct = """
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
         test_to_purge = """
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">http://cds.cern.ch/img/cds.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/site_logo.gif</subfield>
           <subfield code="t">PURGE</subfield>
          </datafield>
         </record>
-        """
+        """ % {
+            'siteurl': CFG_SITE_URL
+        }
 
         testrec_expected_xm = """
         <record>
@@ -3296,10 +3550,10 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="u">Test University</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/head.gif</subfield>
          </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/head.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
          </datafield>
         </record>
         """ % { 'siteurl': CFG_SITE_URL}
@@ -3307,10 +3561,10 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif
         8564_ $$u%(siteurl)s/record/123456789/files/head.gif
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
         """ % { 'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" % { 'siteurl': CFG_SITE_URL}
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" % { 'siteurl': CFG_SITE_URL}
 
         # insert test record:
         recs = bibupload.xml_marc_to_records(test_to_upload)
@@ -3344,12 +3598,16 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         self.assertEqual(compare_hmbuffers(inserted_hm,
                                           testrec_expected_hm), '')
 
-        self._test_bibdoc_status(recid, 'cds', '')
+        self._test_bibdoc_status(recid, 'site_logo', '')
         self._test_bibdoc_status(recid, 'head', '')
 
     def test_revert_fft_correct(self):
         """bibupload - revert FFT correct"""
         # define the test case:
+        email_tag = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][0:3]
+        email_ind1 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][3]
+        email_ind2 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][4]
+        email_code = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][5]
         test_to_upload = """
         <record>
         <controlfield tag="003">SzGeCERN</controlfield>
@@ -3357,18 +3615,26 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">%s/img/iconpen.gif</subfield>
-          <subfield code="n">cds</subfield>
+          <subfield code="a">%(siteurl)s/img/iconpen.gif</subfield>
+          <subfield code="n">site_logo</subfield>
          </datafield>
         </record>
-        """ % CFG_SITE_URL
+        """ % {
+            'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
         test_to_correct = """
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
           <subfield code="a">%s/img/head.gif</subfield>
-          <subfield code="n">cds</subfield>
+          <subfield code="n">site_logo</subfield>
          </datafield>
         </record>
         """ % CFG_SITE_URL
@@ -3376,7 +3642,7 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         <record>
         <controlfield tag="001">123456789</controlfield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="n">cds</subfield>
+          <subfield code="n">site_logo</subfield>
           <subfield code="t">REVERT</subfield>
           <subfield code="v">1</subfield>
          </datafield>
@@ -3391,18 +3657,30 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
-          <subfield code="u">%(siteurl)s/record/123456789/files/cds.gif</subfield>
+          <subfield code="u">%(siteurl)s/record/123456789/files/site_logo.gif</subfield>
          </datafield>
         </record>
-        """ % { 'siteurl': CFG_SITE_URL}
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
         testrec_expected_hm = """
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
-        8564_ $$u%(siteurl)s/record/123456789/files/cds.gif
-        """ % { 'siteurl': CFG_SITE_URL}
-        testrec_expected_url = "%(siteurl)s/record/123456789/files/cds.gif" % { 'siteurl': CFG_SITE_URL}
+        %(email_tag)s%(email_ind1)s%(email_ind2)s $$%(email_code)sjekyll@cds.cern.ch
+        8564_ $$u%(siteurl)s/record/123456789/files/site_logo.gif
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == ' ' and '_' or email_ind1,
+            'email_ind2': email_ind2 == ' ' and '_' or email_ind2,
+            'email_code': email_code}
+        testrec_expected_url = "%(siteurl)s/record/123456789/files/site_logo.gif" % { 'siteurl': CFG_SITE_URL}
 
         # insert test record:
         recs = bibupload.xml_marc_to_records(test_to_upload)
@@ -3436,23 +3714,24 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
         self.assertEqual(compare_hmbuffers(inserted_hm,
                                           testrec_expected_hm), '')
 
-        self._test_bibdoc_status(recid, 'cds', '')
+        self._test_bibdoc_status(recid, 'site_logo', '')
 
         expected_content_version1 = urlopen('%s/img/iconpen.gif' % CFG_SITE_URL).read()
         expected_content_version2 = urlopen('%s/img/head.gif' % CFG_SITE_URL).read()
         expected_content_version3 = expected_content_version1
 
-        content_version1 = urlopen('%s/record/%s/files/cds.gif?version=1' % (CFG_SITE_URL, recid)).read()
-        content_version2 = urlopen('%s/record/%s/files/cds.gif?version=2' % (CFG_SITE_URL, recid)).read()
-        content_version3 = urlopen('%s/record/%s/files/cds.gif?version=3' % (CFG_SITE_URL, recid)).read()
+        self.assertEqual(test_web_page_content('%s/record/%s/files/site_logo.gif?version=1' % (CFG_SITE_URL, recid), 'jekyll', 'j123ekyll', expected_content_version1), [])
+        self.assertEqual(test_web_page_content('%s/record/%s/files/site_logo.gif?version=2' % (CFG_SITE_URL, recid), 'jekyll', 'j123ekyll', expected_content_version2), [])
+        self.assertEqual(test_web_page_content('%s/record/%s/files/site_logo.gif?version=3' % (CFG_SITE_URL, recid), 'jekyll', 'j123ekyll', expected_content_version3), [])
 
-        self.assertEqual(expected_content_version1, content_version1)
-        self.assertEqual(expected_content_version2, content_version2)
-        self.assertEqual(expected_content_version3, content_version3)
 
     def test_simple_fft_replace(self):
         """bibupload - simple FFT replace"""
         # define the test case:
+        email_tag = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][0:3]
+        email_ind1 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][3]
+        email_ind2 = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][4]
+        email_code = CFG_ACC_GRANT_AUTHOR_RIGHTS_TO_EMAILS_IN_TAGS[0][5]
         test_to_upload = """
         <record>
         <controlfield tag="003">SzGeCERN</controlfield>
@@ -3460,12 +3739,20 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">%s/img/iconpen.gif</subfield>
-          <subfield code="n">cds</subfield>
+          <subfield code="a">%(siteurl)s/img/iconpen.gif</subfield>
+          <subfield code="n">site_logo</subfield>
          </datafield>
         </record>
-        """ % CFG_SITE_URL
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
+
         test_to_replace = """
         <record>
         <controlfield tag="001">123456789</controlfield>
@@ -3474,11 +3761,18 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
          <datafield tag="FFT" ind1=" " ind2=" ">
-          <subfield code="a">%s/img/head.gif</subfield>
+          <subfield code="a">%(siteurl)s/img/head.gif</subfield>
          </datafield>
         </record>
-        """ % CFG_SITE_URL
+        """ % {'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
 
         testrec_expected_xm = """
         <record>
@@ -3488,17 +3782,32 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
           <subfield code="a">Test, John</subfield>
           <subfield code="u">Test University</subfield>
          </datafield>
+         <datafield tag="%(email_tag)s" ind1="%(email_ind1)s" ind2="%(email_ind2)s">
+          <subfield code="%(email_code)s">jekyll@cds.cern.ch</subfield>
+         </datafield>
          <datafield tag="856" ind1="4" ind2=" ">
           <subfield code="u">%(siteurl)s/record/123456789/files/head.gif</subfield>
          </datafield>
         </record>
-        """ % { 'siteurl': CFG_SITE_URL}
+        """ % {
+             'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == '_' and ' ' or email_ind1,
+            'email_ind2': email_ind2 == '_' and ' ' or email_ind2,
+            'email_code': email_code}
+
         testrec_expected_hm = """
         001__ 123456789
         003__ SzGeCERN
         100__ $$aTest, John$$uTest University
+        %(email_tag)s%(email_ind1)s%(email_ind2)s $$%(email_code)sjekyll@cds.cern.ch
         8564_ $$u%(siteurl)s/record/123456789/files/head.gif
-        """ % { 'siteurl': CFG_SITE_URL}
+        """ % {
+            'siteurl': CFG_SITE_URL,
+            'email_tag': email_tag,
+            'email_ind1': email_ind1 == ' ' and '_' or email_ind1,
+            'email_ind2': email_ind2 == ' ' and '_' or email_ind2,
+            'email_code': email_code}
         testrec_expected_url = "%(siteurl)s/record/123456789/files/head.gif" % { 'siteurl': CFG_SITE_URL}
 
         # insert test record:
@@ -3528,9 +3837,8 @@ class BibUploadFFTModeTest(GenericBibUploadTest):
 
         expected_content_version = urlopen('%s/img/head.gif' % CFG_SITE_URL).read()
 
-        content_version = urlopen('%s/record/%s/files/head.gif' % (CFG_SITE_URL, recid)).read()
-
-        self.assertEqual(expected_content_version, content_version)
+        self.assertEqual(test_web_page_content(testrec_expected_url, 'hyde', 'h123yde', expected_text='Authorization failure'), [])
+        self.assertEqual(test_web_page_content(testrec_expected_url, 'jekyll', 'j123ekyll', expected_text=expected_content_version), [])
 
 
 TEST_SUITE = make_test_suite(BibUploadHoldingPenTest,

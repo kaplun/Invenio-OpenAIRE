@@ -725,6 +725,15 @@ a.footer:hover {
 .admin_wvar_nomargin {
    margin: 0px;
 }
+tr.admin_row_highlight:hover{
+   background-color:#eee;
+}
+tr.admin_row_highlight:hover td.extracolumn{
+   background-color:#fff;
+}
+.admin_row_color{
+   background-color:#EBF7FF;
+}
 .adminlabel {
    width: 100px;
    font-size: small;
@@ -2010,6 +2019,16 @@ input.hyperlinkformSubmitButton {
   vertical-align: bottom;
 }
 #bibEditMenu .bibEditImgCtrlDisabled {
+  cursor: default;
+  opacity: 0.4;
+  vertical-align: bottom;
+}
+.bibEditImgCtrlEnabled {
+  cursor: pointer;
+  opacity: 1.0;
+  vertical-align: bottom;
+}
+.bibEditImgCtrlDisabled {
   cursor: default;
   opacity: 0.4;
   vertical-align: bottom;

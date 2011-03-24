@@ -92,7 +92,7 @@ install-mathjax-plugin:
 	rm -rf /tmp/invenio-mathjax-plugin
 	mkdir /tmp/invenio-mathjax-plugin
 	(cd /tmp/invenio-mathjax-plugin && \
-	wget 'http://downloads.sourceforge.net/mathjax/$(MATHJAX)' && \
+	wget 'http://www.mathjax.org/dl/$(MATHJAX)' && \
 	unzip -q -u -d ${prefix}/var/www $(MATHJAX))
 	rm -fr /tmp/invenio-mathjax-plugin
 	@echo "* Installing Invenio-specific MathJax config..."
@@ -143,20 +143,35 @@ install-jquery-plugins: install-jquery-plugins
 	(cd ${prefix}/var/www/js && \
 	wget http://jqueryjs.googlecode.com/files/jquery-1.3.1.min.js && \
 	mv jquery-1.3.1.min.js jquery.min.js && \
-	wget http://jquery-ui.googlecode.com/svn/tags/latest/ui/minified/jquery.effects.core.min.js && \
-	wget http://jquery-ui.googlecode.com/svn/tags/latest/ui/minified/jquery.effects.highlight.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/jquery-1.4.4.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.effects.core.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.effects.highlight.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.widget.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.tabs.min.js && \
 	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/ui/minified/ui.slider.min.js && \
 	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/ui/minified/ui.sortable.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.button.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.dialog.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.mouse.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.draggable.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.position.min.js && \
+	wget http://jquery-ui.googlecode.com/svn/tags/1.8.10/ui/minified/jquery.ui.resizable.min.js && \
 	wget http://www.appelsiini.net/download/jquery.jeditable.mini.js && \
 	wget http://github.com/malsup/form/raw/master/jquery.form.js --no-check-certificate && \
 	wget http://jquery-multifile-plugin.googlecode.com/svn/trunk/jquery.MultiFile.pack.js && \
 	wget http://plugins.jquery.com/files/jquery.autogrow-1.2.2.zip && \
 	wget http://tablesorter.com/jquery.tablesorter.zip && \
 	wget http://www.uploadify.com/wp-content/uploads/Uploadify-v2.1.3.zip -O uploadify.zip && \
+	wget http://www.datatables.net/download/build/jquery.dataTables.min.js && \
 	unzip jquery.tablesorter.zip && \
 	rm jquery.tablesorter.zip && \
 	unzip -u uploadify.zip && \
 	mv -T jquery.uploadify-v2.1.3 uploadify && \
+	wget http://flot.googlecode.com/files/flot-0.6.zip && \
+	wget http://trentrichardson.com/examples/timepicker/js/jquery-ui-timepicker-addon.js && \
+	unzip -u flot-0.6.zip && \
+	mv flot/jquery.flot.selection.min.js flot/jquery.flot.min.js flot/excanvas.min.js ./ && \
+	rm flot-0.6.zip && rm -r flot && \
 	mv uploadify/swfobject.js ./ && \
 	mv uploadify/cancel.png uploadify/uploadify.css uploadify/uploadify.allglyphs.swf uploadify/uploadify.fla uploadify/uploadify.swf ../img/ && \
 	mv uploadify/jquery.uploadify.v2.1.3.min.js ./jquery.uploadify.min.js && \
@@ -172,13 +187,17 @@ install-jquery-plugins: install-jquery-plugins
 	wget http://plugins.jquery.com/files/jquery.ajaxPager.js_5.txt && \
 	mv jquery.ajaxPager.js_5.txt jquery.ajaxPager.js && \
 	wget http://jqueryui.com/download/jquery-ui-1.7.3.custom.zip && \
-	unzip jquery-ui-1.7.3.custom.zip development-bundle/ui/ui.core.js && \
+	unzip jquery-ui-1.7.3.custom.zip development-bundle/ui/ui.core.js js/jquery-ui-1.7.3.custom.min.js && \
 	mv development-bundle/ui/ui.core.js ui.core.js && \
+	mv js/jquery-ui-1.7.3.custom.min.js jquery-ui-1.7.3.custom.min.js && \
 	rm -rf development-bundle && \
 	rm jquery-ui-1.7.3.custom.zip && \
 	mkdir -p ${prefix}/var/www/img && \
 	cd ${prefix}/var/www/img && \
 	wget -r -np -nH --cut-dirs=4 -A "png,css" -P jquery-ui/themes http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/base/ && \
+	wget -r -np -nH --cut-dirs=4 -A "png,css" -P jquery-ui/themes http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/smoothness/ && \
+	wget -r -np -nH --cut-dirs=4 -A "png,css" -P jquery-ui/themes http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/redmond/ && \
+	wget --no-check-certificate -O datatables_jquery-ui.css https://github.com/DataTables/DataTables/raw/master/media/css/demo_table_jui.css && \
 	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/redmond/jquery-ui.css && \
 	wget http://jquery-ui.googlecode.com/svn/tags/1.7.3/demos/images/calendar.gif && \
 	wget -r -np -nH --cut-dirs=5 -A "png" http://jquery-ui.googlecode.com/svn/tags/1.7.3/themes/redmond/images/)
@@ -193,6 +212,10 @@ uninstall-jquery-plugins:
 	rm -f jquery.effects.highlight.min.js && \
 	rm -f jquery.MultiFile.pack.js && \
 	rm -f jquery.jeditable.mini.js && \
+	rm -f jquery.flot.selection.min.js && \
+	rm -f jquery.flot.min.js && \
+	rm -f excanvas.min.js && \
+	rm -f jquery-ui-timepicker-addon.min.js && \
 	rm -f jquery.tablesorter.js && \
 	rm -f jquery.tablesorter.pager.js && \
 	rm -f ui.datepicker.min.js && \
@@ -201,14 +224,17 @@ uninstall-jquery-plugins:
 	rm -f jquery.uploadify.min.js && \
 	rm -f jquery.ui.slider.min.js && \
 	rm -f jquery.ui.sortable.min.js && \
+	rm -f jquery.ui.tabs.min.js && \
 	rm -rf tablesorter && \
 	rm -f jquery.hotkeys.min.js && \
 	rm -rf jquery-treeview && \
 	rm -f jquery.ajaxPager.js && \
 	rm -f jquery.form.js && \
+	rm -f jquery.dataTables.min.js && \
 	rm -f ui.core.js) && \
 	(cd ${prefix}/var/www/img && \
-	rm -f cancel.png uploadify.css uploadify.swf uploadify.allglyphs.swf uploadify.fla)
+	rm -f cancel.png uploadify.css uploadify.swf uploadify.allglyphs.swf uploadify.fla && \
+	rm -f datatables_jquery-ui.css)
 	@echo "***********************************************************"
 	@echo "** The jquery plugins were successfully uninstalled.     **"
 	@echo "***********************************************************"
@@ -233,6 +259,7 @@ install-fckeditor-plugin:
 	rm -r ${prefix}/var/www/fckeditor/editor/filemanager/connectors && \
 	find ${prefix}/var/www/fckeditor/fckeditor* -maxdepth 0 ! -name "fckeditor.js" -exec rm -r {} \; && \
 	rm -fr /tmp/invenio-fckeditor-plugin
+	sed -i "s/if (FCKBrowserInfo\.IsSafari){FCKTools\.AddEventListener(FCK\.EditorDocument,'paste'/if (FCKBrowserInfo.IsSafari \&\& false){FCKTools.AddEventListener(FCK.EditorDocument,'paste'/" ${prefix}/var/www/fckeditor/editor/js/fckeditorcode_gecko.js # Fix issue described at <http://dev.ckeditor.com/ticket/4960>, affecting v2.6.5, 2.6.6
 	@echo "* Installing Invenio-specific FCKeditor config..."
 	(cd $(top_srcdir)/modules/webstyle/etc && make install)
 	@echo "***********************************************************"
@@ -410,7 +437,7 @@ update-v0.99.1-tables:
 update-v0.99.2-tables:
 	@echo "Nothing to do; table structure did not change between v0.99.2 and v0.99.3."
 
-update-v0.99.3-tables:
+update-v0.99.3-tables: # from v0.99.3 to v1.0.0-rc0
 	echo "RENAME TABLE oaiARCHIVE TO oaiREPOSITORY;" | ${prefix}/bin/dbexec
 	${prefix}/bin/dbexec < $(top_srcdir)/modules/miscutil/sql/tabcreate.sql
 	echo "INSERT INTO knwKB (id,name,description,kbtype) SELECT id,name,description,'' FROM fmtKNOWLEDGEBASES;" | ${prefix}/bin/dbexec
@@ -505,5 +532,11 @@ update-v0.99.3-tables:
 	migrate_comments_populate_threads_index()' | $(PYTHON)
 	echo -e 'from invenio.access_control_firerole import repair_role_definitions;\
 	repair_role_definitions()' | $(PYTHON)
+
+update-v1.0.0-rc0-tables: # from v1.0.0-rc0 to next release
+	${prefix}/bin/dbexec < $(top_srcdir)/modules/miscutil/sql/tabcreate.sql
+	echo "INSERT INTO sbmALLFUNCDESCR VALUES ('Set_Embargo','Set an embargo on all the documents of a given record.');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Set_Embargo','date_file');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('Set_Embargo','date_format');" | ${prefix}/bin/dbexec
 
 CLEANFILES = *~ *.pyc *.tmp

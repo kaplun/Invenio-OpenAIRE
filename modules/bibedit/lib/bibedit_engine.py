@@ -20,6 +20,9 @@
 
 __revision__ = "$Id"
 
+from invenio import bibrecord
+from invenio import bibformat
+
 from invenio.bibedit_config import CFG_BIBEDIT_AJAX_RESULT_CODES, \
     CFG_BIBEDIT_JS_CHECK_SCROLL_INTERVAL, CFG_BIBEDIT_JS_HASH_CHECK_INTERVAL, \
     CFG_BIBEDIT_JS_CLONED_RECORD_COLOR, \
@@ -36,8 +39,7 @@ from invenio.bibedit_config import CFG_BIBEDIT_AJAX_RESULT_CODES, \
     CFG_BIBEDIT_KEYWORD_TAXONOMY, CFG_BIBEDIT_KEYWORD_TAG, \
     CFG_BIBEDIT_KEYWORD_RDFLABEL
 
-from invenio.config import CFG_SITE_LANG
-
+from invenio.config import CFG_SITE_LANG, CFG_DEVEL_SITE
 from invenio.bibedit_dblayer import get_name_tags_all, reserve_record_id, \
     get_related_hp_changesets, get_hp_update_xml, delete_hp_change, \
     get_record_last_modification_date, get_record_revision_author, \
@@ -59,7 +61,8 @@ from invenio.bibrecord import create_record, print_rec, record_add_field, \
     record_delete_subfield_from, \
     record_modify_subfield, record_move_subfield, \
     create_field, record_replace_field, record_move_fields, \
-    record_modify_controlfield, record_get_field_values
+    record_modify_controlfield, record_get_field_values, \
+    record_get_subfields
 from invenio.config import CFG_BIBEDIT_PROTECTED_FIELDS, CFG_CERN_SITE, \
     CFG_SITE_URL
 from invenio.search_engine import record_exists, search_pattern
@@ -71,6 +74,7 @@ from invenio.bibknowledge import get_kbd_values_for_bibedit, get_kbr_values, \
 
 from invenio.bibcirculation_dblayer import get_number_copies, has_copies
 from invenio.bibcirculation_utils import create_item_details_url
+from datetime import datetime
 
 import re
 import difflib
@@ -329,6 +333,7 @@ def perform_request_ajax(req, recid, uid, data, isBulk = False, \
                                                data))
     elif request_type in ('addField', 'addSubfields', \
                           'addFieldsSubfieldsOnPositions', 'modifyContent', \
+                          'modifySubfieldTag', 'modifyFieldTag', \
                           'moveSubfield', 'deleteFields', 'moveField', \
                           'modifyField', 'otherUpdateRequest', \
                           'disableHpChange', 'deactivateHoldingPenChangeset'):
@@ -364,6 +369,9 @@ def perform_request_ajax(req, recid, uid, data, isBulk = False, \
         cacheMTime = data['cacheMTime']
         response.update(perform_bulk_request_ajax(req, recid, uid, changes, \
                                                   undo_redo, cacheMTime))
+    elif request_type in ('preview', ):
+        response.update(perform_request_preview_record(request_type, recid, uid))
+
     return response
 
 def perform_bulk_request_ajax(req, recid, uid, reqsData, undoRedo, cacheMTime):
@@ -392,6 +400,8 @@ def perform_request_search(data):
     """Handle search requests."""
     response = {}
     searchType = data['searchType']
+    if searchType is None:
+        searchType = "anywhere"
     searchPattern = data['searchPattern']
     if searchType == 'anywhere':
         pattern = searchPattern
@@ -540,6 +550,8 @@ def perform_request_record(req, request_type, recid, uid, data, ln=CFG_SITE_LANG
                     # a normal cacheless retrieval of a record
                     record = get_bibrecord(recid)
                     record_revision = get_record_last_modification_date(recid)
+                    if record_revision == None:
+                        record_revision = datetime.now().timetuple()
                     pending_changes = []
                     disabled_hp_changes = {}
                 cache_dirty = False
@@ -580,13 +592,16 @@ def perform_request_record(req, request_type, recid, uid, data, ln=CFG_SITE_LANG
                     cache_dirty = False
                     undo_list = []
                     redo_list = []
-            if data['clonedRecord']:
+            if data.get('clonedRecord',''):
                 response['resultCode'] = 9
             else:
                 response['resultCode'] = 3
             revision_author = get_record_revision_author(recid, record_revision)
-            last_revision_ts = revision_to_timestamp( \
-                get_record_last_modification_date(recid))
+            latest_revision = get_record_last_modification_date(recid)
+            if latest_revision == None:
+                latest_revision = datetime.now().timetuple()
+            last_revision_ts = revision_to_timestamp(latest_revision)
+
             revisions_history = get_record_revision_timestamps(recid)
             number_of_physical_copies = get_number_copies(recid)
             bibcirc_details_URL = create_item_details_url(recid, ln)
@@ -647,12 +662,18 @@ def perform_request_record(req, request_type, recid, uid, data, ln=CFG_SITE_LANG
                 elif not data['force'] and \
                         not latest_record_revision(recid, record_revision):
                     response['cacheOutdated'] = True
+                    if CFG_DEVEL_SITE:
+                        response['record_revision'] = record_revision.__str__()
+                        response['newest_record_revision'] = \
+                            get_record_last_modification_date(recid).__str__()
                 else:
                     save_xml_record(recid, uid)
                     response['resultCode'] = 4
-            except:
+            except Exception, e:
                 response['resultCode'] = CFG_BIBEDIT_AJAX_RESULT_CODES_REV[ \
                     'error_wrong_cache_file_format']
+                if CFG_DEVEL_SITE: # return debug information in the request
+                    response['exception_message'] = e.__str__()
     elif request_type == 'revert':
         revId = data['revId']
         job_date = "%s-%s-%s %s:%s:%s" % re_revdate_split.search(revId).groups()
@@ -935,6 +956,27 @@ def perform_request_update_record(request_type, recid, uid, cacheMTime, data, \
                   field_position_local=field_position_local)
             response['resultCode'] = 24
 
+        elif request_type == 'modifySubfieldTag':
+            record_add_subfield_into(record, data['tag'], data['subfieldCode'],
+            data["value"], subfield_position= int(data['subfieldIndex']),
+            field_position_local=field_position_local)
+
+            record_delete_subfield_from(record, data['tag'], int(data['subfieldIndex']) + 1,
+            field_position_local=field_position_local)
+
+            response['resultCode'] = 24
+
+        elif request_type == 'modifyFieldTag':
+            subfields = record_get_subfields(record, data['oldTag'],
+            field_position_local=field_position_local)
+
+            record_add_field(record, data['newTag'], data['ind1'],
+                             data['ind2'] , subfields=subfields)
+
+            record_delete_field(record, data['oldTag'], ind1=data['oldInd1'], \
+                                ind2=data['oldInd2'], field_position_local=field_position_local)
+            response['resultCode'] = 32
+
         elif request_type == 'moveSubfield':
             record_move_subfield(record, data['tag'],
                 int(data['subfieldIndex']), int(data['newSubfieldIndex']),
@@ -983,6 +1025,7 @@ def perform_request_update_record(request_type, recid, uid, cacheMTime, data, \
                 response['resultCode'] = 29
             else:
                 response['resultCode'] = 30
+
         response['cacheMTime'], response['cacheDirty'] = \
             update_cache_file_contents(recid, uid, record_revision,
                                        record, \
@@ -1118,3 +1161,42 @@ def perform_request_bibcatalog(request_type, recid, uid):
 
     return response
 
+def perform_request_preview_record(request_type, recid, uid):
+    """ Handle request to preview record with formatting
+
+    """
+
+    response = {}
+    if request_type == "preview":
+        if cache_exists(recid, uid):
+            dummy1, dummy2, record, dummy3, dummy4, dummy5, dummy6 = get_cache_file_contents(recid, uid)
+        else:
+            record = get_bibrecord(recid)
+    response['html_preview'] = _get_formated_record(record)
+
+    return response
+
+def _get_formated_record(record):
+    """Returns a record in a given format
+
+    @param record: BibRecord object
+    """
+
+    xml_record = bibrecord.record_xml_output(record)
+
+    result =  "<html><head><title>Record preview</title></head>"
+    result += "<script src='/MathJax/MathJax.js' type='text/javascript'></script>"
+    result += "<body><h2> Brief format preview </h2>"
+    result += bibformat.format_record(recID=None,
+                                     of="hb",
+                                     xml_record=xml_record)
+    result += "<h2> Detailed format preview </h2>"
+
+    result += bibformat.format_record(recID=None,
+                                     of="hd",
+                                     xml_record=xml_record)
+
+    result += "</body></html>"
+
+
+    return result

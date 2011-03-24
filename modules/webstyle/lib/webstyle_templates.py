@@ -191,6 +191,7 @@ class Template:
                                    adminactivities_menu = adminactivities_menu,
                                    navtrailbox = navtrailbox,
                                    pageheaderadd = pageheaderadd,
+                                   uid=uid,
                                    secure_page_p = secure_page_p,
                                    navmenuid=navmenuid,
                                    rssurl=rssurl,
@@ -214,6 +215,7 @@ class Template:
     %(titleepilogue)s
     %(body)s
   </div>
+  <div class="clear"></div>
 </div>
 """ % {
   'boxlefttop' : boxlefttop,
@@ -229,7 +231,7 @@ class Template:
   'boxrightbottomadd' : boxrightbottomadd,
 
   'titleprologue' : titleprologue,
-  'title' : (title and show_title_p) and '<h1 class="headline">' + cgi.escape(title) + '</h1>' or '',
+  'title' : (title and show_title_p) and '<div class="headline_div"><h1 class="headline">' + cgi.escape(title) + '</h1></div>' or '',
   'titleepilogue' : titleepilogue,
 
   'body' : body,

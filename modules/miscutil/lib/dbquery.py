@@ -32,6 +32,7 @@ from MySQLdb import Warning, Error, InterfaceError, DataError, \
                     DatabaseError, OperationalError, IntegrityError, \
                     InternalError, NotSupportedError, \
                     ProgrammingError
+import os
 import string
 import time
 import marshal
@@ -70,7 +71,15 @@ CFG_DATABASE_PASS = 'my123p$ss'
 
 _DB_CONN = {}
 
+
+class InvenioDbQueryWildcardLimitError(Exception):
+    """Exception raised when query limit reached."""
+    def __init__(self, res):
+        """Initialization."""
+        self.res = res
+
 def _db_login(relogin = 0):
+
     """Login to the database."""
 
     ## Note: we are using "use_unicode=False", because we want to
@@ -90,7 +99,7 @@ def _db_login(relogin = 0):
                        passwd=CFG_DATABASE_PASS,
                        use_unicode=False, charset='utf8')
     else:
-        thread_ident = get_ident()
+        thread_ident = (os.getpid(), get_ident())
     if relogin:
         _DB_CONN[thread_ident] = connect(host=CFG_DATABASE_HOST,
                                          port=int(CFG_DATABASE_PORT),
@@ -114,7 +123,18 @@ def _db_login(relogin = 0):
 def _db_logout():
     """Close a connection."""
     try:
-        del _DB_CONN[get_ident()]
+        del _DB_CONN[(os.getpid(), get_ident())]
+    except KeyError:
+        pass
+
+def close_connection():
+    """
+    Enforce the closing of a connection
+    Highly relevant in multi-processing and multi-threaded modules
+    """
+    try:
+        _DB_CONN[(os.getpid(), get_ident())].close()
+        del(_DB_CONN[(os.getpid(), get_ident())])
     except KeyError:
         pass
 
@@ -144,7 +164,6 @@ def run_sql(sql, param=None, n=0, with_desc=0):
         the Python DB API 2.0.  The client code can import them from
         this file and catch them.
     """
-
     if CFG_ACCESS_CONTROL_LEVEL_SITE == 3:
         # do not connect to the database as the site is closed for maintenance:
         return []
@@ -178,7 +197,7 @@ def run_sql(sql, param=None, n=0, with_desc=0):
             return recset
     else:
         if string.upper(string.split(sql)[0]) == "INSERT":
-            rc =  cur.lastrowid
+            rc = cur.lastrowid
         return rc
 
 def run_sql_many(query, params, limit=CFG_MISCUTIL_SQL_RUN_SQL_MANY_LIMIT):
@@ -202,12 +221,12 @@ def run_sql_many(query, params, limit=CFG_MISCUTIL_SQL_RUN_SQL_MANY_LIMIT):
         try:
             db = _db_login()
             cur = db.cursor()
-            rc = cur.executemany(query, params[i:i+limit])
+            rc = cur.executemany(query, params[i:i + limit])
         except OperationalError:
             try:
                 db = _db_login(relogin=1)
                 cur = db.cursor()
-                rc = cur.executemany(query, params[i:i+limit])
+                rc = cur.executemany(query, params[i:i + limit])
             except OperationalError:
                 raise
         ## collect its result:
@@ -217,6 +236,25 @@ def run_sql_many(query, params, limit=CFG_MISCUTIL_SQL_RUN_SQL_MANY_LIMIT):
             r += rc
         i += limit
     return r
+
+def run_sql_with_limit(query, param=None, n=0, with_desc=0, wildcard_limit=0):
+    """This function should be used in some cases, instead of run_sql function, in order
+        to protect the db from queries that might take a log time to respond
+        Ex: search queries like [a-z]+ ; cern*; a->z;
+        The parameters are exactly the ones for run_sql function.
+        In case the query limit is reached, an InvenioDbQueryWildcardLimitError will be raised.
+    """
+    try:
+        dummy = int(wildcard_limit)
+    except ValueError:
+        raise
+    if wildcard_limit < 1:#no limit on the wildcard queries
+        return run_sql(query, param, n, with_desc)
+    safe_query = query + " limit %s" %wildcard_limit
+    res = run_sql(safe_query, param, n, with_desc)
+    if len(res) == wildcard_limit:
+        raise InvenioDbQueryWildcardLimitError(res)
+    return res
 
 def blob_to_string(ablob):
     """Return string representation of ABLOB.  Useful to treat MySQL
@@ -267,7 +305,7 @@ def get_table_update_time(tablename):
     # MySQL-5.0, we can employ a much cleaner technique of using
     # SELECT UPDATE_TIME FROM INFORMATION_SCHEMA.TABLES WHERE
     # table_name='collection'.
-    res = run_sql("SHOW TABLE STATUS LIKE %s", (tablename, ))
+    res = run_sql("SHOW TABLE STATUS LIKE %s", (tablename,))
     update_times = [] # store all update times
     for row in res:
         if type(row[10]) is long or \
@@ -288,7 +326,7 @@ def get_table_status_info(tablename):
        etc.  If TABLENAME does not exist, return empty dict.
     """
     # Note: again a hack so that it works on all MySQL 4.0, 4.1, 5.0
-    res = run_sql("SHOW TABLE STATUS LIKE %s", (tablename, ))
+    res = run_sql("SHOW TABLE STATUS LIKE %s", (tablename,))
     table_status_info = {} # store all update times
     for row in res:
         if type(row[10]) is long or \

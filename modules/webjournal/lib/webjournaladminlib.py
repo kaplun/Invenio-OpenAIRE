@@ -68,13 +68,15 @@ from invenio.webjournal_utils import \
      get_journal_articles, \
      get_grouped_issues, \
      get_journal_issue_grouping, \
-     get_journal_languages
+     get_journal_languages, \
+     get_journal_collection_to_refresh_on_release
 from invenio.dbquery import run_sql
 from invenio.bibrecord import \
      create_record, \
      print_rec
 from invenio.bibformat import format_record
 from invenio.bibtask import task_low_level_submission
+from invenio.search_engine import get_all_collections_of_a_record
 import invenio.template
 wjt = invenio.template.load('webjournal')
 
@@ -743,6 +745,7 @@ def move_drafts_articles_to_ready(journal_name, issue):
     """
     protected_datafields = ['100', '245', '246', '520', '590', '700']
     keyword_to_remove = get_journal_draft_keyword_to_remove(journal_name)
+    collections_to_refresh = {}
 
     categories = get_journal_categories(journal_name, issue)
     for category in categories:
@@ -774,6 +777,18 @@ def move_drafts_articles_to_ready(journal_name, issue):
                     task_low_level_submission('bibupload',
                                               'WebJournal',
                                               '-c', new_record_xml_path)
+                    task_low_level_submission('bibindex',
+                                              'WebJournal',
+                                              '-i', str(recid))
+                    for collection in get_all_collections_of_a_record(recid):
+                        collections_to_refresh[collection] = ''
+
+    # Refresh collections
+    collections_to_refresh.update([(c, '') for c in get_journal_collection_to_refresh_on_release(journal_name)])
+    for collection in collections_to_refresh.keys():
+        task_low_level_submission('webcoll',
+                                  'WebJournal',
+                                  '-f', '-p', '2','-c', collection)
 
 def update_draft_record_metadata(record, protected_datafields, keyword_to_remove):
     """

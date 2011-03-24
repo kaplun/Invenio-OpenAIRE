@@ -57,13 +57,15 @@ multiedit_templates = template.load('bibeditmulti')
 # base command for subfields
 class BaseSubfieldCommand:
     """Base class for commands manipulating subfields"""
-    def __init__(self, subfield, value = "", new_value = "", condition = "", condition_subfield = ""):
+    def __init__(self, subfield, value = "", new_value = "", condition = "", condition_exact_match=True, condition_subfield = ""):
         """Initialization."""
         self._subfield = subfield
         self._value = value
         self._new_value = new_value
         self._condition = condition
         self._condition_subfield = condition_subfield
+        self._condition_exact_match = condition_exact_match
+        self._modifications = 0
 
     def process_field(self, record, tag, field_number):
         """Make changes to a record.
@@ -72,6 +74,21 @@ class BaseSubfieldCommand:
 
         Every specific command provides its own implementation"""
         pass
+
+    def _subfield_condition_match(self, subfield_value):
+        """Check if the condition is met for the given subfield value
+        in order to act only on certain subfields
+        @return True if condition match, False if condition does not match
+        """
+        if self._condition_exact_match:
+            # exact matching
+            if self._condition == subfield_value:
+                return True
+        else:
+            # partial matching
+            if self._condition in subfield_value:
+                return True
+        return False
 
     def _perform_on_all_matching_subfields(self, record, tag, field_number, callback):
         """Perform an action on all subfields of a given field matching
@@ -98,16 +115,37 @@ class BaseSubfieldCommand:
                 subfield_index = 0
                 for subfield in field[0]:
                     if self._condition != 'condition':
-                        if (self._condition_subfield == subfield[0]) and (self._condition == subfield[1]):
-                            callback(record, tag, field_number, subfield_index)
+                        # only modify subfields that match the condition
+                        if subfield[0] == self._subfield:
+                            for subfield in field[0]:
+                                if self._condition_subfield == subfield[0]:
+                                    if self._subfield_condition_match(subfield[1]):
+                                        self._add_subfield_modification()
+                                        callback(record, tag, field_number, subfield_index)
                     elif subfield[0] == self._subfield:
+                        self._add_subfield_modification()
                         callback(record, tag, field_number, subfield_index)
                     subfield_index = subfield_index+1
+
+    def _add_subfield_modification(self):
+        """Keep a record of the number of modifications made to subfields"""
+        self._modifications += 1
 
 # specific commands for subfields
 
 class AddSubfieldCommand(BaseSubfieldCommand):
     """Add subfield to a given field"""
+    def _perform_on_all_matching_subfields_add_subfield(self, record, tag, field_number, callback):
+        if tag not in record.keys():
+            return
+        for field in record[tag]:
+            if field[4] == field_number:
+                for subfield in field[0]:
+                    if self._condition_subfield == subfield[0]:
+                        if self._subfield_condition_match(subfield[1]):
+                            self._add_subfield_modification()
+                            callback(record, tag, field_number, None)
+
     def process_field(self, record, tag, field_number):
         """@see: BaseSubfieldCommand.process_field"""
         action = lambda record, tag, field_number, subfield_index: \
@@ -116,9 +154,10 @@ class AddSubfieldCommand(BaseSubfieldCommand):
                                          None,
                                          field_position_global=field_number)
         if self._condition != 'condition':
-            self._perform_on_all_matching_subfields(record, tag,
-                                                    field_number, action)
+            self._perform_on_all_matching_subfields_add_subfield(record, tag,
+                                                                field_number, action)
         else:
+            self._add_subfield_modification()
             action(record, tag, field_number, None)
 
 class DeleteSubfieldCommand(BaseSubfieldCommand):
@@ -166,11 +205,16 @@ class ReplaceTextInSubfieldCommand(BaseSubfieldCommand):
                     (field_code, field_value) = subfields[subfield_index]
             #replace text
             new_value = field_value.replace(self._value, self._new_value)
-            #update the subfield
-            bibrecord.record_modify_subfield(record, tag,
-                                             self._subfield, new_value,
-                                             subfield_index,
-                                    field_position_global=field_number)
+            #update the subfield if needed
+            if new_value != field_value:
+                bibrecord.record_modify_subfield(record, tag,
+                                                self._subfield, new_value,
+                                                subfield_index,
+                                                field_position_global=field_number)
+            else:
+                #No modification ocurred, update modification counter
+                self._modifications -= 1
+
         self._perform_on_all_matching_subfields(record,
                                                 tag,
                                                 field_number,
@@ -194,6 +238,7 @@ class BaseFieldCommand:
         self._ind1 = ind1
         self._ind2 = ind2
         self._subfield_commands = subfield_commands
+        self._modifications = 0
 
     def process_record(self, record):
         """Make changes to a record.
@@ -205,8 +250,14 @@ class BaseFieldCommand:
 
     def _apply_subfield_commands_to_field(self, record, field_number):
         """Applies all subfield commands to a given field"""
+        field_modified = False
         for subfield_command in self._subfield_commands:
+            current_modifications = subfield_command._modifications
             subfield_command.process_field(record, self._tag, field_number)
+            if subfield_command._modifications > current_modifications:
+                field_modified = True
+        if field_modified:
+            self._modifications += 1
 
 # specific commands for fields
 
@@ -229,6 +280,8 @@ class DeleteFieldCommand(BaseFieldCommand):
     def process_record(self, record):
         """@see: BaseFieldCommand.process_record"""
         bibrecord.record_delete_field(record, self._tag, self._ind1, self._ind2)
+        self._modifications += 1
+
 class UpdateFieldCommand(BaseFieldCommand):
     """Deletes given fields from a record"""
 
@@ -273,25 +326,37 @@ def perform_request_detailed_record(record_id, update_commands, output_format, l
     @param language: language of the page
     """
 
+    response = {}
     record_content = _get_formated_record(record_id=record_id,
                                 output_format=output_format,
                                 update_commands = update_commands,
                                 language=language)
 
-    result = multiedit_templates.detailed_record(record_content, language)
+    response['search_html'] = multiedit_templates.detailed_record(record_content, language)
+    return response
 
-    return result
-
-def perform_request_test_search(search_criteria, update_commands, output_format, page_to_display, language, outputTags, collection=""):
+def perform_request_test_search(search_criteria, update_commands, output_format, page_to_display, 
+                                language, outputTags, collection="", compute_modifications = 0):
     """Returns the results of a test search.
 
     @param search_criteria: search criteria used in the test search
+    @type search_criteria: string
     @param update_commands: list of commands used to update record contents
+    @type update_commands: list of objects
     @param output_format: specifies the output format as expected from bibformat
+    @type output_format: string (hm, hb, hd, xm, xn, hx)
     @param page_to_display: the number of the page that should be displayed to the user
+    @type page_to_display: int
     @param language: the language used to format the content
+    @param outputTags: list of tags to be displayed in search results
+    @type outputTags: list of strings
+    @param collection: collection to be filtered in the results
+    @type collection: string
+    @param compute_modifications: if equals 0 do not compute else compute modifications
+    @type compute_modifications: int
     """
     RECORDS_PER_PAGE = 10
+    response = {}
 
     if collection == "Any collection":
         collection = ""
@@ -308,26 +373,50 @@ def perform_request_test_search(search_criteria, update_commands, output_format,
 
     first_record_to_display = RECORDS_PER_PAGE * (page_to_display - 1)
     last_record_to_display = (RECORDS_PER_PAGE*page_to_display) - 1
-    record_IDs = record_IDs[first_record_to_display:last_record_to_display]
+
+    if not compute_modifications:
+        record_IDs = record_IDs[first_record_to_display:last_record_to_display + 1]
 
     records_content = []
 
+    record_modifications = 0
     for record_id in record_IDs:
+        current_modifications = [current_command._modifications for current_command in update_commands]
         formated_record = _get_formated_record(record_id=record_id,
                              output_format=output_format,
                              update_commands = update_commands,
                              language=language, outputTags=outputTags)
+        new_modifications = [current_command._modifications for current_command in update_commands]
+        if new_modifications > current_modifications:
+            record_modifications += 1
 
         records_content.append((record_id, formated_record))
 
 
-    result = multiedit_templates.search_results(records = records_content,
+    total_modifications = []
+    if compute_modifications:
+        field_modifications = 0
+        subfield_modifications = 0
+        for current_command in update_commands:
+            field_modifications += current_command._modifications
+            for subfield_command in current_command._subfield_commands:
+                subfield_modifications += subfield_command._modifications
+        if record_modifications:
+            total_modifications.append(record_modifications)
+            total_modifications.append(field_modifications)
+            total_modifications.append(subfield_modifications)
+        records_content = records_content[first_record_to_display:last_record_to_display + 1]
+
+    response['display_info_box'] = compute_modifications
+    response['info_html'] = multiedit_templates.info_box(language = language,
+                                                total_modifications = total_modifications)
+    response['search_html'] = multiedit_templates.search_results(records = records_content,
                                                 number_of_records = number_of_records,
                                                 current_page = page_to_display,
                                                 records_per_page = RECORDS_PER_PAGE,
                                                 language = language,
                                                 output_format=output_format)
-    return result
+    return response
 
 def perform_request_submit_changes(search_criteria, update_commands, language, upload_mode, tag_list, collection, req):
     """Submits changes for upload into database.
@@ -337,9 +426,49 @@ def perform_request_submit_changes(search_criteria, update_commands, language, u
     @param language: the language used to format the content
     """
 
+    response = {}
     status, file_path = _submit_changes_to_bibupload(search_criteria, update_commands, upload_mode, tag_list, collection, req)
 
-    return multiedit_templates.changes_applied(status, file_path)
+    response['search_html'] = multiedit_templates.changes_applied(status, file_path)
+    return response
+
+def _get_record_diff(record_id, record, updated_record):
+    """ Returns the new record with formating to display
+    changes in the search results
+    @param record: Record without modifications
+    @type record: Record object
+    @param updated_record: Record with modifications
+    @type updated_record: Record object
+    @return: formated record with changes highlighted
+    @rtype: string
+    """
+    import itertools
+
+    record_xml = bibrecord.record_xml_output(record)
+    record_marc = cgi.escape(_create_marc(record_xml))
+    record_split = record_marc.split('\n')[:-1]
+
+    updated_record_xml = bibrecord.record_xml_output(updated_record)
+    updated_record_marc = cgi.escape(_create_marc(updated_record_xml))
+    updated_record_split = updated_record_marc.split('\n')[:-1]
+    
+    result = ''
+    if (len(updated_record_split) == len(record_split)) and (record.keys() == updated_record.keys()):
+        for line_updated, line in itertools.izip(updated_record_split, record_split):
+            line_updated_split = line_updated.split("$$")
+            line_split = line.split("$$")
+            for i in xrange(len(line_updated_split)):
+                if line_updated_split[i] not in line_split:
+                    line_updated_split[i] = "<strong style=\"color: red\">" + line_updated_split[i] + "</strong>"
+            new_line = "$$".join(line_updated_split)
+            result += "%09d " % record_id + new_line.strip() + '\n'
+    else:
+        for i in xrange(len(updated_record_split)):
+            if updated_record_split[i] not in record_split:
+                updated_record_split[i] =  "<strong style=\"color: red\">" + updated_record_split[i].strip() + "</strong>"
+            result += "%09d " % record_id + updated_record_split[i].strip() + '\n'
+    return result
+
 
 def _get_formated_record(record_id, output_format, update_commands, language, outputTags=""):
     """Returns a record in a given format
@@ -350,20 +479,19 @@ def _get_formated_record(record_id, output_format, update_commands, language, ou
     @param language: the language to use to format the record
     """
     updated_record = _get_updated_record(record_id, update_commands)
-
     xml_record = bibrecord.record_xml_output(updated_record)
 
+    old_record = search_engine.get_record(recid=record_id)
     if "hm" == output_format:
         result = "<pre>\n"
-        marc_record = cgi.escape(_create_marc(xml_record))
         if "All tags" not in outputTags or not outputTags:
-            for line in marc_record.split('\n')[:-1]:
+            diff_result = _get_record_diff(record_id, old_record, updated_record)
+            for line in diff_result.split('\n')[:-1]:
                 for tag in outputTags:
-                    if tag in line.split()[0]:
-                        result += "%09d " % record_id + line.strip() + '\n'
+                    if tag in line.split()[1]:
+                        result += line.strip() + '\n'
         else:
-            for line in marc_record.split('\n')[:-1]:
-                result += "%09d " % record_id + line.strip() + '\n'
+            result += _get_record_diff(record_id, old_record, updated_record)
 
         result += "</pre>"
         return result
@@ -390,19 +518,13 @@ def _create_marc(records_xml):
 
     records = bibrecord.create_records(records_xml)
     for (record, status_code, list_of_errors) in records:
-        # The system number is in field 970a
-        # By this reason it should exist in the MARC XML
-        # otherwise it will be None in the output ALEPH marc
-        sysno_options = {"text-marc":0}
-        sysno = xmlmarc2textmarc.get_sysno_from_record(record,
-                                                       sysno_options)
 
-        if sysno == None:
-            sysno = ""
+        sysno = ""
 
         options = {"aleph-marc":0, "correct-mode":1, "append-mode":0,
                    "delete-mode":0, "insert-mode":0, "replace-mode":0,
                    "text-marc":1}
+
         aleph_record = xmlmarc2textmarc.create_marc_record(record,
                                                            sysno,
                                                            options)
@@ -445,7 +567,6 @@ def _get_updated_record(record_id, update_commands):
     @return: updated record structure"""
 
     record = search_engine.get_record(recid=record_id)
-
     for current_command in update_commands:
         current_command.process_record(record)
 

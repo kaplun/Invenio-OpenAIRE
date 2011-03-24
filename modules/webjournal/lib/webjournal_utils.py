@@ -38,7 +38,8 @@ from invenio.config import \
      CFG_CACHEDIR, \
      CFG_SITE_LANG, \
      CFG_ACCESS_CONTROL_LEVEL_SITE, \
-     CFG_SITE_SUPPORT_EMAIL
+     CFG_SITE_SUPPORT_EMAIL, \
+     CFG_DEVEL_SITE
 from invenio.dbquery import run_sql
 from invenio.bibformat_engine import BibFormatObject
 from invenio.search_engine import search_pattern
@@ -645,10 +646,23 @@ def get_journal_alert_recipient_email(journal_name):
     Returns the default email address of the recipients of the email
     Return a string of comma-separated emails.
     """
+    if CFG_DEVEL_SITE:
+        # To be on the safe side, do not return the default alert recipients.
+        return ''
     config_strings = get_xml_from_config(["alert_recipients"], journal_name)
     if config_strings.get('alert_recipients', ''):
         return config_strings['alert_recipients'][0]
     return ''
+
+def get_journal_collection_to_refresh_on_release(journal_name):
+    """
+    Returns the list of collection to update (WebColl) upon release of
+    an issue.
+    """
+    from invenio.search_engine import collection_reclist_cache
+    config_strings = get_xml_from_config(["update_on_release/collection"], journal_name)
+    return [coll for coll in config_strings.get('update_on_release/collection', []) if \
+            collection_reclist_cache.cache.has_key(coll)]
 
 def get_journal_template(template, journal_name, ln=CFG_SITE_LANG):
     """

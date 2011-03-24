@@ -45,6 +45,7 @@ from invenio.webpage import page, create_error_box
 from invenio.webuser import getUid, get_email, collect_user_info
 from invenio.websubmit_config import *
 from invenio.messages import gettext_set_language, wash_language
+from invenio.webstat import register_customevent
 from invenio.errorlib import register_exception
 from invenio.websubmitadmin_engine import string_is_alphanumeric_including_underscore
 
@@ -336,6 +337,11 @@ def interface(req,
     ## in case e.g. it is needed in FFT.
     fp = open(os.path.join(curdir, "curdir"), "w")
     fp.write(curdir)
+    fp.close()
+
+    ## Let's write in ln file the current language
+    fp = open(os.path.join(curdir, "ln"), "w")
+    fp.write(ln)
     fp.close()
 
     # Save the form fields entered in the previous submission page
@@ -886,6 +892,11 @@ def endaction(req,
     fp.write(curdir)
     fp.close()
 
+    ## Let's write in ln file the current language
+    fp = open(os.path.join(curdir, "ln"), "w")
+    fp.write(ln)
+    fp.close()
+
     # Save the form fields entered in the previous submission page
     # If the form was sent with the GET method
     form = req.form
@@ -1105,7 +1116,13 @@ def endaction(req,
           next_action = next_action,
         )
 
-    if not finished:
+    if finished:
+        # register event in webstat
+        try:
+            register_customevent("websubmissions", [get_longname_of_doctype(doctype)])
+        except:
+            register_exception(suffix="Do the webstat tables exists? Try with 'webstatadmin --load-config'")
+    else:
         t += websubmit_templates.tmpl_page_do_not_leave_submission_js(ln)
 
     # start display:

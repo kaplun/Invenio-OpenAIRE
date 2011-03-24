@@ -26,7 +26,8 @@ import string
 from datetime import datetime
 
 try:
-    import dateutil.parser
+    from dateutil import parser as du_parser
+    from dateutil.relativedelta import relativedelta as du_delta
     GOT_DATEUTIL = True
 except ImportError:
     # Ok, no date parsing is possible, but continue anyway,
@@ -408,7 +409,7 @@ class SpiresToInvenioSyntaxConverter:
         'cn' : 'collaboration:',
         # conference number
         'conf-number' : '111__g:',
-        'cnum' : '111__g:',
+        'cnum' : '773__w:',
         # country
         'cc' : '044__a:',
         'country' : '044__a:',
@@ -424,8 +425,8 @@ class SpiresToInvenioSyntaxConverter:
         'dupd': _DATE_UPDATED_FIELD,
         'du': _DATE_UPDATED_FIELD,
         # first author
-        'fa' : '100__a:',
-        'first-author' : '100__a:',
+        'fa' : 'firstauthor:',
+        'first-author' : 'firstauthor:',
         # author
         'a' : 'author:',
         'au' : 'author:',
@@ -497,6 +498,9 @@ class SpiresToInvenioSyntaxConverter:
         'hep-topic' : '695__a:',
         'desy-keyword' : '695__a:',
         'dk' : '695__a:',
+
+        # topcite
+        'topcite' : 'cited:',
 
         # second-order operators
         'refersto' : 'refersto:',
@@ -570,8 +574,12 @@ class SpiresToInvenioSyntaxConverter:
         # taking in mind if they are escaped.
         self._re_quotes_match = re.compile('[^\\\\](".*?[^\\\\]")|[^\\\\](\'.*?[^\\\\]\')')
 
-        # for matching cases where kw needs distributing
+        # match cases where a keyword distributes across a conjunction
         self._re_distribute_keywords = re.compile(r'\b(?P<keyword>\S*:)(?P<content>.+?)\s*(?P<combination>and not | and | or | not )\s*(?P<last_content>[^:]*?)(?= and not | and | or | not |$)', re.IGNORECASE)
+
+        # massaging SPIRES quirks
+        self._re_pattern_IRN_search = re.compile(r'970__a:(?P<irn>\d+)')
+        self._re_topcite_match = re.compile(r'(?P<x>cited:\d+)\+')
 
         # regular expression that matches author patterns
         self._re_author_match = re.compile(r'\bauthor:\s*(?P<name>.+?)\s*(?= and not | and | or | not |$)', re.IGNORECASE)
@@ -582,11 +590,12 @@ class SpiresToInvenioSyntaxConverter:
         # in case of changes correct also the code in this method
         self._re_exact_author_match = re.compile(r'\bexactauthor:(?P<author_name>[^\'\"].*?[^\'\"]\b)(?= and not | and | or | not |$)', re.IGNORECASE)
 
-        # regular expression that matches search term, its content (words that
-        # are searched) and the operator preceding the term. In case that the
-        # names of the groups defined in the expression are changed, the
-        # chagned should be reflected in the code that use it.
-        self._re_search_term_pattern_match = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>title:|keyword:|fulltext:)(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
+        # match search term, its content (words that are searched) and
+        # the operator preceding the term.
+        self._re_search_term_pattern_match = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>\S+:)(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
+
+        # match journal searches with a comma at end and no keyword after
+        self._re_search_term_is_journal = re.compile(r'\b(?P<combine_operator>find|and|or|not)\s+(?P<search_term>journal|j):(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # regular expression matching date after pattern
         self._re_date_after_match = re.compile(r'\b(?P<searchop>d|date|dupd|dadd|da|date-added|du|date-updated)\b\s*(after|>)\s*(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
@@ -594,9 +603,7 @@ class SpiresToInvenioSyntaxConverter:
         # regular expression matching date after pattern
         self._re_date_before_match = re.compile(r'\b(?P<searchop>d|date|dupd|dadd|da|date-added|du|date-updated)\b\s*(before|<)\s*(?P<search_content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
-        # regular expression that matches date searches which have been
-        # keyword-substituted
-        #self._re_keysubbed_date_expr = re.compile(r'\b(?P<term>(' + self._DATE_ADDED_FIELD + ')|(' + self._DATE_UPDATED_FIELD + ')|(' + self._DATE_FIELD + '))\s*(?P<content>.+)(?= and not | and | or | not |$)', re.IGNORECASE)
+        # match date searches which have been keyword-substituted
         self._re_keysubbed_date_expr = re.compile(r'\b(?P<term>(' + self._DATE_ADDED_FIELD + ')|(' + self._DATE_UPDATED_FIELD + ')|(' + self._DATE_FIELD + '))(?P<content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # for finding (and changing) a variety of different SPIRES search keywords
@@ -607,7 +614,6 @@ class SpiresToInvenioSyntaxConverter:
         self._re_pattern_double_quotes = re.compile("\"(.*?)\"")
         self._re_pattern_regexp_quotes = re.compile("\/(.*?)\/")
         self._re_pattern_space = re.compile("__SPACE__")
-        self._re_pattern_IRN_search = re.compile(r'970__a:(?P<irn>\d+)')
 
     def is_applicable(self, query):
         """Is this converter applicable to this query?
@@ -631,7 +637,7 @@ class SpiresToInvenioSyntaxConverter:
             # starting with 'find' are SPIRES queries.  Turn fin into find.
             query = self._re_spires_find_keyword.sub(lambda m: 'find '+m.group('query'), query)
 
-            # these calls are before keywords replacement becuase when keywords
+            # these calls are before keywords replacement because when keywords
             # are replaced, date keyword is replaced by specific field search
             # and the DATE keyword is not match in DATE BEFORE or DATE AFTER
             query = self._convert_spires_date_before_to_invenio_span_query(query)
@@ -640,10 +646,12 @@ class SpiresToInvenioSyntaxConverter:
             # call to _replace_spires_keywords_with_invenio_keywords should be at the
             # beginning because the next methods use the result of the replacement
             query = self._replace_spires_keywords_with_invenio_keywords(query)
+            query = self._remove_spaces_in_comma_separated_journal(query)
             query = self._distribute_keywords_across_combinations(query)
 
             query = self._convert_dates(query)
             query = self._convert_irns_to_spires_irns(query)
+            query = self._convert_topcite_to_cited(query)
             query = self._convert_spires_author_search_to_invenio_author_search(query)
             query = self._convert_spires_exact_author_search_to_invenio_author_search(query)
             query = self._convert_spires_truncation_to_invenio_truncation(query)
@@ -718,8 +726,29 @@ class SpiresToInvenioSyntaxConverter:
                         if re.match('[0-9]{1,4}$', datestamp):
                             isodates.append(datestamp)
                         else:
+                            units = 0
+                            datestamp = re.sub('yesterday', datetime.strftime(datetime.today()
+                                                            +du_delta(days=-1), '%Y-%m-%d'),
+                                               datestamp)
+                            datestamp = re.sub('today', datetime.strftime(datetime.today(), '%Y-%m-%d'), datestamp)
+                            datestamp = re.sub('this week', datetime.strftime(datetime.today()
+                                                            +du_delta(days=-(datetime.today().isoweekday()%7)), '%Y-%m-%d'),
+                                                datestamp)
+                            datestamp = re.sub('last week', datetime.strftime(datetime.today()
+                                                            +du_delta(days=-((datetime.today().isoweekday()%7)+7)), '%Y-%m-%d'),
+                                                datestamp)
+                            datestamp = re.sub('this month', datetime.strftime(datetime.today(), '%Y-%m'),
+                                                datestamp)
+                            datestamp = re.sub('last month', datetime.strftime(datetime.today()
+                                                            +du_delta(months=-1), '%Y-%m'),
+                                               datestamp)
+                            datemath = re.match(r'(?P<datestamp>.+)\s+(?P<operator>[-+])\s+(?P<units>\d+)', datestamp)
+                            if datemath:
+                                datestamp = datemath.group('datestamp')
+                                units += int(datemath.group('operator') + datemath.group('units'))
                             try:
-                                dtobj = dateutil.parser.parse(datestamp, default=DEFAULT)
+                                dtobj = du_parser.parse(datestamp, default=DEFAULT)
+                                dtobj = dtobj + du_delta(days=units)
                                 if dtobj.day == 1:
                                     isodates.append("%d-%02d" % (dtobj.year, dtobj.month))
                                 else:
@@ -732,7 +761,7 @@ class SpiresToInvenioSyntaxConverter:
                 position = match.end()
             result += query[position : ]
             return result
-
+	
         if GOT_DATEUTIL:
             query = mangle_with_dateutils(query)
         # else do nothing with the dates
@@ -744,6 +773,14 @@ class SpiresToInvenioSyntaxConverter:
             """method used for replacement with regular expression"""
             return '970__a:SPIRES-' + match.group('irn')
         query = self._re_pattern_IRN_search.sub(create_replacement_pattern, query)
+        return query
+
+    def _convert_topcite_to_cited(self, query):
+        """Replace SPIRES topcite x+ with cited:x->999999999"""
+        def create_replacement_pattern(match):
+            """method used for replacement with regular expression"""
+            return match.group('x') + '->999999999'
+        query = self._re_topcite_match.sub(create_replacement_pattern, query)
         return query
 
     def _convert_spires_date_after_to_invenio_span_query(self, query):
@@ -772,11 +809,11 @@ class SpiresToInvenioSyntaxConverter:
         """Expands search queries.
 
         If a search term is followed by several words e.g.
-        author: ellis or title:THESE THREE WORDS it is expanded to
-        author:ellis or (title: THESE and title:THREE...)
+        author:ellis or title:THESE THREE WORDS it is expanded to
+        author:ellis or (title:THESE and title:THREE...)
 
-        Not all the search terms are expanded this way, but only title:,
-        keyword:, and fulltext: - see _re_search_term_pattern_match for details.
+        All keywords are thus expanded.  XXX: this may lead to surprising
+        results for any later parsing stages if we're not careful.
         """
 
         def create_replacements(term, content):
@@ -900,6 +937,17 @@ class SpiresToInvenioSyntaxConverter:
 
         return search_pattern
 
+    def _remove_spaces_in_comma_separated_journal(self, query):
+        """Phys.Lett, 0903, 024 -> Phys.Lett,0903,024"""
+        result = ""
+        current_position = 0
+        for match in self._re_search_term_is_journal.finditer(query):
+            result += query[current_position : match.start()]
+            result += match.group('combine_operator') + ' ' + match.group('search_term') + ':'
+            result += re.sub(',\s+', ',', match.group('search_content'))
+            current_position = match.end()
+        result += query[current_position : ]
+        return result
 
     def _replace_spires_keywords_with_invenio_keywords(self, query):
         """Replaces SPIRES keywords that have directly
@@ -958,6 +1006,7 @@ class SpiresToInvenioSyntaxConverter:
         return result
 
     def _distribute_keywords_across_combinations(self, query):
+        """author:ellis and james -> author:ellis and author:james"""
         # method used for replacement with regular expression
 
         def create_replacement_pattern(match):

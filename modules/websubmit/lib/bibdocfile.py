@@ -71,6 +71,12 @@ try:
 except ImportError:
     CFG_HAS_MAGIC = False
 
+## The above flag controls whether HTTP range requests are supported or not
+## when serving static files via Python. This is disabled by default as
+## it currently breaks support for opening PDF files on Windows platforms
+## using Acrobat reader brower plugin.
+CFG_ENABLE_HTTP_RANGE_REQUESTS = False
+
 from datetime import datetime
 from mimetypes import MimeTypes
 from thread import get_ident
@@ -2789,7 +2795,7 @@ class BibDocFile:
             req.status = apache.HTTP_NOT_FOUND
             raise InvenioWebSubmitFileError, "%s does not exists!" % self.fullpath
 
-_RE_STATUS_PARSER = re.compile(r'^(?P<type>email|group|egroup|role|firerole|status):\s*(?P<value>.*)$', re.M)
+_RE_STATUS_PARSER = re.compile(r'^(?P<type>email|group|egroup|role|firerole|status):\s*(?P<value>.*)$', re.S + re.I)
 def check_bibdoc_authorization(user_info, status):
     """
     Check if the user is authorized to access a document protected with the given status.
@@ -2829,7 +2835,7 @@ def check_bibdoc_authorization(user_info, status):
     def parse_status(status):
         g = _RE_STATUS_PARSER.match(status)
         if g:
-            return (g.group('type'), g.group('value'))
+            return (g.group('type').lower(), g.group('value'))
         else:
             return ('status', status)
     if acc_is_user_in_role(user_info, acc_get_role_id(SUPERADMINROLE)):
@@ -3048,7 +3054,10 @@ def stream_file(req, fullpath, fullname=None, mime=None, encoding=None, etag=Non
         req.encoding = encoding
         req.filename = fullname
         req.headers_out["Last-Modified"] = time.strftime('%a, %d %b %Y %X GMT', time.gmtime(mtime))
-        req.headers_out["Accept-Ranges"] = "bytes"
+        if CFG_ENABLE_HTTP_RANGE_REQUESTS:
+            req.headers_out["Accept-Ranges"] = "bytes"
+        else:
+            req.headers_out["Accept-Ranges"] = "none"
         req.headers_out["Content-Location"] = location
         if etag is not None:
             req.headers_out["ETag"] = etag
@@ -3069,7 +3078,7 @@ def stream_file(req, fullpath, fullname=None, mime=None, encoding=None, etag=Non
                 raise apache.SERVER_RETURN, apache.HTTP_NOT_MODIFIED
         if headers['unless-modified-since'] and headers['unless-modified-since'] < mtime:
             return normal_streaming(size)
-        if headers['range']:
+        if CFG_ENABLE_HTTP_RANGE_REQUESTS and headers['range']:
             try:
                 if headers['if-range']:
                     if etag is None or etag not in headers['if-range']:
@@ -3099,6 +3108,11 @@ def list_types_from_array(bibdocs):
     for bibdoc in bibdocs:
         if not bibdoc.get_type() in types:
             types.append(bibdoc.get_type())
+    types.sort()
+    if 'Main' in types:
+        ## Move 'Main' at the beginning
+        types.remove('Main')
+        types.insert(0, 'Main')
     return types
 
 def list_versions_from_array(docfiles):

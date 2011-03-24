@@ -63,6 +63,7 @@ var gCommandDisplayTemplateIDPrefix = "commandDisplayTemplateID_";
 var gOutputFormat = gOutputFormatTypes.marc;
 var gOutputFormatDetails = gOutputFormatTypes.htmlDetailed;
 var gOutputFormatPreview = gOutputFormatTypes.marc;
+var gComputeModifications = 0;
 
 /*
 * Global variables
@@ -168,6 +169,7 @@ function onButtonPreviewResultsClick() {
 	gActionToPerform = gActionTypes.previewResults;
 	gOutputFormat = gOutputFormatPreview;
 	gPageToDiplay = 1;
+        gComputeModifications = 1;
 	performAJAXRequest();
 }
 
@@ -221,9 +223,22 @@ function rebindControls() {
 	$(".buttonGoToNextPage").bind("click", onButtonGoToNextPageClick);
 }
 
-function displayResultsPreview(data) {
-	$("#preview_area").html(data);
+function onAjaxSuccess(json) {
+        var display_info_box = json['display_info_box'];
+        var info_html = json['info_html'];
+        var search_html = json['search_html'];
+        if (display_info_box === 1) {
+            $("#info_area").html(info_html);
+            gComputeModifications = 0;
+
+        }
+        $("#preview_area").html(search_html);
 	rebindControls();
+}
+
+function displayError(msg) {
+    $("#preview_area").html(msg);
+    rebindControls();
 }
 
 function createJSONData() {
@@ -239,8 +254,9 @@ function createJSONData() {
 	var currentRecordID = gCurrentRecordID;
 	var outputFormat = gOutputFormat;
 	var pageToDisplay = gPageToDiplay;
-  var collection = $("#collection").val();
+        var collection = $("#collection").val();
 	var commands = createCommandsList();
+        var compute_modifications = gComputeModifications;
 
 	var data = {
 		language : language,
@@ -251,7 +267,8 @@ function createJSONData() {
 		commands : commands,
 		outputFormat : outputFormat,
 		pageToDisplay : pageToDisplay,
-		collection: collection
+		collection : collection,
+                compute_modifications : compute_modifications
 	};
 
 	return JSON.stringify(data);
@@ -270,7 +287,7 @@ function onRequestError(XMLHttpRequest, textStatus, errorThrown) {
 	error_message = 'Request completed with status ' + textStatus +
 			'\nResult: ' + XMLHttpRequest.responseText + '\nError: ' + errorThrown;
 
-	displayResultsPreview(error_message);
+	displayError(error_message);
 }
 
 function performAJAXRequest() {
@@ -281,11 +298,13 @@ function performAJAXRequest() {
 	$.ajax( {
 		cache : false,
 		type : "POST",
-		dataType : "text",
+		dataType : "json",
 		data : {
 			jsondata : createJSONData()
 		},
-		success : displayResultsPreview,
+		success : function(json){
+                      onAjaxSuccess(json);
+                    },
 		error : onRequestError
 	});
 }
@@ -473,19 +492,24 @@ function deleteMsg(fieldID) {
     $(msgID).remove();
 }
 
-function createSubfield(templateNewSubield){
+function createSubfield(templateNewSubfield){
     /*
     * Creates a subfield from the informaiton contained in
     * templateNewSubield. It is expected to contain specific
     * fields with all the necessary information
     */
 
-    var subfieldCode = templateNewSubield.find(".textBoxSubfieldCode").eq(0).val();
-    var value = templateNewSubield.find(".textBoxValue").eq(0).val();
-    var newValue = templateNewSubield.find(".textBoxNewValue").eq(0).val();
-    var action = templateNewSubield.find(".subfieldActionType").eq(0).val();
-    var condition = templateNewSubield.find(".textBoxCondition").eq(0).val();
-    var conditionSubfield = templateNewSubield.find(".textBoxConditionSubfield").eq(0).val();
+    if (templateNewSubfield === "None"){
+        return "None"
+    }
+
+    var subfieldCode = templateNewSubfield.find(".textBoxSubfieldCode").eq(0).val();
+    var value = templateNewSubfield.find(".textBoxValue").eq(0).val();
+    var newValue = templateNewSubfield.find(".textBoxNewValue").eq(0).val();
+    var action = templateNewSubfield.find(".subfieldActionType").eq(0).val();
+    var condition = templateNewSubfield.find(".textBoxCondition").eq(0).val();
+    var conditionSubfieldExactMatch = templateNewSubfield.find(".selectConditionExactMatch").eq(0).val();
+    var conditionSubfield = templateNewSubfield.find(".textBoxConditionSubfield").eq(0).val();
 
     var subfield = {
         subfieldCode : subfieldCode,
@@ -493,6 +517,7 @@ function createSubfield(templateNewSubield){
         newValue : newValue,
         action : action,
         condition : condition,
+        conditionSubfieldExactMatch: conditionSubfieldExactMatch,
         conditionSubfield : conditionSubfield
     };
 
@@ -547,6 +572,13 @@ function onButtonNewSubfieldClick(instance) {
 
     // generate ID for the the element of the new subfield
     var subfieldDisplayID = generateSubfieldDisplayID(fieldID);
+    var subfieldID = getSubfieldID(subfieldDisplayID);
+
+    // create empty subfield to be able to delete it in
+    // case the field is deleted
+    var emptySubfield = createSubfield("None");
+    var field = gFields[fieldID];
+    field.subfields[subfieldID] = emptySubfield;
 
     // add the new subfield to the UI
     var templateNewSubfield = $("#displayTemplates .templateNewSubfield").clone();
@@ -609,12 +641,17 @@ function onButtonSaveNewSubfieldClick() {
 
     // update subfield appearence at the user interface
     var actionText = templateNewSubfield.find(".subfieldActionType").eq(0).find('option').filter(':selected').text();
+    var conditionExactText;
+    if (currentSubfield.conditionSubfieldExactMatch == 0) {
+        conditionExactText = "is equal to"
+    } else conditionExactText = "contains";
 
     templateDisplaySubfield.attr("id", subfieldDisplayID);
     templateDisplaySubfield.find(".action").eq(0).text(actionText);
     templateDisplaySubfield.find(".subfieldCode").eq(0).text(currentSubfield.subfieldCode);
     templateDisplaySubfield.find(".value").eq(0).text(currentSubfield.value);
     templateDisplaySubfield.find(".newValue").eq(0).text(currentSubfield.newValue);
+    templateDisplaySubfield.find(".conditionExact").eq(0).text(conditionExactText);
     templateDisplaySubfield.find(".condition").eq(0).text(currentSubfield.condition);
     templateDisplaySubfield.find(".conditionSubfield").eq(0).text(currentSubfield.conditionSubfield);
 

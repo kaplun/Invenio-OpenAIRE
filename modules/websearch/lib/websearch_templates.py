@@ -58,6 +58,7 @@ from invenio.config import \
      CFG_BIBINDEX_CHARS_PUNCTUATION, \
      CFG_WEBCOMMENT_ALLOW_COMMENTS, \
      CFG_WEBCOMMENT_ALLOW_REVIEWS, \
+     CFG_WEBSEARCH_WILDCARD_LIMIT,\
      CFG_WEBSEARCH_SHOW_COMMENT_COUNT, \
      CFG_WEBSEARCH_SHOW_REVIEW_COUNT
 
@@ -162,6 +163,7 @@ class Template:
         'ap': (int, 1),
         'verbose': (int, 0),
         'ec': (list, []),
+        'wl': (int, CFG_WEBSEARCH_WILDCARD_LIMIT),
         }
 
     # ...and for search interfaces
@@ -257,8 +259,8 @@ class Template:
             'rft.series' : (str, ''),
     }
 
-    tmpl_opensearch_rss_url_syntax = "%(CFG_SITE_URL)s/rss?p={searchTerms}&amp;jrec={startIndex}&amp;rg={count}&amp;ln={language}&amp;startIndex" % {'CFG_SITE_URL': CFG_SITE_URL}
-    tmpl_opensearch_html_url_syntax = "%(CFG_SITE_URL)s/search?p={searchTerms}&amp;jrec={startIndex}&amp;rg={count}&amp;ln={language}&amp;startIndex" % {'CFG_SITE_URL': CFG_SITE_URL}
+    tmpl_opensearch_rss_url_syntax = "%(CFG_SITE_URL)s/rss?p={searchTerms}&amp;jrec={startIndex}&amp;rg={count}&amp;ln={language}" % {'CFG_SITE_URL': CFG_SITE_URL}
+    tmpl_opensearch_html_url_syntax = "%(CFG_SITE_URL)s/search?p={searchTerms}&amp;jrec={startIndex}&amp;rg={count}&amp;ln={language}" % {'CFG_SITE_URL': CFG_SITE_URL}
 
     def tmpl_openurl2invenio(self, openurl_data):
         """ Return an Invenio url corresponding to a search with the data
@@ -529,7 +531,7 @@ class Template:
             base = CFG_SITE_URL
         return create_url(base, parameters)
 
-    def build_rss_url(self, known_parameters,  **kargs):
+    def build_rss_url(self, known_parameters, **kargs):
         """Helper for generating a canonical RSS URL"""
 
         parameters = {}
@@ -699,7 +701,7 @@ class Template:
         # Build example of queries for this collection
         example_search_queries_links = [create_html_link(self.build_search_url(p=example_query,
                                                                                ln=ln,
-                                                                               aas=-1,
+                                                                               aas= -1,
                                                                                c=collection_id),
                                                          {},
                                                          cgi.escape(example_query),
@@ -885,7 +887,7 @@ class Template:
         return out
 
     def tmpl_searchfor_advanced(self,
-                                ln,                  # current language
+                                ln, # current language
                                 collection_id,
                                 collection_name,
                                 record_count,
@@ -1164,7 +1166,7 @@ class Template:
               }
         return out
 
-    def tmpl_inputdate(self, name, ln, sy = 0, sm = 0, sd = 0):
+    def tmpl_inputdate(self, name, ln, sy=0, sm=0, sd=0):
         """
           Produces *From Date*, *Until Date* kind of selection box. Suitable for search options.
 
@@ -1212,7 +1214,7 @@ class Template:
                  'sel' : self.tmpl_is_selected(sy, 0)
                }
         this_year = int(time.strftime("%Y", time.localtime()))
-        for year in range(this_year-20, this_year+1):
+        for year in range(this_year - 20, this_year + 1):
             box += """<option value="%d"%s>%d</option>""" % (year, self.tmpl_is_selected(sy, year), year)
         box += """</select>"""
         return box
@@ -1392,7 +1394,7 @@ class Template:
                                    'internal_name': internal_name,
                                    'name': cgi.escape(name),
                                    'id': "extSearch" + nmtoken_from_string(name),
-                                   'siteurl': CFG_SITE_URL,}
+                                   'siteurl': CFG_SITE_URL, }
 
         html += """</tbody></table></td></tr></table>"""
         return html
@@ -1467,7 +1469,7 @@ class Template:
         return _("This collection does not contain any document yet.")
 
 
-    def tmpl_instant_browse(self, aas, ln, recids, more_link = None):
+    def tmpl_instant_browse(self, aas, ln, recids, more_link=None):
         """
           Formats a list of records (given in the recids list) from the database.
 
@@ -1651,7 +1653,7 @@ class Template:
         if authors:
             out += " / "
             for author in authors[:CFG_WEBSEARCH_AUTHOR_ET_AL_THRESHOLD]:
-                out += '%s; ' % \
+                out += '%s ' % \
                        create_html_link(self.build_search_url(p=author, f='author', ln=ln),
                                         {}, cgi.escape(author))
 
@@ -1662,7 +1664,7 @@ class Template:
         for rn in rns:
             out += """ <small class="quicknote">[%(rn)s]</small>""" % {'rn' : cgi.escape(rn)}
         for abstract in abstracts:
-            out += "<br /><small>%(abstract)s [...]</small>" % {'abstract' : cgi.escape(abstract[:1+string.find(abstract, '.')]) }
+            out += "<br /><small>%(abstract)s [...]</small>" % {'abstract' : cgi.escape(abstract[:1 + string.find(abstract, '.')]) }
         for idx in range(0, len(urls_u)):
             out += """<br /><small class="note"><a class="note" href="%(url)s">%(name)s</a></small>""" % {
                      'url' : urls_u[idx],
@@ -1947,7 +1949,7 @@ class Template:
         if show_title:
             # display cc name if asked for
             out += '''
-            <h1 class="headline">%(ccname)s</h1>''' % {'ccname' : cgi.escape(cc_intl),}
+            <h1 class="headline">%(ccname)s</h1>''' % {'ccname' : cgi.escape(cc_intl), }
 
         out += '''
         <form name="search" action="%(siteurl)s/search" method="get">
@@ -2017,38 +2019,38 @@ class Template:
                 'leading' : leadingtext,
                 'sizepattern' : CFG_WEBSEARCH_ADVANCEDSEARCH_PATTERN_BOX_WIDTH,
                 'matchbox1' : self.tmpl_matchtype_box('m1', m1, ln=ln),
-                'p1' : cgi.escape(p1,1),
+                'p1' : cgi.escape(p1, 1),
                 'searchwithin1' : self.tmpl_searchwithin_select(
-                                  ln = ln,
-                                  fieldname = 'f1',
-                                  selected = f1,
-                                  values = self._add_mark_to_field(value=f1, fields=fieldslist, ln=ln)
+                                  ln=ln,
+                                  fieldname='f1',
+                                  selected=f1,
+                                  values=self._add_mark_to_field(value=f1, fields=fieldslist, ln=ln)
                                 ),
               'andornot1' : self.tmpl_andornot_box(
-                                  name = 'op1',
-                                  value = op1,
-                                  ln = ln
+                                  name='op1',
+                                  value=op1,
+                                  ln=ln
                                 ),
               'matchbox2' : self.tmpl_matchtype_box('m2', m2, ln=ln),
-              'p2' : cgi.escape(p2,1),
+              'p2' : cgi.escape(p2, 1),
               'searchwithin2' : self.tmpl_searchwithin_select(
-                                  ln = ln,
-                                  fieldname = 'f2',
-                                  selected = f2,
-                                  values = self._add_mark_to_field(value=f2, fields=fieldslist, ln=ln)
+                                  ln=ln,
+                                  fieldname='f2',
+                                  selected=f2,
+                                  values=self._add_mark_to_field(value=f2, fields=fieldslist, ln=ln)
                                 ),
               'andornot2' : self.tmpl_andornot_box(
-                                  name = 'op2',
-                                  value = op2,
-                                  ln = ln
+                                  name='op2',
+                                  value=op2,
+                                  ln=ln
                                 ),
               'matchbox3' : self.tmpl_matchtype_box('m3', m3, ln=ln),
-              'p3' : cgi.escape(p3,1),
+              'p3' : cgi.escape(p3, 1),
               'searchwithin3' : self.tmpl_searchwithin_select(
-                                  ln = ln,
-                                  fieldname = 'f3',
-                                  selected = f3,
-                                  values = self._add_mark_to_field(value=f3, fields=fieldslist, ln=ln)
+                                  ln=ln,
+                                  fieldname='f3',
+                                  selected=f3,
+                                  values=self._add_mark_to_field(value=f3, fields=fieldslist, ln=ln)
                                 ),
               'search' : _("Search"),
               'browse' : _("Browse"),
@@ -2102,10 +2104,10 @@ class Template:
               'sizepattern' : CFG_WEBSEARCH_SIMPLESEARCH_PATTERN_BOX_WIDTH,
               'p' : cgi.escape(p, 1),
               'searchwithin' : self.tmpl_searchwithin_select(
-                                  ln = ln,
-                                  fieldname = 'f',
-                                  selected = f,
-                                  values = self._add_mark_to_field(value=f, fields=fieldslist, ln=ln)
+                                  ln=ln,
+                                  fieldname='f',
+                                  selected=f,
+                                  values=self._add_mark_to_field(value=f, fields=fieldslist, ln=ln)
                                 ),
               'search' : _("Search"),
               'browse' : _("Browse"),
@@ -2159,10 +2161,10 @@ class Template:
               'leading' : leadingtext,
               'p' : cgi.escape(p, 1),
               'searchwithin' : self.tmpl_searchwithin_select(
-                                  ln = ln,
-                                  fieldname = 'f',
-                                  selected = f,
-                                  values = self._add_mark_to_field(value=f, fields=fieldslist, ln=ln)
+                                  ln=ln,
+                                  fieldname='f',
+                                  selected=f,
+                                  values=self._add_mark_to_field(value=f, fields=fieldslist, ln=ln)
                                 ),
               'search' : _("Search"),
               'browse' : _("Browse"),
@@ -2227,7 +2229,7 @@ class Template:
                       }
 
         ## fourthly, print from/until date boxen, if applicable:
-        if action == _("Browse") or (d1y==0 and d1m==0 and d1d==0 and d2y==0 and d2m==0 and d2d==0):
+        if action == _("Browse") or (d1y == 0 and d1m == 0 and d1d == 0 and d2y == 0 and d2m == 0 and d2d == 0):
             pass # do not need it
         else:
             cell_6_a = self.tmpl_inputdatetype(dt, ln) + self.tmpl_inputdate("d1", ln, d1y, d1m, d1d)
@@ -2296,28 +2298,28 @@ class Template:
                   'sort_by' : _("Sort by:"),
                   'display_res' : _("Display results:"),
                   'out_format' : _("Output format:"),
-                  'select_sf' : self.tmpl_select(fieldname = 'sf', values = sort_fields, selected = sf, css_class = 'address'),
-                  'select_so' : self.tmpl_select(fieldname = 'so', values = [{
+                  'select_sf' : self.tmpl_select(fieldname='sf', values=sort_fields, selected=sf, css_class='address'),
+                  'select_so' : self.tmpl_select(fieldname='so', values=[{
                                     'value' : 'a',
                                     'text' : _("asc.")
                                   }, {
                                     'value' : 'd',
                                     'text' : _("desc.")
-                                  }], selected = so, css_class = 'address'),
-                  'select_rm' : self.tmpl_select(fieldname = 'rm', values = ranks, selected = rm, css_class = 'address'),
-                  'select_rg' : self.tmpl_select(fieldname = 'rg', values = rgs, selected = rg, css_class = 'address'),
-                  'select_sc' : self.tmpl_select(fieldname = 'sc', values = [{
+                                  }], selected=so, css_class='address'),
+                  'select_rm' : self.tmpl_select(fieldname='rm', values=ranks, selected=rm, css_class='address'),
+                  'select_rg' : self.tmpl_select(fieldname='rg', values=rgs, selected=rg, css_class='address'),
+                  'select_sc' : self.tmpl_select(fieldname='sc', values=[{
                                     'value' : 0,
                                     'text' : _("single list")
                                   }, {
                                     'value' : 1,
                                     'text' : _("split by collection")
-                                  }], selected = sc, css_class = 'address'),
+                                  }], selected=sc, css_class='address'),
                   'select_of' : self.tmpl_select(
-                                  fieldname = 'of',
-                                  selected = of,
-                                  values = self._add_mark_to_field(value=of, fields=formats, chars=3, ln=ln),
-                                  css_class = 'address'),
+                                  fieldname='of',
+                                  selected=of,
+                                  values=self._add_mark_to_field(value=of, fields=formats, chars=3, ln=ln),
+                                  css_class='address'),
                 }
 
         ## last but not least, print end of search box:
@@ -2494,31 +2496,31 @@ class Template:
                 return '<img src="%(siteurl)s/img/%(gif)s.gif" alt="%(txt)s" border="0" />' % {
                     'txt': txt, 'gif': gif, 'siteurl': CFG_SITE_URL}
 
-            if jrec-rg > 1:
+            if jrec - rg > 1:
                 out += create_html_link(self.build_search_url(query, jrec=1, rg=rg),
                                         {}, img('sb', _("begin")),
                                         {'class': 'img'})
 
             if jrec > 1:
-                out += create_html_link(self.build_search_url(query, jrec=max(jrec-rg, 1), rg=rg),
+                out += create_html_link(self.build_search_url(query, jrec=max(jrec - rg, 1), rg=rg),
                                         {}, img('sp', _("previous")),
                                         {'class': 'img'})
 
-            if jrec+rg-1 < nb_found:
-                out += "%d - %d" % (jrec, jrec+rg-1)
+            if jrec + rg - 1 < nb_found:
+                out += "%d - %d" % (jrec, jrec + rg - 1)
             else:
                 out += "%d - %d" % (jrec, nb_found)
 
-            if nb_found >= jrec+rg:
+            if nb_found >= jrec + rg:
                 out += create_html_link(self.build_search_url(query,
-                                                              jrec=jrec+rg,
+                                                              jrec=jrec + rg,
                                                               rg=rg),
                                         {}, img('sn', _("next")),
                                         {'class':'img'})
 
-            if nb_found >= jrec+rg+rg:
+            if nb_found >= jrec + rg + rg:
                 out += create_html_link(self.build_search_url(query,
-                                                            jrec=nb_found-rg+1,
+                                                            jrec=nb_found - rg + 1,
                                                             rg=rg),
                                         {}, img('se', _("end")),
                                         {'class': 'img'})
@@ -2528,17 +2530,17 @@ class Template:
             cc = collection
             sc = 0
             for var in ['p', 'cc', 'f', 'sf', 'so', 'of', 'rg', 'aas', 'ln', 'p1', 'p2', 'p3', 'f1', 'f2', 'f3', 'm1', 'm2', 'm3', 'op1', 'op2', 'sc', 'd1y', 'd1m', 'd1d', 'd2y', 'd2m', 'd2d', 'dt']:
-                out += self.tmpl_input_hidden(name = var, value = vars()[var])
+                out += self.tmpl_input_hidden(name=var, value=vars()[var])
             for var in ['ot', 'sp', 'rm']:
                 if vars()[var]:
-                    out += self.tmpl_input_hidden(name = var, value = vars()[var])
+                    out += self.tmpl_input_hidden(name=var, value=vars()[var])
             if pl_in_url:
                 fieldargs = cgi.parse_qs(pl_in_url)
                 for fieldcode in all_fieldcodes:
                     # get_fieldcodes():
                     if fieldargs.has_key(fieldcode):
                         for val in fieldargs[fieldcode]:
-                            out += self.tmpl_input_hidden(name = fieldcode, value = val)
+                            out += self.tmpl_input_hidden(name=fieldcode, value=val)
             out += """&nbsp; %(jump)s <input type="text" name="jrec" size="4" value="%(jrec)d" />""" % {
                      'jump' : _("jump to record:"),
                      'jrec' : jrec,
@@ -2684,31 +2686,31 @@ class Template:
                 return '<img src="%(siteurl)s/img/%(gif)s.gif" alt="%(txt)s" border="0" />' % {
                     'txt': txt, 'gif': gif, 'siteurl': CFG_SITE_URL}
 
-            if jrec-rg > 1:
+            if jrec - rg > 1:
                 out += create_html_link(self.build_search_url(query, jrec=1, rg=rg),
                                         {}, img('sb', _("begin")),
                                         {'class': 'img'})
 
             if jrec > 1:
-                out += create_html_link(self.build_search_url(query, jrec=max(jrec-rg, 1), rg=rg),
+                out += create_html_link(self.build_search_url(query, jrec=max(jrec - rg, 1), rg=rg),
                                         {}, img('sp', _("previous")),
                                         {'class': 'img'})
 
-            if jrec+rg-1 < nb_found:
-                out += "%d - %d" % (jrec, jrec+rg-1)
+            if jrec + rg - 1 < nb_found:
+                out += "%d - %d" % (jrec, jrec + rg - 1)
             else:
                 out += "%d - %d" % (jrec, nb_found)
 
-            if nb_found >= jrec+rg:
+            if nb_found >= jrec + rg:
                 out += create_html_link(self.build_search_url(query,
-                                                              jrec=jrec+rg,
+                                                              jrec=jrec + rg,
                                                               rg=rg),
                                         {}, img('sn', _("next")),
                                         {'class':'img'})
 
-            if nb_found >= jrec+rg+rg:
+            if nb_found >= jrec + rg + rg:
                 out += create_html_link(self.build_search_url(query,
-                                                            jrec=nb_found-rg+1,
+                                                            jrec=nb_found - rg + 1,
                                                             rg=rg),
                                         {}, img('se', _("end")),
                                         {'class': 'img'})
@@ -2718,17 +2720,17 @@ class Template:
             cc = collection
             sc = 0
             for var in ['p', 'cc', 'f', 'sf', 'so', 'of', 'rg', 'aas', 'ln', 'p1', 'p2', 'p3', 'f1', 'f2', 'f3', 'm1', 'm2', 'm3', 'op1', 'op2', 'sc', 'd1y', 'd1m', 'd1d', 'd2y', 'd2m', 'd2d', 'dt']:
-                out += self.tmpl_input_hidden(name = var, value = vars()[var])
+                out += self.tmpl_input_hidden(name=var, value=vars()[var])
             for var in ['ot', 'sp', 'rm']:
                 if vars()[var]:
-                    out += self.tmpl_input_hidden(name = var, value = vars()[var])
+                    out += self.tmpl_input_hidden(name=var, value=vars()[var])
             if pl_in_url:
                 fieldargs = cgi.parse_qs(pl_in_url)
                 for fieldcode in all_fieldcodes:
                     # get_fieldcodes():
                     if fieldargs.has_key(fieldcode):
                         for val in fieldargs[fieldcode]:
-                            out += self.tmpl_input_hidden(name = fieldcode, value = val)
+                            out += self.tmpl_input_hidden(name=fieldcode, value=val)
             out += """&nbsp; %(jump)s <input type="text" name="jrec" size="4" value="%(jrec)d" />""" % {
                      'jump' : _("jump to record:"),
                      'jrec' : jrec,
@@ -2774,7 +2776,7 @@ class Template:
             for i in range(0, number):
                 if i % 3 == 0 and i != 0:
                     chars_out.append(thousands_separator)
-                chars_out.append(chars_in[number-i-1])
+                chars_out.append(chars_in[number - i - 1])
             chars_out.reverse()
             return ''.join(chars_out)
 
@@ -2885,7 +2887,7 @@ class Template:
         _ = gettext_set_language(ln)
 
         checkbox_for_baskets = """<input name="recid" type="checkbox" value="%(recid)s" />""" % \
-                               {'recid': recid,}
+                               {'recid': recid, }
         if not display_add_to_basket:
             checkbox_for_baskets = ''
         out = """
@@ -2947,7 +2949,7 @@ class Template:
             out = """<table class="searchresultsbox">
                     <thead><tr><th class="searchresultsboxheader">%(founds)s</th></tr></thead>
                     <tbody><tr><td class="searchresultsboxbody"> """ % {
-                    'founds' : _("%(x_fmt_open)sResults overview:%(x_fmt_close)s Found %(x_nb_records)s records in %(x_nb_seconds)s seconds.") %\
+                    'founds' : _("%(x_fmt_open)sResults overview:%(x_fmt_close)s Found %(x_nb_records)s records in %(x_nb_seconds)s seconds.") % \
                     {'x_fmt_open': '<strong>',
                      'x_fmt_close': '</strong>',
                      'x_nb_records': '<strong>' + self.tmpl_nice_number(results_final_nb_total, ln) + '</strong>',
@@ -2959,7 +2961,7 @@ class Template:
                 out = """<table class="searchresultsbox">
                         <thead><tr><th class="searchresultsboxheader">%(founds)s</th></tr></thead>
                         <tbody><tr><td class="searchresultsboxbody"> """ % {
-                        'founds' : _("%(x_fmt_open)sResults overview%(x_fmt_close)s") %\
+                        'founds' : _("%(x_fmt_open)sResults overview%(x_fmt_close)s") % \
                         {'x_fmt_open': '<strong>',
                          'x_fmt_close': '</strong>'}
                       }
@@ -2967,7 +2969,7 @@ class Template:
                 out = """<table class="searchresultsbox">
                         <thead><tr><th class="searchresultsboxheader">%(founds)s</th></tr></thead>
                         <tbody><tr><td class="searchresultsboxbody"> """ % {
-                        'founds' : _("%(x_fmt_open)sResults overview:%(x_fmt_close)s Found at least %(x_nb_records)s records in %(x_nb_seconds)s seconds.") %\
+                        'founds' : _("%(x_fmt_open)sResults overview:%(x_fmt_close)s Found at least %(x_nb_records)s records in %(x_nb_seconds)s seconds.") % \
                         {'x_fmt_open': '<strong>',
                          'x_fmt_close': '</strong>',
                          'x_nb_records': '<strong>' + self.tmpl_nice_number(results_final_nb_total, ln) + '</strong>',
@@ -3053,7 +3055,7 @@ class Template:
         #_ = gettext_set_language(ln)
 
         # first find total number of hits:
-        out = '<table class="searchresultsbox"><thead><tr><th class="searchresultsboxheader">'+header+'</th></tr></thead><tbody><tr><td class="searchresultsboxbody">'+body+'</td></tr></tbody></table>'
+        out = '<table class="searchresultsbox"><thead><tr><th class="searchresultsboxheader">' + header + '</th></tr></thead><tbody><tr><td class="searchresultsboxbody">' + body + '</td></tr></tbody></table>'
         return out
 
 
@@ -3183,7 +3185,7 @@ class Template:
         prs_c = get_fieldvalues(recID, "909C4c")
         for idx in range(0, len(prs_p)):
             out += """<p style="margin-left: 15%%; width: 70%%">
-                     <small><strong>Publ. in:</strong> %s"""  % prs_p[idx]
+                     <small><strong>Publ. in:</strong> %s""" % prs_p[idx]
             if prs_v and prs_v[idx]:
                 out += """<strong>%s</strong>""" % prs_v[idx]
             if prs_y and prs_y[idx]:
@@ -3292,18 +3294,18 @@ class Template:
         ## unAPI identifier
         out = '<abbr class="unapi-id" title="%s"></abbr>\n' % recID
         out += self.tmpl_record_body(
-                 titles = titles,
-                 authors = authors,
-                 dates = dates,
-                 rns = rns,
-                 abstracts = abstracts,
-                 urls_u = non_image_urls_u,
-                 urls_z = urls_z,
+                 titles=titles,
+                 authors=authors,
+                 dates=dates,
+                 rns=rns,
+                 abstracts=abstracts,
+                 urls_u=non_image_urls_u,
+                 urls_z=urls_z,
                  ln=ln)
 
         return out
 
-    def tmpl_print_record_brief_links(self, ln, recID, sf='', so='d', sp='', rm=''):
+    def tmpl_print_record_brief_links(self, ln, recID, sf='', so='d', sp='', rm='', display_claim_link=False):
         """Displays links for brief record on-the-fly
 
         Parameters:
@@ -3320,7 +3322,7 @@ class Template:
         out = '<div class="moreinfo">'
         if CFG_WEBSEARCH_USE_ALEPH_SYSNOS:
             alephsysnos = get_fieldvalues(recID, "970__a")
-            if len(alephsysnos)>0:
+            if len(alephsysnos) > 0:
                 alephsysno = alephsysnos[0]
                 out += '<span class="moreinfo">%s</span>' % \
                     create_html_link(self.build_search_url(recid=alephsysno,
@@ -3360,10 +3362,15 @@ class Template:
                                         or _("Cited by 1 record"),
                                         {'class': "moreinfo"})
             else:
-                out+="<!--not showing citations links-->"
+                out += "<!--not showing citations links-->"
+        if display_claim_link: #Maybe we want not to show the link to who cannot use id?
+            out += '<span class="moreinfo"> - %s</span>' % \
+                create_html_link(CFG_SITE_URL + '/person/action', {'claim':'True','selection':str(recID)}, 
+                                                                        'Attribute this paper',
+                                                                        {'class': "moreinfo"})
 
         if CFG_WEBCOMMENT_ALLOW_COMMENTS and CFG_WEBSEARCH_SHOW_COMMENT_COUNT:
-            num_comments = get_nb_comments(recID)
+            num_comments = get_nb_comments(recID, count_deleted=False)
             if num_comments:
                 out += '<span class="moreinfo"> - %s</span>' % \
                         create_html_link(CFG_SITE_URL + '/record/' + str(recID)
@@ -3371,20 +3378,20 @@ class Template:
                         % (num_comments) or _("1 comment"),
                         {'class': "moreinfo"})
             else:
-                out+="<!--not showing reviews links-->"
+                out += "<!--not showing reviews links-->"
 
         if CFG_WEBCOMMENT_ALLOW_REVIEWS and CFG_WEBSEARCH_SHOW_REVIEW_COUNT:
-            num_reviews = get_nb_reviews(recID)
+            num_reviews = get_nb_reviews(recID, count_deleted=False)
             if num_reviews:
                 out += '<span class="moreinfo"> - %s</span>' % \
                         create_html_link(CFG_SITE_URL + '/record/' + str(recID)
                         + '/reviews?ln=%s' % ln, {}, num_reviews > 1 and _("%i reviews")
                         % (num_reviews) or _("1 review"), {'class': "moreinfo"})
             else:
-                out+="<!--not showing reviews links-->"
+                out += "<!--not showing reviews links-->"
 
 
-        out+='</div>'
+        out += '</div>'
         return out
 
     def tmpl_xml_rss_prologue(self, current_url=None,
@@ -3568,11 +3575,11 @@ class Template:
                         {'x_url1_open': '<a href="%s"><img src="%s/img/mail-icon-12x8.gif" border="0" alt="" /></a> ' % (alerturl, CFG_SITE_URL) + ' <a class="google" href="%s">' % (alerturl),
                          'x_url1_close': '</a>',
                          'x_url2_open': '<a href="%s"><img src="%s/img/feed-icon-12x12.gif" border="0" alt="" /></a> ' % (rssurl, CFG_SITE_URL) + ' <a class="google" href="%s">' % rssurl,
-                         'x_url2_close': '</a>',}
+                         'x_url2_close': '</a>', }
         else:
             msg_alert = _("""Subscribe to the %(x_url2_open)sRSS feed%(x_url2_close)s.""") % \
                         {'x_url2_open': '<a href="%s"><img src="%s/img/feed-icon-12x12.gif" border="0" alt="" /></a> ' % (rssurl, CFG_SITE_URL) + ' <a class="google" href="%s">' % rssurl,
-                         'x_url2_close': '</a>',}
+                         'x_url2_close': '</a>', }
 
         out = '''<a name="googlebox"></a>
                  <table class="googlebox"><tr><th class="googleboxheader">%(similar)s</th></tr>
@@ -3580,7 +3587,7 @@ class Template:
                  </table>
                  ''' % {
                 'similar' : _("Interested in being notified about new results for this query?"),
-                'msg_alert': msg_alert,}
+                'msg_alert': msg_alert, }
         return out
 
     def tmpl_detailed_record_metadata(self, recID, ln, format,
@@ -3661,11 +3668,11 @@ class Template:
         for (index, image, caption) in images:
             # let's put everything in nice little subtables with the image
             # next to the caption
-            out = out + '<table width="95%" style="display: inline;">' +\
-                 '<tr><td width="66%"><a name="' + str(index) + '" ' +\
-                 'href="' + image + '">' +\
-                 '<img src="' + image + '" width="95%"/></a></td>' +\
-                 '<td width="33%">' + caption + '</td></tr>' +\
+            out = out + '<table width="95%" style="display: inline;">' + \
+                 '<tr><td width="66%"><a name="' + str(index) + '" ' + \
+                 'href="' + image + '">' + \
+                 '<img src="' + image + '" width="95%"/></a></td>' + \
+                 '<td width="33%">' + caption + '</td></tr>' + \
                  '</table>'
 
         out = out + '<br /><br />'
@@ -3704,13 +3711,13 @@ class Template:
             out += '''
                     <tr><td>%(graph)s</td></tr>
                     <tr><td>%(similar)s</td></tr>
-                    ''' % { 'siteurl': CFG_SITE_URL,   'recid': recID, 'ln': ln,
+                    ''' % { 'siteurl': CFG_SITE_URL, 'recid': recID, 'ln': ln,
                              'similar': similar, 'more': _("more"),
                              'graph': downloadsimilarity
                              }
 
             out += '</table>'
-            out +=  '<br />'
+            out += '<br />'
 
         if CFG_BIBRANK_SHOW_READING_STATS and viewsimilarity is not None:
             out += self.tmpl_print_record_list_for_similarity_boxen (
@@ -3776,7 +3783,7 @@ class Template:
                       <br /><br />
                     </td></tr>''' % {
                 'more': create_html_link(
-                self.build_search_url(p='refersto:recid:%d' % recID,      #XXXX
+                self.build_search_url(p='refersto:recid:%d' % recID, #XXXX
                                       sf=sf,
                                       so=so,
                                       sp=sp,
@@ -3808,11 +3815,11 @@ class Template:
             out = '<!--citation history--><tr><td>%s</td></tr>' % citationhistory
         else:
             out = "<!--not showing citation history. CFG_BIBRANK_SHOW_CITATION_GRAPHS:"
-            out+= str(CFG_BIBRANK_SHOW_CITATION_GRAPHS)+" citationhistory "
+            out += str(CFG_BIBRANK_SHOW_CITATION_GRAPHS) + " citationhistory "
             if citationhistory:
-                out+= str(len(citationhistory))+"-->"
+                out += str(len(citationhistory)) + "-->"
             else:
-                out+= "no citationhistory -->"
+                out += "no citationhistory -->"
         return out
 
     def tmpl_detailed_record_citations_co_citing(self, recID, ln,
@@ -3878,11 +3885,11 @@ class Template:
                 sc_scorelist.append(tmp)
             scite = self.tmpl_print_record_list_for_similarity_boxen (
                 _(".. of which self-citations: %s records") % len (selfcited), sc_scorelist, ln)
-            out = '<tr><td>'+scite+'</td></tr>'
+            out = '<tr><td>' + scite + '</td></tr>'
         return out
 
     def tmpl_author_information(self, req, pubs, authorname, num_downloads, aff_pubdict,
-                                citedbylist, kwtuples, authors, vtuples, ln):
+                                citedbylist, kwtuples, authors, vtuples, names_dict, person_link, bibauthorid_data, ln):
         """Prints stuff about the author given as authorname.
            1. Author name + his/her institutes. Each institute I has a link
               to papers where the auhtor has I as institute.
@@ -3899,34 +3906,97 @@ class Template:
            citedbylist - list of recs that cite pubs
            kwtuples - keyword tuples like ('HIGGS BOSON',[3,4]) where 3 and 4 are recids
            authors - a list of authors that have collaborated with authorname
+           names_dict - a dict of {name: frequency}
         """
         from invenio.search_engine import perform_request_search
+        from operator import itemgetter
         _ = gettext_set_language(ln)
-        #make a authoraff string that looks like CERN (1), Caltech (2) etc
-        authoraff = ""
-        aff_pubdict_keys = aff_pubdict.keys()
-        aff_pubdict_keys.sort(lambda x, y: cmp(len(aff_pubdict[y]), len(aff_pubdict[x])))
-        for a in aff_pubdict_keys:
-            recids = "+or+".join(map(str, aff_pubdict[a]))
-            print_a = a
-            if (print_a == ' '):
-                print_a = _("unknown")
-            if authoraff:
-                authoraff += '<br>'
-            authoraff += "<a href=\"../search?f=recid&p="+recids+"\">"+print_a+' ('+str(len(aff_pubdict[a]))+")</a>"
+        ib_pubs = intbitset(pubs)
 
-        #print a "general" banner about the author
-        req.write("<h1>" + authorname + "</h1>")
+        # Prepare data for display
+        # construct names box
+        header = "<strong>" + _("Name variants") + "</strong>"
+        content = []
 
-        # print papers:
-        searchstr = create_html_link(self.build_search_url(p=authorname,
-                                     f='exactauthor'),
-                                     {}, "All papers ("+str(len(pubs))+")",)
-        line1 = "<strong>" + _("Papers:") + "</strong>"
+        for name, frequency in sorted(names_dict.iteritems(),
+                                      key=itemgetter(1),
+                                      reverse=True):
+            name_lnk = create_html_link(self.build_search_url(p=name,
+                                                              f='exactauthor'),
+                                                              {},
+                                                              str(frequency),)
+            content.append("%s (%s)" % (name, name_lnk))
+
+        if not content:
+            content = [_("No Name Variants")]
+
+        names_box = self.tmpl_print_searchresultbox(header, "<br />\n".join(content))
+        # construct an extended search as an interim solution for author id
+        # searches. Will build "(exactauthor:v1 OR exactauthor:v2)" strings
+#        extended_author_search_str = ""
+
+#        if bibauthorid_data["is_baid"]:
+#            if len(names_dict.keys()) > 1:
+#                extended_author_search_str = '('
+#
+#            for name_index, name_query in enumerate(names_dict.keys()):
+#                if name_index > 0:
+#                    extended_author_search_str += " OR "
+#
+#                extended_author_search_str += 'exactauthor:"' + name_query + '"'
+#
+#            if len(names_dict.keys()) > 1:
+#                extended_author_search_str += ')'
+#     rec_query = 'exactauthor:"' + authorname + '"'
+#
+#        if bibauthorid_data["is_baid"] and extended_author_search_str:
+#            rec_query = extended_author_search_str
+
+
+        baid_query = ""
+        extended_author_search_str = ""
+
+        if 'is_baid' in bibauthorid_data and bibauthorid_data['is_baid']:
+            if bibauthorid_data["cid"]:
+                baid_query = 'author:%s' % bibauthorid_data["cid"]
+            elif bibauthorid_data["pid"] > -1:
+                baid_query = 'author:%s' % bibauthorid_data["pid"]
+            ## todo: figure out if the author index is filled with pids/cids.
+            ## if not: fall back to exactauthor search.
+            # if not index:
+            #    baid_query = ""
+
+        if not baid_query:
+            baid_query = 'exactauthor:"' + authorname + '"'
+
+            if bibauthorid_data['is_baid']:
+                if len(names_dict.keys()) > 1:
+                    extended_author_search_str = '('
+
+                for name_index, name_query in enumerate(names_dict.keys()):
+                    if name_index > 0:
+                        extended_author_search_str += " OR "
+
+                    extended_author_search_str += 'exactauthor:"' + name_query + '"'
+
+                if len(names_dict.keys()) > 1:
+                    extended_author_search_str += ')'
+
+            if bibauthorid_data['is_baid'] and extended_author_search_str:
+                baid_query = extended_author_search_str
+
+        baid_query = baid_query + " "
+        # construct papers box
+        rec_query = baid_query
+        searchstr = create_html_link(self.build_search_url(p=rec_query),
+                                     {}, "All papers (" + str(len(pubs)) + ")",)
+        line1 = "<strong>" + _("Papers") + "</strong>"
         line2 = searchstr
+
         if CFG_BIBRANK_SHOW_DOWNLOAD_STATS and num_downloads:
-            line2 += " ("+_("downloaded")+" "
-            line2 += str(num_downloads)+" "+_("times")+")"
+            line2 += " (" + _("downloaded") + " "
+            line2 += str(num_downloads) + " " + _("times") + ")"
+
         if CFG_INSPIRE_SITE:
             CFG_COLLS = ['Book',
                          'Conference',
@@ -3940,31 +4010,45 @@ class Template:
         else:
             CFG_COLLS = ['Article',
                          'Book',
-                         'Preprint',]
+                         'Preprint', ]
         collsd = {}
         for coll in CFG_COLLS:
-            coll_num_papers = len(intbitset(pubs) & intbitset(perform_request_search(p="collection:"+coll)))
-            if coll_num_papers:
-                collsd[coll] =  coll_num_papers
+            coll_papers = list(ib_pubs & intbitset(perform_request_search(f="collection", p=coll)))
+            if coll_papers:
+                collsd[coll] = coll_papers
         colls = collsd.keys()
-        colls.sort(lambda x, y: cmp(collsd[y], collsd[x])) # sort by number of papers
+        colls.sort(lambda x, y: cmp(len(collsd[y]), len(collsd[x]))) # sort by number of papers
         for coll in colls:
-            line2 += "<br>" + create_html_link(self.build_search_url(p='exactauthor:"' + authorname + '" ' + \
-                                                                     'collection:' + coll),
-                                                   {}, coll + " ("+str(collsd[coll])+")",)
-        banner = self.tmpl_print_searchresultbox(line1, line2)
+            rec_query = baid_query + 'collection:' + coll
+            line2 += "<br />" + create_html_link(self.build_search_url(p=rec_query),
+                                                                       {}, coll + " (" + str(len(collsd[coll])) + ")",)
 
+        if not pubs:
+            line2 = _("No Papers")
 
-        req.write("<table width=80%><tr valign=top><td>")
-        req.write(banner)
-        req.write("</td><td>&nbsp;</td>")
+        papers_box = self.tmpl_print_searchresultbox(line1, line2)
 
-        #print affiliations
-        line1 = "<strong>" + _("Affiliations:") + "</strong>"
+        #make a authoraff string that looks like CERN (1), Caltech (2) etc
+        authoraff = ""
+        aff_pubdict_keys = aff_pubdict.keys()
+        aff_pubdict_keys.sort(lambda x, y: cmp(len(aff_pubdict[y]), len(aff_pubdict[x])))
+
+        if aff_pubdict_keys:
+            for a in aff_pubdict_keys:
+                print_a = a
+                if (print_a == ' '):
+                    print_a = _("unknown affiliation")
+                if authoraff:
+                    authoraff += '<br>'
+                authoraff += create_html_link(self.build_search_url(p=' or '.join(["%s" % x for x in aff_pubdict[a]]),
+                                                                       f='recid'),
+                                                                       {}, print_a + ' (' + str(len(aff_pubdict[a])) + ')',)
+        else:
+            authoraff = _("No Affiliations")
+
+        line1 = "<strong>" + _("Affiliations") + "</strong>"
         line2 = authoraff
-        req.write("<td>")
-        req.write(self.tmpl_print_searchresultbox(line1, line2))
-        req.write("</td></tr>")
+        affiliations_box = self.tmpl_print_searchresultbox(line1, line2)
 
         # print frequent keywords:
         keywstr = ""
@@ -3972,38 +4056,85 @@ class Template:
             for (kw, freq) in kwtuples:
                 if keywstr:
                     keywstr += '<br>'
-                #create a link in author=x, keyword=y
-                searchstr = create_html_link(self.build_search_url(
-                                                p='exactauthor:"' + authorname + '" ' +
-                                                  'keyword:"' + kw + '"'),
-                                                {}, kw+" ("+str(freq)+")",)
-                keywstr = keywstr+" "+searchstr
-        else: keywstr += 'No Keywords found'
-        banner = self.tmpl_print_searchresultbox("<strong>" + _("Frequent keywords:") + "</strong>", keywstr)
-        req.write("<tr valign=top><td>")
-        req.write(banner)
-        req.write("</td><td>&nbsp;</td>")
+                rec_query = baid_query + 'keyword:"' + kw + '"'
+                searchstr = create_html_link(self.build_search_url(p=rec_query),
+                                                                   {}, kw + " (" + str(freq) + ")",)
+                keywstr = keywstr + " " + searchstr
 
+        else:
+            keywstr += _('No Keywords')
+
+
+        line1 = "<strong>" + _("Frequent keywords") + "</strong>"
+        line2 = keywstr
+        keyword_box = self.tmpl_print_searchresultbox(line1, line2)
+
+
+        header = "<strong>" + _("Frequent co-authors") + "</strong>"
+        content = []
+        sorted_coauthors = sorted(sorted(authors.iteritems(), key=itemgetter(0)), 
+                                  key=itemgetter(1), reverse=True)
+
+        for name, frequency in sorted_coauthors:
+            rec_query = baid_query + 'exactauthor:"' + name + '"'
+            lnk = create_html_link(self.build_search_url(p=rec_query), {}, "%s (%s)" % (name, frequency),)
+            content.append("%s" % lnk)
+
+        if not content:
+            content = [_("No Frequent Co-authors")]
+
+        coauthor_box = self.tmpl_print_searchresultbox(header, "<br />\n".join(content))
+
+        req.write("<h1>%s</h1>" % authorname)
+
+        if person_link:
+            req.write('<div><a href="%s/person/%s">%s</a></div>'
+                      % (CFG_SITE_URL, person_link,
+                         _("Report problem!")))
+
+        req.write("<table width=80%><tr valign=top><td>")
+        req.write(names_box)
+        req.write("<br />")
+        req.write(papers_box)
+        req.write("<br />")
+        req.write(keyword_box)
+        req.write("</td>")
+        req.write("<td>&nbsp;</td>")
+        req.write("<td>")
+        req.write(affiliations_box)
+        req.write("<br />")
+        req.write(coauthor_box)
+        req.write("</td></tr></table>")
+
+        # print citations:
+        rec_query = baid_query
+
+        if len(citedbylist):
+            line1 = "<strong>" + _("Citations:") + "</strong>"
+            line2 = ""
+
+            if not pubs:
+                line2 = _("No Citation Information available")
+
+            req.write(self.tmpl_print_searchresultbox(line1, line2))
 
         # print frequent co-authors:
-        collabstr = ""
-        if (authors):
-            for c in authors:
-                c = c.strip()
-                if collabstr:
-                    collabstr += '<br>'
-                #do not add this person him/herself in the list
-                cUP = c.upper()
-                authornameUP = authorname.upper()
-                if not cUP == authornameUP:
-                    commpubs = intbitset(pubs) & intbitset(perform_request_search(p="exactauthor:\"%s\" exactauthor:\"%s\"" % (authorname, c)))
-                    collabstr = collabstr + create_html_link(self.build_search_url(p='exactauthor:"' + authorname + '" exactauthor:"' + c + '"' ),
-                                                              {}, c + " (" + str(len(commpubs)) + ")",)
-        else: collabstr += 'None'
-        banner = self.tmpl_print_searchresultbox("<strong>" + _("Frequent co-authors:") + "</strong>", collabstr)
-        req.write("<td>")
-        req.write(banner)
-        req.write("</td></tr></table>")
+#        collabstr = ""
+#        if (authors):
+#            for c in authors:
+#                c = c.strip()
+#                if collabstr:
+#                    collabstr += '<br>'
+#                #do not add this person him/herself in the list
+#                cUP = c.upper()
+#                authornameUP = authorname.upper()
+#                if not cUP == authornameUP:
+#                    commpubs = intbitset(pubs) & intbitset(perform_request_search(p="exactauthor:\"%s\" exactauthor:\"%s\"" % (authorname, c)))
+#                    collabstr = collabstr + create_html_link(self.build_search_url(p='exactauthor:"' + authorname + '" exactauthor:"' + c + '"'),
+#                                                              {}, c + " (" + str(len(commpubs)) + ")",)
+#        else: collabstr += 'None'
+#        banner = self.tmpl_print_searchresultbox("<strong>" + _("Frequent co-authors:") + "</strong>", collabstr)
+
 
         # print frequently publishes in journals:
         #if (vtuples):
@@ -4016,14 +4147,6 @@ class Template:
         #    banner = self.tmpl_print_searchresultbox("<strong>" + _("Frequently publishes in:") + "<strong>", pubinfo)
         #    req.write(banner)
 
-
-
-        # print citations:
-        if len(citedbylist):
-            line1 = "<strong>" + _("Citations:") + "</strong>"
-            line2 = ""
-            req.write(self.tmpl_print_searchresultbox(line1, line2))
-            # they will be printed after that
 
     def tmpl_detailed_record_references(self, recID, ln, content):
         """Returns the discussion page of a record
@@ -4050,12 +4173,12 @@ class Template:
         _ = gettext_set_language(ln)
         out = """<p><table id="citesummary">
                   <tr><td><strong class="headline">%(msg_title)s</strong></td>""" % \
-               {'msg_title': _("Citation summary results"),}
+               {'msg_title': _("Citation summary results"), }
         for coll, colldef in l_colls:
             out += '<td align="right">%s</td>' % coll
         out += '</tr>'
         out += """<tr><td><strong>%(msg_recs)s</strong></td>""" % \
-               {'msg_recs': _("Total number of citable papers analyzed:"),}
+               {'msg_recs': _("Total number of citable papers analyzed:"), }
         for coll, colldef in l_colls:
             link_url = CFG_SITE_URL + '/search?p='
             if searchpattern:
@@ -4078,24 +4201,24 @@ class Template:
         """HTML citesummary format, overview. A part of HCS format suite."""
         _ = gettext_set_language(ln)
         out = """<tr><td><strong>%(msg_cites)s</strong></td>""" % \
-              {'msg_cites': _("Total number of citations:"),}
+              {'msg_cites': _("Total number of citations:"), }
         for coll, colldef in l_colls:
             out += '<td align="right">%s</td>' % self.tmpl_nice_number(d_total_cites[coll], ln)
         out += '</tr>'
         out += """<tr><td><strong>%(msg_avgcit)s</strong></td>""" % \
-               {'msg_avgcit': _("Average citations per paper:"),}
+               {'msg_avgcit': _("Average citations per paper:"), }
         for coll, colldef in l_colls:
             out += '<td align="right">%.1f</td>' % d_avg_cites[coll]
         out += '</tr>'
         out += """<tr><td><strong>%(msg_breakdown)s</strong></td></tr>""" % \
-               {'msg_breakdown': _("Breakdown of papers by citations:"),}
+               {'msg_breakdown': _("Breakdown of papers by citations:"), }
         return out
 
     def tmpl_citesummary_breakdown_by_fame(self, d_cites, low, high, fame, l_colls, searchpattern, searchfield, ln=CFG_SITE_LANG):
         """HTML citesummary format, breakdown by fame. A part of HCS format suite."""
         _ = gettext_set_language(ln)
         out = """<tr><td>%(fame)s</td>""" % \
-              {'fame': fame,}
+              {'fame': fame, }
         for coll, colldef in l_colls:
             link_url = CFG_SITE_URL + '/search?p='
             if searchpattern:
@@ -4123,10 +4246,10 @@ class Template:
         _ = gettext_set_language(ln)
         out = "<tr><td></td></tr><tr><td><strong>%(msg_additional)s</strong> <small><small>[<a href=\"%(help_url)s\">?</a>]</small></small></td></tr>" % \
               {'msg_additional': _("Additional Citation Metrics"),
-               'help_url': CFG_SITE_URL+'/help/citation-metrics',}
+               'help_url': CFG_SITE_URL + '/help/citation-metrics', }
         out += '<tr><td>h-index <small><small>[<a href="'
         # use ? help linking in the style of oai_repository_admin.py
-        out += '%s">'% (CFG_SITE_URL+'/help/citation-metrics#citesummary_h-index')
+        out += '%s">' % (CFG_SITE_URL + '/help/citation-metrics#citesummary_h-index')
         out += '?</a>]</small></small></td>'
         for coll, colldef in l_colls:
             out += '<td align="right">%s</td>' % self.tmpl_nice_number(d_h_factors[coll], ln)
@@ -4170,7 +4293,7 @@ class Template:
                 docs = 'http://www.openarchives.org/OAI/2.0/oai_dc.xsd'
             elif format_name == 'xe':
                 format_type = 'application/xml'
-                docs= 'http://www.endnote.com/support/'
+                docs = 'http://www.endnote.com/support/'
                 format_name = 'endnote'
             elif format_name == 'xd':
                 format_type = 'application/xml'

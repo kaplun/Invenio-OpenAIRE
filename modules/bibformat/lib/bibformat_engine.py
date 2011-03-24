@@ -667,7 +667,7 @@ def eval_format_element(format_element, bfo, parameters={}, verbose=0):
                     output_text += '<b><span style="color: rgb(255, 0, 0);">'+ \
                                    str(error_string[0][1]) +'</span></b> '
         # (3)
-        if escape in ['0', '1', '2', '3', '4', '5', '6']:
+        if escape in ['0', '1', '2', '3', '4', '5', '6', '7']:
             escape_mode = int(escape)
 
         # If escape is equal to 1, then escape all
@@ -1221,9 +1221,9 @@ def get_format_element_attrs_from_function(function, element_name,
         param_escape = {}
         param_escape['name'] = "escape"
         param_escape['default'] = ""
-        param_escape['description'] = """0 keeps value as it is. Refers to main
+        param_escape['description'] = """0 keeps value as it is. Refer to main
                                          documentation for escaping modes
-                                         1 to 6"""
+                                         1 to 7"""
         builtin_params.append(param_escape)
 
         attrs['builtin_params'] = builtin_params
@@ -1806,6 +1806,9 @@ class BibFormatObject:
                       4 - Remove all HTML tags
                       5 - Same as 2, with more tags allowed (like <img>)
                       6 - Same as 3, with more tags allowed (like <img>)
+                      7 - Mix of mode 0 and mode 1. If field_value
+                          starts with <!--HTML-->, then use mode
+                          0. Else use mode 1.
 
         @param tag: the marc code of a field
         @param escape: 1 if returned value should be escaped. Else 0. (see above for other modes)
@@ -1874,6 +1877,9 @@ class BibFormatObject:
                       4 - Remove all HTML tags
                       5 - Same as 2, with more tags allowed (like <img>)
                       6 - Same as 3, with more tags allowed (like <img>)
+                      7 - Mix of mode 0 and mode 1. If field_value
+                          starts with <!--HTML-->, then use mode 0.
+                          Else use mode 1.
 
         @param tag: the marc code of a field
         @param escape: 1 if returned values should be escaped. Else 0.
@@ -1962,6 +1968,8 @@ def escape_field(value, mode=0):
     - mode 4: escaping all HTML/XML tags (escaped tags are removed)
     - mode 5: same as 2, but allows more tags, like <img>
     - mode 6: same as 3, but allows more tags, like <img>
+    - mode 7: mix of mode 0 and mode 1. If field_value starts with <!--HTML-->,
+              then use mode 0. Else use mode 1.
     """
     if mode == 1:
         return cgi.escape(value)
@@ -2020,6 +2028,11 @@ def escape_field(value, mode=0):
                                )
         except HTMLParseError:
             # Parsing failed
+            return cgi.escape(value)
+    elif mode == 7:
+        if value.lstrip(' \n').startswith(html_field):
+            return value
+        else:
             return cgi.escape(value)
     else:
         return value
