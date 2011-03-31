@@ -32,6 +32,7 @@ import tempfile
 import time
 import signal
 import select
+import asyncore
 from cStringIO import StringIO
 import subprocess
 
@@ -149,7 +150,7 @@ def run_shell_command(cmd, args=None, filename_out=None, filename_err=None):
     # return results:
     return cmd_exit_code, cmd_out, cmd_err
 
-def run_process_with_timeout(args, filename_in=None, filename_out=None, filename_err=None, cwd=None, timeout=CFG_MISCUTIL_DEFAULT_PROCESS_TIMEOUT):
+def run_process_with_timeout_sam(args, filename_in=None, filename_out=None, filename_err=None, cwd=None, timeout=CFG_MISCUTIL_DEFAULT_PROCESS_TIMEOUT):
     stdin = subprocess.PIPE
     stdout = stderr = None
     if filename_in:
@@ -227,6 +228,56 @@ def run_process_with_timeout(args, filename_in=None, filename_out=None, filename
                 break
     return process.poll(), tmp_stdout.getvalue(), tmp_stderr.getvalue()
 
+class ShellutilsFileWrapper(asyncore.file_dispatcher):
+    def __init__(self, the_file, output):
+        asyncore.file_dispatcher.__init__(self, the_file)
+        self.output = output
+
+    def handle_read(self):
+        self.output.write(self.recv(65536))
+
+def run_process_with_timeout_asyncore(args, filename_in=None, filename_out=None, filename_err=None, cwd=None, timeout=CFG_MISCUTIL_DEFAULT_PROCESS_TIMEOUT, sudo=None):
+    stdin = open('/dev/null', 'r')
+    stdout = stderr = None
+    if filename_in:
+        stdin = open(filename_in, 'r')
+    if filename_out:
+        stdout = open(filename_out, 'w')
+    if filename_err:
+        stderr = open(filename_err, 'w')
+    tmp_stdout = StringIO()
+    tmp_stderr = StringIO()
+    if sudo is not None:
+        args = ['sudo', '-u', sudo, '-S'] + args
+    s("filename_in: %s, filename_out: %s, filename_err: %s, stdin: %s, stdout: %s, stderr: %s, tmp_stdout: %s, tmp_stderr: %s" % (filename_in, filename_out, filename_err, stdin, stdout, stderr, tmp_stdout, tmp_stderr))
+    ## See: <http://stackoverflow.com/questions/3876886/timeout-a-subprocess>
+    process = subprocess.Popen(args, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True, cwd=cwd, preexec_fn=os.setpgrp)
+    s("process: %s, pid: %s, args: %s, cwd: %s" % (process, process.pid, args, cwd))
+
+    asyncmap = {
+        "stdout": ShellutilsFileWrapper(process.stdout, tmp_stdout),
+        "stderr": ShellutilsFileWrapper(process.stderr, tmp_stderr)
+    }
+
+    asyncore.loop(timeout=timeout, map=asyncmap)
+    if process.poll() is None:
+        process.stdin.close()
+        time.sleep(1)
+        if process.poll() is None:
+            ## See: <http://stackoverflow.com/questions/3876886/timeout-a-subprocess>
+            os.kill(process.pid, signal.SIGTERM)
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGTERM)
+            time.sleep(1)
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+        try:
+            os.waitpid(process.pid, 0)
+        except OSError:
+            pass
+        raise Timeout()
+    return process.poll(), tmp_stdout.getvalue(), tmp_stderr.getvalue()
+
 def escape_shell_arg(shell_arg):
     """Escape shell argument shell_arg by placing it within
     single-quotes.  Any single quotes found within the shell argument
@@ -245,6 +296,8 @@ def escape_shell_arg(shell_arg):
         raise TypeError(msg)
 
     return "'%s'" % shell_arg.replace("'", r"'\''")
+
+run_process_with_timeout = run_process_with_timeout_asyncore
 
 def s(t):
     ## De-comment this to have lots of debugging information
