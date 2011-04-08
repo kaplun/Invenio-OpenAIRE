@@ -3462,11 +3462,10 @@ CREATE TABLE IF NOT EXISTS schLOCK(
 ) ENGINE=MyISAM;
 
 CREATE TABLE IF NOT EXISTS schLOCKID(
-  identifier varchar(255),
-  type varchar(9),
-  id_schLOCK int(15),
-  id_schTASK int(15),
-  PRIMARY KEY (identifier, type)
+  identifier varchar(255) NOT NULL,
+  type varchar(9) NOT NULL,
+  id_schLOCK int(15) NOT NULL,
+  PRIMARY KEY (identifier, type, id_schLOCK),
 ) ENGINE=MyISAM;
 
 -- Batch Upload History

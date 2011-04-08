@@ -44,7 +44,7 @@ from invenio.config import \
      CFG_BIBSCHED_MAX_NUMBER_CONCURRENT_TASKS, \
      CFG_SITE_URL, \
      CFG_TMPDIR, \
-     CFG_BIBSCHED_MARCXML_EDITOR
+     CFG_BIBSCHED_EDITOR
 
 from invenio.dbquery import run_sql, real_escape_string
 from invenio.bibupload import open_marc_file
@@ -53,6 +53,23 @@ from invenio.errorlib import register_exception, register_emergency
 from invenio.bibtask import task_low_level_submission
 
 CFG_VALID_STATUS = ('WAITING', 'SCHEDULED', 'RUNNING', 'CONTINUING', '% DELETED', 'ABOUT TO STOP', 'ABOUT TO SLEEP', 'STOPPED', 'SLEEPING', 'KILLED', 'MANUAL')
+
+def get_pager():
+    """
+    Return the first available pager.
+    """
+    for pager in os.environ.get('PAGER'), CFG_BIBSCHED_LOG_PAGER, '/usr/bin/less', '/bin/more':
+        if os.path.exists(pager):
+            return pager
+
+def get_editor():
+    """
+    Return the first available editor.
+    """
+    for editor in os.environ.get('EDITOR'), CFG_BIBSCHED_EDITOR, '/usr/bin/vim', '/usr/bin/emacs', '/usr/bin/vi':
+        if os.path.exists(editor):
+            return editor
+
 
 shift_re = re.compile("([-\+]{0,1})([\d]+)([dhms])")
 def get_datetime(var, format_string="%Y-%m-%d %H:%M:%S"):
@@ -191,10 +208,10 @@ class Manager:
         self.curses = curses
         self.helper_modules = CFG_BIBTASK_VALID_TASKS
         self.running = 1
-        locked_records = run_sql("SELECT COUNT(DISTINCT identifier, type) FROM schLOCKID")
+        locked_identifiers = run_sql("SELECT COUNT(DISTINCT identifier, type) FROM schLOCKID")
         #self.footer_move_mode = "[KeyUp/KeyDown Move] [M Select mode] [Q Quit]"
-        self.footer_auto_mode = "Automatic Mode [A Manual] [1/2/3/4 Display] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] #LR =%s" %locked_records[0][0]
-        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3/4 Display Type] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] LR =%s" %locked_records[0][0]
+        self.footer_auto_mode = "Automatic Mode [A Manual] [1/2/3/4 Display] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] #LI=%s" % locked_identifiers[0][0]
+        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3/4 Display Type] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] #LI=%s" % locked_identifiers[0][0]
         self.footer_waiting_item = "[R Run] [D Delete] [N Priority]"
         self.footer_running_item = "[S Sleep] [T Stop] [K Kill]"
         self.footer_stopped_item = "[I Initialise] [D Delete] [K Acknowledge]"
@@ -271,13 +288,13 @@ class Manager:
                 self.change_sort_mode()
             elif chr == ord("l"):
                 if self.display == 4:
-                    self.list_locked_records()
+                    self.list_locked_identifiers()
                 else:
                     self.openlog()
 
             elif chr == ord("L"):
                 if self.display == 4:
-                    self.list_locked_records()
+                    self.list_locked_identifiers()
                 else:
                     self.openlog(err=True)
             elif chr in (ord("w"), ord("W")):
@@ -360,8 +377,8 @@ class Manager:
         else:
             logname = os.path.join(CFG_LOGDIR, 'bibsched_task_%d.log' % task_id)
         if os.path.exists(logname):
-            pager = CFG_BIBSCHED_LOG_PAGER or os.environ.get('PAGER', '/bin/more')
-            if os.path.exists(pager):
+            pager = get_pager()
+            if pager:
                 self.curses.endwin()
                 os.system('%s %s' % (pager, logname))
                 print >> self.old_stdout, "\rPress ENTER to continue",
@@ -369,7 +386,7 @@ class Manager:
                 raw_input()
                 self.curses.panel.update_panels()
 
-    def list_locked_records(self):
+    def list_locked_identifiers(self):
         """Shows all the record identifiers locked by the current lock"""
         lock_id = self.currentrow[0]
         record_list = run_sql("SELECT DISTINCT type, identifier, id_schTASK from schLOCKID WHERE id_schLOCK=%s", (lock_id,))
@@ -388,8 +405,8 @@ class Manager:
         try:
             if os.path.exists(tmp_list_name):
 
-                pager = CFG_BIBSCHED_LOG_PAGER or os.environ.get('PAGER', '/bin/more')
-                if os.path.exists(pager):
+                pager = get_pager()
+                if pager:
                     self.curses.endwin()
                     os.system('clear')
                     os.system('%s %s' % (pager, tmp_list_name))
@@ -450,9 +467,8 @@ class Manager:
 
         try:
             if os.path.exists(tmp_detailledview_name):
-
-                pager = CFG_BIBSCHED_LOG_PAGER or os.environ.get('PAGER', '/bin/more')
-                if os.path.exists(pager):
+                pager = get_pager()
+                if pager:
                     self.curses.endwin()
                     os.system('%s %s' % (pager, tmp_detailledview_name))
                     print >> self.old_stdout, "\rPress ENTER to continue",
@@ -460,9 +476,8 @@ class Manager:
                     raw_input()
                     self.curses.panel.update_panels()
                     os.remove(tmp_detailledview_name)
-
         except:
-            pass
+            register_exception()
 
     def task_run(self):
         """Prints a message with the previous arguments of the task, ask for the new ones
@@ -569,12 +584,15 @@ Press 'q' to exit"""
 
 
     def unlock(self, lock_id):
-        """Removes all locked records from the database, sets all afected task to manual and
+        """Removes all locked records from the database, sets all affected tasks to manual and
         acknowledges the error that created the lock"""
 
         task_locked_set_old = set()
         task_locked_set_new = set()
-        first_task_locked = run_sql("SELECT DISTINCT id_schtask from schLOCK WHERE id=%s", (lock_id,))
+        first_task_locked = run_sql("SELECT id_schtask from schLOCK WHERE id=%s", (lock_id,))
+        if not first_task_locked:
+            ## Wait a second! Why are we unlocking something that does not exists?
+            return
         task_locked_set_old.add(run_sql("SELECT DISTINCT id_schTASK from schLOCKID WHERE NOT id_schTASK=%s", (first_task_locked[0][0],)))
         run_sql("DELETE FROM schLOCK WHERE id=%s", (lock_id,))
         run_sql("DELETE FROM schLOCKID WHERE id_schLOCK=%s", (lock_id,))
@@ -599,15 +617,14 @@ Press 'q' to exit"""
 
         try:
             if os.path.exists(tmp_marc_name):
-
-                pager = CFG_BIBSCHED_MARCXML_EDITOR or os.environ.get('EDITOR', '/usr/bin/emacs')
-                if os.path.exists(pager):
+                editor = get_editor()
+                if editor:
                     self.curses.endwin()
-                    os.system('%s %s' % (pager, tmp_marc_name))
+                    os.system('%s %s' % (editor, tmp_marc_name))
                     status = os.stat(tmp_marc_name)
                     if status.st_mtime > status.st_atime:
                         new_marc = open_marc_file(tmp_marc_name)
-                        run_sql("UPDATE schLOCK SET marcxml=%s WHERE id =%s", (new_marc, lock_id))
+                        run_sql("UPDATE schLOCK SET marcxml=%s WHERE id=%s", (new_marc, lock_id))
                     print >> self.old_stdout, "\rPress ENTER to continue",
                     self.old_stdout.flush()
                     raw_input()
@@ -979,7 +996,7 @@ Press 'q' to exit"""
         if self.y == self.selected_line - self.first_visible_line and self.y > 1:
             self.current_attr = attr
             attr += self.curses.A_STANDOUT
-        num_identifiers = run_sql("SELECT COUNT(DISTINCT identifier, type) FROM schLOCKID WHERE id_schLOCK=%s", (row[0],))
+        num_identifiers = run_sql("SELECT COUNT(*) FROM schLOCKID WHERE id_schLOCK=%s", (row[0],))
         if header:
             myline = str(row[0]).ljust(col_w[0])
             myline += str(row[1]).ljust(col_w[1])
@@ -1032,11 +1049,11 @@ Press 'q' to exit"""
         maxy = self.height - 2
         maxx = self.width
         if self.display == 4:
-            locked_records = run_sql("SELECT COUNT(id) FROM schLOCK")
-            self.footer = "[V View] [E Edit] [R Run] [U Unlock] [L List Records] [Q Quit] #LR =%s" %locked_records[0][0]
+            locked_identifiers = run_sql("SELECT COUNT(id) FROM schLOCK")
+            self.footer = "[V View] [E Edit] [R Run] [U Unlock] [L List Records] [Q Quit] #LR =%s" %locked_identifiers[0][0]
             self.manual_display(("LOCK ID", "PROCESS", "USER", "TASK ID", "#LR", "L REASON"), True)
             self.manual_display(("------", "--------", "------", "-------", "------", "-------"), True)
-            self.rows = run_sql("""SELECT id, lockprocess,  lockuser, id_schTASK, lockreason FROM schLOCK""")
+            self.rows = run_sql("""SELECT id, lockprocess, lockuser, id_schTASK, lockreason FROM schLOCK""")
             if self.selected_line > maxy + self.first_visible_line - 1:
                 self.first_visible_line = self.selected_line - maxy + 1
                 if self.selected_line < self.first_visible_line + 2:

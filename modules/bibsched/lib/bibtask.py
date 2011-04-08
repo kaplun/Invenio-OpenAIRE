@@ -784,7 +784,7 @@ def _task_run(task_run_fnc, task_used_records_fnc):
             intersection = locked_records_set & task_used_records_set
             if intersection: #If the task uses at least one locked record
                 for record in intersection:
-                    id_schlock = run_sql("SELECT id_schlock from schLOCKID WHERE type=%s AND identifier=%s", (record[0], record[1],))
+                    id_schlock = run_sql("SELECT id_schlock from schLOCKID WHERE identifier=%s AND type=%s", (record[1], record[0],))
                     for identifier in id_schlock:
                         task_lock_record_identifiers(task_used_records_set , identifier[0], _TASK_PARAMS['task_id'])
                 task_update_status("MANUAL")
@@ -1026,4 +1026,4 @@ def task_create_lock(marcxml=None, id_schTASK=None, lockprocess=None, lockuser=N
 def task_lock_record_identifiers(record_identifiers_set, lock_id, task_id=None):
     """Inserts in the DB all the identifiers of the records that should be locked"""
     for identifier_type, identifier in record_identifiers_set:
-        run_sql("INSERT INTO schLOCKID (identifier, type, id_schLOCK, id_schTASK) VALUES (%s, %s, %s, %s)", (identifier, identifier_type, lock_id, task_id))
+        run_sql("INSERT INTO schLOCKID (identifier, type, id_schLOCK) VALUES (%s, %s, %s)", (identifier, identifier_type, lock_id))
