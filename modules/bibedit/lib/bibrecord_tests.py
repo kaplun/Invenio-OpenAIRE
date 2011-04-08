@@ -60,7 +60,7 @@ class BibRecordSuccessTest(unittest.TestCase):
 
     def test_records_created(self):
         """ bibrecord - demo file how many records are created """
-        self.assertEqual(102, len(self.recs))
+        self.assertEqual(104, len(self.recs))
 
     def test_tags_created(self):
         """ bibrecord - demo file which tags are created """
@@ -141,6 +141,7 @@ class BibRecordParsersTest(unittest.TestCase):
             '001': [([], ' ', ' ', '33', 1)],
             '041': [([('a', 'eng')], ' ', ' ', '', 2)]
             }
+
     if parser_pyrxp_available:
         def test_pyRXP(self):
             """ bibrecord - create_record() with pyRXP """
@@ -326,7 +327,6 @@ class BibRecordGettingFieldValuesTest(unittest.TestCase):
         <datafield tag="245" ind1=" " ind2="2">
         <subfield code="a">On the foo and bar2</subfield>
         </datafield>
-
         </record>
         """
         self.rec = bibrecord.create_record(xml_example_record, 1, 1)[0]

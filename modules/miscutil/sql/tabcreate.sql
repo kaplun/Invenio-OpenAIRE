@@ -3442,10 +3442,31 @@ CREATE TABLE IF NOT EXISTS hstTASK (
   status varchar(50),
   progress varchar(255),
   priority tinyint(4) NOT NULL default 0,
-  PRIMARY KEY  (id),
+  PRIMARY KEY (id),
   KEY status (status),
   KEY runtime (runtime),
   KEY priority (priority)
+) ENGINE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS schLOCK(
+  id int(15) unsigned NOT NULL auto_increment,
+  marcxml text DEFAULT NULL,
+  id_schTASK int(15) DEFAULT NULL,
+  locktime datetime,
+  lockreason text DEFAULT NULL,
+  lockprocess varchar(20) DEFAULT NULL,
+  lockuser varchar(50) DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY id_schTASK (id_schTASK),
+  KEY locktime
+) ENGINE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS schLOCKID(
+  identifier varchar(255),
+  type varchar(9),
+  id_schLOCK int(15),
+  id_schTASK int(15),
+  PRIMARY KEY (identifier, type)
 ) ENGINE=MyISAM;
 
 -- Batch Upload History
@@ -3938,22 +3959,5 @@ CREATE TABLE IF NOT EXISTS `aidVIRTUALAUTHORSCLUSTERS` (
   `cluster_name` varchar(60) NOT NULL,
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM;
-
-CREATE TABLE IF NOT EXISTS schLOCK(
-  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, 
-  marcxml TEXT DEFAULT NULL, 
-  id_schTASK INT(9) DEFAULT NULL, 
-  locktime DATETIME,
-  lockreason TEXT,
-  lockprocess TEXT,
-  lockuser TEXT DEFAULT NULL
-) TYPE=MyISAM;
-
-CREATE TABLE IF NOT EXISTS schLOCKREC(
-  rec_identifier VARCHAR(255),
-  rec_identifier_type VARCHAR(9), 
-  id_schLOCK INT,
-  id_schTASK INT 
-) TYPE=MyISAM;
 
 -- end of file

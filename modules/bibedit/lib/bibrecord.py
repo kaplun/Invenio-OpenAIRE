@@ -880,32 +880,36 @@ def record_get_all_identifiers(record):
     @param record: a record structure as returned by create_record()
     """
     record_identifiers_set = set()
-    oai_ids =  record_get_field_values(record,
-                                       CFG_OAI_ID_FIELD[0:3],
-                                       CFG_OAI_ID_FIELD[3:4],
-                                       CFG_OAI_ID_FIELD[4:5],
-                                       CFG_OAI_ID_FIELD[5:6])
-    if oai_ids:
-        oai_id = oai_ids[0]
+    for oai_id in record_get_field_values(record,
+            CFG_OAI_ID_FIELD[0:3],
+            CFG_OAI_ID_FIELD[3],
+            CFG_OAI_ID_FIELD[4],
+            CFG_OAI_ID_FIELD[5]):
         record_identifiers_set.add(('oai_id', oai_id))
 
-    sysnos = record_get_field_values(record,
-                                      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[0:3],
-                                      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[3:4] != "_" and \
-                                      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[3:4] or "",
-                                      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[4:5] != "_" and \
-                                      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[4:5] or "",
-                                      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[5:6])
-    if sysnos:
-        sysno = sysnos[0]
+    for sysno in record_get_field_values(record,
+            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[0:3],
+            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[3],
+            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[4],
+            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[5]):
         record_identifiers_set.add(('sysno', sysno))
-    if record_get_field_value(record, '001'):
-        record_identifiers_set.add(('rec_id', record_get_field_value(record, '001')))
 
-    external_oai_ids = record_get_external_oai_id(record)
-    if external_oai_ids:
-        for ext_oai_id in external_oai_ids:
-            record_identifiers_set.add(('external_oai_id', ext_oai_id))
+    recid = record_get_field_value(record, '001')
+    if recid:
+        record_identifiers_set.add(('rec_id', recid))
+
+    for field in record_get_field_instances(record,
+            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[0:3],
+            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[3],
+            CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG[4]):
+        for code, value in field_get_subfield_instances(field):
+            provenance = ''
+            ext_oai_id = ''
+            if code == CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[5]:
+                ext_oai_id = value
+            elif code == CFG_BIBUPLOAD_EXTERNAL_OAIID_PROVENANCE_TAG[5]:
+                provenance = value
+        record_identifiers_set.add(('external_oai_id', "%s (%s)" % (ext_oai_id, provenance)))
 
     return record_identifiers_set
 
@@ -1561,27 +1565,6 @@ def _compare_lists(list1, list2, custom_cmp):
         if not custom_cmp(element1, element2):
             return False
     return True
-
-def record_get_external_oai_id(record):
-    """Returns the list of (string) values with all external oai ids
-    of the record (rec) with the provenance between parenthesis.
-    Returns empty list if not found.
-    @param rec: a record structure as returned by create_record()
-    @return: a list of strings"""
-
-    provenance = CFG_BIBUPLOAD_EXTERNAL_OAIID_PROVENANCE_TAG[5:]
-    tag = CFG_BIBUPLOAD_EXTERNAL_OAIID_TAG[:3]
-    tmp = []
-    if tag in record:
-        for field in record[tag]:
-            if (field[0][0] == provenance):
-                tmp.append(("("+field[0][0][1]+")"+field[0][1][1]))
-            else:
-                if len(field[0]) == 2:
-                    tmp.append(("("+field[0][1][1]+")"+field[0][0][1]))
-                else:
-                    tmp.append(("()"+field[0][0][1]))
-    return tmp
 
 if PSYCO_AVAILABLE:
     psyco.bind(_correct_record)

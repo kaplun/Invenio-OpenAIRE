@@ -45,7 +45,7 @@ from invenio.config import \
      CFG_SITE_URL, \
      CFG_TMPDIR, \
      CFG_BIBSCHED_MARCXML_EDITOR
-     
+
 from invenio.dbquery import run_sql, real_escape_string
 from invenio.bibupload import open_marc_file
 from invenio.textutils import wrap_text_in_a_box
@@ -191,10 +191,10 @@ class Manager:
         self.curses = curses
         self.helper_modules = CFG_BIBTASK_VALID_TASKS
         self.running = 1
-        locked_records = run_sql("SELECT COUNT(DISTINCT rec_identifier, rec_identifier_type) FROM schLOCKREC")
+        locked_records = run_sql("SELECT COUNT(DISTINCT identifier, type) FROM schLOCKID")
         #self.footer_move_mode = "[KeyUp/KeyDown Move] [M Select mode] [Q Quit]"
         self.footer_auto_mode = "Automatic Mode [A Manual] [1/2/3/4 Display] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] #LR =%s" %locked_records[0][0]
-        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3/4 Display Type] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] LR =%s" %locked_records[0][0]  
+        self.footer_select_mode = "Manual Mode [A Automatic] [1/2/3/4 Display Type] [P Purge] [l/L Log] [O Opts] [X Sort] [Q Quit] LR =%s" %locked_records[0][0]
         self.footer_waiting_item = "[R Run] [D Delete] [N Priority]"
         self.footer_running_item = "[S Sleep] [T Stop] [K Kill]"
         self.footer_stopped_item = "[I Initialise] [D Delete] [K Acknowledge]"
@@ -223,7 +223,7 @@ class Manager:
                                            ord("q"), ord("Q"), ord("a"),
                                            ord("A"), ord("1"), ord("2"), ord("3"),
                                            ord("p"), ord("P"), ord("o"), ord("O"),
-                                           ord("l"), ord("L"))):
+                                           ord("l"), ord("L"), ord("x"), ord("X"))):
             self.display_in_footer("in automatic mode")
             self.stdscr.refresh()
         #elif self.move_mode and (chr not in (self.curses.KEY_UP,
@@ -274,7 +274,7 @@ class Manager:
                     self.list_locked_records()
                 else:
                     self.openlog()
-                
+
             elif chr == ord("L"):
                 if self.display == 4:
                     self.list_locked_records()
@@ -372,7 +372,7 @@ class Manager:
     def list_locked_records(self):
         """Shows all the record identifiers locked by the current lock"""
         lock_id = self.currentrow[0]
-        record_list = run_sql("SELECT DISTINCT rec_identifier_type, rec_identifier, id_schTASK from schLOCKREC WHERE id_schLOCK=%s", (lock_id,))
+        record_list = run_sql("SELECT DISTINCT type, identifier, id_schTASK from schLOCKID WHERE id_schLOCK=%s", (lock_id,))
         if record_list:
             tmp_list_name = os.path.join(CFG_TMPDIR, 'tmp_list_%d.xm' % lock_id)
             tmp_view = open(tmp_list_name, "a")
@@ -383,11 +383,11 @@ class Manager:
                     msg += '     '
                 msg += '\n'
             tmp_view.write(msg)
-            
+
             tmp_view.close()
-        try:    
+        try:
             if os.path.exists(tmp_list_name):
-            
+
                 pager = CFG_BIBSCHED_LOG_PAGER or os.environ.get('PAGER', '/bin/more')
                 if os.path.exists(pager):
                     self.curses.endwin()
@@ -397,14 +397,14 @@ class Manager:
                     self.old_stdout.flush()
                     raw_input()
                     self.curses.panel.update_panels()
-                    os.remove(tmp_list_name)                  
+                    os.remove(tmp_list_name)
         except:
             pass
-                
+
 
     def task_view(self):
         """Shows detailled information of the task"""
-        
+
         task_id = self.currentrow[3]
         lock_id = self.currentrow[0]
         lock_reason = self.currentrow[4]
@@ -427,7 +427,7 @@ class Manager:
             msg += 'Arguments : %s\n' % ' '.join(arguments[1:])
         msg += 'Reason: %s\n' %lock_reason
 
-        locked_tasks = run_sql("SELECT DISTINCT id_schTASK FROM schLOCKREC WHERE id_schLOCK=%s ORDER BY id_schTASK ASC", (lock_id,))
+        locked_tasks = run_sql("SELECT DISTINCT id_schTASK FROM schLOCKID WHERE id_schLOCK=%s ORDER BY id_schTASK ASC", (lock_id,))
         if locked_tasks:
             msg += 'TASKS AFFECTED BY THIS LOCK:\n'
             for task_id in locked_tasks:
@@ -448,9 +448,9 @@ class Manager:
         tmp_view.write(msg)
         tmp_view.close()
 
-        try:    
+        try:
             if os.path.exists(tmp_detailledview_name):
-            
+
                 pager = CFG_BIBSCHED_LOG_PAGER or os.environ.get('PAGER', '/bin/more')
                 if os.path.exists(pager):
                     self.curses.endwin()
@@ -460,14 +460,14 @@ class Manager:
                     raw_input()
                     self.curses.panel.update_panels()
                     os.remove(tmp_detailledview_name)
-                  
+
         except:
             pass
-        
+
     def task_run(self):
         """Prints a message with the previous arguments of the task, ask for the new ones
         and submits the new task to bibsched"""
-        
+
         task_id = self.currentrow[3]
         lock_id = self.currentrow[0]
         msg = """This were the previous arguments:
@@ -556,17 +556,17 @@ Press 'q' to exit"""
         except:
             pass
 
-            
-        
+
+
     def unlock_task(self):
         """Displays a confirmation message and calls the unlock function"""
 
-        lock_id =self.currentrow[0]      
+        lock_id =self.currentrow[0]
         if self._display_YN_box("All quarantined records by this lock \n\n"
              "will be unlocked.\n\n"
              "Do you want to proceed?"):
             self.unlock(lock_id)
-            
+
 
     def unlock(self, lock_id):
         """Removes all locked records from the database, sets all afected task to manual and
@@ -575,17 +575,17 @@ Press 'q' to exit"""
         task_locked_set_old = set()
         task_locked_set_new = set()
         first_task_locked = run_sql("SELECT DISTINCT id_schtask from schLOCK WHERE id=%s", (lock_id,))
-        task_locked_set_old.add(run_sql("SELECT DISTINCT id_schTASK from schLOCKREC WHERE NOT id_schTASK=%s", (first_task_locked[0][0],)))
+        task_locked_set_old.add(run_sql("SELECT DISTINCT id_schTASK from schLOCKID WHERE NOT id_schTASK=%s", (first_task_locked[0][0],)))
         run_sql("DELETE FROM schLOCK WHERE id=%s", (lock_id,))
-        run_sql("DELETE FROM schLOCKREC WHERE id_schLOCK=%s", (lock_id,))
-        task_locked_set_new.add(run_sql("SELECT DISTINCT id_schTASK from schLOCKREC WHERE NOT id_schTASK=%s", (first_task_locked[0][0],)))
+        run_sql("DELETE FROM schLOCKID WHERE id_schLOCK=%s", (lock_id,))
+        task_locked_set_new.add(run_sql("SELECT DISTINCT id_schTASK from schLOCKID WHERE NOT id_schTASK=%s", (first_task_locked[0][0],)))
         unlocked_tasks = task_locked_set_old.difference(task_locked_set_new)
         for task_tuple in unlocked_tasks:
             for task in task_tuple:
                 bibsched_set_status(task[0], "WAITING")
         status = run_sql("SELECT status from schTASK WHERE id=%s", (first_task_locked[0][0],))
-        bibsched_set_status(first_task_locked[0][0], "ACK " + status[0][0])    
-        
+        bibsched_set_status(first_task_locked[0][0], "ACK " + status[0][0])
+
     def task_edit(self):
         """Opens the configured editor to edit the marcxml code of the record that created the lock"""
 
@@ -597,9 +597,9 @@ Press 'q' to exit"""
             tmp_view.write(marc[0][0])
             tmp_view.close()
 
-        try:    
+        try:
             if os.path.exists(tmp_marc_name):
-            
+
                 pager = CFG_BIBSCHED_MARCXML_EDITOR or os.environ.get('EDITOR', '/usr/bin/emacs')
                 if os.path.exists(pager):
                     self.curses.endwin()
@@ -611,7 +611,7 @@ Press 'q' to exit"""
                     print >> self.old_stdout, "\rPress ENTER to continue",
                     self.old_stdout.flush()
                     raw_input()
-                    
+
                     self.curses.panel.update_panels()
                     os.remove(tmp_marc_name)
 
@@ -836,7 +836,7 @@ Press 'q' to exit"""
 
     def delete(self):
         task_id = self.currentrow[0]
-        
+
         status = self.currentrow[5]
         if status not in ('RUNNING', 'CONTINUING', 'SLEEPING', 'SCHEDULED', 'ABOUT TO STOP', 'ABOUT TO SLEEP'):
             bibsched_set_status(task_id, "%s_DELETED" % status, status)
@@ -963,7 +963,7 @@ Press 'q' to exit"""
 
 
     def manual_display(self, row, header=False):
-       
+
         col_w = [12 , 15, 10, 10, 12, 11]
         maxx = self.width
         if self.y == self.selected_line - self.first_visible_line and self.y > 1:
@@ -971,16 +971,16 @@ Press 'q' to exit"""
         if self.y == 0:
             attr = self.curses.color_pair(8) + self.curses.A_STANDOUT + self.curses.A_BOLD
         elif self.y == 1:
-            attr =  self.curses.color_pair(8) 
-            
+            attr =  self.curses.color_pair(8)
+
         else:
             attr = self.curses.color_pair(5)  + self.curses.A_BOLD
 
         if self.y == self.selected_line - self.first_visible_line and self.y > 1:
             self.current_attr = attr
             attr += self.curses.A_STANDOUT
-        num_identifiers = run_sql("SELECT COUNT(DISTINCT rec_identifier, rec_identifier_type) FROM schLOCKREC WHERE id_schLOCK=%s", (row[0],))
-        if header: 
+        num_identifiers = run_sql("SELECT COUNT(DISTINCT identifier, type) FROM schLOCKID WHERE id_schLOCK=%s", (row[0],))
+        if header:
             myline = str(row[0]).ljust(col_w[0])
             myline += str(row[1]).ljust(col_w[1])
             myline += str(row[2])[:10].ljust(col_w[2])
@@ -1046,9 +1046,9 @@ Press 'q' to exit"""
 #                row += status[0]
                 self.manual_display(row)
             self.y = self.stdscr.getmaxyx()[0] - 1
-            self.display_in_footer(self.footer, print_time_p=1) 
+            self.display_in_footer(self.footer, print_time_p=1)
 
-        
+
         else:
             self.put_line(("ID", "PROC [PRI]", "USER", "RUNTIME", "SLEEP", "STATUS", "PROGRESS"), True)
             self.put_line(("------", "---------", "----", "-------------------", "-----", "-----", "--------"), True)
@@ -1115,9 +1115,9 @@ Press 'q' to exit"""
                     else:
                         order = "priority DESC"
                 elif self.display == 4:
-                    fields = "id, marcxml, comments"
-                    table = "errors"
-                    order = "creationdate DESC"
+                    fields = "id, marcxml, lockreason"
+                    table = "schLOCK"
+                    order = "locktime DESC"
                     where = ''
                 else:
                     fields = "id,proc,user,runtime,sleeptime,status,progress,arguments,priority"
@@ -1323,33 +1323,20 @@ class BibSched:
 
     def watch_loop(self):
         def calculate_rows():
-			"""Return all the rows to work on."""
-			errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS' AND proc NOT IN (SELECT proc FROM schTASK WHERE proc='bibupload' AND status='DONE WITH ERRORS' )")
-        #                errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")
-			if errors:
-			#	for each_task in errors:
-				errors = ["    #%s %s -> %s" % row for row in errors]
-				raise StandardError('BibTask with ERRORS:\n%s' % "\n".join(errors)) 
-                    
-			else:
-				max_bibupload_priority = run_sql("SELECT max(priority) FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()")
-				if max_bibupload_priority:
-					run_sql("UPDATE schTASK SET priority=%s WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()", ( max_bibupload_priority[0][0], ))
-				self.next_bibupload = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW() ORDER BY id ASC LIMIT 1", n=1)
-				self.waitings = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE (status='WAITING' AND runtime<=NOW()) OR status='SLEEPING' ORDER BY priority DESC, runtime ASC, id ASC")
-				self.rows = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status IN ('RUNNING','CONTINUING','SCHEDULED','ABOUT TO STOP','ABOUT TO SLEEP', 'MANUAL')")
-        # def calculate_rows():
-        #     """Return all the rows to work on."""
-        #     if run_sql("SELECT count(id) FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")[0][0] > 0:
-        #         errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS'")
-        #         errors = ["    #%s %s -> %s" % row for row in errors]
-        #         raise StandardError('BibTask with ERRORS:\n%s' % "\n".join(errors))
-        #     max_bibupload_priority = run_sql("SELECT max(priority) FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()")
-        #     if max_bibupload_priority:
-        #         run_sql("UPDATE schTASK SET priority=%s WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()", ( max_bibupload_priority[0][0], ))
-        #     self.next_bibupload = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW() ORDER BY id ASC LIMIT 1", n=1)
-        #     self.waitings = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE (status='WAITING' AND runtime<=NOW()) OR status='SLEEPING' ORDER BY priority DESC, runtime ASC, id ASC")
-        #     self.rows = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status IN ('RUNNING','CONTINUING','SCHEDULED','ABOUT TO STOP','ABOUT TO SLEEP')")
+            """Return all the rows to work on."""
+            errors = run_sql("SELECT id,proc,status FROM schTASK WHERE status='ERROR' OR status='DONE WITH ERRORS' AND proc NOT IN (SELECT proc FROM schTASK WHERE proc='bibupload' AND status='DONE WITH ERRORS' )")
+            if errors:
+                # for each_task in errors:
+                errors = ["    #%s %s -> %s" % row for row in errors]
+                raise StandardError('BibTask with ERRORS:\n%s' % "\n".join(errors))
+
+            else:
+                max_bibupload_priority = run_sql("SELECT max(priority) FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()")
+                if max_bibupload_priority:
+                    run_sql("UPDATE schTASK SET priority=%s WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW()", ( max_bibupload_priority[0][0], ))
+                self.next_bibupload = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status='WAITING' AND proc='bibupload' AND runtime<=NOW() ORDER BY id ASC LIMIT 1", n=1)
+                self.waitings = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE (status='WAITING' AND runtime<=NOW()) OR status='SLEEPING' ORDER BY priority DESC, runtime ASC, id ASC")
+                self.rows = run_sql("SELECT id,proc,runtime,status,priority FROM schTASK WHERE status IN ('RUNNING','CONTINUING','SCHEDULED','ABOUT TO STOP','ABOUT TO SLEEP', 'MANUAL')")
 
         def calculate_task_status():
             """Return a handy data structure to analize the task status."""
@@ -1726,7 +1713,6 @@ def main():
     except IndexError:
         cmd = 'monitor'
 
-    
     try:
         if cmd in ('status', 'purge'):
             { 'status' : report_queue_status,

@@ -310,9 +310,14 @@ def task_init(
     bibtask_get_option) once all the options where parsed;
     @param task_run_fnc: will be called as the main core function. Must return
     False in case of errors.
-    @param task_used_records:
+    @param task_used_records_fnc: will be called in order to retrieve the list
+    of record identifiers this task is going to work on.
     """
     global _TASK_PARAMS, _OPTIONS
+
+    ## check as whom we want to submit?
+    check_running_process_user()
+
     _TASK_PARAMS = {
         "version" : version,
         "task_stop_helper_fnc" : task_stop_helper_fnc,
@@ -380,14 +385,18 @@ def task_init(
                         if sort not in required_sorts:
                             required_sorts.append(sort)
                     if sys.hexversion < 0x02050000:
-                        import hotshot, hotshot.stats
+                        import hotshot
+                        import hotshot.stats
                         pr = hotshot.Profile(filename)
                         ret = pr.runcall(_task_run, task_run_fnc)
                         for sort_type in required_sorts:
                             tmp_out = sys.stdout
                             sys.stdout = StringIO()
                             hotshot.stats.load(filename).strip_dirs().sort_stats(sort_type).print_stats()
+                            # pylint: disable=E1103
+                            # This is a hack. sys.stdout is a StringIO in this case.
                             profile_dump.append(sys.stdout.getvalue())
+                            # pylint: enable=E1103
                             sys.stdout = tmp_out
                     else:
                         import cProfile
@@ -407,8 +416,8 @@ def task_init(
                     write_message("ERROR: The Python Profiler is not installed!", stream=sys.stderr)
             else:
                 ret = _task_run(task_run_fnc, task_used_records_fnc)
-                if not ret:
-                    write_message("Error occurred.  Exiting.", sys.stderr)
+            if not ret:
+                write_message("Error occurred.  Exiting.", sys.stderr)
         except Exception, e:
             register_exception(alert_admin=True)
             write_message("Unexpected error occurred: %s." % e, sys.stderr)
@@ -702,9 +711,6 @@ def _task_submit(argv, authorization_action, authorization_msg):
     """Submits task to the BibSched task queue.  This is what people will
         be invoking via command line."""
 
-    ## check as whom we want to submit?
-    check_running_process_user()
-
     ## sanity check: remove eventual "task" option:
 
     ## authenticate user:
@@ -752,7 +758,6 @@ def _task_run(task_run_fnc, task_used_records_fnc):
 
     from invenio.bibtasklet import _TASKLETS
     ## We prepare the pid file inside /prefix/var/run/taskname_id.pid
-    check_running_process_user()
     try:
         pidfile_name = os.path.join(CFG_PREFIX, 'var', 'run',
             'bibsched_task_%d.pid' % _TASK_PARAMS['task_id'])
@@ -771,26 +776,20 @@ def _task_run(task_run_fnc, task_used_records_fnc):
             (_TASK_PARAMS['task_id'], task_status), sys.stderr)
         return False
 
-    locked_records_set = task_get_locked_record_identifiers()
-    # if there is at least one bad record
-    if locked_records_set:
-        try:
-            if callable(task_used_records_fnc):
-                task_used_records_set= task_used_records_fnc()
-                intersection = locked_records_set & task_used_records_set
-                if intersection: #If the task uses at least one locked record
-                    for record in intersection:
-                        id_schlock = run_sql("SELECT id_schlock from schLOCKREC WHERE rec_identifier_type=%s AND rec_identifier=%s", (record[0], record[1],))
-                        for identifier in id_schlock:
-                            task_lock_record_identifiers(task_used_records_set , identifier[0], _TASK_PARAMS['task_id'])
-                    task_update_status("MANUAL")
-                    os.remove(pidfile_name)
-                    return True
-            else:
-                task_update_status("ERROR")
-
-        except SystemExit:
-            pass
+    if callable(task_used_records_fnc):
+        locked_records_set = task_get_locked_record_identifiers()
+        # if there is at least one bad record
+        if locked_records_set:
+            task_used_records_set= task_used_records_fnc()
+            intersection = locked_records_set & task_used_records_set
+            if intersection: #If the task uses at least one locked record
+                for record in intersection:
+                    id_schlock = run_sql("SELECT id_schlock from schLOCKID WHERE type=%s AND identifier=%s", (record[0], record[1],))
+                    for identifier in id_schlock:
+                        task_lock_record_identifiers(task_used_records_set , identifier[0], _TASK_PARAMS['task_id'])
+                task_update_status("MANUAL")
+                os.remove(pidfile_name)
+                return True
 
     time_now = time.time()
     if _TASK_PARAMS['runtime_limit'] is not None and os.environ.get('BIBSCHED_MODE', 'manual') != 'manual':
@@ -1011,9 +1010,9 @@ appropriately and rerun "inveniocfg --update-config-py".""" % \
     return
 
 def task_get_locked_record_identifiers():
-    """Returns a set with all the record identifiers in the schLOCKREC table"""
+    """Returns a set with all the record identifiers in the schLOCKID table"""
 
-    sql_query = "SELECT rec_identifier_type, rec_identifier FROM schLOCKREC"
+    sql_query = "SELECT type, identifier FROM schLOCKID"
     locked_records_set = set(run_sql(sql_query))
     return locked_records_set
 
@@ -1027,6 +1026,4 @@ def task_create_lock(marcxml=None, id_schTASK=None, lockprocess=None, lockuser=N
 def task_lock_record_identifiers(record_identifiers_set, lock_id, task_id=None):
     """Inserts in the DB all the identifiers of the records that should be locked"""
     for identifier_type, identifier in record_identifiers_set:
-        run_sql("INSERT INTO schLOCKREC (rec_identifier, rec_identifier_type, id_schLOCK, id_schTASK) VALUES (%s, %s, %s, %s)", (identifier, identifier_type, lock_id, task_id))
-
-
+        run_sql("INSERT INTO schLOCKID (identifier, type, id_schLOCK, id_schTASK) VALUES (%s, %s, %s, %s)", (identifier, identifier_type, lock_id, task_id))
