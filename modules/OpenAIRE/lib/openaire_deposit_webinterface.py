@@ -50,7 +50,16 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
     _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships', 'keywords']
 
     def index(self, req, form):
-        argd = wash_urlargd(form, {'projectid': (int, -1), 'delete': (str, ''), 'publicationid': (str, ''), 'plus': (int, -1), 'linkproject': (int, -1), 'unlinkproject': (int, -1), 'style': (str, None), 'upload': (str, '')})
+        argd = wash_urlargd(form, {
+            'projectid': (int, -1),
+            'delete': (str, ''),
+            'publicationid': (str, ''),
+            'plus': (int, -1),
+            'linkproject': (int, -1),
+            'unlinkproject': (int, -1),
+            'style': (str, None),
+            'upload': (str, '')})
+
         _ = gettext_set_language(argd['ln'])
         user_info = collect_user_info(req)
         auth_code, auth_message = acc_authorize_action(user_info, 'submit', doctype='OpenAIRE')
@@ -65,6 +74,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                     "ln" : argd['ln']}, {})))
             else:
                 return page(req=req, body=_("You are not authorized to use OpenAIRE deposition."), title=_("Authorization failure"))
+
         projectid = argd['projectid']
         plus = argd['plus']
         style = get_openaire_style(req)
@@ -82,25 +92,26 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
 
         if projectid not in all_project_ids:
             projectid = -1
+
         uid = user_info['uid']
         if argd['upload']:
+            ## Perform the upload
             if projectid < 0:
                 projectid = 0
             upload_file(form, uid, projectid)
-        projects = [get_project_information(uid, projectid_, deletable=False, ln=argd['ln'], style=style, linked=True) for projectid_ in get_exisiting_projectids_for_uid(user_info['uid']) if projectid_ != projectid]
+
         if projectid < 0:
             selected_project = None
         else:
             selected_project = get_project_information(uid, projectid, deletable=False, linked=False, ln=argd['ln'], style=style)
-        body = openaire_deposit_templates.tmpl_choose_project(existing_projects=projects, selected_project=selected_project, ln=argd['ln'])
         if projectid < 0:
             upload_to_projectid = 0
             upload_to_project_information = get_project_information(uid, 0, deletable=False, linked=False, ln=argd['ln'], style=style)
         else:
             upload_to_projectid = projectid
             upload_to_project_information = selected_project
-        body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), style=style, ln=argd['ln'])
 
+        body = ""
         if projectid >= 0:
             ## There is a project on which we are working good!
             publications = get_all_publications_for_project(uid, projectid, ln=argd['ln'], style=style)
@@ -130,6 +141,13 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 else:
                     submitted_publications += publication.get_publication_preview()
             body += openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, forms, submitted_publications, ln=argd['ln'])
+            body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), style=style, ln=argd['ln'])
+        else:
+            body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), style=style, ln=argd['ln'])
+            projects = [get_project_information(uid, projectid_, deletable=False, ln=argd['ln'], style=style, linked=True) for projectid_ in get_exisiting_projectids_for_uid(user_info['uid']) if projectid_ != projectid]
+            if projects:
+                body += openaire_deposit_templates.tmpl_focus_on_project(existing_projects=projects, ln=argd['ln'])
+
         title = _('Manage Your Publications')
         return page(body=body, title=title, req=req)
 

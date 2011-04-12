@@ -127,11 +127,9 @@
                     <img title="%(volume_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
                     <label for="volume_%(id)s">%(volume_label)s</label>
                     <input name="volume_%(id)s" type="text" id="volume_%(id)s" value="%(volume_value)s" size="4" class="volume" />
-                    <br />
                     <img title="%(issue_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
                     <label for="issue_%(id)s">%(issue_label)s</label>
                     <input name="issue_%(id)s" type="text" id="issue_%(id)s" value="%(issue_value)s" size="4" class="issue" />
-                    <br />
                     <img title="%(pages_tooltip)s" class="tooltip" src="%(site)s/img/help.png" />
                     <label for="pages_%(id)s">%(pages_label)s</label>
                     <input name="pages_%(id)s" type="text" id="pages_%(id)s" value="%(pages_value)s" size="8" class="pages" />
@@ -202,12 +200,12 @@
             return confirm("%(remove_confirm)s");
         });
         $('#edit_metadata_%(id)s,#status_%(id)s').click(function(){
-            $('#body_%(id)s').toggle('slow');
+            $('#body_%(id)s').toggle();
             return false;
         });
         $('#journal_title_%(id)s').autocomplete({
             source: "%(site)s/kb/export?kbname=journal_name&amp;format=jquery&amp;ln=%(ln)s&amp;limit=100"
         });
-        $('#body_%(id)s').hide();
+//         $('#body_%(id)s').hide();
     });
 // ]]></script>

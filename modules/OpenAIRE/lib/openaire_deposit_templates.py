@@ -71,6 +71,47 @@ class Template:
             <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
             """ % {'site': CFG_SITE_URL, 'ln': ln}
 
+    def tmpl_focused_project(self, selected_project=None, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        out = """
+            <div class="note">
+                <h3>%(select_project_title)s</h3>
+            """ % {'select_project_title': select_project_title}
+        if selected_project:
+            select_project_description = escape(_("This is the list of other projects for which you have already deposited (or begun to deposit) at least one publication. Click on any project to focus on its publications:"))
+        else:
+            select_project_description = escape(_("This is the list of projects for which you have already deposited (or begun a deposit) at least one publication. Click on any project to focus on its publications:"))
+        out += """<p>%(select_project_description)s<br />%(existing_projects)s.</p>""" % {
+            'select_project_description': select_project_description,
+            'existing_projects': ', '.join(existing_projects)
+        }
+        out += """
+            <p>
+                <noscript>
+                    <form>
+                        <label for="project">%(noscript_description)s</label>
+                        <input type="text" name="projectid" size="75" />
+                        <input type="submit" value="%(submit)s" />
+                    </form>
+                </noscript>
+                <span style="display: none;" class="yesscript">
+                    <form>
+                        <label for="project">%(yesscript_description)s</label><br />
+                        <input type="text" id="project" name="project" size="75" />
+                        <input type="hidden" id="projectid" name="projectid" />
+                        <input type="submit" value="%(submit)s" />
+                    </form>
+                </span>
+            </p>
+            </div>
+            """ % {
+                'noscript_description': escape(_("Enter the grant agreement number for the project you wish to select: ")),
+                'yesscript_description': escape(_("Start typing the project title or acronym or the grant agreement number for the project you wish to select: ")),
+                'submit': escape(_("Select project"), True)
+            }
+        return out
+
+
     def tmpl_choose_project(self, existing_projects=None, selected_project=None, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         if existing_projects is None:
@@ -127,6 +168,25 @@ class Template:
             }
         return out
 
+    def tmpl_focus_on_project(self, existing_projects=None, ln=CFG_SITE_LANG):
+        _ = gettext_set_language(ln)
+        if existing_projects is None:
+            return ""
+            existing_projects = []
+        out = ""
+        out = """
+            <div class="note">
+                <h3>%(focus_on_project_title)s</h3>
+                <p>%(select_project_description)s<br />%(existing_projects)s.</p>
+            </div>
+            """ % {
+                'focus_on_project_title': _("Focus on a project"),
+                'select_project_description': escape(_("This is the list of projects for which you have already deposited (or begun a deposit) at least one publication. Click on any project to focus on its publications:")),
+                'existing_projects': ', '.join(existing_projects),
+            }
+        return out
+
+
     def tmpl_select_a_project(self, existing_projects=None, plus=False, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         if plus:
@@ -163,7 +223,7 @@ class Template:
             <p>%(description)s</p>
             <div class="note">%(body)s</div>
             """ % {
-                'description': escape(_("This is a preview of the submitted publication. It will be available at %(url)s.")) % {
+                'description': escape(_("This is a preview of the submitted publication. If approved, it will be available at %(url)s.")) % {
                     "url": """<a href="%(site)s/record/%(recid)s" alt="%(the_record)s">%(site)s/record/%(recid)s</a>""" % {
                         'site': escape(CFG_SITE_URL, True),
                         'recid': recid,
@@ -291,11 +351,10 @@ class Template:
         _ = gettext_set_language(ln)
         data = {
                 'upload_publications': escape(_("Upload New Publications")),
-                'upload_publications_description': escape(_("Click on %(x_fmt_open)s%(upload)s%(x_fmt_cose)s to start uploading one or more publications. These publications will initially be associated with the project %(project_information)s")) % {
+                'upload_publications_description': escape(_("Click on %(x_fmt_open)s%(upload)s%(x_fmt_cose)s to start uploading one or more publications.")) % {
                     'x_fmt_open': "<strong>",
                     'x_fmt_cose': "</strong>",
                     'upload': escape(_("Upload")),
-                    'project_information': project_information
                 },
                 'site': CFG_SITE_URL,
                 'projectid': projectid,
@@ -308,19 +367,26 @@ class Template:
                 'filedescription': _("Publications"),
                 'style': style
             }
+        if projectid > 0:
+            data['upload_publications_description2'] = escape(_("These publications will initially be associated with the project %(project_information)s.")) % {
+                'project_information': project_information
+            }
+        else:
+            data['upload_publications_description2'] = "kl;ksd;lfkdskdlsfkdslfk"
         prepare4js(data)
         return """
+            <div class="note">
             <h3>%(upload_publications)s</h3>
             <div id="noFlash">
                 <form action="%(site)s/deposit/?ln=%(ln)s&style=%(style)s&projectid=%(projectid)s" method="POST" enctype="multipart/form-data">
-                <p>%(upload_publications_description)s</p>
+                <p>%(upload_publications_description)s %(upload_publications_description2)s</p>
                 <input type="file" name="Filedata" />
                 <input type="submit" name="upload" value="%(buttontext)s" />
                 </form>
             </div>
             <div id="yesFlash">
                 <form action="%(site)s/deposit/?ln=%(ln)s&style=%(style)s" method="POST">
-                    <p>%(upload_publications_description)s</p>
+                    <p>%(upload_publications_description)s %(upload_publications_description2)s</p>
                     <input id="fileInput" name="file" type="file" />
                     <input type="reset" value="%(cancel_upload)s" id="cancel_upload"/>
                     <input type="hidden" value="%(projectid)s" name="projectid" />
@@ -363,7 +429,8 @@ class Template:
                         return 0;
                     });
                 });
-            // ]]></script>""" % data
+            // ]]></script>
+            </div>""" % data
 
 
     def tmpl_publication_information(self, publicationid, title, authors, abstract, ln=CFG_SITE_LANG):
@@ -412,7 +479,7 @@ class Template:
                     $(document).ready(function(){
                         var tooltip = clone(gTipDefault);
                         tooltip.content = {
-                            'text': '<table><tbody><tr><td align="right"><strong>%(js_acronym_label)s:<strong></td><td align="left">%(js_acronym)s</td></tr><tr><td align="right"><strong>%(js_title_label)s:<strong></td><td align="left">%(js_title)s</td></tr><tr><td align="right"><strong>%(js_grant_agreement_number_label)s:<strong></td><td align="left">%(js_grant_agreement_number)s</td></tr><tr><td align="right"><strong>%(js_ec_project_website_label)s:<strong></td><td align="left"><a href="%(js_ec_project_website)s" target="_blank">%(js_ec_project_website_label)s</a></td></tr><tr><td align="right"><strong>%(js_start_date_label)s:<strong></td><td align="left">%(js_start_date)s</td></tr><tr><td align="right"><strong>%(js_end_date_label)s:<strong></td><td align="left">%(js_end_date)s</td></tr><tr><td align="right"><strong>%(js_fundedby_label)s:<strong></td><td align="left">%(js_fundedby)s</td></tr><tr><td align="right"><strong>%(js_call_identifier_label)s:<strong></td><td align="left">%(js_call_identifier)s</td></tr><tbody></table>'
+                            'text': '<table><tbody><tr><td align="right"><strong>%(js_acronym_label)s:<strong></td><td align="left">%(js_acronym)s</td></tr><tr><td align="right"><strong>%(js_title_label)s:<strong></td><td align="left">%(js_title)s</td></tr><tr><td align="right"><strong>%(js_grant_agreement_number_label)s:<strong></td><td align="left">%(js_grant_agreement_number)s</td></tr>%(ec_project_website_row)s<tr><td align="right"><strong>%(js_start_date_label)s:<strong></td><td align="left">%(js_start_date)s</td></tr><tr><td align="right"><strong>%(js_end_date_label)s:<strong></td><td align="left">%(js_end_date)s</td></tr><tr><td align="right"><strong>%(js_fundedby_label)s:<strong></td><td align="left">%(js_fundedby)s</td></tr><tr><td align="right"><strong>%(js_call_identifier_label)s:<strong></td><td align="left">%(js_call_identifier)s</td></tr><tbody></table>'
                         };
                         $('#project_%(js_id)s_%(js_publicationid)s').qtip(tooltip);
                     });
@@ -420,9 +487,9 @@ class Template:
         if deletable:
             out += """
                 <noscript>
-                    <a href="%(site)s/deposit?projectid=%(global_projectid)s&amp;publicationid=%(publicationid)s&amp;unlinkproject=%(id)s&amp;ln=%(ln)s&amp;style=%(style)s"><img src="%(site)s/img/smallbin.gif" alt="%(delete_project_label)s" /></a>
+                    <a href="%(site)s/deposit?projectid=%(global_projectid)s&amp;publicationid=%(publicationid)s&amp;unlinkproject=%(id)s&amp;ln=%(ln)s&amp;style=%(style)s"><img src="%(site)s/img/delete.png" title="%(delete_project_label)s" alt="%(delete_project_label)s" /></a>
                 </noscript>
-                <img src="%(site)s/img/smallbin.gif" alt="%(delete_project_label)s" id="delete_%(id)s_%(publicationid)s" class="hidden" />
+                <img src="%(site)s/img/delete.png" title="%(delete_project_label)s" alt="%(delete_project_label)s" id="delete_%(id)s_%(publicationid)s" class="hidden" />
                 <script type="text/javascript">// <![CDATA[
                     $(document).ready(function(){
                         $("#delete_%(js_id)s_%(js_publicationid)s").click(function(){
@@ -464,13 +531,16 @@ class Template:
             'style': style,
         }
         prepare4js(data)
+        ## We add the ec_project_website_row only if there is indeed a project website
+        data['ec_project_website_row'] = ec_project_website and ("""<tr><td align="right"><strong>%(js_ec_project_website_label)s:<strong></td><td align="left"><a href="%(js_ec_project_website)s" target="_blank">%(js_ec_project_website_label)s</a></td></tr>""" % data) or ""
+
         return out % data
 
 
     def tmpl_projects_box(self, publicationid, associated_projects, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
 
-        associated_projects = ''.join(["%s<br />" % (associated_project) for associated_project in associated_projects])
+        associated_projects = ' '.join(associated_projects)
 
         out = """
             <div id="projectsbox_%(id)s">
@@ -478,7 +548,7 @@ class Template:
                 <noscript>
                     <label for="linkproject_%(id)s">Grant Agreement Number</label>
                 </noscript>
-                <input type="text" name="linkproject" id="linkproject_%(id)s" size="75" />
+                <input type="text" name="linkproject" id="linkproject_%(id)s" size="10" />
                 <input type="hidden" name="dummy" id="linkproject_%(id)s_hidden" />
                 <input type="hidden" name="publicationid" value="%(id)s" />
                 <img src="%(site)s/img/add.png" alt="%(link_project)s" id="projectsbox_submit_%(id)s" />
@@ -504,6 +574,11 @@ class Template:
                         select: function(event, ui) {
                             $('#linkproject_%(js_id)s').val(ui.item.label);
                             $('#linkproject_%(js_id)s_hidden').val(ui.item.value);
+                            var data = {};
+                            data.projectid = $('#linkproject_%(js_id)s_hidden').val();
+                            data.publicationid = "%(js_id)s";
+                            data.action = "linkproject";
+                            $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
                             return false;
                         }
                     });
@@ -532,14 +607,15 @@ class Template:
         out = ""
         if publication_forms:
             publication_forms = """<form method="POST" id="publication_forms" accept-charset="UTF-8">
-            <div class="note OpenAIRE">
-            <table>
+            <div class="OpenAIRE">
+            <table width="100%%">
             %(publication_forms)s
             </table>
             </div>
             </form>""" % {'publication_forms': publication_forms}
 
             out += """
+                <div class="note">
                 <h3>%(title)s</h3>
                 %(publication_forms)s
                 <script type="text/javascript">//<![CDATA[
@@ -563,9 +639,10 @@ class Template:
                         });
                     });
                 //]]></script>
+                </div>
                 """
         out += """
-        <div id="submitted_publications">
+        <div id="submitted_publications" class="note">
         <h3>%(submitted_publications_title)s</h3>
         %(submitted_publications)s
         </div>

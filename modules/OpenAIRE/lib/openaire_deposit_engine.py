@@ -97,7 +97,9 @@ def portal_page(title, body, navtrail="", description="", keywords="",
     else:
         username = 'Guest'
         invenio_logouturl = ''
-    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, portalurl=CFG_OPENAIRE_PORTAL_URL, return_value=encodestring(invenio_logouturl), ln=language)
+    if not CFG_OPENAIRE_PORTAL_URL:
+        portalurl = "http://www.openaire.eu"
+    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, portalurl=portalurl, return_value=encodestring(invenio_logouturl), ln=language)
 
 def get_project_description(projectid):
     info = get_kb_mapping(CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, str(projectid))
@@ -425,6 +427,8 @@ class OpenAIREPublication(object):
     def get_projects_information(self, global_projectid=None):
         associated_projects = []
         for projectid in self.projectids:
+            if projectid == 0:
+                continue
             associated_projects.append(get_project_information(self.uid, projectid, deletable=True, linked=False, ln=self.ln, style=self.style,  global_projectid=global_projectid, publicationid=self.publicationid))
         return openaire_deposit_templates.tmpl_projects_box(publicationid=self.publicationid, associated_projects=associated_projects, ln=self.ln)
 
