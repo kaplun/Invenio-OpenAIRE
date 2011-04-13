@@ -3420,7 +3420,14 @@ def download_url(url, format=None, sleep=2):
                 raise StandardError, "%s is not in one of the allowed paths." % path
             else:
                 try:
-                    from_file = urllib2.urlopen(url)
+                    if url.startswith("http://www.sciencedirect.com/"):
+                        ## HACK: this is just a hack for CDS
+                        request = urllib2.Request(url=url, headers={
+                            "User-agent": "Mozilla/5.0 (X11; U; Linux x86_64; en-US) AppleWebKit/534.16 (KHTML, like Gecko) Ubuntu/11.04 Chromium/10.0.648.204 Chrome/10.0.648.204 Safari/534.16"
+                        })
+                        from_file = urllib2.urlopen(request)
+                    else:
+                        from_file = urllib2.urlopen(url)
                     to_file = open(tmppath, 'w')
                     while True:
                         block = from_file.read(CFG_BIBDOCFILE_BLOCK_SIZE)
