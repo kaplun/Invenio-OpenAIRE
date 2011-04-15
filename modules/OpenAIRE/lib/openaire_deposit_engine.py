@@ -99,6 +99,8 @@ def portal_page(title, body, navtrail="", description="", keywords="",
         invenio_logouturl = ''
     if not CFG_OPENAIRE_PORTAL_URL:
         portalurl = "http://www.openaire.eu"
+    else:
+        portalurl = CFG_OPENAIRE_PORTAL_URL
     return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, portalurl=portalurl, return_value=encodestring(invenio_logouturl), ln=language)
 
 def get_project_description(projectid):

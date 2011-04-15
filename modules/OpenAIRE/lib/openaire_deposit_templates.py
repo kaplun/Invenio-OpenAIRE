@@ -372,7 +372,7 @@ class Template:
                 'project_information': project_information
             }
         else:
-            data['upload_publications_description2'] = "kl;ksd;lfkdskdlsfkdslfk"
+            data['upload_publications_description2'] = ""
         prepare4js(data)
         return """
             <div class="note">
