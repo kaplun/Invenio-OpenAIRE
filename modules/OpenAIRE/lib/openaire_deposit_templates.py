@@ -350,10 +350,14 @@ class Template:
     def tmpl_upload_publications(self, projectid, project_information, session, style, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
         data = {
-                'upload_publications': escape(_("Upload New Publications")),
-                'upload_publications_description': escape(_("Click on %(x_fmt_open)s%(upload)s%(x_fmt_cose)s to start uploading one or more publications.")) % {
+                'noflash_description': escape(_("It looks like you have not installed a recent version of the %(x_fmt_open)sFlash plugin (minimum 9.0.24)%(x_fmt_close)s or that you are using %(x_fmt_open)sGoogle Chrome 10.x/11.x%(x_fmt_close)s or %(x_fmt_open)sChromium 10.x/11.x%(x_fmt_close)s. You will be therefore able to upload only one publication at a time.")) % {
                     'x_fmt_open': "<strong>",
-                    'x_fmt_cose': "</strong>",
+                    'x_fmt_close': "</strong>",
+                },
+                'upload_publications': escape(_("Upload New Publications")),
+                'upload_publications_description': escape(_("Click on %(x_fmt_open)s%(upload)s%(x_fmt_close)s to start uploading one or more publications.")) % {
+                    'x_fmt_open': "<strong>",
+                    'x_fmt_close': "</strong>",
                     'upload': escape(_("Upload")),
                 },
                 'site': CFG_SITE_URL,
@@ -379,6 +383,7 @@ class Template:
             <h3>%(upload_publications)s</h3>
             <div id="noFlash">
                 <form action="%(site)s/deposit/?ln=%(ln)s&style=%(style)s&projectid=%(projectid)s" method="POST" enctype="multipart/form-data">
+                <p>%(noflash_description)s</p>
                 <p>%(upload_publications_description)s %(upload_publications_description2)s</p>
                 <input type="file" name="Filedata" />
                 <input type="submit" name="upload" value="%(buttontext)s" />
@@ -394,7 +399,8 @@ class Template:
                 </form>
             </div>
             <script type="text/javascript">// <![CDATA[
-                if (swfobject.hasFlashPlayerVersion("9.0.24")) {
+                if (swfobject.hasFlashPlayerVersion("9.0.24") &&
+                        navigator.userAgent.search('Chromium/1(1|0)') < 0) { // There is a bug in Chrom(e|iumt) 10.x/11.x
                     $('#noFlash').hide();
                     $('#yesFlash').show();
                 } else {
