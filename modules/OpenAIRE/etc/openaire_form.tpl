@@ -168,13 +168,13 @@
     </td>
 </tr>
 <script type="text/javascript">// <![CDATA[
-    $(document).ready(function(){
-        $('#access_rights_%(id)s').bind('change', {
+    $j(document).ready(function(){
+        $j('#access_rights_%(id)s').bind('change', {
             from_id: '#access_rights_%(id)s',
             to_id: '#embargo_date_container_%(id)s'
         }, update_embargo_date);
-        $('#access_rights_%(id)s').trigger('change');
-        $('#language_%(id)s').bind('change', {
+        $j('#access_rights_%(id)s').trigger('change');
+        $j('#language_%(id)s').bind('change', {
             from_id: '#language_%(id)s',
             to_id: '#original_language_container_%(id)s'
         }, update_language);
@@ -184,28 +184,28 @@
                 to_id: '#original_language_container_%(id)s'
             }
         });
-        $('#save_%(id)s').click(function(event){
+        $j('#save_%(id)s').click(function(event){
             var element = this;
             ajaxGateway(element, 'save');
             event.preventDefault();
             return 0;
         });
-        $('#submit_%(id)s').click(function(event){
+        $j('#submit_%(id)s').click(function(event){
             var element = this;
             ajaxGateway(element, 'submit');
             event.preventDefault();
             return 0;
         });
-        $('#remove_%(id)s').click(function(){
+        $j('#remove_%(id)s').click(function(){
             return confirm("%(remove_confirm)s");
         });
-        $('#edit_metadata_%(id)s,#status_%(id)s').click(function(){
-            $('#body_%(id)s').toggle();
+        $j('#edit_metadata_%(id)s,#status_%(id)s').click(function(){
+            $j('#body_%(id)s').toggle();
             return false;
         });
-        $('#journal_title_%(id)s').autocomplete({
+        $j('#journal_title_%(id)s').autocomplete({
             source: "%(site)s/kb/export?kbname=journal_name&amp;format=jquery&amp;ln=%(ln)s&amp;limit=100"
         });
-//         $('#body_%(id)s').hide();
+//         $j('#body_%(id)s').hide();
     });
 // ]]></script>

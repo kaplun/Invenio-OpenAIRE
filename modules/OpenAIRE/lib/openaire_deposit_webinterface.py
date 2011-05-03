@@ -15,6 +15,8 @@
 ## along with CDS Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
+import urllib
+import urllib2
 import sys
 if sys.hexversion < 0x2060000:
     try:
@@ -31,7 +33,7 @@ from invenio.messages import gettext_set_language
 from invenio.webuser import collect_user_info, session_param_get, session_param_set
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd
 from invenio.session import get_session
-from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL
+from invenio.config import CFG_SITE_URL, CFG_SITE_SECURE_URL, CFG_OPENAIRE_PORTAL_URL
 from invenio.openaire_deposit_engine import page, get_project_information, \
     OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid, \
     get_all_projectsids, get_favourite_authorships_for_user, \
@@ -47,7 +49,28 @@ import invenio.template
 openaire_deposit_templates = invenio.template.load('openaire_deposit')
 
 class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
-    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships', 'keywords']
+    _exports = ['', 'uploadifybackend', 'sandbox', 'checkmetadata', 'ajaxgateway', 'checksinglefield', 'getfile', 'authorships', 'keywords', 'portalproxy']
+
+    def portalproxy(self, req, form):
+        argd_query = wash_urlargd(form, {
+            'option': (str, ''),
+            'tmpl': (str, ''),
+            'type': (str, ''),
+            'ordering': (str, ''),
+            'searchphrase': (str, ''),
+            'Itemid': (int, 0)
+        })
+        argd_post = wash_urlargd(form, {
+            'searchword': (str, '')
+        })
+        if argd_query['option'] == 'com_search' and argd_query['tmpl'] == 'raw' and argd_query['type'] == 'json' and argd_post['searchword']:
+            proxy = urllib2.urlopen("%s/index.php?%s" % (CFG_OPENAIRE_PORTAL_URL, urllib.urlencode(argd_query)), urllib.urlencode(argd_post))
+            buf = None
+            while buf != "":
+                buf = proxy.read(1024)
+                req.write(buf)
+            return ""
+        return ""
 
     def index(self, req, form):
         argd = wash_urlargd(form, {
@@ -140,7 +163,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                     forms += publication.get_publication_form(projectid)
                 else:
                     submitted_publications += publication.get_publication_preview()
-            body += openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, forms, submitted_publications, ln=argd['ln'])
+            body += openaire_deposit_templates.tmpl_add_publication_data_and_submit(projectid, forms, submitted_publications, project_information=upload_to_project_information, ln=argd['ln'])
             body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), style=style, ln=argd['ln'])
         else:
             body += openaire_deposit_templates.tmpl_upload_publications(projectid=upload_to_projectid, project_information=upload_to_project_information, session=get_session(req).sid(), style=style, ln=argd['ln'])
@@ -148,7 +171,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
             if projects:
                 body += openaire_deposit_templates.tmpl_focus_on_project(existing_projects=projects, ln=argd['ln'])
 
-        title = _('Manage Your Publications')
+        title = _('Orphan Repository')
         return page(body=body, title=title, req=req)
 
     def uploadifybackend(self, req, form):

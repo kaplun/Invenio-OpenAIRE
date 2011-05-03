@@ -68,6 +68,9 @@ class Template:
             <script type="text/javascript" src="http://cdn.jquerytools.org/1.2.4/all/jquery.tools.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.qtip-1.0.0-rc3.js"></script>
+            <script type="text/javascript">// <![CDATA[
+              var $j = jQuery.noConflict();
+            // ]]></script>
             <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
             """ % {'site': CFG_SITE_URL, 'ln': ln}
 
@@ -401,15 +404,15 @@ class Template:
             <script type="text/javascript">// <![CDATA[
                 if (swfobject.hasFlashPlayerVersion("9.0.24") &&
                         navigator.userAgent.search('Chromium/1(1|0)') < 0) { // There is a bug in Chrom(e|iumt) 10.x/11.x
-                    $('#noFlash').hide();
-                    $('#yesFlash').show();
+                    $j('#noFlash').hide();
+                    $j('#yesFlash').show();
                 } else {
-                    $('#noFlash').show();
-                    $('#yesFlash').hide();
+                    $j('#noFlash').show();
+                    $j('#yesFlash').hide();
                 }
-                $(document).ready(function() {
-                    $('#cancel_upload').hide();
-                    $('#fileInput').uploadify({
+                $j(document).ready(function() {
+                    $j('#cancel_upload').hide();
+                    $j('#fileInput').uploadify({
                         'uploader'  : '%(js_site)s/flash/uploadify.swf',
                         'expressInstall' : '%(js_site)s/flash/expressInstall.swf',
                         'script'    : '%(js_site)s/deposit/uploadifybackend',
@@ -423,15 +426,15 @@ class Template:
                         'fileDesc': '%(js_filedescription)s',
                         'scriptData': {'projectid': '%(js_projectid)s', 'session': '%(js_session)s'},
                         'onAllComplete': function(){
-                            $('input.save').trigger('click');
+                            $j('input.save').trigger('click');
                             window.location="%(js_site)s/deposit/?projectid=%(js_projectid)s&style=%(style)s";
                         },
                         'onOpen': function(){
-                            $('#cancel_upload').show();
+                            $j('#cancel_upload').show();
                         }
                     });
-                    $('#cancel_upload').click(function(){
-                        $('#fileInput').uploadifyClearQueue();
+                    $j('#cancel_upload').click(function(){
+                        $j('#fileInput').uploadifyClearQueue();
                         return 0;
                     });
                 });
@@ -458,12 +461,12 @@ class Template:
         return """
             %(body)s
             <script type="text/javascript">// <![CDATA[
-                $(document).ready(function(){
+                $j(document).ready(function(){
                     var tooltip = clone(gTipDefault);
                     tooltip.content = {
                         'text': '<table><tbody><tr><td align="right"><strong>%(js_title_label)s:<strong></td><td align="left">%(js_title)s</td></tr><tr><td align="right"><strong>%(js_authors_label)s:<strong></td><td align="left">%(js_authors)s</td></tr><tr><td align="right"><strong>%(js_abstract_label)s:<strong></td><td align="left">%(js_abstract)s</td></tr><tbody></table>'
                     };
-                    $('#publication_information_%(id)s').qtip(tooltip);
+                    $j('#publication_information_%(id)s').qtip(tooltip);
                 });
             // ]]></script>""" % data
 
@@ -482,12 +485,12 @@ class Template:
         if projectid > 0:
             out += """
                 <script type="text/javascript">// <![CDATA[
-                    $(document).ready(function(){
+                    $j(document).ready(function(){
                         var tooltip = clone(gTipDefault);
                         tooltip.content = {
                             'text': '<table><tbody><tr><td align="right"><strong>%(js_acronym_label)s:<strong></td><td align="left">%(js_acronym)s</td></tr><tr><td align="right"><strong>%(js_title_label)s:<strong></td><td align="left">%(js_title)s</td></tr><tr><td align="right"><strong>%(js_grant_agreement_number_label)s:<strong></td><td align="left">%(js_grant_agreement_number)s</td></tr>%(ec_project_website_row)s<tr><td align="right"><strong>%(js_start_date_label)s:<strong></td><td align="left">%(js_start_date)s</td></tr><tr><td align="right"><strong>%(js_end_date_label)s:<strong></td><td align="left">%(js_end_date)s</td></tr><tr><td align="right"><strong>%(js_fundedby_label)s:<strong></td><td align="left">%(js_fundedby)s</td></tr><tr><td align="right"><strong>%(js_call_identifier_label)s:<strong></td><td align="left">%(js_call_identifier)s</td></tr><tbody></table>'
                         };
-                        $('#project_%(js_id)s_%(js_publicationid)s').qtip(tooltip);
+                        $j('#project_%(js_id)s_%(js_publicationid)s').qtip(tooltip);
                     });
                 // ]]></script>"""
         if deletable:
@@ -497,14 +500,14 @@ class Template:
                 </noscript>
                 <img src="%(site)s/img/delete.png" title="%(delete_project_label)s" alt="%(delete_project_label)s" id="delete_%(id)s_%(publicationid)s" class="hidden" />
                 <script type="text/javascript">// <![CDATA[
-                    $(document).ready(function(){
-                        $("#delete_%(js_id)s_%(js_publicationid)s").click(function(){
+                    $j(document).ready(function(){
+                        $j("#delete_%(js_id)s_%(js_publicationid)s").click(function(){
                             var data = {};
                             data.projectid = %(js_id)s;
                             data.publicationid = "%(js_publicationid)s";
                             data.action = "unlinkproject";
                             if (confirm("%(js_confirm_delete_project)s"))
-                                $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
+                                $j.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
                             return false;
                         }).show();
                     });
@@ -560,40 +563,40 @@ class Template:
                 <img src="%(site)s/img/add.png" alt="%(link_project)s" id="projectsbox_submit_%(id)s" />
             </div>
             <script type="text/javascript">//<![CDATA[
-                $(document).ready(function() {
-                    $('#linkproject_%(js_id)s').each(function() {
+                $j(document).ready(function() {
+                    $j('#linkproject_%(js_id)s').each(function() {
                         // Since Javascript is working, lets disable sending
                         // the text filled up by the user, and instead
                         // let's consider what is filled by the autocomplete plugin
                         // inside the hidden field.
                         this.name = "dummy";
                     });
-                    $('#linkproject_%(js_id)s_hidden').each(function() {
+                    $j('#linkproject_%(js_id)s_hidden').each(function() {
                         this.name = "linkproject";
                     });
-                    $('#linkproject_%(js_id)s').autocomplete({
+                    $j('#linkproject_%(js_id)s').autocomplete({
                         source: gSite + "/kb/export?kbname=projects&format=jquery&limit=20&ln=" + gLn,
                         focus: function(event, ui) {
-                            $('#linkproject_%(js_id)s').val(ui.item.label);
+                            $j('#linkproject_%(js_id)s').val(ui.item.label);
                             return false;
                         },
                         select: function(event, ui) {
-                            $('#linkproject_%(js_id)s').val(ui.item.label);
-                            $('#linkproject_%(js_id)s_hidden').val(ui.item.value);
+                            $j('#linkproject_%(js_id)s').val(ui.item.label);
+                            $j('#linkproject_%(js_id)s_hidden').val(ui.item.value);
                             var data = {};
-                            data.projectid = $('#linkproject_%(js_id)s_hidden').val();
+                            data.projectid = $j('#linkproject_%(js_id)s_hidden').val();
                             data.publicationid = "%(js_id)s";
                             data.action = "linkproject";
-                            $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
+                            $j.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
                             return false;
                         }
                     });
-                    $("#projectsbox_submit_%(js_id)s").click(function(){
+                    $j("#projectsbox_submit_%(js_id)s").click(function(){
                         var data = {};
-                        data.projectid = $('#linkproject_%(js_id)s_hidden').val();
+                        data.projectid = $j('#linkproject_%(js_id)s_hidden').val();
                         data.publicationid = "%(js_id)s";
                         data.action = "linkproject";
-                        $.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
+                        $j.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
                         return false;
                     });
                 });
@@ -607,7 +610,7 @@ class Template:
         data = prepare4js(data)
         return out % data
 
-    def tmpl_add_publication_data_and_submit(self, projectid, publication_forms, submitted_publications, ln=CFG_SITE_LANG):
+    def tmpl_add_publication_data_and_submit(self, projectid, publication_forms, submitted_publications, project_information, ln=CFG_SITE_LANG):
         _ = gettext_set_language(ln)
 
         out = ""
@@ -623,24 +626,25 @@ class Template:
             out += """
                 <div class="note">
                 <h3>%(title)s</h3>
+                <p>%(description)s</p>
                 %(publication_forms)s
                 <script type="text/javascript">//<![CDATA[
                     var gProjectid = "%(js_projectid)s";
-                    $(document).ready(function(){
-                        $('input.datepicker').datepicker({
+                    $j(document).ready(function(){
+                        $j('input.datepicker').datepicker({
                             dateFormat: 'yy-mm-dd',
                             showOn: 'both',
                             onClose: function(){
-                                $(this).focus();
+                                $j(this).focus();
                             },
                             showButtonPanel: true
                         });
-                        $('textarea').elastic();
-                        $('#publication_forms').submit(function(event){
+                        $j('textarea').elastic();
+                        $j('#publication_forms').submit(function(event){
                             event.preventDefault();
                             return false;
                         });
-                        $('a.deletepublication').click(function(){
+                        $j('a.deletepublication').click(function(){
                             return confirm("%(js_confirm_delete_publication)s");
                         });
                     });
@@ -653,12 +657,16 @@ class Template:
         %(submitted_publications)s
         </div>
         <script type="text/javascript">//<![CDATA[
-            $(document).ready(function(){
+            $j(document).ready(function(){
                 if (%(hide_submitted_publications_section)s)
-                    $("#submitted_publications").hide();
+                    $j("#submitted_publications").hide();
             });
         //]]> </script>
         """
+        if projectid:
+            description = escape(_('These are the publications you are depositing for the project %s')) % (project_information)
+        else:
+            description = escape(_('These are the publications you are depositing for which you have not yet associated any project.'))
         data = {
             'submitted_publications_title': escape(_("Successfully submitted publications")),
             'title': escape(_('Your Current Publications')),
@@ -680,6 +688,7 @@ class Template:
             'next': escape(_("Next"), True),
             'prev': escape(_("Prev"), True),
             'site': escape(CFG_SITE_URL, True),
+            'description': description
         }
         data = prepare4js(data)
         return out % data
@@ -708,12 +717,12 @@ class Template:
         return """
             %(file_label)s: <div class="file" id="file_%(id)s"><em>%(filename)s</em></div>
             <script type="text/javascript">//<![CDATA[
-                $(document).ready(function(){
+                $j(document).ready(function(){
                     var tooltip = clone(gTipDefault);
                     tooltip.content = {
                         'text': '<table><tbody><tr><td align="right"><strong>%(js_filename_label)s:<strong></td><td align="left"><a href="%(js_download_url)s" target="_blank" type="%(js_mimetype)s">%(js_filename)s</a></td></tr><tr><td align="right"><strong>%(js_format_label)s:<strong></td><td align="left">%(js_format)s</td></tr><tr><td align="right"><strong>%(js_size_label)s:<strong></td><td align="left">%(js_size)s</td></tr><tr><td align="right"><strong>%(js_mimetype_label)s:<strong></td><td align="left">%(js_mimetype)s</td></tr><tr><td align="right"><strong>%(js_checksum_label)s:<strong></td><td align="left">%(js_md5)s</td></tr><tbody></table>'
                     };
-                    $('#file_%(id)s').qtip(tooltip);
+                    $j('#file_%(id)s').qtip(tooltip);
                 });
             //]]></script>""" % data
 
