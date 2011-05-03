@@ -95,7 +95,7 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
             jQuery(hiddens[query]).hide('slow');
         }
     }
-    if (appens.length > 0) {
+    if (appends.length > 0) {
         for (query in appends) {
             jQuery(query).append(appends[query]);
         }
