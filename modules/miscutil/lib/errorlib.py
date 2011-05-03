@@ -220,6 +220,7 @@ def get_pretty_traceback(req=None, exc_info=None):
             f = f.f_back
         stack.reverse()
         stack = stack[-10:] ## Let's just take the last few frames
+        traceback.print_exc(file=tracestack_data_stream)
         print >> tracestack_data_stream, \
                 "\n** Traceback details"
         values_to_hide = set()

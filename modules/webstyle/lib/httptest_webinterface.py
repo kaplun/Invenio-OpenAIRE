@@ -26,14 +26,17 @@ __revision__ = \
 __lastupdated__ = """$Date$"""
 
 import cgi
+import os
+import tempfile
+import time
 
-from invenio.config import CFG_SITE_URL
+from invenio.config import CFG_SITE_URL, CFG_TMPDIR
 from invenio.webpage import page
 from invenio.webinterface_handler import WebInterfaceDirectory
 from invenio.urlutils import redirect_to_url
 
 class WebInterfaceHTTPTestPages(WebInterfaceDirectory):
-    _exports = ["", "post1", "post2", "sso", "dumpreq", "whatismyip"]
+    _exports = ["", "post1", "post2", "sso", "dumpreq", "whatismyip", "plupload", "plupload_ajax"]
 
     def __call__(self, req, form):
         redirect_to_url(req, CFG_SITE_URL + '/httptest/post1')
@@ -96,3 +99,97 @@ class WebInterfaceHTTPTestPages(WebInterfaceDirectory):
         """
         req.content_type = "text/plain"
         return req.remote_ip
+
+    def plupload_ajax(self, req, form):
+        log = tempfile.NamedTemporaryFile(suffix=".log", prefix="plupload-%s-" % time.strftime('%Y%m%d%H%M%S'), dir=CFG_TMPDIR, delete=False)
+        print >> log, req
+        print >> log, form
+        for key, value in form.items():
+            if value.filename:
+                chunk = tempfile.NamedTemporaryFile(suffix=".chunk", prefix="plupload-%s-" % time.strftime('%Y%m%d%H%M%S'), dir=CFG_TMPDIR, delete=False)
+                buf = None
+                while buf != "":
+                    buf = value.file.read(1024)
+                    chunk.write(buf)
+                chunk.flush()
+                print >> log, "chunk %s -> %s (%s)" % (value.filename, chunk.name, os.path.getsize(chunk.name))
+            else:
+                print >> log, "%s -> %s" % (key, value.value)
+        print >> log, "-" * 80
+        return ""
+
+    def plupload(self, req, form):
+        """
+        To test plupload implementation
+        """
+        CFG_PLUPLOAD_PATH = "/js/plupload"
+        metaheader = """\
+<style type="text/css">@import url(%(plupload_path)s/jquery.plupload.queue/css/jquery.plupload.queue.css);</style>
+<script type="text/javascript" src="/js/jquery.min.js"></script>
+<script type="text/javascript" src="%(plupload_path)s/plupload.full.js"></script>
+<script type="text/javascript" src="%(plupload_path)s/jquery.plupload.queue/jquery.plupload.queue.js"></script>
+""" % {'plupload_path': CFG_PLUPLOAD_PATH}
+        body = "<pre>%s</pre>" % cgi.escape(str(req))
+        body += "<pre>%s</pre>" % cgi.escape(str(form))
+        body += """\
+<script type="text/javascript">
+//<![CDATA[
+
+// Convert divs to queue widgets when the DOM is ready
+$(function() {
+    $("#uploader").pluploadQueue({
+        // General settings
+        runtimes : 'html5,silverlight,html4',
+        url : '/httptest/plupload_ajax',
+        max_file_size : '10mb',
+        chunk_size : '1mb',
+        unique_names : true,
+
+        // Resize images on clientside if we can
+        resize : {width : 320, height : 240, quality : 90},
+
+        // Specify what files to browse for
+        filters : [
+            {title : "Image files", extensions : "jpg,gif,png"},
+            {title : "Zip files", extensions : "zip"}
+        ],
+
+        // Flash settings
+        // flash_swf_url : '%(plupload_path)s/plupload.flash.swf',
+
+        // Silverlight settings
+        silverlight_xap_url : '%(plupload_path)s/plupload.silverlight.xap'
+    });
+
+    // Client side form validation
+    $('form').submit(function(e) {
+        var uploader = $('#uploader').pluploadQueue();
+
+        // Validate number of uploaded files
+        if (uploader.total.uploaded == 0) {
+            // Files in queue upload them first
+            if (uploader.files.length > 0) {
+                // When all files are uploaded submit form
+                uploader.bind('UploadProgress', function() {
+                    if (uploader.total.uploaded == uploader.files.length)
+                        $('form').submit();
+                });
+
+                uploader.start();
+            } else
+                alert('You must at least upload one file.');
+
+            e.preventDefault();
+        }
+    });
+});
+//]]>
+</script>
+
+<form post="/httptest/plupload">
+    <div id="uploader">
+        <p>You browser doesn't have Flash, Silverlight or HTML5 support.</p>
+    </div>
+</form>
+""" % {'plupload_path': CFG_PLUPLOAD_PATH}
+        return page("plupload test", metaheaderadd=metaheader, body=body, req=req)
