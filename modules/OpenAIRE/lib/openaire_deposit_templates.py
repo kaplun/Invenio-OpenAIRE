@@ -71,7 +71,7 @@ class Template:
             <script type="text/javascript">// <![CDATA[
               var $j = jQuery.noConflict();
             // ]]></script>
-            <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js"></script>
+            <script type="text/javascript" src="%(site)s/js/openaire_deposit_engine.js?v2"></script>
             """ % {'site': CFG_SITE_URL, 'ln': ln}
 
     def tmpl_focused_project(self, selected_project=None, ln=CFG_SITE_LANG):
