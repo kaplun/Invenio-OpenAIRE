@@ -90,14 +90,20 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     for (query in delclasses) {
         jQuery(query).removeClass(delclasses[query]);
     }
-    for (query in hiddens) {
-        jQuery(hiddens[query]).hide('slow');
+    if (hiddens.length > 0) {
+        for (query in hiddens) {
+            jQuery(hiddens[query]).hide('slow');
+        }
     }
-    for (query in appends) {
-        jQuery(query).append(appends[query]);
+    if (appens.length > 0) {
+        for (query in appends) {
+            jQuery(query).append(appends[query]);
+        }
     }
-    for (query in showns) {
-        jQuery(showns[query]).show('slow');
+    if (showns.length > 0) {
+        for (query in showns) {
+            jQuery(showns[query]).show('slow');
+        }
     }
     for (query in substitutions) {
         jQuery(query).replaceWith(substitutions[query]);
