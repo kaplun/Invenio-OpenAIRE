@@ -45,18 +45,18 @@ var gTipDefault = {
 };
 
 function update_embargo_date(event){
-    if ($j(event.data.from_id).val() == 'embargoedAccess') {
-        $j(event.data.to_id).show('slow');
+    if (jQuery(event.data.from_id).val() == 'embargoedAccess') {
+        jQuery(event.data.to_id).show('slow');
     } else {
-        $j(event.data.to_id).hide('slow');
+        jQuery(event.data.to_id).hide('slow');
     }
 }
 
 function update_language(event){
-    if ($j(event.data.from_id).val() != 'eng') {
-        $j(event.data.to_id).removeAttr("disabled").show('slow');
+    if (jQuery(event.data.from_id).val() != 'eng') {
+        jQuery(event.data.to_id).removeAttr("disabled").show('slow');
     } else {
-        $j(event.data.to_id).attr("disabled", "disabled").hide('slow');
+        jQuery(event.data.to_id).attr("disabled", "disabled").hide('slow');
     }
 }
 
@@ -72,57 +72,57 @@ function elaborateAjaxGateway(results, textStatus, XMLHttpRequest){
     var query;
     for (var error in errors) {
         if (errors[error]) {
-            $j('#error_' + error).html(errors[error]).fadeIn('slow');
+            jQuery('#error_' + error).html(errors[error]).fadeIn('slow');
         } else {
-            $j('#error_' + error).fadeOut('slow');
+            jQuery('#error_' + error).fadeOut('slow');
         }
     }
     for (var warning in warnings) {
         if (warnings[warning]) {
-            $j('#warning_' + warning).html(warnings[warning]).fadeIn('slow');
+            jQuery('#warning_' + warning).html(warnings[warning]).fadeIn('slow');
         } else {
-            $j('#warning_' + warning).fadeOut('slow');
+            jQuery('#warning_' + warning).fadeOut('slow');
         }
     }
     for (query in addclasses) {
-        $j(query).addClass(addclasses[query]);
+        jQuery(query).addClass(addclasses[query]);
     }
     for (query in delclasses) {
-        $j(query).removeClass(delclasses[query]);
+        jQuery(query).removeClass(delclasses[query]);
     }
     for (query in hiddens) {
-        $j(hiddens[query]).hide('slow');
+        jQuery(hiddens[query]).hide('slow');
     }
     for (query in appends) {
-        $j(query).append(appends[query]);
+        jQuery(query).append(appends[query]);
     }
     for (query in showns) {
-        $j(showns[query]).show('slow');
+        jQuery(showns[query]).show('slow');
     }
     for (query in substitutions) {
-        $j(query).replaceWith(substitutions[query]);
+        jQuery(query).replaceWith(substitutions[query]);
     }
     return 0;
 }
 
 function getPublicationMetadata(publicationid){
     var ret = {};
-    $j('#body_row_' + publicationid + ' input').each(function(){
+    jQuery('#body_row_' + publicationid + ' input').each(function(){
         ret[this.id] = this.value;
     });
-    $j('#body_row_' + publicationid + ' select').each(function(){
+    jQuery('#body_row_' + publicationid + ' select').each(function(){
         ret[this.id] = this.value;
     });
-    $j('#body_row_' + publicationid + ' textarea').each(function(){
+    jQuery('#body_row_' + publicationid + ' textarea').each(function(){
         ret[this.id] = this.value;
     });
-    $j('#header_row_' + publicationid + ' input').each(function(){
+    jQuery('#header_row_' + publicationid + ' input').each(function(){
         ret[this.id] = this.value;
     });
-    $j('#header_row_' + publicationid + ' select').each(function(){
+    jQuery('#header_row_' + publicationid + ' select').each(function(){
         ret[this.id] = this.value;
     });
-    $j('#header_row_' + publicationid + ' textarea').each(function(){
+    jQuery('#header_row_' + publicationid + ' textarea').each(function(){
         ret[this.id] = this.value;
     });
     return ret;
@@ -144,7 +144,7 @@ function ajaxGateway(element, action) {
     data.projectid = gProjectid;
     data.action = action;
     data.current_field = element.id;
-    $j.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
+    jQuery.post(gSite + '/deposit/ajaxgateway', data, elaborateAjaxGateway, "json");
     return 1;
 }
 
@@ -166,26 +166,26 @@ function clone(obj) {
 }
 
 /* Initialization */
-$j(document).ready(function(){
-    $j('div.OpenAIRE input:text,div.OpenAIRE textarea,div.OpenAIRE select').focusout(function(){
+jQuery(document).ready(function(){
+    jQuery('div.OpenAIRE input:text,div.OpenAIRE textarea,div.OpenAIRE select').focusout(function(){
         return ajaxGateway(this, 'verify_field');
     });
-    $j('div.OpenAIRE select').select(function(){
+    jQuery('div.OpenAIRE select').select(function(){
         return ajaxGateway(this, 'verify_field');
     });
-    $j('#project').autocomplete({
+    jQuery('#project').autocomplete({
         source: gSite + "/kb/export?kbname=projects&format=jquery&limit=20&ln=" + gLn,
         focus: function(event, ui) {
-            $j('#projectid').val(ui.item.label);
+            jQuery('#projectid').val(ui.item.label);
             return false;
         },
         select: function(event, ui) {
-            $j('#project').val(ui.item.label);
-            $j('#projectid').val(ui.item.value);
+            jQuery('#project').val(ui.item.label);
+            jQuery('#projectid').val(ui.item.value);
             return false;
         }
     }).focus();
-    $j(function(){
+    jQuery(function(){
         /* Adapted from <http://jqueryui.com/demos/autocomplete/#multiple> */
         function split(val) {
             return val.split(/\r\n|\r|\n/);
@@ -194,10 +194,10 @@ $j(document).ready(function(){
             return split(term).pop();
         }
 
-        $j('textarea.authors').keydown(function(event) {
+        jQuery('textarea.authors').keydown(function(event) {
             /* Thanks to: http://forum.jquery.com/topic/autocomplete-changing-key-bindings */
-            var isOpen = $j( this ).autocomplete( "widget" ).is( ":visible" );
-            var keyCode = $j.ui.keyCode;
+            var isOpen = jQuery( this ).autocomplete( "widget" ).is( ":visible" );
+            var keyCode = jQuery.ui.keyCode;
             if ( !isOpen && ( event.keyCode == keyCode.UP || event.keyCode == keyCode.DOWN ) ) {
                     event.stopImmediatePropagation();
             }
@@ -209,7 +209,7 @@ $j(document).ready(function(){
                 var term = extractLast(request.term);
                 if (term) {
 
-                    $j.getJSON(gSite + "/deposit/authorships", {
+                    jQuery.getJSON(gSite + "/deposit/authorships", {
                         publicationid: publicationid,
                         term: term
                     }, function(data, status, xhr) {
@@ -232,10 +232,10 @@ $j(document).ready(function(){
                 return false;
             }
         });
-        $j('textarea.keywords').keydown(function(event) {
+        jQuery('textarea.keywords').keydown(function(event) {
             /* Thanks to: http://forum.jquery.com/topic/autocomplete-changing-key-bindings */
-            var isOpen = $j( this ).autocomplete( "widget" ).is( ":visible" );
-            var keyCode = $j.ui.keyCode;
+            var isOpen = jQuery( this ).autocomplete( "widget" ).is( ":visible" );
+            var keyCode = jQuery.ui.keyCode;
             if ( !isOpen && ( event.keyCode == keyCode.UP || event.keyCode == keyCode.DOWN ) ) {
                     event.stopImmediatePropagation();
             }
@@ -247,7 +247,7 @@ $j(document).ready(function(){
                 var term = extractLast(request.term);
                 if (term) {
 
-                    $j.getJSON(gSite + "/deposit/keywords", {
+                    jQuery.getJSON(gSite + "/deposit/keywords", {
                         publicationid: publicationid,
                         term: term
                     }, function(data, status, xhr) {
@@ -271,13 +271,13 @@ $j(document).ready(function(){
             }
         });
     });
-    $j('*[title]').qtip(gTipDefault);
-    $j('div.error').filter(function(){
+    jQuery('*[title]').qtip(gTipDefault);
+    jQuery('div.error').filter(function(){
         return this.textContent == '' || this.textContent == undefined;
     }).hide();
-    $j('div.warning').filter(function(){
+    jQuery('div.warning').filter(function(){
         return this.textContent == '' || this.textContent == undefined;
     }).hide();
-    $j.datepicker.setDefaults($j.datepicker.regional[gLn]);
-    $j('span.yesscript').show();
+    jQuery.datepicker.setDefaults(jQuery.datepicker.regional[gLn]);
+    jQuery('span.yesscript').show();
 });

@@ -89,7 +89,7 @@ def portal_page(title, body, navtrail="", description="", keywords="",
          language=CFG_SITE_LANG, verbose=1, titleprologue="",
          titleepilogue="", secure_page_p=0, req=None, errors=[], warnings=[], navmenuid="admin",
          navtrail_append_title_p=1, of="", rssurl=CFG_SITE_URL+"/rss", show_title_p=True,
-         body_css_classes=None):
+         body_css_classes=None, project_information=None):
     if req is not None:
         user_info = collect_user_info(req)
         username = user_info.get('external_fullname', user_info['email'])
@@ -101,7 +101,7 @@ def portal_page(title, body, navtrail="", description="", keywords="",
         portalurl = "http://www.openaire.eu"
     else:
         portalurl = CFG_OPENAIRE_PORTAL_URL
-    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, portalurl=portalurl, return_value=encodestring(invenio_logouturl), ln=language)
+    return openaire_deposit_templates.tmpl_page(title=title, body=body, headers=metaheaderadd, username=username, portalurl=portalurl, return_value=encodestring(invenio_logouturl), ln=language, project_information=project_information)
 
 def get_project_description(projectid):
     info = get_kb_mapping(CFG_OPENAIRE_PROJECT_DESCRIPTION_KB, str(projectid))
@@ -218,7 +218,7 @@ def page(title, body, navtrail="", description="", keywords="",
          language=CFG_SITE_LANG, verbose=1, titleprologue="",
          titleepilogue="", secure_page_p=0, req=None, errors=[], warnings=[], navmenuid="admin",
          navtrail_append_title_p=1, of="", rssurl=CFG_SITE_URL+"/rss", show_title_p=True,
-         body_css_classes=None):
+         body_css_classes=None, project_information=None):
     style = get_openaire_style(req)
     argd = wash_urlargd(req.form, {})
     if not metaheaderadd:
@@ -236,7 +236,7 @@ def page(title, body, navtrail="", description="", keywords="",
             language, verbose, titleprologue,
             titleepilogue, secure_page_p, req, errors, warnings, navmenuid,
             navtrail_append_title_p, of, rssurl, show_title_p,
-            body_css_classes)
+            body_css_classes, project_information=project_information)
     else:
         return invenio_page(title, body, navtrail, description, keywords,
             metaheaderadd, uid,
@@ -256,6 +256,22 @@ def update_publication_projects_mapping(uid, publicationid, new_projectids):
         run_sql("INSERT INTO eupublication(uid, publicationid, projectid) VALUES(%s, %s, %s)", (uid, publicationid, projectid))
     for projectid in old_projectids - new_projectids:
         run_sql("DELETE FROM eupublication WHERE uid=%s AND publicationid=%s AND projectid=%s", (uid, publicationid, projectid))
+
+def get_project_acronym(projectid):
+    if projectid == 0:
+        return 'no project'
+    if projectid < 0:
+        return None
+    project_information = get_project_information_from_projectid(projectid)
+    if project_information.get('acronym', '').strip():
+        return project_information['acronym'].strip()
+    title = project_information.get('title', '').strip().decode('utf-8')
+    if len(title) > 10:
+        title = title[:10] + u'...'
+    title = title.encode('utf-8')
+    if not title:
+        return 'no acronym'
+    return title
 
 def get_project_information(uid, projectid, deletable, linked, ln, style, global_projectid=None, publicationid=None):
     project_information = get_project_information_from_projectid(projectid)

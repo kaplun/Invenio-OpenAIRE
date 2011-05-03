@@ -391,7 +391,8 @@ window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '
                                 <a href="%(portalurl)s/en/component/openaire/ingestion1/default/381">Deposit Publications</a>
                                 <img src="%(portalurl)s/templates/yoo_level/images/arrow.png" alt="" />
                                 <a href="%(portalurl)s/en/component/openaire/ingestion1/default/381">Deposit Publications</a>
-                                <img src="%(portalurl)s/templates/yoo_level/images/arrow.png" alt="" /> to orphan repository</span>
+                                %(crumbs)s
+                                </span>
                               </div>
                               <div class="floatbox">
                                 <div class="headline">

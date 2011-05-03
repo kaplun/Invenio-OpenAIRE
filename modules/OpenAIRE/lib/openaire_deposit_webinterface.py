@@ -38,7 +38,7 @@ from invenio.openaire_deposit_engine import page, get_project_information, \
     OpenAIREPublication, wash_form, get_exisiting_projectids_for_uid, \
     get_all_projectsids, get_favourite_authorships_for_user, \
     get_all_publications_for_project, upload_file, get_openaire_style, \
-    get_favourite_keywords_for_user
+    get_favourite_keywords_for_user, get_project_acronym
 from invenio.openaire_deposit_utils import simple_metadata2namespaced_metadata
 from invenio.access_control_engine import acc_authorize_action
 from invenio.bibknowledge import get_kbr_keys
@@ -172,7 +172,7 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
                 body += openaire_deposit_templates.tmpl_focus_on_project(existing_projects=projects, ln=argd['ln'])
 
         title = _('Orphan Repository')
-        return page(body=body, title=title, req=req)
+        return page(body=body, title=title, req=req, project_information=get_project_acronym(projectid))
 
     def uploadifybackend(self, req, form):
         argd = wash_urlargd(form, {'session': (str, ''), 'projectid': (int, -1)})

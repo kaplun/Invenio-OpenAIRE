@@ -113,8 +113,8 @@ def autocomplete_input_field(curdir, field_name, kbname):
     curdir_dict = get_all_values_in_curdir(curdir)
     field_value = curdir_dict.get(field_name, '')
     out = """<script type="text/javascript">
-    $(document).ready(function() {
-        $("#field_name").autocomplete({
+    jQuery(document).ready(function() {
+        jQuery("#field_name").autocomplete({
             source: "%(site)s/kb/export?kbname=%(kb)s&format=jquery"
         });
     });
