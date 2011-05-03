@@ -68,6 +68,7 @@ class Template:
             <script type="text/javascript" src="http://cdn.jquerytools.org/1.2.4/all/jquery.tools.min.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.elastic.js"></script>
             <script type="text/javascript" src="%(site)s/js/jquery.qtip-1.0.0-rc3.js"></script>
+            <script type="text/javascript" src="%(site)s/js/jquery.coolinput.min.js"></script>
             <script type="text/javascript">// <![CDATA[
               jQuery.noConflict();
             // ]]></script>
@@ -557,7 +558,7 @@ class Template:
                 <noscript>
                     <label for="linkproject_%(id)s">Grant Agreement Number</label>
                 </noscript>
-                <input type="text" name="linkproject" id="linkproject_%(id)s" size="10" />
+                <input type="text" name="linkproject" id="linkproject_%(id)s" size="30" />
                 <input type="hidden" name="dummy" id="linkproject_%(id)s_hidden" />
                 <input type="hidden" name="publicationid" value="%(id)s" />
                 <!-- <img src="%(site)s/img/add.png" alt="%(link_project)s" id="projectsbox_submit_%(id)s" /> -->
@@ -574,7 +575,9 @@ class Template:
                     jQuery('#linkproject_%(js_id)s_hidden').each(function() {
                         this.name = "linkproject";
                     });
-                    jQuery('#linkproject_%(js_id)s').autocomplete({
+                    jQuery('#linkproject_%(js_id)s').coolinput({
+                            hint: "%(js_hint)s"
+                        }).autocomplete({
                         source: gSite + "/kb/export?kbname=projects&format=jquery&limit=20&ln=" + gLn,
                         focus: function(event, ui) {
                             jQuery('#linkproject_%(js_id)s').val(ui.item.label);
@@ -606,6 +609,7 @@ class Template:
             "associated_projects": associated_projects,
             "site": CFG_SITE_URL,
             "link_project": escape(_("Link project")),
+            "hint": escape(_("Start typing the project name..."))
         }
         data = prepare4js(data)
         return out % data
