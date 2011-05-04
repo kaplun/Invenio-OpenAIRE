@@ -65,11 +65,14 @@ class WebInterfaceOpenAIREDepositPages(WebInterfaceDirectory):
         })
         if argd_query['option'] == 'com_search' and argd_query['tmpl'] == 'raw' and argd_query['type'] == 'json' and argd_post['searchword']:
             proxy = urllib2.urlopen("%s/index.php?%s" % (CFG_OPENAIRE_PORTAL_URL, urllib.urlencode(argd_query)), urllib.urlencode(argd_post))
-            buf = None
-            while buf != "":
-                buf = proxy.read(1024)
-                req.write(buf)
-            return ""
+            content = proxy.read()
+            content = json.loads(content)
+            ## HACK to transform relative URLs into full URLs to the Portal
+            if 'results' in content:
+                for elem in content['results']:
+                    if 'url' in elem and elem['url'].startswith('/'):
+                        elem['url'] = CFG_OPENAIRE_PORTAL_URL + elem['url']
+            return json.dumps(content)
         return ""
 
     def index(self, req, form):
