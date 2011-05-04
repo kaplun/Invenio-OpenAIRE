@@ -29,7 +29,8 @@ var gTipDefault = {
         screen: true
     },
     hide: {
-        fixed: true
+        fixed: true,
+        delay: 1000
     },
     border: {
         width: 7,
