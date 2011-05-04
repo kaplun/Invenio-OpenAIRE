@@ -350,7 +350,7 @@ window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '
                                           </a>
                                         </li>
                                         <li class="level2 item2 last active current active current">
-                                          <a href="%(site)s" class="level2 item2 last active current">
+                                          <a href="%(site)s/deposit?style=portal" class="level2 item2 last active current">
                                             <span>to orphan repository</span>
                                           </a>
                                         </li>
