@@ -295,7 +295,7 @@ window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '
                     </li>
                   </ul>
                 </li>
-                <li class="level1 item14 last parent">
+                <li class="level1 item14 parent">
                   <a href="%(portalurl)s/en/news-a-events/news" class="level1 item14 last parent">
                     <span>News &amp; Events</span>
                   </a>
@@ -308,6 +308,63 @@ window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '
                     <li class="level2 item2 last">
                       <a href="%(portalurl)s/en/news-a-events/events" class="level2 item2 last">
                         <span>Events</span>
+                      </a>
+                    </li>
+                  </ul>
+                </li>
+                <li class="level1 item15 last parent">
+                  <a href="%(portalurl)s/en/private-space.html" class="level1 item15 last parent">
+                    <span>For members</span>
+                  </a>
+                  <ul class="level2">
+                    <li class="level2 item1 first">
+                      <a href="%(portalurl)s/en/private-space/project-documents.html" class="level2 item1 first">
+                        <span>Project Documents</span>
+                      </a>
+                    </li>
+                    <li class="level2 item2">
+                      <a href="%(portalurl)s/en/private-space/meeting-documents.html" class="level2 item2">
+                        <span>Meeting Documents</span>
+                      </a>
+                    </li>
+                    <li class="level2 item3">
+                      <a href="%(portalurl)s/en/private-space/mailing-lists.html" class="level2 item3">
+                        <span>Mailing lists</span>
+                      </a>
+                    </li>
+                    <li class="level2 item5">
+                      <a href="%(portalurl)s/en/private-space/add-news.html" class="level2 item5">
+                        <span>Add a News item</span>
+                      </a>
+                    </li>
+                    <li class="level2 item6">
+                      <a href="%(portalurl)s/en/private-space/add-web-link.html" class="level2 item6">
+                        <span>Add a Web Link</span>
+                      </a>
+                    </li>
+                    <li class="level2 item7">
+                      <a href="%(portalurl)s/en/private-space/2010-03-11-11-34-58.html" class="level2 item7">
+                        <span>Add an Event</span>
+                      </a>
+                    </li>
+                    <li class="level2 item8">
+                      <a href="%(portalurl)s/en/private-space/manage-articles.html" class="level2 item8">
+                        <span>Manage Articles</span>
+                      </a>
+                    </li>
+                    <li class="level2 item11">
+                      <a href="%(portalurl)s/en/private-space/user-contact.html" class="level2 item11">
+                        <span>My Contact Info</span>
+                      </a>
+                    </li>
+                    <li class="level2 item12">
+                      <a href="%(portalurl)s/en/private-space/user-data.html" class="level2 item12">
+                        <span>My Personal Info</span>
+                      </a>
+                    </li>
+                    <li class="level2 item13 last">
+                      <a href="%(portalurl)s/en/private-space/helpdesk-contacts.html" class="level2 item13 last">
+                        <span>HelpDesk Contacts</span>
                       </a>
                     </li>
                   </ul>
