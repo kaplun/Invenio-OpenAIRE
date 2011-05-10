@@ -61,6 +61,7 @@ img_DATA = add-small.png \
            bullet_toggle_plus.png \
            circle_green.png \
            circle_red.png \
+           confidential.jpg \
            cross_red.gif \
            delete-big.png \
            delete-small.png \
