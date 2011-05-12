@@ -31,20 +31,15 @@ It also contains Apache-related user authentication stuff.
 
 __revision__ = "$Id$"
 
-from invenio import webinterface_handler_config as apache
-
 import cgi
 import urllib
 import urlparse
 from socket import gaierror
-import os
-import crypt
 import socket
 import smtplib
 import re
 import random
 import datetime
-import base64
 
 from invenio.config import \
      CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS, \
@@ -53,15 +48,12 @@ from invenio.config import \
      CFG_ACCESS_CONTROL_LIMIT_REGISTRATION_TO_DOMAIN, \
      CFG_ACCESS_CONTROL_NOTIFY_ADMIN_ABOUT_NEW_ACCOUNTS, \
      CFG_ACCESS_CONTROL_NOTIFY_USER_ABOUT_NEW_ACCOUNT, \
-     CFG_APACHE_GROUP_FILE, \
-     CFG_APACHE_PASSWORD_FILE, \
      CFG_SITE_ADMIN_EMAIL, \
      CFG_SITE_LANG, \
      CFG_SITE_NAME, \
      CFG_SITE_NAME_INTL, \
      CFG_SITE_SUPPORT_EMAIL, \
      CFG_SITE_SECURE_URL, \
-     CFG_TMPDIR, \
      CFG_SITE_URL, \
      CFG_WEBSESSION_DIFFERENTIATE_BETWEEN_GUESTS, \
      CFG_CERN_SITE, \
@@ -560,6 +552,17 @@ def loginUser(req, p_un, p_pw, login_method):
                     return([], p_email, p_pw_local, 19)
                 else:
                     return([], p_email, p_pw_local, 13)
+            elif CFG_EXTERNAL_AUTHENTICATION[login_method].enforce_external_nicknames:
+                ## Let's still fetch a possibly upgraded nickname.
+                try: # Let's discover the external nickname!
+                    p_nickname = CFG_EXTERNAL_AUTHENTICATION[login_method].fetch_user_nickname(p_email, p_pw, req)
+                    if nickname_valid_p(p_nickname) and nicknameUnique(p_nickname) == 0:
+                        updateDataUser(query_result[0][0], p_email, p_nickname)
+                except (AttributeError, NotImplementedError):
+                    pass
+                except:
+                    register_exception(alert_admin=True)
+                    raise
             try:
                 groups = CFG_EXTERNAL_AUTHENTICATION[login_method].fetch_user_groups_membership(p_email, p_pw, req)
                 # groups is a dictionary {group_name : group_description,}
@@ -1153,11 +1156,11 @@ def collect_user_info(req, login_time=False, refresh=False):
                     viewlink = False
             else:
                 viewlink = False
-                
+
             if (CFG_BIBAUTHORID_ENABLED
-                and usepaperattribution
-                and viewlink): 
-                    viewclaimlink = True
+                    and usepaperattribution
+                    and viewlink):
+                viewclaimlink = True
 
             user_info['precached_viewclaimlink'] = viewclaimlink
             user_info['precached_usepaperattribution'] = usepaperattribution
@@ -1229,7 +1232,7 @@ def collect_user_info(req, login_time=False, refresh=False):
                 if (CFG_BIBAUTHORID_ENABLED
                     and acc_is_user_in_role(user_info, acc_get_role_id("paperattributionviewers"))):
                     usepaperattribution = True
-                
+
                 if is_req:
                     session = get_session(req)
                     viewlink = False
@@ -1239,11 +1242,11 @@ def collect_user_info(req, login_time=False, refresh=False):
                         viewlink = False
                 else:
                     viewlink = False
-                    
+
                 if (CFG_BIBAUTHORID_ENABLED
-                    and usepaperattribution
-                    and viewlink): 
-                        viewclaimlink = True
+                        and usepaperattribution
+                        and viewlink):
+                    viewclaimlink = True
 
 #                if (CFG_BIBAUTHORID_ENABLED
 #                    and ((usepaperclaim or usepaperattribution)
