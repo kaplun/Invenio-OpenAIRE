@@ -26,10 +26,21 @@ suffix_en="</small><br />"
 suffix_fr="</small><br />"
 />
 
+<BFE_SUBJECT prefix="<br /><small><strong>Subject(s): </strong></small><small>" separator="</small><small>"
+suffix="</small>" />
+
 <BFE_KEYWORDS
 prefix="<br /><small><strong>Keyword(s): </strong></small>"
 keyword_prefix="<small>"
 keyword_suffix="</small>" />
+
+<!-- BEGIN OpenAIRE specific -->
+
+<BFE_FIELD tag="536__a" prefix="<br /><small><strong>Funded by project(s): </strong></small><small>", instances_separator=', ' suffix="</small>" />
+
+<BFE_OPENAIRE_ACCESS_RIGHTS prefix="<br /><small>" suffix="</small>" />
+
+<!-- END OpenAIRE specific -->
 
 <BFE_NOTES
 note_prefix="<br /><small><strong>Note: </strong>"

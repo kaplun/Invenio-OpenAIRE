@@ -179,6 +179,8 @@ def get_pretty_traceback(req=None, exc_info=None):
     """
     Given an optional request object and an optional exc_info,
     returns a text string representing many details about an exception.
+
+    @note: force_stack is deprecated and actually ignored.
     """
     if exc_info is None:
         exc_info = sys.exc_info()
@@ -220,6 +222,7 @@ def get_pretty_traceback(req=None, exc_info=None):
             f = f.f_back
         stack.reverse()
         stack = stack[-10:] ## Let's just take the last few frames
+        traceback.print_exc(file=tracestack_data_stream)
         print >> tracestack_data_stream, \
                 "\n** Traceback details"
         values_to_hide = set()
@@ -281,6 +284,9 @@ def get_pretty_traceback(req=None, exc_info=None):
 
         if tracestack_data:
             print >> output, tracestack_data
+        if req:
+            print >> output, "\n>>> Request object\n"
+            print >> output, req
         return output.getvalue()
     else:
         return ""

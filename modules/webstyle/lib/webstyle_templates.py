@@ -326,6 +326,7 @@ template function generated it.
  <link rel="alternate" type="application/rss+xml" title="%(sitename)s RSS" href="%(rssurl)s" />
  <link rel="search" type="application/opensearchdescription+xml" href="%(siteurl)s/opensearchdescription" title="%(sitename)s" />
  <link rel="unapi-server" type="application/xml" title="unAPI" href="%(unAPIurl)s" />
+ <link rel="icon" href="%(siteurl)s/img/favicon.png" type="image/png" />
  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
  <meta http-equiv="Content-Language" content="%(ln)s" />
  <meta name="description" content="%(description)s" />
@@ -362,7 +363,7 @@ template function generated it.
              &nbsp;
        </td>
        <td class="headermoduleboxbody%(submit_selected)s">
-             <a class="header%(submit_selected)s" href="%(siteurl)s/submit?ln=%(ln)s">%(msg_submit)s</a>
+             <a class="header%(submit_selected)s" href="%(siteurl)s/deposit?style=invenio&ln=%(ln)s">%(msg_submit)s</a>
        </td>
        <td class="headermoduleboxbodyblank">
              &nbsp;

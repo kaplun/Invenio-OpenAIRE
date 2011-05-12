@@ -446,25 +446,76 @@ def create_html_tag(tag, body=None, escape_body=False, escape_attr=True, indent=
 
     if attrs is None:
         attrs = {}
-    attrs.update(other_attrs)
+    for key, value in other_attrs.iteritems():
+        if key.endswith('_'):
+            attrs[key[:-1]] = value
+        else:
+            attrs[key] = value
     out = "<%s" % tag
     for key, value in attrs.iteritems():
         if escape_attr:
-            value = escape_html(value, escape_quotes=True)
+            value = EscapedString(value, escape_quotes=True)
         out += ' %s="%s"' % (key, value)
-    if body:
+    if body is not None:
+        if callable(body) and body.__name__ == 'handle_body':
+            body = body()
         out += ">\n"
-        if escape_body:
-            body = escape_html(body)
+        if escape_body and not isinstance(body, EscapedString):
+            body = EscapedString(body)
         out += indent_text(body, 1)
         out += "</%s>" % tag
     else:
         out += " />"
     out = indent_text(out, indent)
     out = out[:-1] # Let's remove trailing new line
-    return out
+    return EscapedString(out, escape_nothing=True)
 
-def create_html_select(options, selected=None, attrs=None, **other_attrs):
+class EscapedString(str):
+    def __new__(cls, original_string='', escape_quotes=False, escape_nothing=False):
+        if escape_nothing or isinstance(original_string, EscapedString):
+            escaped_string = str(original_string)
+        else:
+            if original_string and not str(original_string).strip():
+                escaped_string = '&nbsp;'
+            else:
+                escaped_string = cgi.escape(str(original_string), escape_quotes)
+        obj = str.__new__(cls, escaped_string)
+        obj.original_string = original_string
+        return obj
+
+    def __repr__(self):
+        return 'EscapedString(%s)' % repr(self.original_string)
+
+    def __add__(self, rhs):
+        if not isinstance(rhs, EscapedString):
+            rhs = EscapedString(rhs)
+        return EscapedString(str(self) + str(rhs), escape_nothing=True)
+
+
+class HClass(object):
+    def __getattr__(self, tag):
+        def html_tag_creator(body=None, escape_body=False, escape_attr=True, indent=0, attrs=None, **other_attrs):
+            if body:
+                return create_html_tag(tag, body=body, escape_body=escape_body, escape_attr=escape_attr, indent=indent, attrs=attrs, **other_attrs)
+            else:
+                def handle_body(*other_bodies):
+                    full_body = None
+                    if other_bodies:
+                        full_body = ""
+                        for body in other_bodies:
+                            if callable(body) and body.__name__ == 'handle_body':
+                                full_body += body()
+                            elif isinstance(body, EscapedString):
+                                full_body += body
+                            else:
+                                full_body += EscapedString(str(body))
+                    return create_html_tag(tag, body=full_body, escape_body=escape_body, escape_attr=escape_attr, indent=indent, attrs=attrs, **other_attrs)
+                return handle_body
+        return html_tag_creator
+
+H = HClass()
+
+def create_html_select(options, name=None, selected=None, disabled=None, multiple=False, attrs=None, **other_attrs):
     """
     Create an HTML select box.
 
@@ -477,7 +528,7 @@ def create_html_select(options, selected=None, attrs=None, **other_attrs):
             foo
           </option>
         </select>
-        >>> print create_html_select({"foo": "oof", "bar": "rab"}, selected="bar", name="baz")
+        >>> print create_html_select([("foo", "oof"), ("bar", "rab")], selected="bar", name="baz")
         <select name="baz">
           <option value="foo">
             oof
@@ -487,18 +538,22 @@ def create_html_select(options, selected=None, attrs=None, **other_attrs):
           </option>
         </select>
 
-    @param options: this can either be a sequence of strings or a map of
-        C{key->value}. In the former case, the C{select} tag will contain
-        a list of C{option} tags (in alphabetical order), where the
-        C{value} attribute is not specified. In the latter case, the
-        C{value} attribute will be set to the C{key}, while the body
+    @param options: this can either be a sequence of strings, or a sequence
+        couples or a map of C{key->value}. In the former case, the C{select}
+        tag will contain a list of C{option} tags (in alphabetical order),
+        where the C{value} attribute is not specified. In the latter case,
+        the C{value} attribute will be set to the C{key}, while the body
         of the C{option} will be set to C{value}.
     @type options: sequence or map
-    @param selected: optional key/value to select by default. In case
-        a map has been used for options, C{selected} must be set to an
-        existing C{key}, otherwise it must be set to an existing
-        C{value}.
-    @type selected: string
+    @param name: the name of the form element.
+    @type name: string
+    @param selected: optional key(s)/value(s) to select by default. In case
+        a map has been used for options.
+    @type selected: string (or list of string)
+    @param disabled: optional key(s)/value(s) to disable.
+    @type disabled: string (or list of string)
+    @param multiple: whether a multiple select box must be created.
+    @type mutable: bool
     @param attrs: optional attributes to create the select tag.
     @type attrs: dict
     @param other_attrs: other optional attributes.
@@ -508,17 +563,44 @@ def create_html_select(options, selected=None, attrs=None, **other_attrs):
     @note: the values and keys will be escaped for HTML.
     """
     body = []
-    try:
+    if selected is None:
+        selected = []
+    elif isinstance(selected, (str, unicode)):
+        selected = [selected]
+    if disabled is None:
+        disabled = []
+    elif isinstance(disabled, (str, unicode)):
+        disabled = [disabled]
+    if name is not None and multiple and not name.endswith('[]'):
+        name += "[]"
+    if isinstance(options, dict):
         items = options.items()
         items.sort(lambda item1, item2: cmp(item1[1], item2[1]))
-        for key, value in items:
-            option_attrs = key == selected and {"selected": "selected"} or {}
-            body.append(create_html_tag("option", body=value, escape_body=True, value=key, attrs=option_attrs))
-    except AttributeError:
-        options.sort()
-        for value in options:
-            option_attrs = value == selected and {"selected": "selected"} or {}
-            body.append(create_html_tag("option", body=value, escape_body=True, attrs=option_attrs))
+    elif isinstance(options, (list, tuple)):
+        options = list(options)
+        items = []
+        for item in options:
+            if isinstance(item, (str, unicode)):
+                items.append((item, item))
+            elif isinstance(item, (tuple, list)) and len(item) == 2:
+                items.append(tuple(item))
+            else:
+                raise ValueError('Item "%s" of incompatible type: %s' % (item, type(item)))
+    else:
+        raise ValueError('Options of incompatible type: %s' % type(options))
+    for key, value in items:
+        option_attrs = {}
+        if key in selected:
+            option_attrs['selected'] = 'selected'
+        if key in disabled:
+            option_attrs['disabled'] = 'disabled'
+        body.append(create_html_tag("option", body=value, escape_body=True, value=key, attrs=option_attrs))
+    if attrs is None:
+        attrs = {}
+    if name is not None:
+        attrs['name'] = name
+    if multiple:
+        attrs['multiple'] = 'multiple'
     return create_html_tag("select", body='\n'.join(body), attrs=attrs, **other_attrs)
 
 class _LinkGetter(HTMLParser):

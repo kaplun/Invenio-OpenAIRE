@@ -25,6 +25,7 @@ img_DATA = add-small.png \
            arrow_link-icon-15x11-right.gif \
            arrow_up.gif \
            arrow_up2.png \
+           asterisk.png \
            at.gif \
            aid_90low_right.png \
            aid_btn_blue.png \
@@ -76,7 +77,9 @@ img_DATA = add-small.png \
            drop_down_menu_arrow_down_lb.gif \
            drop_down_menu_arrow_down_w.gif \
            edit1.gif \
+           einfrastructure_sm.png \
            external-icon-light-8x8.gif \
+           favicon.png \
            feed-icon-12x12.gif \
            file-icon-none-96x128.gif \
            file-icon-text-12x16.gif \
@@ -85,6 +88,7 @@ img_DATA = add-small.png \
            file-icon-text-96x128.gif \
            forbidden_left.gif \
            forbidden_right.gif \
+           fp7-capacities_tr.png \
            gradient-lightgray-1x100.gif \
            gradient_tab-gray-1x23.gif \
            gradient_tab_on-gray-1x23.gif \
@@ -101,6 +105,7 @@ img_DATA = add-small.png \
            iconeye.gif \
            iconpen.gif \
            indicator.gif \
+           invenio.png \
            journal-template1.gif \
            journal-template2.gif \
            journal-template3.gif \
@@ -133,6 +138,7 @@ img_DATA = add-small.png \
            move_to.gif \
            noway.gif \
            okay.gif \
+           openaire_logo.jpeg \
            out.gif \
            paper-texture-128x128.gif \
            paper_clip-72x72.gif \
@@ -246,8 +252,9 @@ img_DATA = add-small.png \
            wb-subscribe.png \
            wb-unsubscribe.png \
            white_field.gif \
+           white_arrow_big.png \
            wsignout.gif \
-	   compare.png \
+           compare.png \
            document-preview.png
 
 tmpdir=$(localstatedir)/tmp

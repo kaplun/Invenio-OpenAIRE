@@ -1,0 +1,17 @@
+every publication has zero/one/many project.
+
+This publication belongs to the following projects:
+<div id="projects_%s">
+OpenAIRE {trash}
+D4Science II {trash}
+[            ] {add}
+</div>
+
+When trash is clicked, /deposit/deleteprojectfrompublication?uid=&projectid=&publicationid=&
+plus the line itself is deleted. That's easy :-)
+che come favore restituira il nuovo HTML da aggiornare. Cool!
+confirmation? only if this is the same publication of gPublicationid
+
+the autoselect will instead call /deposit/addprojecttopublication?uid=&projectid&publicationid=& che come favore restituira' il nuovo HTML da aggiornare.
+
+poi occorrera' aggiornare il template, ma soprattutto l'engine.

@@ -3762,6 +3762,47 @@ CREATE TABLE IF NOT EXISTS user_expJOB (
   KEY id_expJOB (id_expJOB)
 ) ENGINE=MyISAM;
 
+-- OpenAIRE specific tables
+CREATE TABLE IF NOT EXISTS OpenAIREauthorships (
+  uid int(15) NOT NULL,
+  publicationid varchar(30) NOT NULL,
+  authorship varchar(255) NOT NULL,
+  UNIQUE (uid, publicationid, authorship),
+  KEY (uid, publicationid),
+  KEY (uid, authorship),
+  KEY (authorship)
+) TYPE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS OpenAIREkeywords (
+  uid int(15) NOT NULL,
+  publicationid varchar(30) NOT NULL,
+  keyword varchar(255) NOT NULL,
+  KEY (uid, publicationid),
+  KEY (uid, keyword),
+  KEY (keyword)
+) TYPE=MyISAM;
+
+
+CREATE TABLE IF NOT EXISTS eupublication (
+  publicationid varchar(255) NOT NULL,
+  projectid int(15) NOT NULL,
+  uid int(15) NOT NULL,
+  id_bibrec int(15) NULL default NULL,
+  UNIQUE KEY (publicationid, projectid, uid),
+  KEY (publicationid),
+  KEY (projectid),
+  KEY (uid),
+  KEY (id_bibrec)
+) TYPE=MyISAM;
+
+CREATE TABLE IF NOT EXISTS pgreplayqueue (
+  id int(15) unsigned NOT NULL auto_increment,
+  query longblob,
+  first_try datetime NOT NULL default '0000-00-00',
+  last_try datetime NOT NULL default '0000-00-00',
+  PRIMARY KEY (id)
+) TYPE=MyISAM;
+
 CREATE TABLE IF NOT EXISTS swrREMOTESERVER (
   id int(15) unsigned NOT NULL auto_increment,
   name varchar(50) unique NOT NULL,

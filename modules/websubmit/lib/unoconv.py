@@ -840,9 +840,6 @@ def main():
     except OSError:
         error("Warning: failed to launch OpenOffice. Aborting.")
 
-
-
-
 ### Main entrance
 if __name__ == '__main__':
     exitcode = 0

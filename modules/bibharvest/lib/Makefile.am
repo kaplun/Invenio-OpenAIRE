@@ -15,6 +15,8 @@
 ## along with Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
+SUBDIRS = registries
+
 pylibdir = $(libdir)/python/invenio
 
 pylib_DATA = oai_repository_server.py \
@@ -22,7 +24,7 @@ pylib_DATA = oai_repository_server.py \
              oai_repository_webinterface.py \
              oai_repository_regression_tests.py \
              oai_harvest_getter.py \
-	     oai_harvest_dblayer.py \
+             oai_harvest_dblayer.py \
              bibharvest_templates.py \
              oai_harvest_admin.py \
              oai_harvest_admin_regression_tests.py \

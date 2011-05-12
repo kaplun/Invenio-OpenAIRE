@@ -27,8 +27,8 @@ etc_DATA = Default_HTML_captions.bft Picture_HTML_brief.bft \
 	   Default_HTML_references.bft Default_HTML_files.bft \
 	   Default_HTML_actions.bft Journal_HTML_detailed.bft \
 	   Journal_HTML_brief.bft \
-           Poetry_HTML_brief.bft Poetry_HTML_detailed.bft \
-           AID_HTML_very_brief.bft Podcast.xsl
+	   Poetry_HTML_brief.bft Poetry_HTML_detailed.bft \
+	   OAI_DC_OpenAIRE.xsl AID_HTML_very_brief.bft Podcast.xsl
 
 tmpdir = $(prefix)/var/tmp
 
@@ -36,4 +36,4 @@ tmp_DATA = Test1.bft Test3.bft Test_2.bft Test_no_template.test
 
 EXTRA_DIST = $(etc_DATA) $(tmp_DATA)
 
-CLEANFILES = *.tmp
+CLEANFILES = *.tmp *~

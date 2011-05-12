@@ -24,8 +24,8 @@ import re
 from invenio.bibdocfile import BibRecDocs, file_strip_ext
 from invenio.messages import gettext_set_language
 from invenio.config import CFG_SITE_URL, CFG_CERN_SITE
-from invenio.websubmit_config import CFG_WEBSUBMIT_ICON_SUBFORMAT_RE
 from cgi import escape, parse_qs
+from invenio.websubmit_config import CFG_WEBSUBMIT_ICON_SUBFORMAT_RE
 from urlparse import urlparse
 from os.path import basename
 import urllib
