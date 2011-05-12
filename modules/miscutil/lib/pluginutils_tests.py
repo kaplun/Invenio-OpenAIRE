@@ -56,7 +56,7 @@ class TestPluginContainer(unittest.TestCase):
             plugin_builder=plugin_builder)
 
         self.failUnless(bibformat_elements['bfe_fulltext'])
-        self.failUnless(callable(bibformat_elements['bfe_fulltext']['format']))
+        self.failUnless(callable(bibformat_elements['bfe_fulltext']['format_element']))
         self.failUnless(len(bibformat_elements) >= 50)
 
     def test_plugin_container_wrapping_websubmit_functions(self):

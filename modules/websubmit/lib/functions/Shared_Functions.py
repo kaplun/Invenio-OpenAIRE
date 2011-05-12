@@ -22,6 +22,8 @@ import os
 import cgi
 import glob
 import sys
+import re
+from logging import debug, error, DEBUG, getLogger
 
 from invenio.config import \
      CFG_PATH_CONVERT, \
@@ -37,10 +39,6 @@ from invenio.bibsched import server_pid
 from invenio.messages import gettext_set_language
 from invenio.search_engine import get_record
 from invenio.bibrecord import record_get_field_values, record_get_field_value
-import re
-import os
-from logging import debug, error, DEBUG, getLogger
-
 
 def createRelatedFormats(fullpath, overwrite=True, debug=False):
     """Given a fullpath, this function extracts the file's extension and

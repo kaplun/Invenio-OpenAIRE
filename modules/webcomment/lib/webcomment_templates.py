@@ -77,9 +77,13 @@ class Template:
 
         # comments
         comment_rows = ''
-        max_comment_round_name = comments[-1][0]
+        last_comment_round_name = None
+        comment_round_names = [comment[0] for comment in comments]
+        if comment_round_names:
+            last_comment_round_name = comment_round_names[-1]
+
         for comment_round_name, comments_list in comments:
-            comment_rows += '<div id="cmtRound%i" class="cmtRound">' % (comment_round_name)
+            comment_rows += '<div id="cmtRound%s" class="cmtRound">' % (comment_round_name)
             comment_rows += _('%(x_nb)i comments for round "%(x_name)s"') % {'x_nb': len(comments_list), 'x_name': comment_round_name}  + "<br/>"
             for comment in comments_list:
                 if comment[c_nickname]:
@@ -143,8 +147,8 @@ class Template:
              'write_button_form': write_button_form,
              'nb_comments': len(comments)
             }
-        else:
-            out = """
+            else:
+                out = """
 <!--  comments title table -->
 <table>
   <tr>
@@ -228,9 +232,13 @@ class Template:
 
         #comment row
         comment_rows = ' '
-        max_comment_round_name = comments[-1][0]
+        last_comment_round_name = None
+        comment_round_names = [comment[0] for comment in comments]
+        if comment_round_names:
+            last_comment_round_name = comment_round_names[-1]
+
         for comment_round_name, comments_list in comments:
-            comment_rows += '<div id="cmtRound%i" class="cmtRound">' % (comment_round_name)
+            comment_rows += '<div id="cmtRound%s" class="cmtRound">' % (comment_round_name)
             comment_rows += _('%(x_nb)i comments for round "%(x_name)s"') % {'x_nb': len(comments_list), 'x_name': comment_round_name} + "<br/>"
             for comment in comments_list:
                 if comment[c_nickname]:
@@ -992,7 +1000,8 @@ class Template:
 </form>"""
         return output
 
-    def create_write_comment_hiddenform(self, action="", method="get", text="", button="confirm", cnfrm='', enctype='', **hidden):
+    def create_write_comment_hiddenform(self, action="", method="get", text="", button="confirm", cnfrm='',
+                                        enctype='', form_id=None, form_name=None, **hidden):
         """
         create select with hidden values and submit button
         @param action: name of the action to perform on submit
@@ -1000,6 +1009,8 @@ class Template:
         @param text: additional text, can also be used to add non hidden input
         @param button: value/caption on the submit button
         @param cnfrm: if given, must check checkbox to confirm
+        @param form_id: HTML 'id' attribute of the form tag
+        @param form_name: HTML 'name' attribute of the form tag
         @param **hidden: dictionary with name=value pairs for hidden input
         @return: html form
         """
@@ -1008,7 +1019,10 @@ class Template:
             enctype_attr = 'enctype=' + enctype
 
         output  = """
-<form action="%s" method="%s" %s>""" % (action, method.lower().strip() in ['get', 'post'] and method or 'get', enctype_attr)
+<form action="%s" method="%s" %s%s%s>""" % \
+        (action, method.lower().strip() in ['get', 'post'] and method or 'get',
+        enctype_attr, form_name and ' name="%s"' % form_name or '',
+        form_id and ' id="%s"' % form_id or '')
         if cnfrm:
             output += """
         <input type="checkbox" name="confirm" value="1" />"""
@@ -1156,7 +1170,7 @@ class Template:
                   <span class="reportabuse">%(note)s</span>
                   <div class="submit-area">
                       %(subscribe_to_discussion)s<br />
-                      <input class="adminbutton" type="submit" value="Add comment" />
+                      <input class="adminbutton" type="submit" value="Add comment" onclick="user_must_confirm_before_leaving_page = false;return true;"/>
                       %(reply_to)s
                   </div>
                 """ % {'note': note,
@@ -1169,9 +1183,11 @@ class Template:
                        'simple_attach_file_interface': simple_attach_file_interface}
         form_link = "%(siteurl)s/record/%(recID)s/comments/%(function)s?%(arguments)s" % link_dic
         form = self.create_write_comment_hiddenform(action=form_link, method="post", text=form, button='Add comment',
-                                                    enctype='multipart/form-data')
+                                                    enctype='multipart/form-data', form_id='cmtForm',
+                                                    form_name='cmtForm')
         form += '</div>'
-        return warnings + form
+
+        return warnings + form + self.tmpl_page_do_not_leave_comment_page_js(ln=ln)
 
     def tmpl_add_comment_form_with_ranking(self, recID, uid, nickname, ln, msg, score, note,
                                            warnings, textual_msg=None, show_title_p=False,
@@ -2139,3 +2155,40 @@ class Template:
 
         return  out
 
+    def tmpl_page_do_not_leave_comment_page_js(self, ln):
+        """
+        Code to ask user confirmation when leaving the page, so that the
+        comment is not lost if clicking by mistake on links.
+
+        @param ln: the user language
+        """
+
+        # load the right message language
+        _ = gettext_set_language(ln)
+
+        out = '''
+        <script language="JavaScript">
+            var initial_comment_value = document.forms.cmtForm.msg.value;
+            var user_must_confirm_before_leaving_page = true;
+
+            window.onbeforeunload = confirmExit;
+            function confirmExit() {
+                var editor_type_field = document.getElementById('%(name)seditortype');
+                if (editor_type_field && editor_type_field.value == 'fckeditor') {
+                    var oEditor = FCKeditorAPI.GetInstance('%(name)s');
+                    if (user_must_confirm_before_leaving_page && oEditor.IsDirty()) {
+                        /* Might give false positives, when editor pre-loaded
+                           with content. But is better than the opposite */
+                        return "%(message)s";
+                    }
+                } else {
+                    if (user_must_confirm_before_leaving_page && document.forms.cmtForm.msg.value != initial_comment_value){
+                        return "%(message)s";
+                    }
+               }
+            }
+        </script>
+        ''' % {'message': _('Your comment will be lost.').replace('"', '\\"'),
+               'name': 'msg'}
+
+        return out

@@ -25,12 +25,26 @@ from invenio import bibknowledge_dblayer
 from invenio.bibformat_config  import CFG_BIBFORMAT_ELEMENTS_PATH
 from invenio.config import CFG_WEBDIR
 import os
+import sys
 import re
 
+if sys.hexversion < 0x2060000:
+    try:
+        import simplejson as json
+    except ImportError:
+        # Okay, no Ajax app will be possible, but continue anyway,
+        # since this package is only recommended, not mandatory.
+        pass
+else:
+    import json
+
+
 def get_kb_mappings(kb_name="", key="", value="", match_type="s"):
-    """Get mappings from kb kb_name. If key given, give only those with
-       left side (mapFrom) = key. If value given, give only those with
-       right side (mapTo) = value.
+    """Get leftside/rightside mappings from kb kb_name.
+
+       If key given, give only those with left side (mapFrom) = key.
+       If value given, give only those with right side (mapTo) = value.
+
        @param kb_name: the name of the kb
        @param key: include only lines matching this on left side in the results
        @param value: include only lines matching this on right side in the results
@@ -96,6 +110,26 @@ def update_kb_mapping(kb_name, old_key, key, value):
         else:
             bibknowledge_dblayer.update_kb_mapping(kb_name, old_key, key, value)
 
+def get_kb_mappings_json(kb_name="", key="", value="", match_type="s"):
+    """Get leftside/rightside mappings from kb kb_name formatted as json dict.
+
+       If key given, give only those with left side (mapFrom) = key.
+       If value given, give only those with right side (mapTo) = value.
+
+       @param kb_name: the name of the kb
+       @param key: include only lines matching this on left side in the results
+       @param value: include only lines matching this on right side in the results
+       @param match_type: s = substring match, e = exact match
+       @return a list of mappings
+    """
+    mappings = get_kb_mappings(kb_name, key, value, match_type)
+    ret = []
+    for m in mappings:
+        label = m['value'] or m['key']
+        value = m['key'] or m['value']
+        ret.append({'label': label, 'value': value})
+    return json.dumps(ret)
+
 def kb_exists(kb_name):
     """Returns True if a kb with the given name exists
        @param kb_name: the name of the knowledge base
@@ -109,9 +143,8 @@ def get_kb_name(kb_id):
     """
     return bibknowledge_dblayer.get_kb_name(kb_id)
 
-def update_kb_attributes(kb_name, new_name, new_description):
-    """
-    Updates given kb_name with a new name and new description
+def update_kb_attributes(kb_name, new_name, new_description=''):
+    """Update kb kb_name with a new name and (optionally) description
 
     @param kb_name: the name of the kb to update
     @param new_name: the new name for the kb
@@ -136,6 +169,12 @@ def add_kb(kb_name="Untitled", kb_type=None):
         name = kb_name + " " + str(i)
         i += 1
     kb_id = bibknowledge_dblayer.add_kb(name, "", kb_type)
+    return kb_id
+
+def add_dynamic_kb(kbname, tag, collection="", searchwith=""):
+    """A convenience method"""
+    kb_id = add_kb(kb_name=kbname, kb_type='dynamic')
+    bibknowledge_dblayer.save_kb_dyn_config(kb_id, tag, searchwith, collection)
     return kb_id
 
 def kb_mapping_exists(kb_name, key):
@@ -238,11 +277,12 @@ def get_kbr_keys(kb_name, searchkey="", searchvalue="", searchtype='s'):
 
 def get_kbr_values(kb_name, searchkey="", searchvalue="", searchtype='s'):
     """
-    Returns an array of keys.
-       @param kb_name: the name of the knowledge base
-       @param searchkey: search using this key
-       @param searchvalue: search using this value
-       @param searchtype: s = substring, e=exact
+    Return a tuple of values from key-value mapping kb.
+
+    @param kb_name:     the name of the knowledge base
+    @param searchkey:   search using this key
+    @param searchvalue: search using this value
+    @param searchtype:  s=substring; e=exact
    """
     return bibknowledge_dblayer.get_kbr_values(kb_name, searchkey,
                                                searchvalue, searchtype)
@@ -260,9 +300,9 @@ def get_kbr_items(kb_name, searchkey="", searchvalue="", searchtype='s'):
                                               searchvalue, searchtype)
 
 def get_kbd_values(kbname, searchwith=""):
-    """
-    To be used by bibedit. Returns a list of values based on a dynamic kb.
-    @param kbname: name of the knowledge base
+    """Return a list of values by searching a dynamic kb.
+
+    @param kbname:     name of the knowledge base
     @param searchwith: a term to search with
     """
     import search_engine
@@ -288,23 +328,18 @@ def get_kbd_values(kbname, searchwith=""):
     if confdict.has_key('collection'):
         collection = confdict['collection']
     reclist = [] #return this
-    #see if searchwith is a quoted expression
-    if searchwith:
-        if not searchwith.startswith("'"):
-            searchwith = "'"+searchwith
-        if not searchwith.endswith("'"):
-            searchwith = searchwith+"'"
     if searchwith and expression:
-        if (expression.count('%') > 0) or (expression.endswith(":*")):
+        if (expression.count('%') > 0):
             expression = expression.replace("%", searchwith)
-            expression = expression.replace(":*", ':'+searchwith)
+            reclist = search_engine.perform_request_search(p=expression,
+                                                           cc=collection)
         else:
             #no %.. just make a combination
-            expression = expression + "and "+searchwith
-        reclist = search_engine.perform_request_search(p=expression,
+            expression = expression + " and "+searchwith
+            reclist = search_engine.perform_request_search(p=expression,
                                                        cc=collection)
     else: #either no expr or no searchwith.. but never mind about searchwith
-        if expression:
+        if expression: #in this case: only expression
             reclist = search_engine.perform_request_search(p=expression, cc=collection)
         else:
             #make a fake expression so that only records that have this field
@@ -319,31 +354,51 @@ def get_kbd_values(kbname, searchwith=""):
         val_list = []
         for f in fieldvaluelist:
             (val, dummy) = f
-            #support "starts with",
-            #indicated by the * at the end of the searchstring
-            if searchwith and (len(searchwith) > 2) and (searchwith[-2] == '*'):
-                if (val.startswith(searchwith[1:-3])):
-                    val_list.append(val)
-            else:
-                val_list.append(val)
+            val_list.append(val)
         return val_list
     return [] #in case nothing worked
 
-def get_kbd_values_for_bibedit(tag, collection="", searchwith=""):
+
+def get_kbd_values_json(kbname, searchwith=""):
+    """Return values from searching a dynamic kb as a json-formatted string.
+
+    This IS probably the method you want.
+
+    @param kbname:     name of the knowledge base
+    @param searchwith: a term to search with
     """
-    A specific convenience method: based on a tag and collection, create a temporary dynamic knowledge base
-    a return its values.
+    res = get_kbd_values(kbname, searchwith)
+    return json.dumps(res)
+
+
+def get_kbd_values_for_bibedit(tag, collection="", searchwith="", expression=""):
+    """
+    Dynamically create a dynamic KB for a specific search; search; then destroy it.
+
+    This probably isn't the method you want.
+
+    Example1: tag=100__a : return values of 100__a
+    Example2: tag=100__a, searchwith=Jill: return values of 100__a that match with Jill
+    Example3: tag=100__a, searchwith=Ellis, expression="700__a:*%*: return values of
+              100__a for which Ellis matches some 700__a
+
     Note: the performace of this function is ok compared to a plain
-    perform req search / get most popular fields -pair. The overhead is about 5% with large record sets.
-    @param tag: the tag like 100__a
+          perform_request_search / get most popular fields -pair. The overhead
+          is about 5% with large record sets; the lookups are the xpensive part.
+
+    @param tag:        the tag like 100__a
     @param collection: collection id
     @param searchwith: the string to search. If empty, match all.
+    @param expression: the search expression for perform_request_search; if
+                       present, '%' is substituted with /searcwith/.  If absent,
+                       /searchwith/ is searched for in /tag/.
     """
-    kb_id = add_kb(kb_name="tmp_dynamic", kb_type='dynamic')
+    dkbname = "tmp_dynamic_"+tag+'_'+expression
+    kb_id = add_kb(kb_name=dkbname, kb_type='dynamic')
     #get the kb name since it may be catenated by a number
     #in case there are concurrent calls.
     kb_name = get_kb_name(kb_id)
-    bibknowledge_dblayer.save_kb_dyn_config(kb_id, tag, collection, searchwith)
+    bibknowledge_dblayer.save_kb_dyn_config(kb_id, tag, expression, collection)
     #now, get stuff
     myvalues = get_kbd_values(kb_name, searchwith)
     #the tmp dyn kb is now useless, delete it

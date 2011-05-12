@@ -1,3 +1,4 @@
+
 .version
 Makefile
 Makefile.in
@@ -78,6 +79,7 @@ modules/webstat/bin/webstatadmin
 modules/webstyle/bin/webdoc
 modules/websubmit/bin/bibdocfile
 modules/websubmit/bin/websubmit_dump
+modules/websubmit/bin/inveniounoconv
 tags
 config.status.lineno
 configure.lineno

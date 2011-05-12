@@ -45,7 +45,8 @@ from invenio.bibrecord import \
      create_record, \
      record_get_field_instances, \
      record_get_field_value, \
-     record_get_field_values
+     record_get_field_values, \
+     record_xml_output
 from invenio.bibformat_xslt_engine import format
 from invenio.dbquery import run_sql
 from invenio.messages import \
@@ -409,16 +410,19 @@ def decide_format_template(bfo, of):
     for rule in output_format['rules']:
         if rule['field'].startswith('00'):
             # Rule uses controlfield
-            value = bfo.control_field(rule['field']).strip() #Remove spaces
+            values = [bfo.control_field(rule['field']).strip()] #Remove spaces
         else:
             # Rule uses datafield
-            value = bfo.field(rule['field']).strip() #Remove spaces
-        pattern = rule['value'].strip() #Remove spaces
-        match_obj = re.match(pattern, value, re.IGNORECASE)
-        if match_obj is not None and \
-               match_obj.start() == 0 and match_obj.end() == len(value):
-            return rule['template']
-
+            values = bfo.fields(rule['field'])
+        # loop over multiple occurences, but take the first match
+        if len(values) > 0:
+            for value in values:
+                value = value.strip() #Remove spaces
+                pattern = rule['value'].strip() #Remove spaces
+                match_obj = re.match(pattern, value, re.IGNORECASE)
+                if match_obj is not None and \
+                       match_obj.end() == len(value):
+                    return rule['template']
     template = output_format['default']
     if template != '':
         return template
@@ -475,10 +479,14 @@ def format_with_format_template(format_template_filename, bfo,
         errors_ = errors
     else:
         #.xsl
-        # Fetch MARCXML. On-the-fly xm if we are now formatting in xm
-
-        xml_record = '<?xml version="1.0" encoding="UTF-8"?>\n' + \
-                     record_get_xml(bfo.recID, 'xm', on_the_fly=False)
+        if bfo.xml_record:
+            # bfo was initialized with a custom MARCXML
+            xml_record = '<?xml version="1.0" encoding="UTF-8"?>\n' + \
+                         record_xml_output(bfo.record)
+        else:
+            # Fetch MARCXML. On-the-fly xm if we are now formatting in xm
+            xml_record = '<?xml version="1.0" encoding="UTF-8"?>\n' + \
+                         record_get_xml(bfo.recID, 'xm', on_the_fly=False)
 
         # Transform MARCXML using stylesheet
         evaluated_format = format(xml_record, template_source=format_content)
@@ -558,7 +566,7 @@ def eval_format_template_elements(format_template, bfo, verbose=0):
     return (format, errors_)
 
 
-def eval_format_element(format_element, bfo, parameters={}, verbose=0):
+def eval_format_element(format_element, bfo, parameters=None, verbose=0):
     """
     Returns the result of the evaluation of the given format element
     name, with given BibFormatObject and parameters. Also returns
@@ -574,6 +582,8 @@ def eval_format_element(format_element, bfo, parameters={}, verbose=0):
 
     @return: tuple (result, errors)
     """
+    if parameters is None:
+        parameters = {}
 
     errors = []
     #Load special values given as parameters
@@ -1734,9 +1744,10 @@ class BibFormatObject:
         @param user_info: the information of the user who will view the formatted page
         @param output_format: the output_format used for formatting this record
         """
-
+        self.xml_record = None # *Must* remain empty if recid is given
         if xml_record is not None:
             # If record is given as parameter
+            self.xml_record = xml_record
             self.record = create_record(xml_record)[0]
             recID = record_get_field_value(self.record, "001")
 

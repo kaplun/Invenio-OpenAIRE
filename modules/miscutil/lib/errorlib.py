@@ -190,12 +190,16 @@ def get_pretty_traceback(req=None, exc_info=None):
         ## We want to extract the name of the Exception
         exc_name = exc_info[0].__name__
         exc_value = str(exc_info[1])
+        filename, line_no, function_name = _get_filename_and_line(exc_info)
 
         ## Let's record when and where and what
-        www_data = "%(time)s -> %(name)s: %(value)s" % {
+        www_data = "%(time)s -> %(name)s: %(value)s (%(file)s:%(line)s:%(function)s)" % {
             'time': time.strftime("%Y-%m-%d %H:%M:%S"),
             'name': exc_name,
-            'value': exc_value}
+            'value': exc_value,
+            'file': filename,
+            'line': line_no,
+            'function': function_name }
 
         ## Let's retrieve contextual user related info, if any
         try:
@@ -220,12 +224,12 @@ def get_pretty_traceback(req=None, exc_info=None):
         stack = stack[-10:] ## Let's just take the last few frames
         traceback.print_exc(file=tracestack_data_stream)
         print >> tracestack_data_stream, \
-                "Locals by frame, innermost last"
+                "\n** Traceback details"
         values_to_hide = set()
         for frame in stack:
             print >> tracestack_data_stream
             print >> tracestack_data_stream, \
-                    ">>>> Frame %s in %s at line %s" % (
+                    "Frame %s in %s at line %s" % (
                         frame.f_code.co_name,
                         frame.f_code.co_filename,
                         frame.f_lineno)
@@ -235,7 +239,7 @@ def get_pretty_traceback(req=None, exc_info=None):
                 code = open(frame.f_code.co_filename).readlines()
                 first_line = max(1, frame.f_lineno-3)
                 last_line = min(len(code), frame.f_lineno+3)
-                print >> tracestack_data_stream, "*" * 79
+                print >> tracestack_data_stream, "-" * 79
                 for line in xrange(first_line, last_line+1):
                     code_line = code[line-1].rstrip()
                     for value in values_to_hide:
@@ -247,17 +251,22 @@ def get_pretty_traceback(req=None, exc_info=None):
                     else:
                         print >> tracestack_data_stream, \
                             "      %4i %s" % (line, code_line)
-                print >> tracestack_data_stream, "*" * 79
+                print >> tracestack_data_stream, "-" * 79
             except:
                 pass
-            keys = frame.f_locals.keys()
-            keys.sort()
-            for key in keys:
-                value = frame.f_locals[key]
+            for key, value in frame.f_locals.items():
                 print >> tracestack_data_stream, "\t%20s = " % key,
+                try:
+                    value = repr(value)
+                except Exception, err:
+                    ## We shall gracefully accept errors when repr() of
+                    ## a value fails (e.g. when we are trying to repr() a
+                    ## variable that was not fully initialized as the
+                    ## exception was raised during its __init__ call).
+                    value = "ERROR: when representing the value: %s" % (err)
                 for to_hide in values_to_hide:
                     ## Let's hide passwords
-                    value = repr(value).replace(to_hide, '<*****>')
+                    value = value.replace(to_hide, '<*****>')
                 try:
                     print >> tracestack_data_stream, \
                         _truncate_dynamic_string(value)
@@ -269,16 +278,11 @@ def get_pretty_traceback(req=None, exc_info=None):
         ## Okay, start printing:
         output = StringIO()
 
-        print >> output, '\n',
-
-        print >> output, "The following problem occurred on <%s>" \
-            " (Invenio %s)" % (CFG_SITE_URL, CFG_VERSION)
-        print >> output, "\n>> %s" % www_data
-        print >> output, "\n>>> User details\n"
+        print >> output, "* %s" % www_data
+        print >> output, "\n** User details"
         print >> output, client_data
 
         if tracestack_data:
-            print >> output, "\n>>> Traceback details\n"
             print >> output, tracestack_data
         if req:
             print >> output, "\n>>> Request object\n"

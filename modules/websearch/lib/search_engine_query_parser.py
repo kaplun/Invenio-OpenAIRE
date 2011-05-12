@@ -58,6 +58,16 @@ class SearchQueryParenthesisedParser(object):
     * substitution_dict: a dictionary mapping strings to other strings.  By
       default, maps 'and', 'or' and 'not' to '+', '|', and '-'.  Dictionary
       values will be treated as valid operators for output.
+
+    A note (valkyrie 25.03.2011):
+    Based on looking through the prod search logs, it is evident that users,
+    when they are using parentheses to do searches, only run word characters
+    up against parens when they intend the parens to be part of the word (e.g.
+    U(1)), and when they are using parentheses to combine operators, they put
+    a space before and after them.  As of writing, this is the behavior that
+    SQPP now expects, in order that it be able to handle such queries as
+    e(+)e(-) that contain operators in parentheses that should be interpreted
+    as words.
     """
 
     def __init__(self, substitution_dict = {'and': '+', 'or': '|', 'not': '-'}):
@@ -224,6 +234,12 @@ class SearchQueryParenthesisedParser(object):
         "expr1|expr2 (expr3-(expr4 or expr5))"
         becomes:
         ['expr1', '|', 'expr2', '(', 'expr3', '-', '(', 'expr4', 'or', 'expr5', ')', ')']
+
+        special case:
+        "e(+)e(-)" interprets '+' and '-' as word characters since they are in parens with
+        word characters run up against them.
+        it becomes:
+        ['e(+)e(-)']
         """
         ###
         # Invariants:
@@ -241,8 +257,13 @@ class SearchQueryParenthesisedParser(object):
             """
             s = ' '+s
             s = s.replace('->', '####DATE###RANGE##OP#') # XXX: Save '->'
-            s = re.sub('(?P<outside>[a-zA-Z0-9_,]+)\((?P<inside>[a-zA-Z0-9_,]*)\)',
+            s = re.sub('(?P<outside>[a-zA-Z0-9_,=]+)\((?P<inside>[a-zA-Z0-9_,+-/]*)\)',
                        '#####\g<outside>####PAREN###\g<inside>##PAREN#', s) # XXX: Save U(1) and SL(2,Z)
+            s = re.sub('####PAREN###(?P<content0>[.0-9/-]*)(?P<plus>[+])(?P<content1>[.0-9/-]*)##PAREN#',
+                       '####PAREN###\g<content0>##PLUS##\g<content1>##PAREN#', s)
+            s = re.sub('####PAREN###(?P<content0>([.0-9/]|##PLUS##)*)(?P<minus>[-])' +\
+                                   '(?P<content1>([.0-9/]|##PLUS##)*)##PAREN#',
+                       '####PAREN###\g<content0>##MINUS##\g<content1>##PAREN#', s) # XXX: Save e(+)e(-)
             for char in self.specials:
                 if char == '-':
                     s = s.replace(' -', ' '+char+' ')
@@ -250,7 +271,9 @@ class SearchQueryParenthesisedParser(object):
                     s = s.replace('-(', ' '+char+' (')
                 else:
                     s = s.replace(char, ' '+char+' ')
-            s = re.sub('#####(?P<outside>[a-zA-Z0-9_,]+)####PAREN###(?P<inside>[a-zA-Z0-9_,]*)##PAREN#',
+            s = re.sub('##PLUS##', '+', s)
+            s = re.sub('##MINUS##', '-', s) # XXX: Restore e(+)e(-)
+            s = re.sub('#####(?P<outside>[a-zA-Z0-9_,=]+)####PAREN###(?P<inside>[a-zA-Z0-9_,+-/]*)##PAREN#',
                        '\g<outside>(\g<inside>)', s) # XXX: Restore U(1) and SL(2,Z)
             s = s.replace('####DATE###RANGE##OP#', '->') # XXX: Restore '->'
             return s.split()
@@ -340,7 +363,7 @@ class SearchQueryParenthesisedParser(object):
                 elif token == ')':
                     if parsed_values[-1] in op_symbols:
                         parsed_values = parsed_values[:-1]
-                    if parsed_values[0] == '+' and parsed_values[1] in op_symbols:
+                    if len(parsed_values) > 1 and parsed_values[0] == '+' and parsed_values[1] in op_symbols:
                         parsed_values = parsed_values[1:]
                     return parsed_values
                 elif token in op_symbols:
@@ -502,15 +525,12 @@ class SpiresToInvenioSyntaxConverter:
         # topcite
         'topcite' : 'cited:',
 
-        # second-order operators
-        'refersto' : 'refersto:',
-        'refs': 'refersto:',
-        'citedby' : 'citedby:',
+        # captions
+        'caption' : 'caption:',
 
         # replace all the keywords without match with empty string
         # this will remove the noise from the unknown keywrds in the search
         # and will in all fields for the words following the keywords
-
 
         # category
         'arx' : '037__c:',
@@ -557,7 +577,27 @@ class SpiresToInvenioSyntaxConverter:
         # test index
         'test' : '',
         'testindex' : '',
-        }
+    }
+
+    _SECOND_ORDER_KEYWORD_MATCHINGS = {
+        'refersto' : 'refersto:',
+        'refs': 'refersto:',
+        'citedby' : 'citedby:'
+    }
+
+    _INVENIO_KEYWORDS_FOR_SPIRES_PHRASE_SEARCHES = [
+        'affiliation:',
+        #'cited:', # topcite is technically a phrase index - this isn't necessary
+        '773__y:', # journal-year
+        '773__c:', # journal-page
+        '773__w:', # cnum
+        '044__a:', # country code
+        '65017a:', # field code
+        '690C_a:', # type code
+        '035__z:', # texkey
+        # also exact expno, corp-auth, url, abstract, doi, mycite, citing
+        # but we have no invenio equivalents for these ATM
+    ]
 
     def __init__(self):
         """Initialize the state of the converter"""
@@ -582,13 +622,14 @@ class SpiresToInvenioSyntaxConverter:
         self._re_topcite_match = re.compile(r'(?P<x>cited:\d+)\+')
 
         # regular expression that matches author patterns
-        self._re_author_match = re.compile(r'\bauthor:\s*(?P<name>.+?)\s*(?= and not | and | or | not |$)', re.IGNORECASE)
+        # and author patterns with second-order-ops on top
+        self._re_author_match = re.compile(r'\b((?P<secondorderop>[^\s]+:)?)author:\s*(?P<name>.+?)\s*(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # regular expression that matches exact author patterns
         # the group defined in this regular expression is used in method
         # _convert_spires_exact_author_search_to_invenio_author_search(...)
         # in case of changes correct also the code in this method
-        self._re_exact_author_match = re.compile(r'\bexactauthor:(?P<author_name>[^\'\"].*?[^\'\"]\b)(?= and not | and | or | not |$)', re.IGNORECASE)
+        self._re_exact_author_match = re.compile(r'\b((?P<secondorderop>[^\s]+:)?)exactauthor:(?P<author_name>[^\'\"].*?[^\'\"]\b)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # match search term, its content (words that are searched) and
         # the operator preceding the term.
@@ -607,13 +648,17 @@ class SpiresToInvenioSyntaxConverter:
         self._re_keysubbed_date_expr = re.compile(r'\b(?P<term>(' + self._DATE_ADDED_FIELD + ')|(' + self._DATE_UPDATED_FIELD + ')|(' + self._DATE_FIELD + '))(?P<content>.+?)(?= and not | and | or | not |$)', re.IGNORECASE)
 
         # for finding (and changing) a variety of different SPIRES search keywords
-        self._re_spires_find_keyword = re.compile('^(?P<find>f|fin|find)\s+(?P<query>.*)$', re.IGNORECASE)
+        self._re_spires_find_keyword = re.compile('^(f|fin|find)\s+', re.IGNORECASE)
+
+        # for finding boolean expressions
+        self._re_boolean_expression = re.compile(r' and | or | not | and not ')
 
         # patterns for subbing out spaces within quotes temporarily
         self._re_pattern_single_quotes = re.compile("'(.*?)'")
         self._re_pattern_double_quotes = re.compile("\"(.*?)\"")
         self._re_pattern_regexp_quotes = re.compile("\/(.*?)\/")
         self._re_pattern_space = re.compile("__SPACE__")
+        self._re_pattern_equals = re.compile("__EQUALS__")
 
     def is_applicable(self, query):
         """Is this converter applicable to this query?
@@ -632,10 +677,10 @@ class SpiresToInvenioSyntaxConverter:
 
         # SPIRES syntax allows searches with 'find' or 'fin'.
         if self.is_applicable(query):
+            query = re.sub(self._re_spires_find_keyword, 'find ', query)
 
-            # Everywhere else make the assumption that all and only queries
-            # starting with 'find' are SPIRES queries.  Turn fin into find.
-            query = self._re_spires_find_keyword.sub(lambda m: 'find '+m.group('query'), query)
+            # a holdover from SPIRES syntax is e.g. date = 2000 rather than just date 2000
+            query = self._remove_extraneous_equals_signs(query)
 
             # these calls are before keywords replacement because when keywords
             # are replaced, date keyword is replaced by specific field search
@@ -645,6 +690,7 @@ class SpiresToInvenioSyntaxConverter:
 
             # call to _replace_spires_keywords_with_invenio_keywords should be at the
             # beginning because the next methods use the result of the replacement
+            query = self._standardize_already_invenio_keywords(query)
             query = self._replace_spires_keywords_with_invenio_keywords(query)
             query = self._remove_spaces_in_comma_separated_journal(query)
             query = self._distribute_keywords_across_combinations(query)
@@ -761,7 +807,7 @@ class SpiresToInvenioSyntaxConverter:
                 position = match.end()
             result += query[position : ]
             return result
-	
+
         if GOT_DATEUTIL:
             query = mangle_with_dateutils(query)
         # else do nothing with the dates
@@ -820,19 +866,27 @@ class SpiresToInvenioSyntaxConverter:
             result = ''
             content = content.strip()
 
+
             # replace spaces within quotes by __SPACE__ temporarily:
             content = self._re_pattern_single_quotes.sub(lambda x: "'"+string.replace(x.group(1), ' ', '__SPACE__')+"'", content)
             content = self._re_pattern_double_quotes.sub(lambda x: "\""+string.replace(x.group(1), ' ', '__SPACE__')+"\"", content)
             content = self._re_pattern_regexp_quotes.sub(lambda x: "/"+string.replace(x.group(1), ' ', '__SPACE__')+"/", content)
 
-            words = content.split()
-            if len(words) > 1:
-                result = '(' + term + words[0]
-                for word in words[1:]:
-                    result += ' and ' + term + word
-                result += ')'
+            if term in self._INVENIO_KEYWORDS_FOR_SPIRES_PHRASE_SEARCHES \
+                    and not self._re_boolean_expression.search(content) and ' ' in content:
+                # the case of things which should be searched as phrases
+                result = term + '"' + content + '"'
+
             else:
-                result = term + words[0]
+                words = content.split()
+                if len(words) > 1:
+                    result = '(' + term + words[0]
+                    for word in words[1:]:
+                        result += ' and ' + term + word
+                    result += ')'
+                else:
+                    result = term + words[0]
+
             # replace back __SPACE__ by spaces:
             result = self._re_pattern_space.sub(" ", result)
             return result.strip()
@@ -846,6 +900,18 @@ class SpiresToInvenioSyntaxConverter:
             current_position = match.end()
         result += query[current_position : len(query)]
         return result.strip()
+
+    def _remove_extraneous_equals_signs(self, query):
+        """In SPIRES, both date = 2000 and date 2000 are acceptable. Get rid of the ="""
+        query = self._re_pattern_single_quotes.sub(lambda x: "'"+string.replace(x.group(1), '=', '__EQUALS__')+"'", query)
+        query = self._re_pattern_double_quotes.sub(lambda x: "\""+string.replace(x.group(1), '=', '__EQUALS__')+'\"', query)
+        query = self._re_pattern_regexp_quotes.sub(lambda x: "/"+string.replace(x.group(1), '=', '__EQUALS__')+"/", query)
+
+        query = query.replace('=', '')
+
+        query = self._re_pattern_equals.sub("=", query)
+
+        return query
 
     def _convert_spires_truncation_to_invenio_truncation(self, query):
         """Replace SPIRES truncation symbol # with invenio trancation symbol *"""
@@ -875,6 +941,8 @@ class SpiresToInvenioSyntaxConverter:
         current_position = 0
         for match in self._re_author_match.finditer(query):
             result += query[current_position : match.start() ]
+            if match.group('secondorderop'):
+                result += match.group('secondorderop')
             scanned_name = NameScanner.scan(match.group('name'))
             author_atoms = self._create_author_search_pattern_from_fuzzy_name_dict(scanned_name)
             if author_atoms.find(' ') == -1:
@@ -949,6 +1017,21 @@ class SpiresToInvenioSyntaxConverter:
         result += query[current_position : ]
         return result
 
+    def _standardize_already_invenio_keywords(self, query):
+        """Replaces invenio keywords kw with "and kw" in order to
+           parse them correctly further down the line."""
+
+        unique_invenio_keywords = set(self._SPIRES_TO_INVENIO_KEYWORDS_MATCHINGS.values()) |\
+                                  set(self._SECOND_ORDER_KEYWORD_MATCHINGS.values())
+        unique_invenio_keywords.remove('') # for the ones that don't have invenio equivalents
+
+        for invenio_keyword in unique_invenio_keywords:
+            query = re.sub("(?<!... \+|... -| and |. or | not |....:)"+invenio_keyword, "and "+invenio_keyword, query)
+            query = re.sub("\+"+invenio_keyword, "and "+invenio_keyword, query)
+            query = re.sub("-"+invenio_keyword, "and not "+invenio_keyword, query)
+
+        return query
+
     def _replace_spires_keywords_with_invenio_keywords(self, query):
         """Replaces SPIRES keywords that have directly
         corresponding Invenio keywords
@@ -989,19 +1072,29 @@ class SpiresToInvenioSyntaxConverter:
         corresponding Invenio keywords"""
 
         for spires_keyword, invenio_keyword in self._SPIRES_TO_INVENIO_KEYWORDS_MATCHINGS.iteritems():
-            query = self._replace_keyword(query, spires_keyword, \
-                                          invenio_keyword)
+            query = self._replace_keyword(query, spires_keyword, invenio_keyword)
+        for spires_keyword, invenio_keyword in self._SECOND_ORDER_KEYWORD_MATCHINGS.iteritems():
+            query = self._replace_second_order_keyword(query, spires_keyword, invenio_keyword)
 
         return query
 
     def _replace_keyword(self, query, old_keyword, new_keyword):
         """Replaces old keyword in the query with a new keyword"""
-        # perform case insensitive replacement with regular expression
 
-        regex_string = r'\b(?P<operator>(find|and|or|not)\b[\s\(]*)' + \
+        regex_string = r'(?P<operator>(^find|\band|\bor|\bnot|\brefersto|\bcitedby|^)\b[:\s\(]*)' + \
                        old_keyword + r'(?P<end>[\s\(]+|$)'
         regular_expression = re.compile(regex_string, re.IGNORECASE)
         result = regular_expression.sub(r'\g<operator>' + new_keyword + r'\g<end>', query)
+        result = re.sub(':\s+', ':', result)
+        return result
+
+    def _replace_second_order_keyword(self, query, old_keyword, new_keyword):
+        """Replaces old second-order keyword in the query with a new keyword"""
+
+        regex_string = r'(?P<operator>(^find|\band|\bor|\bnot|\brefersto|\bcitedby|^)\b[:\s\(]*)' + \
+                       old_keyword + r'(?P<endorop>\s*[a-z]+:|[\s\(]+|$)'
+        regular_expression = re.compile(regex_string, re.IGNORECASE)
+        result = regular_expression.sub(r'\g<operator>' + new_keyword + r'\g<endorop>', query)
         result = re.sub(':\s+', ':', result)
         return result
 

@@ -56,7 +56,8 @@ class PersonIDStatusDataCacher(DataCacher):
     def __init__(self):
         def cache_filler():
             try:
-                res = run_sql("""SELECT count(personid) FROM aidPERSONID""")
+                res = run_sql("SELECT count(personid) FROM aidPERSONID "
+                              "where tag='paper'")
                 if res and res[0] and res[0][0] > 0:
                     return True
                 else:
@@ -72,6 +73,24 @@ class PersonIDStatusDataCacher(DataCacher):
 
         DataCacher.__init__(self, cache_filler, timestamp_verifier)
 
+
+def create_new_person(uid, uid_is_owner=False):
+        #creates a new person
+        pid = run_sql("select max(personid) from aidPERSONID")[0][0]
+
+        if pid:
+            try:
+                pid = int(pid)
+            except (ValueError, TypeError):
+                pid = -1
+            pid += 1
+        if uid_is_owner:
+            set_person_data(pid, 'uid', str(uid))
+            set_person_data(pid, 'user-created', str(uid))
+        else:
+            set_person_data(pid, 'user-created', str(uid))
+
+        return pid
 
 def get_pid_from_name_bibrec(bibrecs, name_string):
     '''
@@ -316,12 +335,60 @@ def update_personID_canonical_names(persons_list=[], overwrite=False, suggested=
                 run_sql("insert into aidPERSONID (personid,tag,data) values (%s,%s,%s) ", (pid[0], 'canonical_name', canonical_name))
 
 
-def update_personID_table_from_paper(papers_list=[]):
+def update_personID_table_from_paper(papers_list=[], personid=None):
     '''
     Updates the personID table removing the bibrec/bibrefs couples no longer existing (after a paper has been
     updated (name changed))
     @param: list of papers to consider for the update (bibrecs) (('1'),)
+    @param: limit to given personid (('1',),)
     '''
+
+    personid_q = ''
+    if personid:
+        personid_q = '( '
+        for p in personid:
+            personid_q += " '" + str(p[0]) + "',"
+        personid_q = personid_q[0:len(personid_q)-1]   + ' )'
+
+    if not papers_list and personid_q:
+        papers_list = []
+        try:
+            bibrefrec_list = run_sql("select data from aidPERSONID use index (`ptf-b`) where tag='paper' and personid in %s" % (personid_q))
+        except (ProgrammingError, OperationalError):
+            bibrefrec_list = run_sql("select data from aidPERSONID where tag='paper' and personid in %s" % (personid_q))
+            
+        for b in bibrefrec_list:
+            papers_list.append(b)
+               
+    elif not papers_list:
+        papers_list = []
+        try:
+            bibrefrec_list = run_sql("select data from aidPERSONID use index (`tdf-b`) where tag='paper'")
+        except (ProgrammingError, OperationalError):
+            bibrefrec_list = run_sql("select data from aidPERSONID where tag='paper'")
+            
+        for b in bibrefrec_list:
+            papers_list.append(b)
+            
+    if bconfig.TABLES_UTILS_DEBUG:
+            print "update_personID_table_from_paper: bibrefrec selected:  " + str(len(papers_list))
+    
+    bibreclist = []
+    for p in papers_list:
+        try:
+            br = [p[0].split(',')[1]]
+            if br not in bibreclist:
+                bibreclist.append(br)
+            if bconfig.TABLES_UTILS_DEBUG:
+                print 'update_personID_table_from_paper: Selected ' + str(p[0].split(',')[1]) +' from '+str(p)
+        except IndexError:
+            continue
+            
+    full_papers_list = papers_list
+    papers_list = bibreclist
+    if bconfig.TABLES_UTILS_DEBUG:
+        print "update_personID_table_from_paper: After duplicate removing remaining bibrecs:  " + str(len(papers_list))
+        
     for paper in papers_list:
         fullbibrefs100 = run_sql("select id_bibxxx from bibrec_bib10x where id_bibrec=%s", (paper[0],))
         fullbibrefs700 = run_sql("select id_bibxxx from bibrec_bib70x where id_bibrec=%s", (paper[0],))
@@ -358,10 +425,18 @@ def update_personID_table_from_paper(papers_list=[]):
 
         pid_rows = []
 
-        try:
-            pid_rows = run_sql("select id,personid,tag,data,flag,lcul from aidPERSONID use index (`tdf-b`) where tag='paper' and data like %s", ('%,' + str(paper[0]),))
-        except (ProgrammingError, OperationalError):
-            pid_rows = run_sql("select id,personid,tag,data,flag,lcul from aidPERSONID where tag='paper' and data like %s", ('%,' + str(paper[0]),))
+        if personid_q:
+            try:
+                query = "select id,personid,tag,data,flag,lcul from aidPERSONID use index (`tdf-b`,`ptf-b`) where tag='paper'  and personid in %s" %  personid_q + " and data like %s"
+                pid_rows = run_sql(query, ('%,' + str(paper[0]),))
+            except (ProgrammingError, OperationalError):
+                query = "select id,personid,tag,data,flag,lcul from aidPERSONID where tag='paper'  and personid in %s" %  personid_q + " and data like %s"
+                pid_rows = run_sql(query, ('%,' + str(paper[0]),))
+        else:
+            try:
+                pid_rows = run_sql("select id,personid,tag,data,flag,lcul from aidPERSONID use index (`tdf-b`,`ptf-b`) where tag='paper' and data like %s", ('%,' + str(paper[0]),))
+            except (ProgrammingError, OperationalError):
+                pid_rows = run_sql("select id,personid,tag,data,flag,lcul from aidPERSONID where tag='paper' and data like %s", ('%,' + str(paper[0]),))
 
         #finally, if a bibrec/ref pair is in the authornames table but not in this list that name of that paper
         #is no longer existing and must be removed from the table. The new one will be addedd by the
@@ -383,7 +458,13 @@ def update_personID_table_from_paper(papers_list=[]):
             else:
                 if bconfig.TABLES_UTILS_DEBUG:
                     print "update_personID_table_from_paper: not touching " + str(row)
-        update_personID_canonical_names()
+        persons_to_update = []
+        for p in pid_rows:
+            if p[1] not in persons_to_update:
+                persons_to_update.append([p[1]])
+        if bconfig.TABLES_UTILS_DEBUG:
+                    print "update_personID_table_from_paper: updating canonical names of" + str(persons_to_update)
+        update_personID_canonical_names(persons_to_update)
 
 
 def personid_perform_cleanup():
@@ -851,7 +932,7 @@ def find_personIDs_by_name_string(namestring, strict=False):
 
     if use_index:
         matching_pids_names_tuple = run_sql("select o.personid, o.data, o.flag from aidPERSONID o use index (`ptf-b`), "
-                                            "(select i.personid as ipid from aidPERSONID i use index (`tdf-b`) where i.tag='gathered_name' and i.data like %s)"
+                                            "(select distinct i.personid as ipid from aidPERSONID i use index (`tdf-b`) where i.tag='gathered_name' and i.data like %s)"
                                             " as dummy where  o.tag='gathered_name' and o.personid = dummy.ipid",(surname,))
 #        matching_pids_names_tuple = run_sql("select personid, data, flag from aidPERSONID use index (`ptf-b`) "
 #                                            "where  tag=\'gathered_name\' and personid in "
@@ -859,7 +940,7 @@ def find_personIDs_by_name_string(namestring, strict=False):
 #                                            "where tag=\'gathered_name\' and data like %s)", (surname,))
     else:
         matching_pids_names_tuple = run_sql("select o.personid, o.data, o.flag from aidPERSONID o, "
-                                            "(select i.personid as ipid from aidPERSONID i where i.tag='gathered_name' and i.data like %s)"
+                                            "(select distinct i.personid as ipid from aidPERSONID i where i.tag='gathered_name' and i.data like %s)"
                                             " as dummy where  o.tag='gathered_name' and o.personid = dummy.ipid",(surname,))
 #    print matching_pids_names_tuple
     if len(matching_pids_names_tuple) == 0 and len(surname) >= 2:
@@ -867,11 +948,11 @@ def find_personIDs_by_name_string(namestring, strict=False):
 
         if use_index:
             matching_pids_names_tuple = run_sql("select o.personid, o.data, o.flag from aidPERSONID o use index (`ptf-b`), "
-                                            "(select i.personid as ipid from aidPERSONID i use index (`tdf-b`) where i.tag='gathered_name' and i.data like %s)"
+                                            "(select distinct i.personid as ipid from aidPERSONID i use index (`tdf-b`) where i.tag='gathered_name' and i.data like %s)"
                                             " as dummy where  o.tag='gathered_name' and o.personid = dummy.ipid",(surname,))
         else:
             matching_pids_names_tuple = run_sql("select o.personid, o.data, o.flag from aidPERSONID o, "
-                                            "(select i.personid as ipid from aidPERSONID i where i.tag='gathered_name' and i.data like %s)"
+                                            "(select distinct i.personid as ipid from aidPERSONID i where i.tag='gathered_name' and i.data like %s)"
                                             " as dummy where  o.tag='gathered_name' and o.personid = dummy.ipid",(surname,))
 
     if len(matching_pids_names_tuple) == 0 and len(surname) >= 2:
@@ -879,11 +960,11 @@ def find_personIDs_by_name_string(namestring, strict=False):
 
         if use_index:
             matching_pids_names_tuple = run_sql("select o.personid, o.data, o.flag from aidPERSONID o use index (`ptf-b`), "
-                                            "(select i.personid as ipid from aidPERSONID i use index (`tdf-b`) where i.tag='gathered_name' and i.data like %s)"
+                                            "(select distinct i.personid as ipid from aidPERSONID i use index (`tdf-b`) where i.tag='gathered_name' and i.data like %s)"
                                             " as dummy where  o.tag='gathered_name' and o.personid = dummy.ipid",(surname,))
         else:
             matching_pids_names_tuple = run_sql("select o.personid, o.data, o.flag from aidPERSONID o, "
-                                            "(select i.personid as ipid from aidPERSONID i where i.tag='gathered_name' and i.data like %s)"
+                                            "(select distinct i.personid as ipid from aidPERSONID i where i.tag='gathered_name' and i.data like %s)"
                                             " as dummy where  o.tag='gathered_name' and o.personid = dummy.ipid",(surname,))
 
     matching_pids = []
@@ -953,10 +1034,11 @@ def update_personID_names_string_set(PIDlist=[]):
                 self.pname = run_sql("select Name from aidAUTHORNAMES where id = "
                  "(select Name_id from aidAUTHORNAMESBIBREFS where bibref = %s)",
                                     (str(p[0].split(',')[0]),))
-                if self.pname[0][0] not in self.namesdict:
-                    self.namesdict[self.pname[0][0]] = 1
-                else:
-                    self.namesdict[self.pname[0][0]] += 1
+                if len(self.pname) > 0:
+                    if self.pname[0][0] not in self.namesdict:
+                        self.namesdict[self.pname[0][0]] = 1
+                    else:
+                        self.namesdict[self.pname[0][0]] += 1
 
             if use_index:
                 self.current_namesdict = dict(run_sql("select data,flag from aidPERSONID use index (`ptf-b`) where personID=%s "
@@ -984,10 +1066,15 @@ def update_personID_names_string_set(PIDlist=[]):
 #                    sys.stdout.flush()
                 run_sql("delete from `aidPERSONID` where PersonID=%s and tag=%s", (str(self.pid[0]), 'gathered_name'))
                 for name in self.namesdict:
+                    if bconfig.TABLES_UTILS_DEBUG:
+                        #print 'insert into aidPERSONID (PersonID, tag, data, flag) values ('+ str(self.pid[0]) + ',\'gathered_name\',\"' + str(name)+ '\",\"' + str(self.namesdict[name]) + '\")'
+                        pass
 #                    self.pstr += '  ' + str(self.pid[0]) + '    ...processing: ' + str(name) + ' ' + str(self.namesdict[name])
-                    run_sql('insert into aidPERSONID (PersonID, tag, data, flag) values ('
-                            + str(self.pid[0]) + ',\'gathered_name\',\"' + str(name)
-                            + '\",\"' + str(self.namesdict[name]) + '\")')
+#                    run_sql('insert into aidPERSONID (PersonID, tag, data, flag) values ('
+#                            + str(self.pid[0]) + ',\'gathered_name\',\"' + str(name)
+#                            + '\",\"' + str(self.namesdict[name]) + '\")')
+                    run_sql('insert into aidPERSONID (PersonID, tag, data, flag) values (%s,%s,%s,%s)',
+                            (str(self.pid[0]),'gathered_name',str(name),str(self.namesdict[name])))
 
             close_connection()
 #                else:
@@ -1175,21 +1262,21 @@ def update_personID_from_algorithm(RAlist=[]):
             def run(self):
                 self.authnameid = run_sql("select Name_id from aidAUTHORNAMESBIBREFS where bibref=%s",
                         (str(self.paper[0].split(',')[0]),))
-                self.va = run_sql(
-                  "select a.virtualauthorID from aidVIRTUALAUTHORSDATA as a inner join "
-                  "aidVIRTUALAUTHORSDATA as b on a.virtualauthorID=b.virtualauthorID "
-                  "where ((a.tag=%s and a.value=%s) and (b.tag=%s and b.value=%s))",
-                  ('bibrec_id', str(self.paper[0].split(',')[1]), 'orig_authorname_id', str(self.authnameid[0][0])))
-
-                #This is left here for benchmarking, it is still not clear which approach is the fastest
-                #self.va = run_sql('select virtualauthorID from `aidVIRTUALAUTHORSDATA` where ( virtualauthorID in ('
-                #         + ('select virtualauthorID from `aidVIRTUALAUTHORSDATA` where tag=\'bibrec_id\' and value=\'%s\'')
-                #             % (str(self.paper[0].split(',')[1]))
-                #         + ')) and ((tag, value) = (\'orig_authorname_id\', \''
-                #         + str(authnameid[0][0]) + '\'))')
-                for i in self.va:
-                    self.vas.append(i[0])
-
+                if len(self.authnameid)>0:
+                    self.va = run_sql(
+                      "select a.virtualauthorID from aidVIRTUALAUTHORSDATA as a inner join "
+                      "aidVIRTUALAUTHORSDATA as b on a.virtualauthorID=b.virtualauthorID "
+                      "where ((a.tag=%s and a.value=%s) and (b.tag=%s and b.value=%s))",
+                      ('bibrec_id', str(self.paper[0].split(',')[1]), 'orig_authorname_id', str(self.authnameid[0][0])))
+    
+                    #This is left here for benchmarking, it is still not clear which approach is the fastest
+                    #self.va = run_sql('select virtualauthorID from `aidVIRTUALAUTHORSDATA` where ( virtualauthorID in ('
+                    #         + ('select virtualauthorID from `aidVIRTUALAUTHORSDATA` where tag=\'bibrec_id\' and value=\'%s\'')
+                    #             % (str(self.paper[0].split(',')[1]))
+                    #         + ')) and ((tag, value) = (\'orig_authorname_id\', \''
+                    #         + str(authnameid[0][0]) + '\'))')
+                    for i in self.va:
+                        self.vas.append(i[0])
                 close_connection()
 
         tvapaper = []
@@ -1216,8 +1303,10 @@ def update_personID_from_algorithm(RAlist=[]):
             papers_vas_string += '\'' + str(i) + '\','
         papers_vas_string = papers_vas_string[0:len(papers_vas_string) - 1] + ' )'
         if len(papers_vas) >= 1:
-            inverse_ra_list.append(run_sql("select distinct `realauthorID` "
-                    " from `aidREALAUTHORS` where virtualauthorID in " + papers_vas_string))
+            r = run_sql("select distinct `realauthorID` "
+                    " from `aidREALAUTHORS` where virtualauthorID in " + papers_vas_string)
+            if len(r)>0:
+                inverse_ra_list.append(r)
         else:
             inverse_ra_list = []
         if bconfig.TABLES_UTILS_DEBUG:
@@ -2158,17 +2247,25 @@ def get_persons_from_recids(recids, return_alt_names=False,
     @param return_all_person_papers: Return also a person's record IDs?
     @type return_all_person_papers: boolean
 
-    return: list of dicts
-        [{
-            'person_id': int,
-            'canonical_name' : str,
-            'canonical_id': str,
-            'alternatative_names': list of str
-        }, ...]
-    rtype: list of dicts
+    return: tuple of two dicts:
+        structure: ({recid: [personids]}, {personid: {personinfo}})
+        example:
+        ({1: [4]},
+        {4: {'canonical_id' : str,
+             'alternatative_names': list of str,
+             'person_records': list of int
+            }
+        })
+    rtype: tuple of two dicts
     '''
     rec_pid = {}
     pinfo = {}
+
+    if not isinstance(recids, list) or isinstance(recids, tuple):
+        if isinstance(recids, int):
+            recids = [recids]
+        else:
+            return (rec_pid, pinfo)
 
     if not DATA_CACHERS:
         DATA_CACHERS.append(PersonIDStatusDataCacher())
@@ -2177,7 +2274,7 @@ def get_persons_from_recids(recids, return_alt_names=False,
     pid_table_cacher.recreate_cache_if_needed()
 
     if not pid_table_cacher.cache:
-        return None
+        return (rec_pid, pinfo)
 
     for recid in recids:
         rec_names = get_field_values_on_condition(recid,

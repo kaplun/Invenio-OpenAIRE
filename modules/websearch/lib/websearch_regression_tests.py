@@ -45,7 +45,8 @@ from invenio.urlutils import same_urls_p
 from invenio.search_engine import perform_request_search, \
     guess_primary_collection_of_a_record, guess_collection_of_a_record, \
     collection_restricted_p, get_permitted_restricted_collections, \
-    get_fieldvalues
+    get_fieldvalues, search_pattern, search_unit, search_unit_in_bibrec, \
+    wash_colls
 
 def parse_url(url):
     parts = urlparse.urlparse(url)
@@ -645,16 +646,21 @@ class WebSearchTestWildcardLimit(unittest.TestCase):
     """Checks if the wildcard limit is correctly passed and that
     users without autorization can not exploit it"""
 
-    def test_wildcard_limit_correctly_passed_when_default(self):
+    def test_wildcard_limit_correctly_passed_when_not_set(self):
         """websearch - wildcard limit is correctly passed when default"""
-        self.assertEqual(perform_request_search(p="e*", f='author'),
-                            perform_request_search(p="e*", f='author', wl=1000))
+        self.assertEqual(search_pattern(p='e*', f='author'),
+                         search_pattern(p='e*', f='author', wl=1000))
 
     def test_wildcard_limit_correctly_passed_when_set(self):
         """websearch - wildcard limit is correctly passed when set"""
         self.assertEqual([],
             test_web_page_content(CFG_SITE_URL + '/search?p=e*&f=author&of=id&wl=5',
                                   expected_text="[9, 10, 11, 17, 46, 48, 50, 51, 52, 53, 54, 67, 72, 74, 81, 88, 92, 96]"))
+
+    def test_wildcard_limit_correctly_not_active(self):
+        """websearch - wildcard limit is not active when there is no wildcard query"""
+        self.assertEqual(search_pattern(p='ellis', f='author'),
+                         search_pattern(p='ellis', f='author', wl=1))
 
     def test_wildcard_limit_increased_by_authorized_users(self):
         """websearch - wildcard limit increased by authorized user"""
@@ -1370,7 +1376,6 @@ class WebSearchExtSysnoQueryTest(unittest.TestCase):
                          test_web_page_content(CFG_SITE_URL + '/search?sysno=000289446CER&of=id',
                                                expected_text="[95]"))
 
-
     def test_nonexisting_sysno_html_output(self):
         """websearch - external sysno query, non-existing sysno, HTML output"""
         self.assertEqual([],
@@ -1750,6 +1755,102 @@ class WebSearchSPIRESSyntaxTest(unittest.TestCase):
                          test_web_page_content(CFG_SITE_URL +'/search?p=find+a+ellis%2C+j+and+not+a+enqvist&of=id&ap=0',
                                                expected_text='[9, 12, 14, 47]'))
 
+    def test_dadd_search(self):
+        'websearch - find da > today - 3650'
+        # XXX: assumes we've reinstalled our site in the last 10 years
+        # should return every document in the system
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL +'/search?ln=en&p=find+da+%3E+today+-+3650&f=&of=id',
+                                               expected_text='[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104]'))
+
+
+class WebSearchDateQueryTest(unittest.TestCase):
+    """Test various date queries."""
+
+    def setUp(self):
+        """Establish variables we plan to re-use"""
+        from invenio.intbitset import intbitset as HitSet
+        self.empty = HitSet()
+
+    def test_search_unit_hits_for_datecreated_previous_millenia(self):
+        """websearch - search_unit with datecreated returns >0 hits for docs in the last 1000 years"""
+        self.assertNotEqual(self.empty, search_unit('1000-01-01->9999', 'datecreated'))
+
+    def test_search_unit_hits_for_datemodified_previous_millenia(self):
+        """websearch - search_unit with datemodified returns >0 hits for docs in the last 1000 years"""
+        self.assertNotEqual(self.empty, search_unit('1000-01-01->9999', 'datemodified'))
+
+    def test_search_unit_in_bibrec_for_datecreated_previous_millenia(self):
+        """websearch - search_unit_in_bibrec with creationdate gets >0 hits for past 1000 years"""
+        self.assertNotEqual(self.empty, search_unit_in_bibrec("1000-01-01", "9999-12-31", 'creationdate'))
+
+    def test_search_unit_in_bibrec_for_datecreated_next_millenia(self):
+        """websearch - search_unit_in_bibrec with creationdate gets 0 hits for after year 3000"""
+        self.assertEqual(self.empty, search_unit_in_bibrec("3000-01-01", "9999-12-31", 'creationdate'))
+
+
+class WebSearchSynonymQueryTest(unittest.TestCase):
+    """Test of queries using synonyms."""
+
+    def test_journal_phrvd(self):
+        """websearch - search-time synonym search, journal title"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=PHRVD&f=journal&of=id',
+                                               expected_text="[66, 72]"))
+
+    def test_journal_phrvd_54_1996_4234(self):
+        """websearch - search-time synonym search, journal article"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=PHRVD%2054%20%281996%29%204234&f=journal&of=id',
+                                               expected_text="[66]"))
+
+    def test_journal_beta_decay_title(self):
+        """websearch - index-time synonym search, beta decay in title"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=beta+decay&f=title&of=id',
+                                               expected_text="[59]"))
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=%CE%B2+decay&f=title&of=id',
+                                               expected_text="[59]"))
+
+    def test_journal_beta_decay_global(self):
+        """websearch - index-time synonym search, beta decay in any field"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=beta+decay&of=id',
+                                               expected_text="[52, 59]"))
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=%CE%B2+decay&of=id',
+                                               expected_text="[52, 59]"))
+
+    def test_journal_beta_title(self):
+        """websearch - index-time synonym search, beta in title"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=beta&f=title&of=id',
+                                               expected_text="[59]"))
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=%CE%B2&f=title&of=id',
+                                               expected_text="[59]"))
+
+    def test_journal_beta_global(self):
+        """websearch - index-time synonym search, beta in any field"""
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=beta&of=id',
+                                               expected_text="[52, 59]"))
+        self.assertEqual([],
+                         test_web_page_content(CFG_SITE_URL + '/search?p=%CE%B2&of=id',
+                                               expected_text="[52, 59]"))
+
+class WebSearchWashCollectionsTest(unittest.TestCase):
+    """Test if the collection argument is washed correctly"""
+
+    def test_wash_coll_when_coll_restricted(self):
+        """websearch - washing of restricted daughter collections"""
+        self.assertEqual(
+            sorted(wash_colls(cc='', c=['Books & Reports', 'Theses'])[1]),
+            ['Books & Reports', 'Theses'])
+        self.assertEqual(
+            sorted(wash_colls(cc='', c=['Books & Reports', 'Theses'])[2]),
+            ['Books & Reports', 'Theses'])
 
 TEST_SUITE = make_test_suite(WebSearchWebPagesAvailabilityTest,
                              WebSearchTestSearch,
@@ -1785,8 +1886,10 @@ TEST_SUITE = make_test_suite(WebSearchWebPagesAvailabilityTest,
                              WebSearchSpanQueryTest,
                              WebSearchReferstoCitedbyTest,
                              WebSearchSPIRESSyntaxTest,
-                             WebSearchTestWildcardLimit)
-
+                             WebSearchDateQueryTest,
+                             WebSearchTestWildcardLimit,
+                             WebSearchSynonymQueryTest,
+                             WebSearchWashCollectionsTest)
 
 if __name__ == "__main__":
     run_test_suite(TEST_SUITE, warn_user=True)

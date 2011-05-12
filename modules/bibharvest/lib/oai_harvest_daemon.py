@@ -42,7 +42,8 @@ from invenio.config import \
      CFG_BINDIR, \
      CFG_TMPDIR, \
      CFG_ETCDIR, \
-     CFG_INSPIRE_SITE
+     CFG_INSPIRE_SITE, \
+     CFG_CERN_SITE
 from invenio.dbquery import run_sql
 from invenio.bibtask import \
      task_get_task_param, \
@@ -122,8 +123,7 @@ def task_run_core():
         downloaded_material_dict = {}
         harvested_files_list = []
         # Harvest phase
-        harvestpath = filepath_prefix + "_" + str(j) + "_" + \
-                     time.strftime("%Y%m%d%H%M%S") + "_harvested"
+        harvestpath = "%s_%d_%s_" % (filepath_prefix, j, time.strftime("%Y%m%d%H%M%S"))
         if dateflag == 1:
             task_update_progress("Harvesting %s from %s to %s (%i/%i)" % \
                                  (reponame, \
@@ -142,8 +142,8 @@ def task_run_core():
                               (reponame, str(datelist[0]), str(datelist[1])))
                 harvested_files_list = file_list
             else:
-                write_message("an error occurred while harvesting from source %s for the dates chosen" % \
-                              (reponame,))
+                write_message("an error occurred while harvesting from source %s for the dates chosen:\n%s\n" % \
+                              (reponame, file_list))
                 error_happened_p = True
                 continue
 
@@ -162,7 +162,7 @@ def task_run_core():
                 update_lastrun(repos[0][0])
                 harvested_files_list = file_list
             else :
-                write_message("an error occurred while harvesting from source %s" % (reponame,))
+                write_message("an error occurred while harvesting from source %s:\n%s\n" % (reponame, file_list))
                 error_happened_p = True
                 continue
 
@@ -193,7 +193,7 @@ def task_run_core():
                     update_lastrun(repos[0][0])
                     harvested_files_list = file_list
                 else :
-                    write_message("an error occurred while harvesting from source %s" % (reponame,))
+                    write_message("an error occurred while harvesting from source %s:\n%s\n" % (reponame, file_list))
                     error_happened_p = True
                     continue
             else:
@@ -228,8 +228,7 @@ def task_run_core():
                                      (reponame, \
                                       i, \
                                       len(active_files_list)))
-                updated_file = filepath_prefix + "_" + str(i) + "_" + \
-                    time.strftime("%Y%m%d%H%M%S") + "_converted"
+                updated_file = "%s.converted" % (active_file.split('.')[0],)
                 updated_files_list.append(updated_file)
                 (exitcode, err_msg) = call_bibconvert(config=str(repos[0][5]),
                                                       harvestpath=active_file,
@@ -260,8 +259,7 @@ def task_run_core():
                 task_sleep_now_if_required()
                 task_update_progress("Extracting plots from harvested material from %s (%i/%i)" % \
                                      (reponame, i, len(active_files_list)))
-                updated_file = filepath_prefix + "_" + str(i) + "_" + \
-                    time.strftime("%Y%m%d%H%M%S") + "_extracted"
+                updated_file = "%s.plotextracted" % (active_file.split('.')[0],)
                 updated_files_list.append(updated_file)
                 (exitcode, err_msg) = call_plotextractor(active_file,
                                                          updated_file,
@@ -295,8 +293,7 @@ def task_run_core():
                 task_sleep_now_if_required()
                 task_update_progress("Extracting references from material harvested from %s (%i/%i)" % \
                                      (reponame, i, len(active_files_list)))
-                updated_file = filepath_prefix + "_" + str(i) + "_" + \
-                    time.strftime("%Y%m%d%H%M%S") + "_refextracted"
+                updated_file = "%s.refextracted" % (active_file.split('.')[0],)
                 updated_files_list.append(updated_file)
                 (exitcode, err_msg) = call_refextract(active_file,
                                                       updated_file,
@@ -332,8 +329,7 @@ def task_run_core():
                 task_sleep_now_if_required()
                 task_update_progress("Attaching fulltext to records harvested from %s (%i/%i)" % \
                                      (reponame, i, len(active_files_list)))
-                updated_file = filepath_prefix + "_" + str(i) + "_" + \
-                    time.strftime("%Y%m%d%H%M%S") + "_fulltext"
+                updated_file = "%s.fulltext" % (active_file.split('.')[0],)
                 updated_files_list.append(updated_file)
                 (exitcode, err_msg) = call_fulltext(active_file,
                                                     updated_file,
@@ -577,20 +573,11 @@ def oai_harvest_get(prefix, baseurl, harvestpath,
         if setspecs:
             sets = [set.strip() for set in setspecs.split(' ')]
 
-        print "Start harvesting"
-        oai_harvest_getter.harvest(network_location, path, http_param_dict, method, harvestpath,
+        harvested_files = oai_harvest_getter.harvest(network_location, path, http_param_dict, method, harvestpath,
                                    sets, secure, user, password, cert_file, key_file)
-
-        harvest_dir, harvest_filename = os.path.split(harvestpath)
-        files = os.listdir(harvest_dir)
-        files.sort()
-        harvested_files = [harvest_dir + os.sep + filename for \
-                           filename in files \
-                           if filename.startswith(harvest_filename)]
         remove_duplicates(harvested_files)
         return (1, harvested_files)
-    except StandardError, e:
-        print e
+    except (StandardError, oai_harvest_getter.InvenioOAIRequestError), e:
         return (0, e)
 
 def call_bibconvert(config, harvestpath, convertpath):
@@ -616,7 +603,7 @@ def call_plotextractor(active_file, extracted_file, harvested_identifier_list, \
     @param extracted_file: path to the file where the final results will be saved
     @param harvested_identifier_list: list of OAI identifiers for this active_file
     @param downloaded_files: dict of identifier -> dict mappings for downloaded material.
-    
+
     @return: exitcode and any error messages as: (exitcode, err_msg)
     """
     all_err_msg = []
@@ -669,7 +656,7 @@ def call_plotextractor(active_file, extracted_file, harvested_identifier_list, \
 
 def call_refextract(active_file, extracted_file, harvested_identifier_list,
                     downloaded_files):
-    """ 
+    """
     Function that calls refextractor to extract references and attach them to
     harvested records. It will download the fulltext-pdf for each identifier
     if necessary.
@@ -678,7 +665,7 @@ def call_refextract(active_file, extracted_file, harvested_identifier_list,
     @param extracted_file: path to the file where the final results will be saved
     @param harvested_identifier_list: list of OAI identifiers for this active_file
     @param downloaded_files: dict of identifier -> dict mappings for downloaded material.
-    
+
     @return: exitcode and any error messages as: (exitcode, all_err_msg)
     """
     all_err_msg = []
@@ -737,7 +724,7 @@ def call_refextract(active_file, extracted_file, harvested_identifier_list,
 
 def call_fulltext(active_file, extracted_file, harvested_identifier_list,
                   downloaded_files):
-    """ 
+    """
     Function that calls attach FFT tag for full-text pdf to harvested records.
     It will download the fulltext-pdf for each identifier if necessary.
 
@@ -745,8 +732,8 @@ def call_fulltext(active_file, extracted_file, harvested_identifier_list,
     @param extracted_file: path to the file where the final results will be saved
     @param harvested_identifier_list: list of OAI identifiers for this active_file
     @param downloaded_files: dict of identifier -> dict mappings for downloaded material.
-    
-    @return: exitcode and any error messages as: (exitcode, err_msg)    
+
+    @return: exitcode and any error messages as: (exitcode, err_msg)
     """
     all_err_msg = []
     exitcode = 0
@@ -756,7 +743,15 @@ def call_fulltext(active_file, extracted_file, harvested_identifier_list,
     records = recs_fd.read()
     recs_fd.close()
 
-    # Find all record
+    # Set doctype FIXME: Remove when parameters are introduced to post-process steps
+    if CFG_INSPIRE_SITE == 1:
+        doctype = "arXiv"
+    elif CFG_CERN_SITE == 1:
+        doctype = ""
+    else:
+        doctype = ""
+
+    # Find all records
     record_xmls = REGEXP_RECORD.findall(records)
     updated_xml = ['<?xml version="1.0" encoding="UTF-8"?>']
     updated_xml.append('<collection>')
@@ -777,11 +772,12 @@ def call_fulltext(active_file, extracted_file, harvested_identifier_list,
                 all_err_msg.append(err_msg)
             else:
                 downloaded_files[identifier]["pdf"] = pdf
-        if current_exitcode != 0:
-            fulltext_xml = '  <datafield tag="FFT" ind1=" " ind2=" ">\n' + \
-                   '    <subfield code="a">' + downloaded_files[identifier]["pdf"] + '</subfield>\n' + \
-                   '    <subfield code="t"></subfield>\n' + \
-                   '  </datafield>'
+        if current_exitcode == 0:
+            fulltext_xml = """  <datafield tag="FFT" ind1=" " ind2=" ">
+    <subfield code="a">%(url)s</subfield>
+    <subfield code="t">%(doctype)s</subfield>
+  </datafield>""" % {'url': downloaded_files[identifier]["pdf"],
+                     'doctype': doctype}
             updated_xml.append(fulltext_xml)
         updated_xml.append("</record>")
     updated_xml.append('</collection>')

@@ -28,8 +28,9 @@ from invenio.config import CFG_LOGDIR, CFG_PYLIBDIR
 CFG_BIBTASK_VALID_TASKS = ("bibindex", "bibupload", "bibreformat",
                            "webcoll", "bibtaskex", "bibrank",
                            "oaiharvest", "oairepositoryupdater", "inveniogc",
-                           "webstatadmin", "bibclassify", "bibexport", "dbdump",
-                           "batchuploader", "bibtasklet", "bibauthorid")
+                           "webstatadmin", "bibclassify", "bibexport",
+                           "dbdump", "batchuploader", "bibauthorid",
+                           "bibtasklet")
 
 # Task that should not be reinstatiated
 CFG_BIBTASK_NON_REPETITIVE_TASK = ('bibupload')

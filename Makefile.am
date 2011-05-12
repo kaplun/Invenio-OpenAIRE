@@ -25,9 +25,9 @@ EXTRA_DIST = UNINSTALL THANKS RELEASE-NOTES configure-tests.py config.nice.in \
 
 
 # current MathJax version and packages
-
-MJV = 1.0.1a
-MATHJAX = MathJax-v$(MJV).zip
+# See also modules/miscutil/lib/htmlutils.py (get_mathjax_header)
+MJV = 1.1
+MATHJAX = https://github.com/mathjax/MathJax/zipball/v$(MJV)
 
 # current FCKeditor version
 FCKV = 2.6.6
@@ -80,38 +80,38 @@ install-data-local:
 		mkdir -p $(localstatedir)$$d ;		\
 	done
 	@echo "************************************************************"
-	@echo "** Invenio software has been successfully installed!  **"
+	@echo "** Invenio software has been successfully installed!      **"
 	@echo "**                                                        **"
 	@echo "** You may proceed to customizing your installation now.  **"
 	@echo "************************************************************"
 
 install-mathjax-plugin:
 	@echo "***********************************************************"
-	@echo "** Installing MathJax plugin, please wait...              **"
+	@echo "** Installing MathJax plugin, please wait...             **"
 	@echo "***********************************************************"
 	rm -rf /tmp/invenio-mathjax-plugin
 	mkdir /tmp/invenio-mathjax-plugin
+	mkdir -p ${prefix}/var/www/MathJax
 	(cd /tmp/invenio-mathjax-plugin && \
-	wget 'http://www.mathjax.org/dl/$(MATHJAX)' && \
-	unzip -q -u -d ${prefix}/var/www $(MATHJAX))
+	wget '$(MATHJAX)' -O mathjax.zip --no-check-certificate && \
+	unzip -q mathjax.zip && cd mathjax-MathJax-* && cp -ur * \
+	${prefix}/var/www/MathJax)
 	rm -fr /tmp/invenio-mathjax-plugin
-	@echo "* Installing Invenio-specific MathJax config..."
-	(cd $(top_srcdir)/modules/webstyle/etc && make install)
-	@echo "***********************************************************"
+	@echo "************************************************************"
 	@echo "** The MathJax plugin was successfully installed.         **"
-	@echo "** Please do not forget to properly set the option       **"
+	@echo "** Please do not forget to properly set the option        **"
 	@echo "** CFG_WEBSEARCH_USE_MATHJAX_FOR_FORMATS in invenio.conf. **"
-	@echo "***********************************************************"
+	@echo "************************************************************"
 
 uninstall-mathjax-plugin:
 	@rm -rvf ${prefix}/var/www/MathJax
 	@echo "***********************************************************"
-	@echo "** The MathJax plugin was successfully uninstalled.       **"
+	@echo "** The MathJax plugin was successfully uninstalled.      **"
 	@echo "***********************************************************"
 
 install-jscalendar-plugin:
 	@echo "***********************************************************"
-	@echo "** Installing jsCalendar plugin, please wait...              **"
+	@echo "** Installing jsCalendar plugin, please wait...          **"
 	@echo "***********************************************************"
 	rm -rf /tmp/invenio-jscalendar-plugin
 	mkdir /tmp/invenio-jscalendar-plugin
@@ -343,7 +343,7 @@ update-v0.7.1-tables:
 	@echo "**********************************************************"
 	@echo "** Do not forget to run the basket migration now:       **"
 	@echo "**    @PYTHON@ modules/webbasket/lib/webbasket_migration_kit.py "
-	@echo "** Please see the RELEASE-NOTES for details.           **"
+	@echo "** Please see the RELEASE-NOTES for details.            **"
 	@echo "**********************************************************"
 	@echo "INSERT INTO oaiARCHIVE (id, setName, setSpec, setDescription, setDefinition, setRecList) SELECT id, setName, setSpec, CONCAT_WS('', setDescription), setDefinition, setRecList FROM oaiSET;"
 
@@ -538,5 +538,9 @@ update-v1.0.0-rc0-tables: # from v1.0.0-rc0 to next release
 	echo "INSERT INTO sbmALLFUNCDESCR VALUES ('Set_Embargo','Set an embargo on all the documents of a given record.');" | ${prefix}/bin/dbexec
 	echo "INSERT INTO sbmFUNDESC VALUES ('Set_Embargo','date_file');" | ${prefix}/bin/dbexec
 	echo "INSERT INTO sbmFUNDESC VALUES ('Set_Embargo','date_format');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('User_is_Record_Owner_or_Curator','curator_role');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO sbmFUNDESC VALUES ('User_is_Record_Owner_or_Curator','curator_flag');" | ${prefix}/bin/dbexec
+	echo "INSERT INTO format (name, code, description, content_type, visibility) VALUES ('Podcast', 'xp', 'Sample format suitable for multimedia feeds, such as podcasts', 'application/rss+xml', 0);" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE accMAILCOOKIE ADD INDEX expiration (expiration);" | ${prefix}/bin/dbexec
 
 CLEANFILES = *~ *.pyc *.tmp
