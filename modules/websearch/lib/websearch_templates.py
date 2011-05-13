@@ -3471,12 +3471,12 @@ class Template:
         out = """<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
         <channel>
         <title>%(sitename)s</title>
-	<link>%(siteurl)s</link>
+        <link>%(siteurl)s</link>
         <description>%(sitename)s latest documents</description>
         <language>%(sitelang)s</language>
         <pubDate>%(timestamp)s</pubDate>
         <category></category>
-	<generator>CDS Invenio %(version)s</generator>
+        <generator>Invenio %(version)s</generator>
         <webMaster>%(siteadminemail)s</webMaster>
         <ttl>%(timetolive)s</ttl>%(previous_link)s%(next_link)s%(current_link)s
         <image>
@@ -3488,13 +3488,13 @@ class Template:
         <itunes:email>%(siteadminemail)s</itunes:email>
         </itunes:owner>
         """ % {'sitename': CFG_SITE_NAME,
-	       'siteurl': CFG_SITE_URL,
+               'siteurl': CFG_SITE_URL,
                'sitelang': CFG_SITE_LANG,
                'siteadminemail': CFG_SITE_ADMIN_EMAIL,
                'timestamp': time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime()),
                'version': CFG_VERSION,
                'sitesupportemail': CFG_SITE_SUPPORT_EMAIL,
-	       'timetolive': CFG_WEBSEARCH_RSS_TTL,
+               'timetolive': CFG_WEBSEARCH_RSS_TTL,
                'current_link': (current_url and \
                                  '\n<atom:link rel="self" href="%s" />\n' % current_url) or '',
                'previous_link': (previous_url and \
@@ -3509,7 +3509,7 @@ class Template:
         return out
 
     def tmpl_xml_podcast_epilogue(self):
-	"""Creates XML podcast epilogue."""
+        """Creates XML podcast epilogue."""
         out = """\n</channel>
 </rss>\n"""
         return out
