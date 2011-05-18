@@ -288,8 +288,13 @@ window.addEvent('domready', function(){ new YOOsearch('yoo-search-1', { 'url': '
                         <span>Copyright Issues</span>
                       </a>
                     </li>
-                    <li class="level2 item5 last">
-                      <a href="%(portalurl)s/en/support/links" class="level2 item5 last">
+                    <li class="level2 item5">
+                      <a href="%(portalurl)s/en/support/ec-resources" class="level2 item5">
+                        <span>EC Resources</span>
+                      </a>
+                    </li>
+                    <li class="level2 item6 last">
+                      <a href="%(portalurl)s/en/support/links" class="level2 item6 last">
                         <span>Related Links</span>
                       </a>
                     </li>
