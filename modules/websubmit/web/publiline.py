@@ -42,15 +42,16 @@ from invenio.config import \
      CFG_PYLIBDIR, \
      CFG_WEBSUBMIT_STORAGEDIR, \
      CFG_SITE_SUPPORT_EMAIL, \
-     CFG_SITE_SECURE_URL
+     CFG_SITE_SECURE_URL, \
+     CFG_SITE_RECORD
 from invenio.dbquery import run_sql, Error, OperationalError
 from invenio.access_control_engine import acc_authorize_action
-from invenio.access_control_admin import *
+from invenio.access_control_admin import acc_get_role_users, acc_get_role_id
 from invenio.webpage import page, create_error_box
-from invenio.webuser import getUid, get_email, page_not_authorized
+from invenio.webuser import getUid, get_email, page_not_authorized, collect_user_info
 from invenio.messages import gettext_set_language, wash_language
-from invenio.websubmit_config import *
-from invenio.search_engine import search_pattern, get_fieldvalues
+#from invenio.websubmit_config import *
+from invenio.search_engine import search_pattern, get_fieldvalues,check_user_can_view_record
 from invenio.websubmit_functions.Retrieve_Data import Get_Field
 from invenio.mailutils import send_email
 from invenio.urlutils import wash_url_argument
@@ -58,6 +59,7 @@ from invenio.webgroup_dblayer import get_group_infos, insert_new_group, insert_n
 from invenio.webaccessadmin_lib import cleanstring_email
 from invenio.access_control_config import MAXSELECTUSERS
 from invenio.access_control_admin import acc_get_user_email
+from invenio.access_control_engine import acc_get_authorized_emails
 from invenio.webmessage import perform_request_send
 import invenio.webbasket_dblayer as basketdb
 from invenio.webbasket_config import CFG_WEBBASKET_SHARE_LEVELS, CFG_WEBBASKET_CATEGORIES, CFG_WEBBASKET_SHARE_LEVELS_ORDERED
@@ -83,7 +85,6 @@ def perform_request_save_comment(*args, **kwargs):
     return
 
 def index(req,c=CFG_SITE_NAME,ln=CFG_SITE_LANG,doctype="",categ="",RN="",send="",flow="",apptype="", action="", email_user_pattern="", id_user="", id_user_remove="", validate="", id_user_val="", msg_subject="", msg_body="", reply="", commentId=""):
-    global uid
 
     ln = wash_language(ln)
     categ = wash_url_argument(categ, 'str')
@@ -125,9 +126,9 @@ def index(req,c=CFG_SITE_NAME,ln=CFG_SITE_LANG,doctype="",categ="",RN="",send=""
         elif RN == "":
             t = selectCplxDocument(doctype, categ, apptype, ln)
         elif action == "":
-            t = displayCplxDocument(req, doctype, categ, RN, apptype, reply, commentId, ln)
+            t = __displayCplxDocument(req, doctype, categ, RN, apptype, reply, commentId, ln)
         else:
-            t = doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, id_user, id_user_remove, validate, id_user_val, msg_subject, msg_body, reply, commentId, ln)
+            t = __doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, id_user, id_user_remove, validate, id_user_val, msg_subject, msg_body, reply, commentId, ln)
         return page(title=_("Document Approval Workflow"),
                     navtrail= """<a class="navtrail" href="%(sitesecureurl)s/youraccount/display">%(account)s</a>""" % {
                                  'sitesecureurl' : CFG_SITE_SECURE_URL,
@@ -148,7 +149,7 @@ def index(req,c=CFG_SITE_NAME,ln=CFG_SITE_LANG,doctype="",categ="",RN="",send=""
         elif RN == "":
             t = selectDocument(doctype, categ, ln)
         else:
-            t = displayDocument(req, doctype, categ, RN, send, ln)
+            t = __displayDocument(req, doctype, categ, RN, send, ln)
         return page(title=_("Approval and Refereeing Workflow"),
                     navtrail= """<a class="navtrail" href="%(sitesecureurl)s/youraccount/display">%(account)s</a>""" % {
                                  'sitesecureurl' : CFG_SITE_SECURE_URL,
@@ -307,7 +308,7 @@ def selectCplxDocument(doctype,categ,apptype, ln = CFG_SITE_LANG):
         )
     return t
 
-def displayDocument(req, doctype,categ,RN,send, ln = CFG_SITE_LANG):
+def __displayDocument(req, doctype,categ,RN,send, ln = CFG_SITE_LANG):
 
     # load the right message language
     _ = gettext_set_language(ln)
@@ -339,21 +340,26 @@ def displayDocument(req, doctype,categ,RN,send, ln = CFG_SITE_LANG):
     ##     'report-number'    : '',  ## String - the item's report number
     ##     'authors'          : [],  ## List   - the item's authors
     ##   }
+
     if item_details is not None:
         authors = ", ".join(item_details['authors'])
         newrn = item_details['report-number']
         title = item_details['title']
         sysno = item_details['recid']
     else:
-        ## FIXME!
-        ## For backward compatibility reasons, it we failed to find the item's
-        ## details, we will try the old way, which includes searching for files
-        ## like TI, TIF in the submission's working directory.
-        ## This is not nice and should be removed.
+        # Was not found in the pending directory. Already approved?
         try:
-            (authors,title,sysno,newrn) = getInfo(doctype,categ,RN)
-        except TypeError:
+            (authors, title, sysno) = getInfo(RN)
+            newrn = RN
+            if sysno is None:
+                return _("Unable to display document.")
+        except:
             return _("Unable to display document.")
+
+    user_info = collect_user_info(req)
+    can_view_record_p, msg = check_user_can_view_record(user_info, sysno)
+    if can_view_record_p != 0:
+        return msg
 
     confirm_send = 0
     if send == _("Send Again"):
@@ -361,7 +367,8 @@ def displayDocument(req, doctype,categ,RN,send, ln = CFG_SITE_LANG):
             SendWarning(doctype, categ, RN, title, authors, access)
         else:
             # @todo - send in different languages
-            SendEnglish(doctype,categ,RN,title,authors,access,sysno)
+            #SendEnglish(doctype,categ,RN,title,authors,access,sysno)
+            send_approval(doctype, categ, RN, title, authors, access, sysno)
             run_sql("update sbmAPPROVAL set dLastReq=NOW() where rn=%s",(RN,))
             confirm_send = 1
 
@@ -396,7 +403,7 @@ def displayDocument(req, doctype,categ,RN,send, ln = CFG_SITE_LANG):
         )
     return t
 
-def displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln = CFG_SITE_LANG):
+def __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln = CFG_SITE_LANG):
     # load the right message language
     _ = gettext_set_language(ln)
 
@@ -463,6 +470,11 @@ def displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln = CF
         isReferee = None
         isProjectLeader = None
         isAuthor = None
+
+    user_info = collect_user_info(req)
+    can_view_record_p, msg = check_user_can_view_record(user_info, sysno)
+    if can_view_record_p != 0:
+        return msg
 
     t += websubmit_templates.tmpl_publiline_displaycplxdoc(
           ln = ln,
@@ -600,7 +612,7 @@ def __db_set_PubComRecom_time (key):
 def __db_set_status ((RN,apptype), status):
     run_sql("UPDATE sbmCPLXAPPROVAL SET status=%s, dProjectLeaderAction=NOW() WHERE  rn=%s and type=%s", (status,RN,apptype,))
 
-def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, id_user, id_user_remove, validate, id_user_val, msg_subject, msg_body, reply, commentId, ln=CFG_SITE_LANG):
+def __doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, id_user, id_user_remove, validate, id_user_val, msg_subject, msg_body, reply, commentId, ln=CFG_SITE_LANG):
     """
     Perform complex action. Note: all argume,ts are supposed to be washed already.
     Return HTML body for the paget.
@@ -682,7 +694,7 @@ def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, i
             if dEdBoardSel == None:
                 __db_set_EdBoardSel_time (key)
                 perform_request_send (uid, "", RN, TEXT_RPB_EdBoardSel_MSG_EDBOARD_SUBJECT, TEXT_RPB_EdBoardSel_MSG_EDBOARD_BODY)
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         id_EdBoardGroup = __db_check_EdBoardGroup (key, id_EdBoardGroup, uid, TEXT_RPB_EdBoardSel_EDBOARD_GROUP_DESCR)
 
@@ -817,7 +829,7 @@ def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, i
                 group_name = run_sql("""SELECT name FROM usergroup WHERE id = %s""", (id_group, ))[0][0]
                 perform_request_send (int(id_user_val), "", group_name, TEXT_RefereeSel_MSG_GROUP_SUBJECT, TEXT_RefereeSel_MSG_GROUP_BODY)
                 sendMailToGroup(doctype,categ,RN,id_group,authors)
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         subtitle1 = _('Referee selection')
 
@@ -954,7 +966,7 @@ def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, i
 #                sendMailToProjectLeader(doctype, categ, RN, email, authors, "referee", msg_body)
                 sendMailtoCommitteeChair(doctype, categ, RN, user_addr, authors)
                 __db_set_RefereeRecom_time (key)
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         t = websubmit_templates.tmpl_publiline_displaycplxrecom (
               ln = ln,
@@ -995,7 +1007,7 @@ def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, i
             if dEdBoardRecom == None:
                 perform_request_send (uid, user_addr, "", msg_subject, msg_body)
                 __db_set_EdBoardRecom_time (key)
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         t = websubmit_templates.tmpl_publiline_displaycplxrecom (
               ln = ln,
@@ -1051,7 +1063,7 @@ def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, i
                 perform_request_send (uid, user_addr, "", msg_subject, msg_body, 0, 0, 0, ln, 1)
                 sendMailToProjectLeader(doctype, categ, RN, user_addr, authors, "publication committee chair", msg_body)
                 __db_set_PubComRecom_time (key)
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         t = websubmit_templates.tmpl_publiline_displaycplxrecom (
               ln = ln,
@@ -1144,12 +1156,12 @@ def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, i
         if validate == "approve":
             if dProjectLeaderAction == None:
                 __db_set_status (key, 'approved')
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         elif validate == "reject":
             if dProjectLeaderAction == None:
                 __db_set_status (key, 'rejected')
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         t = """<p>
                  <form action="publiline.py">
@@ -1193,7 +1205,7 @@ def doCplxAction(req, doctype, categ, RN, apptype, action, email_user_pattern, i
 
         if validate == "go":
             __db_set_status (key, 'cancelled')
-            return displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
+            return __displayCplxDocument(req, doctype,categ,RN,apptype, reply, commentId, ln)
 
         t = """<p>
                  <form action="publiline.py">
@@ -1493,12 +1505,22 @@ def get_brief_doc_details_from_repository(reportnumber):
 
 
 # Retrieve info about document
-def getInfo(doctype,categ,RN):
-    """FIXME: DEPRECATED!"""
-    result = getInPending(doctype,categ,RN)
-    if not result:
-        result = getInAlice(doctype,categ,RN)
-    return result
+def getInfo(RN):
+    """
+    Retrieve basic info from record with given report number.
+    Returns (authors, title, sysno)
+    """
+    authors = None
+    title = None
+    sysno = None
+
+    recids = search_pattern(p=RN, f='037__a')
+    if len(recids) == 1:
+        sysno = int(recids.tolist()[0])
+        authors = ','.join(get_fieldvalues(sysno, "100__a") + get_fieldvalues(sysno, "700__a"))
+        title = ','.join(get_fieldvalues(sysno, "245__a"))
+
+    return (authors, title, sysno)
 
 #seek info in pending directory
 def getInPending(doctype,categ,RN):
@@ -1600,17 +1622,49 @@ def SendEnglish(doctype,categ,RN,title,authors,access,sysno):
     Author(s): %s
 
     To access the document(s), select the file(s) from the location:
-    <%s/record/%s/files/>
+    <%s/%s/%s/files/>
 
     To approve/reject the document, you should go to this URL:
     <%s/approve.py?%s>
 
     ---------------------------------------------
     Best regards.
-    The submission team.""" % (RN,title,authors,CFG_SITE_URL,sysno,CFG_SITE_URL,access)
+    The submission team.""" % (RN,title,authors,CFG_SITE_URL,CFG_SITE_RECORD,sysno,CFG_SITE_URL,access)
     # send the mail
     send_email(FROMADDR,addresses,"Request for Approval of %s" % RN, message,footer="")
     return ""
+
+def send_approval(doctype, categ, rn, title, authors, access, sysno):
+    fromaddr = '%s Submission Engine <%s>' % (CFG_SITE_NAME, CFG_SITE_SUPPORT_EMAIL)
+    if not categ:
+        categ = "nocategory"
+    if not doctype:
+        doctype = "nodoctype"
+    addresses = acc_get_authorized_emails('referee', categ=categ, doctype=doctype)
+    if not addresses:
+        return SendWarning(doctype, categ, rn, title, authors, access)
+    if not authors:
+        authors = "-"
+    message = """
+    The document %s has been published as a Communication.
+    Your approval is requested for it to become an official Note.
+
+    Title: %s
+
+    Author(s): %s
+
+    To access the document(s), select the file(s) from the location:
+    <%s/record/%s/files/>
+
+    As a referee for this document, you may approve or reject it
+    from the submission interface:
+    <%s/submit?doctype=%s>
+
+    ---------------------------------------------
+    Best regards.
+    The submission team.""" % (rn, title, authors, CFG_SITE_URL, sysno, CFG_SITE_URL, doctype)
+    # send the mail
+    return send_email(fromaddr, ', '.join(addresses), "Request for Approval of %s" % rn, message, footer="")
 
 def SendWarning(doctype,categ,RN,title,authors,access):
     FROMADDR = '%s Submission Engine <%s>' % (CFG_SITE_NAME,CFG_SITE_SUPPORT_EMAIL)
@@ -1663,7 +1717,7 @@ def sendMailToReferee(doctype,categ,RN,email,authors):
     Author(s): %s
 
     To access the document(s), select the file(s) from the location:
-    <%s/record/%s>
+    <%s/%s/%s>
 
     To make a reccommendation, you should go to this URL:
     <%s>
@@ -1677,6 +1731,7 @@ def sendMailToReferee(doctype,categ,RN,email,authors):
                                str(categ),
                                str(item_details['title']),
                                authors,
+                               CFG_SITE_URL,
                                CFG_SITE_URL,
                                str(item_details['recid']),
                                str(CFG_SITE_URL + "/publiline.py?flow=cplx&doctype="+doctype+"&ln=en&apptype=RRP&categ="+categ+"&RN="+RN+"&action=RefereeRecom"),
@@ -1710,7 +1765,7 @@ def sendMailToGroup(doctype,categ,RN,group_id,authors):
     Author(s): %s
 
     To access the document(s), select the file(s) from the location:
-    <%s/record/%s>
+    <%s/%s/%s>
 
     To leave a comment or check the status of the approval process, you should go to this URL:
     <%s>
@@ -1720,6 +1775,7 @@ def sendMailToGroup(doctype,categ,RN,group_id,authors):
            str(item_details['title']),
            authors,
            CFG_SITE_URL,
+           CFG_SITE_RECORD,
            str(item_details['recid']),
            str(CFG_SITE_URL + "/publiline.py?flow=cplx&doctype="+doctype+"&ln=en&apptype=RRP&categ="+categ+"&RN="+RN))
 
@@ -1754,7 +1810,7 @@ def sendMailToProjectLeader(doctype, categ, RN, email, authors, actor, recommend
     Author(s): %s
 
     To access the document(s), select the file(s) from the location:
-    <%s/record/%s>
+    <%s/%s/%s>
 
     The %s has made a recommendation for the document. He/she said the following:
 
@@ -1771,6 +1827,7 @@ def sendMailToProjectLeader(doctype, categ, RN, email, authors, actor, recommend
            str(item_details['title']),
            authors,
            CFG_SITE_URL,
+           CFG_SITE_RECORD,
            str(item_details['recid']),
            actor,
            recommendation,
@@ -1830,7 +1887,7 @@ def sendMailtoCommitteeChair(doctype, categ, RN, email, authors):
     Author(s): %s
 
     To access the document(s), select the file(s) from the location:
-    <%s/record/%s>
+    <%s/%s/%s>
 
     You can make a reccommendation by visiting this page:
     <%s>
@@ -1838,6 +1895,7 @@ def sendMailtoCommitteeChair(doctype, categ, RN, email, authors):
            str(item_details['title']),
            authors,
            CFG_SITE_URL,
+           CFG_SITE_RECORD,
            str(item_details['recid']),
            str(CFG_SITE_URL + "/publiline.py?flow=cplx&doctype="+doctype+"&ln=en&apptype=RRP&categ="+categ+"&RN="+RN))
 

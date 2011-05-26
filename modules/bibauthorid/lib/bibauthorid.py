@@ -155,20 +155,25 @@ def list_creation_process(mp_queue, job_last_names, mp_termination_queue):
         to terminate upon finishing all queue elements
     @type mp_termination_queue: queue
     '''
-    job_last_names = sorted(job_last_names, key=lambda k: len(k))
-    for lname in list(job_last_names):
+    #job_last_names = sorted(job_last_names, key=lambda k: len(k))
+    variations_set = set()
+    jl = []
+
+    for lname in job_last_names:
+        if lname in variations_set:
+            continue
+
         if bconfig.TABLES_UTILS_DEBUG:
             print time.strftime('%H:%M:%S') + ' ' + "List_creator: working on " + str(lname.encode('UTF-8'))
 
         dat.reset_mem_cache(True)
         init_authornames(lname)
         nameset = set([x['name'].split(",")[0] for x in dat.AUTHOR_NAMES])
-        fullnameset = set([x['name'] for x in dat.AUTHOR_NAMES])
 
         if bconfig.TABLES_UTILS_DEBUG:
             print time.strftime('%H:%M:%S') + ' ' + "List_creator: computation finished, getting queue"
 
-        jl = mp_queue.get()
+        jl[:] = mp_queue.get()
 
         if bconfig.TABLES_UTILS_DEBUG:
             print time.strftime('%H:%M:%S') + ' ' + "List_creator: appending " + str(nameset) + ' with still ' + str(len(jl)) + ' elements in queue'
@@ -176,9 +181,8 @@ def list_creation_process(mp_queue, job_last_names, mp_termination_queue):
         jl.append(list(nameset))
         mp_queue.put(jl)
 
-        for n in fullnameset:
-            if n.split(",")[0] in list(job_last_names):
-                job_last_names.remove(n.split(",")[0])
+        for n in nameset:
+            variations_set.add(n)
 
     if bconfig.TABLES_UTILS_DEBUG:
         print time.strftime('%H:%M:%S') + ' ' + "List_creator: putting exit token"
@@ -287,16 +291,18 @@ def computation_process_starter(i, mp_termination_queue, job_mp_queue,
             if populate_doclist:
                 populate_doclist_for_author_surname(lname, job_last_names)
 
-            start_computation(process_orphans=process_orphans)
+            start_computation(process_orphans=process_orphans,
+                              process_doclist=process_doclist,
+                              print_stats=print_stats)
             post_remove_names = set()
 
-            # The following snippet finds additionally processed last names
-            # and removes them from the processing queue. E.g. 't hooft and t'hooft
+            # The following snippet finds additionally processed last names and
+            # removes them from the processing queue. E.g. 't hooft and t'hooft
             for name in [row['name'] for row in dat.AUTHOR_NAMES
                          if not row['processed']]:
-                potential_removal = "%s" % (name.split(',')[0],)
+                potential_removal = "%s" % (name.split(',')[0])
 
-                if not potential_removal == "%s" % (lname,):
+                if not potential_removal == "%s" % (lname):
                     post_remove_names.add(potential_removal)
 
             if len(post_remove_names) > 0:

@@ -64,11 +64,12 @@ from invenio.bibrecord import create_record, print_rec, record_add_field, \
     record_modify_controlfield, record_get_field_values, \
     record_get_subfields
 from invenio.config import CFG_BIBEDIT_PROTECTED_FIELDS, CFG_CERN_SITE, \
-    CFG_SITE_URL
+    CFG_SITE_URL, CFG_SITE_RECORD
 from invenio.search_engine import record_exists, search_pattern
 from invenio.webuser import session_param_get, session_param_set
 from invenio.bibcatalog import bibcatalog_system
 from invenio.webpage import page
+from invenio.htmlutils import get_mathjax_header
 from invenio.bibknowledge import get_kbd_values_for_bibedit, get_kbr_values, \
      get_kbt_items_for_bibedit #autosuggest
 
@@ -194,6 +195,7 @@ def perform_request_init(uid, ln, req, lastupdated):
             'gTAG_NAMES': tag_names,
             'gPROTECTED_FIELDS': protected_fields,
             'gSITE_URL': '"' + CFG_SITE_URL + '"',
+            'gSITE_RECORD': '"' + CFG_SITE_RECORD + '"',
             'gHISTORY_URL': history_url,
             'gCERN_SITE': cern_site,
             'gHASH_CHECK_INTERVAL': CFG_BIBEDIT_JS_HASH_CHECK_INTERVAL,
@@ -1185,7 +1187,7 @@ def _get_formated_record(record):
     xml_record = bibrecord.record_xml_output(record)
 
     result =  "<html><head><title>Record preview</title></head>"
-    result += "<script src='/MathJax/MathJax.js' type='text/javascript'></script>"
+    result += get_mathjax_header()
     result += "<body><h2> Brief format preview </h2>"
     result += bibformat.format_record(recID=None,
                                      of="hb",

@@ -36,7 +36,8 @@ from invenio.config import CFG_SITE_URL, CFG_BIBMATCH_FUZZY_WORDLIMITS, \
                            CFG_BIBMATCH_QUERY_TEMPLATES, \
                            CFG_BIBMATCH_FUZZY_EMPTY_RESULT_LIMIT, \
                            CFG_BIBMATCH_LOCAL_SLEEPTIME, \
-                           CFG_BIBMATCH_REMOTE_SLEEPTIME
+                           CFG_BIBMATCH_REMOTE_SLEEPTIME, \
+                           CFG_SITE_RECORD
 from invenio.invenio_connector import InvenioConnector
 from invenio.bibrecord import create_records, \
     record_get_field_values, record_xml_output, record_modify_controlfield, \
@@ -91,29 +92,35 @@ def usage():
  -a,  --alter-recid        The recid (controlfield 001) of matched or fuzzy matched records in
                            output will be replaced by the 001 value of the matched record.
                            Note: Useful if you want to replace matched records using BibUpload.
- -c,  --clean              clean queries before searching
+ -z,  --clean              clean queries before searching
+
  -h,  --help               print this help and exit
  -V,  --version            print version information and exit
 
  Advanced options:
 
- -c --config=(config-filename)
- -m --mode=(a|e|o|p|r) perform an advanced search using special search mode.
-    Where mode is:
-      "a" all of the words,
-      "o" any of the words,
-      "e" exact phrase,
-      "p" partial phrase,
-      "r" regular expression.
+ -c --config=filename      load querystrings from a config file. Each line starting with QRYSTR will
+                           be added as a query. i.e. QRYSTR --- [title] [author]
 
- -o --operator(a|o) used to concatenate identical fields in search query (i.e. several report-numbers)
-    Where operator is:
-      "a" boolean AND (default)
-      "o" boolean OR
+ -x --collection           only perform queries in certain collection(s).
+                           Note: matching against restricted collections does not work.
+
+ -m --mode=(a|e|o|p|r)     perform an advanced search using special search mode.
+                             Where mode is:
+                               "a" all of the words,
+                               "o" any of the words,
+                               "e" exact phrase,
+                               "p" partial phrase,
+                               "r" regular expression.
+
+ -o --operator(a|o)        used to concatenate identical fields in search query (i.e. several report-numbers)
+                             Where operator is:
+                               "a" boolean AND (default)
+                               "o" boolean OR
 
  QUERYSTRINGS
-     Querystrings determine which type of query/strategy to use when searching for the
-     matching records in the database.
+   Querystrings determine which type of query/strategy to use when searching for the
+   matching records in the database.
 
    Predefined querystrings:
 
@@ -185,6 +192,8 @@ def usage():
 
  $ bibmatch --print-ambiguous -q title-author < input.xml > ambigmatched.xml
  $ bibmatch -q "980:Thesis 773__p:\"[773__p]\" 100__a:[100__a]" -r "http://inspirebeta.net" < input.xml
+
+ $ bibmatch -x 'Books,Articles' < input.xml
     """ % (sys.argv[0],)
     sys.exit(1)
 
@@ -480,8 +489,8 @@ def match_result_output(recID_list, server_url, query, matchmode="no match"):
     """
     result = []
     for recID in recID_list:
-        result.append("<!-- BibMatch-Matching-Found: %s/record/%s -->" \
-                             % (server_url, recID))
+        result.append("<!-- BibMatch-Matching-Found: %s/%s/%s -->" \
+                             % (server_url, CFG_SITE_RECORD, recID))
     result.append("<!-- BibMatch-Matching-Mode: %s -->" \
                               % (matchmode,))
     result.append("<!-- BibMatch-Matching-Criteria: %s -->\n" \
@@ -489,7 +498,8 @@ def match_result_output(recID_list, server_url, query, matchmode="no match"):
     return "\n".join(result)
 
 def match_records(records, qrystrs=None, search_mode=None, operator="and", verbose=1, \
-                  server_url=CFG_SITE_URL, modify=0, sleeptime=CFG_BIBMATCH_LOCAL_SLEEPTIME, clean=False):
+                  server_url=CFG_SITE_URL, modify=0, sleeptime=CFG_BIBMATCH_LOCAL_SLEEPTIME, \
+                  clean=False, collections=[]):
     """
     Match passed records with existing records on a local or remote Invenio
     installation. Returns which records are new (no match), which are matched,
@@ -522,6 +532,12 @@ def match_records(records, qrystrs=None, search_mode=None, operator="and", verbo
 
     @param sleeptime: amount of time to wait between each query
     @type sleeptime: float
+
+    @param clean: should the search queries be cleaned before passed them along?
+    @type clean: bool
+
+    @param collections: list of collections to search, if specified
+    @type collections: list
 
     @rtype: list of lists
     @return an array of arrays of records, like this [newrecs,matchedrecs,
@@ -566,9 +582,9 @@ def match_records(records, qrystrs=None, search_mode=None, operator="and", verbo
 
             # Determine proper search parameters
             if search_mode != None:
-                search_params = dict(p1=query, f1=field, m1=search_mode, of='id')
+                search_params = dict(p1=query, f1=field, m1=search_mode, of='id', c=collections)
             else:
-                search_params = dict(p=query, f=field, of='id')
+                search_params = dict(p=query, f=field, of='id', c=collections)
 
             ## Perform the search with retries
             result_recids = server.search_with_retry(**search_params)
@@ -621,7 +637,7 @@ def match_records(records, qrystrs=None, search_mode=None, operator="and", verbo
                 # Go through every expression in the query and generate fuzzy searches
                 for current_operator, qry in fuzzy_query_list:
                     current_resultset = None
-                    search_params = dict(p=qry, f=field, of='id')
+                    search_params = dict(p=qry, f=field, of='id', c=collections)
                     current_resultset = server.search_with_retry(**search_params)
                     if (verbose > 8):
                         if len(current_resultset) > 10:
@@ -729,7 +745,7 @@ def main():
     done on the title field.
     """
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "0123hVm:fq:c:nv:o:b:i:r:taz",
+        opts, args = getopt.getopt(sys.argv[1:], "0123hVm:fq:c:nv:o:b:i:r:tazx:",
                  [
                    "print-new",
                    "print-match",
@@ -749,7 +765,8 @@ def main():
                    "remote=",
                    "text-marc-output",
                    "alter-recid",
-                   "clean"
+                   "clean",
+                   "collection="
                  ])
 
     except getopt.GetoptError, e:
@@ -771,6 +788,7 @@ def main():
     search_mode = None                        # activates a mode, uses advanced search instead of simple
     sleeptime = CFG_BIBMATCH_LOCAL_SLEEPTIME  # the amount of time to sleep between queries, changes on remote queries
     clean = False                             # should queries be sanitized?
+    collections = []                          # only search certain collections?
 
     for opt, opt_value in opts:
         if opt in ["-0", "--print-new"]:
@@ -827,6 +845,12 @@ def main():
                 tmp = line.split("---")
                 if(tmp[0] == "QRYSTR"):
                     qrystrs.append((field, tmp[1]))
+        if opt in ["-x", "--collection"]:
+            colls = opt_value.split(',')
+            print opt_value
+            for collection in colls:
+                if collection not in collections:
+                    collections.append(collection)
 
     if verbose:
         sys.stderr.write("\nBibMatch: Parsing input file %s..." % (f_input,))
@@ -866,7 +890,8 @@ def main():
                                   server_url,
                                   modify,
                                   sleeptime,
-                                  clean)
+                                  clean,
+                                  collections)
 
     # set the output according to print..
     # 0-newrecs 1-matchedrecs 2-ambiguousrecs 3-fuzzyrecs

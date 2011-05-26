@@ -283,7 +283,7 @@ def tarballs_by_arXiv_id(arXiv_ids, sdir):
     for arXiv_id in arXiv_ids:
         if 'arXiv' not in arXiv_id:
             arXiv_id = 'arXiv:' + arXiv_id
-        tarball, dummy_pdf = harvest_single(arXiv_id, sdir)
+        tarball, dummy_pdf = harvest_single(arXiv_id, sdir, ("tarball",))
         if tarball != None:
             tarballs.append(tarball)
 
@@ -351,12 +351,12 @@ def harvest_single(single, to_dir, selection=("tarball", "pdf")):
             idno = idno[-1]
         yymm = int(idno[:4])
         yymm_dir = make_useful_directories(yymm, to_dir)
-        individual_dir = make_single_directory(yymm_dir, 'arXiv:' + id_str)
         url_for_file = CFG_PLOTEXTRACTOR_ARXIV_BASE + CFG_PLOTEXTRACTOR_ARXIV_E_PRINT + \
                        id_str
         url_for_pdf = CFG_PLOTEXTRACTOR_ARXIV_BASE + CFG_PLOTEXTRACTOR_ARXIV_PDF + \
                       id_str
         individual_file = 'arXiv:' + id_str.replace('/', '_')
+        individual_dir = make_single_directory(yymm_dir, individual_file)
         abs_path = os.path.join(individual_dir, individual_file)
         tarball = abs_path
         pdf = abs_path + '.pdf'
@@ -454,13 +454,13 @@ def src_pdf_from_marc(marc_file):
     if possible_match != None:
         # it's listed on arXiv, hooray!
         arXiv_id = possible_match.group(0)
-        dummy1, pdf_loc = harvest_single(arXiv_id, to_dir)
+        dummy1, pdf_loc = harvest_single(arXiv_id, to_dir, ("pdf",))
 
     possible_match = re.search(DESY_match, marc_text)
     if possible_match != None:
         # it's listed on DESY, hooray!
         desy_id = possible_match.group(0)
-        dummy1, pdf_loc = harvest_single(desy_id, to_dir)
+        dummy1, pdf_loc = harvest_single(desy_id, to_dir, ("pdf",))
 
     return pdf_loc
 

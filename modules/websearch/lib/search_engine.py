@@ -62,6 +62,7 @@ from invenio.config import \
      CFG_BIBUPLOAD_EXTERNAL_SYSNO_TAG, \
      CFG_BIBRANK_SHOW_DOWNLOAD_GRAPHS, \
      CFG_WEBSEARCH_WILDCARD_LIMIT, \
+     CFG_WEBSEARCH_SYNONYM_KBRS, \
      CFG_SITE_LANG, \
      CFG_SITE_NAME, \
      CFG_LOGDIR, \
@@ -69,7 +70,9 @@ from invenio.config import \
      CFG_SITE_URL, \
      CFG_ACCESS_CONTROL_LEVEL_ACCOUNTS, \
      CFG_BIBRANK_SHOW_CITATION_LINKS, \
-     CFG_SOLR_URL
+     CFG_SOLR_URL, \
+     CFG_SITE_RECORD
+
 from invenio.search_engine_config import InvenioWebSearchUnknownCollectionError, InvenioWebSearchWildcardLimitError
 from invenio.bibrecord import create_record, record_get_field_instances
 from invenio.bibrank_record_sorter import get_bibrank_methods, rank_records, is_method_valid
@@ -79,6 +82,7 @@ from invenio.bibindex_engine_tokenizer import wash_author_name, author_name_requ
 from invenio.bibformat import format_record, format_records, get_output_format_content_type, create_excel
 from invenio.bibformat_config import CFG_BIBFORMAT_USE_OLD_BIBFORMAT
 from invenio.bibrank_downloads_grapher import create_download_history_graph_and_box
+from invenio.bibknowledge import get_kbr_values
 from invenio.data_cacher import DataCacher
 from invenio.websearch_external_collections import print_external_results_overview, perform_external_collection_search
 from invenio.access_control_admin import acc_get_action_id
@@ -90,6 +94,7 @@ from invenio.dbquery import DatabaseError, deserialize_via_marshal, InvenioDbQue
 from invenio.access_control_engine import acc_authorize_action
 from invenio.errorlib import register_exception
 from invenio.textutils import encode_for_xml, wash_for_utf8
+from invenio.htmlutils import get_mathjax_header
 
 import invenio.template
 webstyle_templates = invenio.template.load('webstyle')
@@ -225,7 +230,10 @@ def ziplist(*lists):
        [[f1, p1, op1], [f2, p2, op2], [f3, p3, '']]
 
     FIXME: This is handy to have, and should live somewhere else, like
-    miscutil.really_useful_functions or something.
+           miscutil.really_useful_functions or something.
+    XXX: Starting in python 2.6, the same can be achieved (faster) by
+         using itertools.izip_longest(); when the minimum recommended Python
+         is bumped, we should use that instead.
     """
     def l(*items):
         return list(items)
@@ -827,9 +835,7 @@ def page_start(req, of, cc, aas, ln, uid, title_message=None,
         ## add MathJax if displaying single records (FIXME: find
         ## eventual better place to this code)
         if of.lower() in CFG_WEBSEARCH_USE_MATHJAX_FOR_FORMATS:
-            metaheaderadd = """
-  <script src='/MathJax/MathJax.js' type='text/javascript'></script>
-"""
+            metaheaderadd = get_mathjax_header()
         else:
             metaheaderadd = ''
 
@@ -843,8 +849,8 @@ def page_start(req, of, cc, aas, ln, uid, title_message=None,
             # the nav. trail to have a link back to main record. (Due
             # to the way perform_request_search() works, hb
             # (lowercase) is equal to hd)
-            navtrail += ' <a class="navtrail" href="%s/record/%s">%s</a>' % \
-                            (CFG_SITE_URL, recID, title_message)
+            navtrail += ' <a class="navtrail" href="%s/%s/%s">%s</a>' % \
+                            (CFG_SITE_URL, CFG_SITE_RECORD, recID, title_message)
             if (of != '' or of.lower() != 'hd') and of != 'hb':
                 # Export
                 format_name = of
@@ -1322,17 +1328,24 @@ def wash_colls(cc, c, split_colls=0, verbose=0):
         debug += "<br />colls_out_for_display : %s" % colls_out_for_display
         debug += "<br />"
 
+    # FIXME: The below quoted part of the code has been commented out
+    # because it prevents searching in individual restricted daughter
+    # collections when both parent and all its public daughter
+    # collections were asked for, in addition to some restricted
+    # daughter collections.  The removal was introduced for hosted
+    # collections, so we may want to double check in this context.
+
     # the following piece of code takes care of removing collections whose ancestors are going to be searched anyway
     # list to hold the collections to be removed
-    colls_to_be_removed = []
+    #colls_to_be_removed = []
     # first calculate the collections that can safely be removed
-    for coll in colls_out_for_display:
-        for ancestor in get_coll_ancestors(coll):
-            #if ancestor in colls_out_for_display: colls_to_be_removed.append(coll)
-            if ancestor in colls_out_for_display and not is_hosted_collection(coll): colls_to_be_removed.append(coll)
+    #for coll in colls_out_for_display:
+    #    for ancestor in get_coll_ancestors(coll):
+    #        #if ancestor in colls_out_for_display: colls_to_be_removed.append(coll)
+    #        if ancestor in colls_out_for_display and not is_hosted_collection(coll): colls_to_be_removed.append(coll)
     # secondly remove the collections
-    for coll in colls_to_be_removed:
-        colls_out_for_display.remove(coll)
+    #for coll in colls_to_be_removed:
+    #    colls_out_for_display.remove(coll)
 
     if verbose:
         debug += "<br />6) --- remove collections that have ancestors about to be search, unless they are hosted ---"
@@ -1491,6 +1504,51 @@ def lower_index_term(term):
     """
     return unicode(term, 'utf-8').lower().encode('utf-8')
 
+
+def get_synonym_terms(term, kbr_name, match_type):
+    """
+    Return list of synonyms for TERM by looking in KBR_NAME in
+    MATCH_TYPE style.
+
+    @param term: search-time term or index-time term
+    @type term: str
+    @param kbr_name: knowledge base name
+    @type kbr_name: str
+    @param match_type: specifies how the term matches against the KBR
+        before doing the lookup.  Could be `exact' (default),
+        'leading_to_comma', `leading_to_number'.
+    @type match_type: str
+    @return: list of term synonyms
+    @rtype: list of strings
+    """
+    dterms = {}
+    ## exact match is default:
+    term_for_lookup = term
+    term_remainder = ''
+    ## but maybe match different term:
+    if match_type == 'leading_to_comma':
+        mmm = re.match(r'^(.*?)(\s*,.*)$', term)
+        if mmm:
+            term_for_lookup = mmm.group(1)
+            term_remainder = mmm.group(2)
+    elif match_type == 'leading_to_number':
+        mmm = re.match(r'^(.*?)(\s*\d.*)$', term)
+        if mmm:
+            term_for_lookup = mmm.group(1)
+            term_remainder = mmm.group(2)
+    ## FIXME: workaround: escaping SQL wild-card signs, since KBR's
+    ## exact search is doing LIKE query, so would match everything:
+    term_for_lookup = term_for_lookup.replace('%', '\%')
+    ## OK, now find synonyms:
+    for kbr_values in get_kbr_values(kbr_name,
+                                     searchkey=term_for_lookup,
+                                     searchtype='e'):
+        for kbr_value in kbr_values:
+            dterms[kbr_value + term_remainder] = 1
+    ## return list of term synonyms:
+    return dterms.keys()
+
+
 def wash_output_format(format):
     """Wash output format FORMAT.  Currently only prevents input like
     'of=9' for backwards-compatible format that prints certain fields
@@ -1637,6 +1695,15 @@ def get_colID(c):
     if res:
         colID = res[0][0]
     return colID
+
+def get_coll_normalised_name(c):
+    """Returns normalised collection name (case sensitive) for collection name
+       C (case insensitive).
+       Returns None if no match found."""
+    try:
+        return run_sql("SELECT name FROM collection WHERE name=%s", (c,))[0][0]
+    except:
+        return None
 
 def get_coll_ancestors(coll):
     "Returns a list of ancestors for collection 'coll'."
@@ -2054,6 +2121,7 @@ def search_pattern_parenthesised(req=None, p=None, f=None, m=None, ap=0, of="id"
 
         return search_pattern(req, p, f, m, ap, of, verbose, ln, display_nearest_terms_box=display_nearest_terms_box, wl=wl)
 
+
 def search_unit(p, f=None, m=None, wl=0):
     """Search for basic search unit defined by pattern 'p' and field
        'f' and matching type 'm'.  Return hitset of recIDs.
@@ -2062,6 +2130,11 @@ def search_unit(p, f=None, m=None, wl=0):
        'p' is assumed to be already a ``basic search unit'' so that it
        is searched as such and is not broken up in any way.  Only
        wildcard and span queries are being detected inside 'p'.
+
+       If CFG_WEBSEARCH_SYNONYM_KBRS is set and we are searching in
+       one of the indexes that has defined runtime synonym knowledge
+       base, then look up there and automatically enrich search
+       results with results for synonyms.
 
        In case the wildcard limit (wl) is greater than 0 and this limit
        is reached an InvenioWebSearchWildcardLimitError will be raised.
@@ -2072,22 +2145,33 @@ def search_unit(p, f=None, m=None, wl=0):
     """
 
     ## create empty output results set:
-    set = HitSet()
+    hitset = HitSet()
     if not p: # sanity checking
-        return set
+        return hitset
+
+    ## eventually look up runtime synonyms:
+    hitset_synonyms = HitSet()
+    if CFG_WEBSEARCH_SYNONYM_KBRS.has_key(f):
+        for p_synonym in get_synonym_terms(p,
+                             CFG_WEBSEARCH_SYNONYM_KBRS[f][0],
+                             CFG_WEBSEARCH_SYNONYM_KBRS[f][1]):
+            if p_synonym != p:
+                hitset_synonyms |= search_unit(p_synonym, f, m, wl)
+
+    ## look up hits:
     if CFG_SOLR_URL and f == 'fulltext':
         # redirect to Solr/Lucene
         return search_unit_in_solr(p, f, m)
     if f == 'datecreated':
-        set = search_unit_in_bibrec(p, p, 'c')
+        hitset = search_unit_in_bibrec(p, p, 'c')
     elif f == 'datemodified':
-        set = search_unit_in_bibrec(p, p, 'm')
+        hitset = search_unit_in_bibrec(p, p, 'm')
     elif f == 'refersto':
         # we are doing search by the citation count
-        set = search_unit_refersto(p)
+        hitset = search_unit_refersto(p)
     elif f == 'citedby':
         # we are doing search by the citation count
-        set = search_unit_citedby(p)
+        hitset = search_unit_citedby(p)
     elif m == 'a' or m == 'r':
         # we are doing either phrase search or regexp search
         if f == 'fulltext':
@@ -2095,16 +2179,19 @@ def search_unit(p, f=None, m=None, wl=0):
             return search_pattern(None, p, f, 'w')
         index_id = get_index_id_from_field(f)
         if index_id != 0:
-            set = search_unit_in_idxphrases(p, f, m, wl)
+            hitset = search_unit_in_idxphrases(p, f, m, wl)
         else:
-            set = search_unit_in_bibxxx(p, f, m, wl)
+            hitset = search_unit_in_bibxxx(p, f, m, wl)
     elif p.startswith("cited:"):
         # we are doing search by the citation count
-        set = search_unit_by_times_cited(p[6:])
+        hitset = search_unit_by_times_cited(p[6:])
     else:
         # we are doing bibwords search by default
-        set = search_unit_in_bibwords(p, f, m, wl=wl)
-    return set
+        hitset = search_unit_in_bibwords(p, f, m, wl=wl)
+
+    ## merge synonym results and return total:
+    hitset |= hitset_synonyms
+    return hitset
 
 def search_unit_in_bibwords(word, f, m=None, decompress=zlib.decompress, wl=0):
     """Searches for 'word' inside bibwordsX table for field 'f' and returns hitset of recIDs."""
@@ -2184,6 +2271,7 @@ def search_unit_in_idxphrases(p, f, type, wl=0):
     set = HitSet() # will hold output result set
     set_used = 0 # not-yet-used flag, to be able to circumvent set operations
     limit_reached = 0 # flag for knowing if the query limit has been reached
+    use_query_limit = False # flag for knowing if to limit the query results or not
     # deduce in which idxPHRASE table we will search:
     idxphraseX = "idxPHRASE%02dF" % get_index_id_from_field("anyfield")
     if f:
@@ -2196,16 +2284,19 @@ def search_unit_in_idxphrases(p, f, type, wl=0):
     if type == 'r':
         query_addons = "REGEXP %s"
         query_params = (p,)
+        use_query_limit = True
     else:
         p = string.replace(p, '*', '%') # we now use '*' as the truncation character
         ps = string.split(p, "->", 1) # check for span query:
         if len(ps) == 2 and not (ps[0].endswith(' ') or ps[1].startswith(' ')):
             query_addons = "BETWEEN %s AND %s"
             query_params = (ps[0], ps[1])
+            use_query_limit = True
         else:
             if string.find(p, '%') > -1:
                 query_addons = "LIKE %s"
                 query_params = (p,)
+                use_query_limit = True
             else:
                 query_addons = "= %s"
                 query_params = (p,)
@@ -2217,12 +2308,15 @@ def search_unit_in_idxphrases(p, f, type, wl=0):
             query_params_washed += (wash_author_name(query_param),)
         query_params = query_params_washed
     # perform search:
-    try:
-        res = run_sql_with_limit("SELECT term,hitlist FROM %s WHERE term %s" % (idxphraseX, query_addons),
+    if use_query_limit:
+        try:
+            res = run_sql_with_limit("SELECT term,hitlist FROM %s WHERE term %s" % (idxphraseX, query_addons),
                       query_params, wildcard_limit=wl)
-    except InvenioDbQueryWildcardLimitError, excp:
-        res = excp.res
-        limit_reached = 1 # set the limit reached flag to true
+        except InvenioDbQueryWildcardLimitError, excp:
+            res = excp.res
+            limit_reached = 1 # set the limit reached flag to true
+    else:
+        res = run_sql("SELECT term,hitlist FROM %s WHERE term %s" % (idxphraseX, query_addons), query_params)
     # fill the result set:
     for word, hitlist in res:
         hitset_bibphrase = HitSet(hitlist)
@@ -2248,6 +2342,7 @@ def search_unit_in_bibxxx(p, f, type, wl=0):
         return search_unit_in_bibwords(p, f, wl=wl)
     p_orig = p # saving for eventual future 'no match' reporting
     limit_reached = 0 # flag for knowing if the query limit has been reached
+    use_query_limit = False  # flag for knowing if to limit the query results or not
     query_addons = "" # will hold additional SQL code for the query
     query_params = () # will hold parameters for the query (their number may vary depending on TYPE argument)
     # wash arguments:
@@ -2255,16 +2350,19 @@ def search_unit_in_bibxxx(p, f, type, wl=0):
     if type == 'r':
         query_addons = "REGEXP %s"
         query_params = (p,)
+        use_query_limit = True
     else:
         p = string.replace(p, '*', '%') # we now use '*' as the truncation character
         ps = string.split(p, "->", 1) # check for span query:
         if len(ps) == 2 and not (ps[0].endswith(' ') or ps[1].startswith(' ')):
             query_addons = "BETWEEN %s AND %s"
             query_params = (ps[0], ps[1])
+            use_query_limit = True
         else:
             if string.find(p, '%') > -1:
                 query_addons = "LIKE %s"
                 query_params = (p,)
+                use_query_limit = True
             else:
                 query_addons = "= %s"
                 query_params = (p,)
@@ -2293,12 +2391,16 @@ def search_unit_in_bibxxx(p, f, type, wl=0):
                     query_params = tuple(int(param) for param in query_params)
                 except ValueError:
                     return HitSet()
-            try:
-                res = run_sql_with_limit("SELECT id FROM bibrec WHERE id %s" % query_addons,
+            if use_query_limit:
+                try:
+                    res = run_sql_with_limit("SELECT id FROM bibrec WHERE id %s" % query_addons,
                               query_params, wildcard_limit=wl)
-            except InvenioDbQueryWildcardLimitError, excp:
-                res = excp.res
-                limit_reached = 1 # set the limit reached flag to true
+                except InvenioDbQueryWildcardLimitError, excp:
+                    res = excp.res
+                    limit_reached = 1 # set the limit reached flag to true
+            else:
+                res = run_sql("SELECT id FROM bibrec WHERE id %s" % query_addons,
+                              query_params)
         else:
             query = "SELECT bibx.id_bibrec FROM %s AS bx LEFT JOIN %s AS bibx ON bx.id=bibx.id_bibxxx WHERE bx.value %s" % \
                     (bx, bibx, query_addons)
@@ -2306,19 +2408,19 @@ def search_unit_in_bibxxx(p, f, type, wl=0):
                 # wildcard query, or only the beginning of field 't'
                 # is defined, so add wildcard character:
                 query += " AND bx.tag LIKE %s"
+                query_params = query_params + (t + '%',)
+            else:
+                # exact query for 't':
+                query += " AND bx.tag=%s"
+                query_params = query_params + (t,)
+            if use_query_limit:
                 try:
-                    res = run_sql_with_limit(query, query_params + (t + '%',), wildcard_limit=wl)
+                    res = run_sql_with_limit(query, query_params, wildcard_limit=wl)
                 except InvenioDbQueryWildcardLimitError, excp:
                     res = excp.res
                     limit_reached = 1 # set the limit reached flag to true
             else:
-                # exact query for 't':
-                query += " AND bx.tag=%s"
-                try:
-                    res = run_sql_with_limit(query, query_params + (t,), wildcard_limit=wl)
-                except InvenioDbQueryWildcardLimitError, excp:
-                    res = excp.res
-                    limit_reached = 1 # set the limit reached flag to true
+                res = run_sql(query, query_params)
         # fill the result set:
         for id_bibrec in res:
             if id_bibrec[0]:
@@ -2356,6 +2458,12 @@ def search_unit_in_bibrec(datetext1, datetext2, type='c'):
         type = "modification_date"
     else:
         type = "creation_date" # by default we are searching for creation dates
+
+    parts = datetext1.split('->')
+    if len(parts) > 1 and datetext1 == datetext2:
+        datetext1 = parts[0]
+        datetext2 = parts[1]
+
     if datetext1 == datetext2:
         res = run_sql("SELECT id FROM bibrec WHERE %s LIKE %%s" % (type,),
                       (datetext1 + '%',))
@@ -2902,10 +3010,12 @@ def guess_primary_collection_of_a_record(recID):
     out = CFG_SITE_NAME
     dbcollids = get_fieldvalues(recID, "980__a")
     if dbcollids:
-        dbquery = "collection:" + dbcollids[0]
-        res = run_sql("SELECT name FROM collection WHERE dbquery=%s", (dbquery,))
-        if res:
-            out = res[0][0]
+        for dbcollid in dbcollids:
+            dbquery = "collection:" + dbcollid
+            res = run_sql("SELECT name FROM collection WHERE dbquery=%s", (dbquery,))
+            if res:
+                out = res[0][0]
+                break
     if CFG_CERN_SITE:
         # dirty hack for ATLAS collections at CERN:
         if out in ('ATLAS Communications', 'ATLAS Internal Notes'):
@@ -2925,9 +3035,14 @@ def guess_collection_of_a_record(recID, referer=None, recreate_cache_if_needed=T
        primary collection."""
     if referer:
         dummy, hostname, path, dummy, query, dummy = urlparse.urlparse(referer)
+        #requests can come from different invenio installations, with different collections
+        if CFG_SITE_URL.find(hostname) < 0:
+            return guess_primary_collection_of_a_record(recID)
         g = _re_collection_url.match(path)
         if g:
-            name = normalize_collection_name(urllib.unquote_plus(g.group(1)))
+            name = urllib.unquote_plus(g.group(1))
+            #check if this collection actually exist (also normalize the name if case-insensitive)
+            name = get_coll_normalised_name(name)
             if name and recID in get_collection_reclist(name):
                 return name
         elif path.startswith('/search'):
@@ -3016,10 +3131,6 @@ def get_fieldvalues(recIDs, tag, repetitive_values=True):
     only.
     """
     out = []
-    try:
-        recIDs = int(recIDs)
-    except:
-        pass
     if isinstance(recIDs, (int, long)):
         recIDs =[recIDs,]
     if not isinstance(recIDs, (list, tuple)):
@@ -3640,7 +3751,7 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
                             references = len(record_get_field_instances(tmprec, reftag[0:3], reftag[3], reftag[4]))
 
                     tabs = [(unordered_tabs[tab_id]['label'], \
-                             '%s/record/%s/%s%s' % (CFG_SITE_URL, recid_to_display, tab_id, link_ln), \
+                             '%s/%s/%s/%s%s' % (CFG_SITE_URL, CFG_SITE_RECORD, recid_to_display, tab_id, link_ln), \
                              tab_id == tab,
                              unordered_tabs[tab_id]['enabled']) \
                             for (tab_id, order) in ordered_tabs_id
@@ -3833,7 +3944,7 @@ def print_records(req, recIDs, jrec=1, rg=10, format='hb', ot='', ln=CFG_SITE_LA
     else:
         print_warning(req, _("Use different search terms."))
 
-def print_records_prologue(req, format):
+def print_records_prologue(req, format, cc=None):
     """
     Print the appropriate prologue for list of records in the given
     format.
@@ -3846,11 +3957,13 @@ def print_records_prologue(req, format):
     elif format.startswith('xw'):
         prologue = websearch_templates.tmpl_xml_refworks_prologue()
     elif format.startswith('xr'):
-        prologue = websearch_templates.tmpl_xml_rss_prologue()
+        prologue = websearch_templates.tmpl_xml_rss_prologue(cc=cc)
     elif format.startswith('xe'):
         prologue = websearch_templates.tmpl_xml_endnote_prologue()
     elif format.startswith('xo'):
         prologue = websearch_templates.tmpl_xml_mods_prologue()
+    elif format.startswith('xp'):
+        prologue = websearch_templates.tmpl_xml_podcast_prologue(cc=cc)
     elif format.startswith('x'):
         prologue = websearch_templates.tmpl_xml_default_prologue()
     req.write(prologue)
@@ -3873,6 +3986,8 @@ def print_records_epilogue(req, format):
         epilogue = websearch_templates.tmpl_xml_endnote_epilogue()
     elif format.startswith('xo'):
         epilogue = websearch_templates.tmpl_xml_mods_epilogue()
+    elif format.startswith('xp'):
+        epilogue = websearch_templates.tmpl_xml_podcast_epilogue()
     elif format.startswith('x'):
         epilogue = websearch_templates.tmpl_xml_default_epilogue()
     req.write(epilogue)
@@ -5069,7 +5184,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
             else:
                 if len(colls_to_search)>1:
                     cpu_time = -1 # we do not want to have search time printed on each collection
-                print_records_prologue(req, of)
+                print_records_prologue(req, of, cc=cc)
                 for coll in colls_to_search:
                     if results_final.has_key(coll) and len(results_final[coll]):
                         if of.startswith("h"):
@@ -5397,34 +5512,3 @@ def profile(p="", f="", c=CFG_SITE_NAME):
     p = pstats.Stats("perform_request_search_profile")
     p.strip_dirs().sort_stats("cumulative").print_stats()
     return 0
-
-## test cases:
-#print wash_colls(CFG_SITE_NAME,"Library Catalogue", 0)
-#print wash_colls("Periodicals & Progress Reports",["Periodicals","Progress Reports"], 0)
-#print wash_field("wau")
-#print print_record(20,"tm","001,245")
-#print create_opft_search_units(None, "PHE-87-13","reportnumber")
-#print ":"+wash_pattern("* and % doo * %")+":\n"
-#print ":"+wash_pattern("*")+":\n"
-#print ":"+wash_pattern("ellis* ell* e*%")+":\n"
-#print run_sql("SELECT name,dbquery from collection")
-#print get_index_id("author")
-#print get_coll_ancestors("Theses")
-#print get_coll_sons("Articles & Preprints")
-#print get_coll_real_descendants("Articles & Preprints")
-#print get_collection_reclist("Theses")
-#print log(sys.stdin)
-#print search_unit_in_bibrec('2002-12-01','2002-12-12')
-#print get_nearest_terms_in_bibxxx("ellis", "author", 5, 5)
-#print call_bibformat(68, "HB_FLY")
-#print get_fieldvalues(10, "980__a")
-#print get_fieldvalues_alephseq_like(10,"001___")
-#print get_fieldvalues_alephseq_like(10,"980__a")
-#print get_fieldvalues_alephseq_like(10,"foo")
-#print get_fieldvalues_alephseq_like(10,"-1")
-#print get_fieldvalues_alephseq_like(10,"99")
-#print get_fieldvalues_alephseq_like(10,["001", "980"])
-
-## profiling:
-#profile("of the this")
-#print perform_request_search(p="ellis")

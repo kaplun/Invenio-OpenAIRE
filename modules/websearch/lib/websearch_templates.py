@@ -51,6 +51,7 @@ from invenio.config import \
      CFG_SITE_URL, \
      CFG_SITE_SUPPORT_EMAIL, \
      CFG_SITE_ADMIN_EMAIL, \
+     CFG_CERN_SITE, \
      CFG_INSPIRE_SITE, \
      CFG_WEBSEARCH_DEFAULT_SEARCH_INTERFACE, \
      CFG_WEBSEARCH_ENABLED_SEARCH_INTERFACES, \
@@ -60,7 +61,8 @@ from invenio.config import \
      CFG_WEBCOMMENT_ALLOW_REVIEWS, \
      CFG_WEBSEARCH_WILDCARD_LIMIT,\
      CFG_WEBSEARCH_SHOW_COMMENT_COUNT, \
-     CFG_WEBSEARCH_SHOW_REVIEW_COUNT
+     CFG_WEBSEARCH_SHOW_REVIEW_COUNT, \
+     CFG_SITE_RECORD
 
 from invenio.dbquery import run_sql
 from invenio.messages import gettext_set_language
@@ -112,6 +114,7 @@ class Template:
         'fr': 'fr_FR',
         'it': 'it_IT',
         'ka': 'ka_GE',
+        'lt': 'lt_LT',
         'ro': 'ro_RO',
         'ru': 'ru_RU',
         'rw': 'rw_RW',
@@ -498,9 +501,9 @@ class Template:
             parameters['as'] = parameters['aas']
             del parameters['aas']
 
-        # Asking for a recid? Return a /record/<recid> URL
+        # Asking for a recid? Return a /CFG_SITE_RECORD/<recid> URL
         if 'recid' in parameters:
-            target = "%s/record/%s" % (CFG_SITE_URL, parameters['recid'])
+            target = "%s/%s/%s" % (CFG_SITE_URL, CFG_SITE_RECORD, parameters['recid'])
             del parameters['recid']
             target += make_canonical_urlargd(parameters, self.search_results_default_urlargd)
             return target
@@ -559,7 +562,7 @@ class Template:
         return CFG_SITE_URL + '/rss' + args
 
     def tmpl_record_page_header_content(self, req, recid, ln):
-        """ Provide extra information in the header of /record pages """
+        """ Provide extra information in the header of /CFG_SITE_RECORD pages """
 
         _ = gettext_set_language(ln)
 
@@ -3365,7 +3368,7 @@ class Template:
                 out += "<!--not showing citations links-->"
         if display_claim_link: #Maybe we want not to show the link to who cannot use id?
             out += '<span class="moreinfo"> - %s</span>' % \
-                create_html_link(CFG_SITE_URL + '/person/action', {'claim':'True','selection':str(recID)}, 
+                create_html_link(CFG_SITE_URL + '/person/action', {'claim':'True','selection':str(recID)},
                                                                         'Attribute this paper',
                                                                         {'class': "moreinfo"})
 
@@ -3373,7 +3376,7 @@ class Template:
             num_comments = get_nb_comments(recID, count_deleted=False)
             if num_comments:
                 out += '<span class="moreinfo"> - %s</span>' % \
-                        create_html_link(CFG_SITE_URL + '/record/' + str(recID)
+                        create_html_link(CFG_SITE_URL + '/'+ CFG_SITE_RECORD +'/' + str(recID)
                         + '/comments?ln=%s' % ln, {}, num_comments > 1 and _("%i comments")
                         % (num_comments) or _("1 comment"),
                         {'class': "moreinfo"})
@@ -3384,7 +3387,7 @@ class Template:
             num_reviews = get_nb_reviews(recID, count_deleted=False)
             if num_reviews:
                 out += '<span class="moreinfo"> - %s</span>' % \
-                        create_html_link(CFG_SITE_URL + '/record/' + str(recID)
+                        create_html_link(CFG_SITE_URL + '/'+ CFG_SITE_RECORD +'/' + str(recID)
                         + '/reviews?ln=%s' % ln, {}, num_reviews > 1 and _("%i reviews")
                         % (num_reviews) or _("1 review"), {'class': "moreinfo"})
             else:
@@ -3397,8 +3400,14 @@ class Template:
     def tmpl_xml_rss_prologue(self, current_url=None,
                               previous_url=None, next_url=None,
                               first_url=None, last_url=None,
-                              nb_found=None, jrec=None, rg=None):
+                              nb_found=None, jrec=None, rg=None, cc=None):
         """Creates XML RSS 2.0 prologue."""
+        title = CFG_SITE_NAME
+        description = '%s latest documents' % CFG_SITE_NAME
+        if cc and cc != CFG_SITE_NAME:
+            title += ': ' + cgi.escape(cc)
+            description += ' in ' + cgi.escape(cc)
+
         out = """<rss version="2.0"
         xmlns:media="http://search.yahoo.com/mrss/"
         xmlns:atom="http://www.w3.org/2005/Atom"
@@ -3406,9 +3415,9 @@ class Template:
         xmlns:dcterms="http://purl.org/dc/terms/"
         xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">
       <channel>
-        <title>%(sitename)s</title>
+        <title>%(rss_title)s</title>
         <link>%(siteurl)s</link>
-        <description>%(sitename)s latest documents</description>
+        <description>%(rss_description)s</description>
         <language>%(sitelang)s</language>
         <pubDate>%(timestamp)s</pubDate>
         <category></category>
@@ -3452,6 +3461,8 @@ class Template:
                              '\n<opensearch:startIndex>%i</opensearch:startIndex>' % jrec) or '',
                'items_per_page': (rg and \
                              '\n<opensearch:itemsPerPage>%i</opensearch:itemsPerPage>' % rg) or '',
+               'rss_title': title,
+               'rss_description': description
         }
         return out
 
@@ -3459,6 +3470,68 @@ class Template:
         """Creates XML RSS 2.0 epilogue."""
         out = """\
       </channel>
+</rss>\n"""
+        return out
+
+    def tmpl_xml_podcast_prologue(self, current_url=None,
+                                  previous_url=None, next_url=None,
+                                  first_url=None, last_url=None,
+                                  nb_found=None, jrec=None, rg=None, cc=None):
+        """Creates XML podcast prologue."""
+        title = CFG_SITE_NAME
+        description = '%s latest documents' % CFG_SITE_NAME
+        if CFG_CERN_SITE:
+            title = 'CERN'
+            description = 'CERN latest documents'
+        if cc and cc != CFG_SITE_NAME:
+            title += ': ' + cgi.escape(cc)
+            description += ' in ' + cgi.escape(cc)
+
+        out = """<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
+        <channel>
+        <title>%(podcast_title)s</title>
+	<link>%(siteurl)s</link>
+        <description>%(podcast_description)s</description>
+        <language>%(sitelang)s</language>
+        <pubDate>%(timestamp)s</pubDate>
+        <category></category>
+	<generator>Invenio %(version)s</generator>
+        <webMaster>%(siteadminemail)s</webMaster>
+        <ttl>%(timetolive)s</ttl>%(previous_link)s%(next_link)s%(current_link)s
+        <image>
+            <url>%(siteurl)s/img/site_logo_rss.png</url>
+            <title>%(sitename)s</title>
+            <link>%(siteurl)s</link>
+        </image>
+        <itunes:owner>
+        <itunes:email>%(siteadminemail)s</itunes:email>
+        </itunes:owner>
+        """ % {'sitename': CFG_SITE_NAME,
+	       'siteurl': CFG_SITE_URL,
+               'sitelang': CFG_SITE_LANG,
+               'siteadminemail': CFG_SITE_ADMIN_EMAIL,
+               'timestamp': time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime()),
+               'version': CFG_VERSION,
+               'sitesupportemail': CFG_SITE_SUPPORT_EMAIL,
+	       'timetolive': CFG_WEBSEARCH_RSS_TTL,
+               'current_link': (current_url and \
+                                 '\n<atom:link rel="self" href="%s" />\n' % current_url) or '',
+               'previous_link': (previous_url and \
+                                 '\n<atom:link rel="previous" href="%s" />' % previous_url) or '',
+               'next_link': (next_url and \
+                             '\n<atom:link rel="next" href="%s" />' % next_url) or '',
+               'first_link': (first_url and \
+                             '\n<atom:link rel="first" href="%s" />' % first_url) or '',
+               'last_link': (last_url and \
+                             '\n<atom:link rel="last" href="%s" />' % last_url) or '',
+                'podcast_title': title,
+                'podcast_description': description
+               }
+        return out
+
+    def tmpl_xml_podcast_epilogue(self):
+	"""Creates XML podcast epilogue."""
+        out = """\n</channel>
 </rss>\n"""
         return out
 
@@ -3913,24 +3986,6 @@ class Template:
         _ = gettext_set_language(ln)
         ib_pubs = intbitset(pubs)
 
-        # Prepare data for display
-        # construct names box
-        header = "<strong>" + _("Name variants") + "</strong>"
-        content = []
-
-        for name, frequency in sorted(names_dict.iteritems(),
-                                      key=itemgetter(1),
-                                      reverse=True):
-            name_lnk = create_html_link(self.build_search_url(p=name,
-                                                              f='exactauthor'),
-                                                              {},
-                                                              str(frequency),)
-            content.append("%s (%s)" % (name, name_lnk))
-
-        if not content:
-            content = [_("No Name Variants")]
-
-        names_box = self.tmpl_print_searchresultbox(header, "<br />\n".join(content))
         # construct an extended search as an interim solution for author id
         # searches. Will build "(exactauthor:v1 OR exactauthor:v2)" strings
 #        extended_author_search_str = ""
@@ -3986,10 +4041,31 @@ class Template:
                 baid_query = extended_author_search_str
 
         baid_query = baid_query + " "
+
+        sorted_names_list = sorted(names_dict.iteritems(), key=itemgetter(1),
+                                   reverse=True)
+
+        # Prepare data for display
+        # construct names box
+        header = "<strong>" + _("Name variants") + "</strong>"
+        content = []
+
+        for name, frequency in sorted_names_list:
+            prquery = baid_query + ' exactauthor:"' + name + '"'
+            name_lnk = create_html_link(self.build_search_url(p=prquery),
+                                                              {},
+                                                              str(frequency),)
+            content.append("%s (%s)" % (name, name_lnk))
+
+        if not content:
+            content = [_("No Name Variants")]
+
+        names_box = self.tmpl_print_searchresultbox(header, "<br />\n".join(content))
+
         # construct papers box
         rec_query = baid_query
         searchstr = create_html_link(self.build_search_url(p=rec_query),
-                                     {}, "All papers (" + str(len(pubs)) + ")",)
+                                     {}, "<strong>" + "All papers (" + str(len(pubs)) + ")" + "</strong>",)
         line1 = "<strong>" + _("Papers") + "</strong>"
         line2 = searchstr
 
@@ -4072,7 +4148,7 @@ class Template:
 
         header = "<strong>" + _("Frequent co-authors") + "</strong>"
         content = []
-        sorted_coauthors = sorted(sorted(authors.iteritems(), key=itemgetter(0)), 
+        sorted_coauthors = sorted(sorted(authors.iteritems(), key=itemgetter(0)),
                                   key=itemgetter(1), reverse=True)
 
         for name, frequency in sorted_coauthors:
@@ -4085,12 +4161,22 @@ class Template:
 
         coauthor_box = self.tmpl_print_searchresultbox(header, "<br />\n".join(content))
 
-        req.write("<h1>%s</h1>" % authorname)
+        pubs_to_papers_link = create_html_link(self.build_search_url(p=baid_query), {}, str(len(pubs)))
+        display_name = ""
+
+        try:
+            display_name = sorted_names_list[0][0]
+        except IndexError:
+            display_name = "&nbsp;"
+
+        req.write('<h1>%s <span style="font-size:50%%;">(%s papers)</span></h1>'
+                  % (display_name, pubs_to_papers_link))
+#        req.write("<h1>%s</h1>" % (authorname))
 
         if person_link:
-            req.write('<div><a href="%s/person/%s">%s</a></div>'
+            req.write('<div><a href="%s/person/%s?open_claim=True">%s</a></div>'
                       % (CFG_SITE_URL, person_link,
-                         _("Report problem!")))
+                         _("This is me.  Verify my publication list.")))
 
         req.write("<table width=80%><tr valign=top><td>")
         req.write(names_box)

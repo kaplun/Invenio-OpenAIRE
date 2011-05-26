@@ -213,6 +213,7 @@ INSERT INTO format VALUES (18,'HTML citesummary','hcs', 'HTML cite summary forma
 INSERT INTO format VALUES (19,'RefWorks','xw', 'RefWorks.', 'text/xml', 1);
 INSERT INTO format VALUES (20,'MODS', 'xo', 'Metadata Object Description Schema', 'application/xml', 1);
 INSERT INTO format VALUES (21,'HTML author claiming', 'ha', 'Very brief HTML output format for author/paper claiming facility.', 'text/html', 0);
+INSERT INTO format VALUES (22,'Podcast', 'xp', 'Sample format suitable for multimedia feeds, such as podcasts', 'application/rss+xml', 0);
 
 INSERT INTO tag VALUES (1,'first author name','100__a');
 INSERT INTO tag VALUES (2,'additional author name','700__a');
@@ -599,6 +600,8 @@ INSERT INTO sbmFUNDESC VALUES ('Move_Uploaded_Files_to_Storage','iconsize');
 INSERT INTO sbmFUNDESC VALUES ('Move_Uploaded_Files_to_Storage','createIconDoctypes');
 INSERT INTO sbmFUNDESC VALUES ('Move_Uploaded_Files_to_Storage','forceFileRevision');
 INSERT INTO sbmFUNDESC VALUES ('Move_Photos_to_Storage','iconsize');
+INSERT INTO sbmFUNDESC VALUES ('User_is_Record_Owner_or_Curator','curator_role');
+INSERT INTO sbmFUNDESC VALUES ('User_is_Record_Owner_or_Curator','curator_flag');
 
 INSERT INTO sbmGFILERESULT VALUES ('HTML','HTML document');
 INSERT INTO sbmGFILERESULT VALUES ('WORD','data');

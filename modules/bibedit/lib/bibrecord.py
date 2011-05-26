@@ -888,13 +888,14 @@ def record_xml_output(rec, tags=None):
 
     # Add the tag 'tag' to each field in rec[tag]
     fields = []
-    for tag in rec:
-        if not tags or tag in tags:
-            for field in rec[tag]:
-                fields.append((tag, field))
-    record_order_fields(fields)
-    for field in fields:
-        marcxml.append(field_xml_output(field[1], field[0]))
+    if rec is not None:
+        for tag in rec:
+            if not tags or tag in tags:
+                for field in rec[tag]:
+                    fields.append((tag, field))
+        record_order_fields(fields)
+        for field in fields:
+            marcxml.append(field_xml_output(field[1], field[0]))
     marcxml.append('</record>')
     return '\n'.join(marcxml)
 
@@ -1060,6 +1061,7 @@ def record_strip_empty_fields(rec, tag=None):
                 for subfield in field[0]:
                     # check if the subfield has been given a value
                     if subfield[1]:
+                        subfield = (subfield[0], subfield[1].strip()) # Always strip values
                         subfields.append(subfield)
                 if len(subfields) > 0:
                     new_field = create_field(subfields, field[1], field[2],

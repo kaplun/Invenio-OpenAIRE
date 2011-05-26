@@ -24,7 +24,8 @@ import cgi
 from invenio.config import CFG_SITE_URL, CFG_BIBEDITMULTI_LIMIT_INSTANT_PROCESSING,\
                            CFG_BIBEDITMULTI_LIMIT_DELAYED_PROCESSING,\
                            CFG_BIBEDITMULTI_LIMIT_DELAYED_PROCESSING_TIME,\
-                           CFG_SITE_ADMIN_EMAIL
+                           CFG_SITE_ADMIN_EMAIL, \
+                           CFG_SITE_RECORD
 from invenio.messages import gettext_set_language
 
 
@@ -223,6 +224,10 @@ div .boxleft_2 {
     color:#000000;
 }
 
+.buttonDisabled{
+    background:grey;
+}
+
 </style>
         """
         return styles
@@ -249,7 +254,7 @@ div .boxleft_2 {
             <b>%(text_search_criteria)s:</b>
         </div>
         <div class="boxleft_2">
-            <input type="text" id="textBoxSearchCriteria"  size="40" onkeypress="onEnter(event);"> <br />
+            <input type="text" id="textBoxSearchCriteria"  size="40"> <br />
         </div>
     </div>
     <div class="boxContainer">
@@ -265,7 +270,7 @@ div .boxleft_2 {
             <b>%(text_output_tags)s:</b>
         </div>
         <div class="boxleft_2">
-            <div><input class="inputValueGrey" type="text" id="textBoxOutputTags" value="All tags" size="28" onkeypress="onEnter(event);">&nbsp;&nbsp;<i>Ex. 100, 700</i><br/></div>
+            <div><input class="inputValueGrey" type="text" id="textBoxOutputTags" value="All tags" size="28">&nbsp;&nbsp;<i>Ex. 100, 700</i><br/></div>
         </div>
     </div>
     <div class="boxContainer">
@@ -377,7 +382,7 @@ div .boxleft_2 {
     <tr class="tagTableRow">
         <td />
         <td>
-        <input class="textBoxFieldTag txtTag" type="Text" onkeypress="onPressEsc(event);" maxlength="3" /><input class="textBoxFieldInd1 txtInd" onkeypress="onPressEsc(event);" type="Text" maxlength="1" /><input class="textBoxFieldInd2 txtInd" onkeypress="onPressEsc(event);" type="text" maxlength="1" />
+        <input class="textBoxFieldTag txtTag" type="Text" maxlength="3" /><input class="textBoxFieldInd1 txtInd" type="Text" maxlength="1" /><input class="textBoxFieldInd2 txtInd" type="text" maxlength="1" />
         </td>
         <td />
         <td />
@@ -412,14 +417,42 @@ div .boxleft_2 {
         <td />
         <td />
         <td><span class="action colActionType"></span></td>
+        <td class="conditionParametersDisplay">
+            <span class="conditionParametersDisplay"><strong> %(text_with_condition)s</strong></span>
+            <input id="textBoxConditionSubfieldDisplay" class="txtValue textBoxConditionSubfield conditionSubfieldParameters" type="text" maxlength="1"/>
 
+            <span class="conditionExact conditionParametersDisplay"></span>
+            <input id="textBoxConditionFieldDisplay" class="txtValue textBoxCondition conditionParametersDisplay" type="text"/>
+        </td>
         <td align="center">
             <img src="%(site_url)s/img/add.png" class="buttonNewSubfield" alt="Add new"/>
             <span class="buttonNewSubfield linkButton">%(text_define_subfield)s</span>
         </td>
         <td />
     </tr>
-    </tbody>
+    <tr class="conditionParameters">
+        <td /> <td /> <td /> <td /><td colspan="3">%(text_condition_subfield_delete)s
+        <input id="textBoxConditionSubfield" class="txtValue textBoxConditionSubfield" type="text" maxlength="1"/>
+        <select class="selectConditionExactMatch">
+            <option value="0">%(text_equal_to)s</option>
+            <option value="1">%(text_contains)s</option>
+        </select>
+        <input id="textBoxCondition" class="txtValue textBoxCondition" type="text" value="%(text_condition)s"/>
+        </td>
+    </tr>
+    <tr class="conditionActOnFields">
+        <td /><td /><td /><td />
+        <td colspan="3">
+            <span class="actOnFieldLink" id="actOnFieldsDelete"><u>%(text_filter_fields)s</u></span>
+        </td>
+    </tr>
+    <tr class="conditionActOnFieldsSave">
+        <td /><td /><td /><td /><td>
+            <input value="%(text_save)s" type="button" id="buttonSaveNewFieldCondition" class="formbutton"/>
+            <input value="%(text_cancel)s" type="button" id="buttonCancelFieldCondition" class="formbutton">
+        </td>
+    </tr>
+</tbody>
 
     <!-- Templates for subfields -->
 
@@ -433,17 +466,16 @@ div .boxleft_2 {
         <span class="action colActionType">%(text_replace_text)s</span>&nbsp;
     </td>
     <td>
-        <span class="value valueParameters">value</span>&nbsp;
+        <input id="textBoxValueDisplay" class="txtValue textBoxValue valueParameters" type="text"/>&nbsp;
 
         <span class="newValueParameters"><strong> %(text_with)s </strong></span>
-        <span class="newValue newValueParameters">new value</span>
+        <input id="textBoxNewValueDisplay" class="txtValue textBoxNewValue newValueParameters" type="text" value="%(text_new_value)s"/>
 
-        <span class="conditionParameters"><strong> %(text_with_condition)s </strong></span>
+        <span class="conditionParameters"><strong> %(text_with_condition)s</strong></span>
+        <input id="textBoxConditionSubfieldDisplay" class="txtValue textBoxConditionSubfield conditionSubfieldParameters" type="text" maxlength="1"/>
+
         <span class="conditionExact conditionParameters"></span>
-        <span class="condition conditionParameters"></span>
-
-        <span class="conditionSubfieldParameters"><strong> %(text_with_condition_subfield)s </strong></span>
-        <span class="conditionSubfield conditionSubfieldParameters"></span>
+        <input id="textBoxConditionDisplay" class="txtValue textBoxCondition conditionParameters" type="text"/>
 
     </td>
     <td/>
@@ -479,8 +511,8 @@ div .boxleft_2 {
         </td>
     </tr>
     <tr class="conditionParameters">
-        <td /> <td /> <td /> <td /><td colspan="3">when other subfield
-        <input class="txtValue textBoxConditionSubfield" type="text"/>
+        <td /> <td /> <td /> <td /><td colspan="3">%(text_condition_subfield)s
+        <input class="txtValue textBoxConditionSubfield" type="text" maxlength="1"/>
         <select class="selectConditionExactMatch">
             <option value="0">%(text_equal_to)s</option>
             <option value="1">%(text_contains)s</option>
@@ -533,12 +565,13 @@ div .boxleft_2 {
               "text_replace_text" : _("Replace substring"),
               "text_replace_content" : _("Replace full content"),
               "text_with" : _("with"),
-              "text_with_condition": _("when field"),
-              "text_with_condition_subfield" : _("on subfield"),
+              "text_with_condition": _("when subfield $$"),
               "text_new_value" : _("new value"),
               "text_equal_to" : _("is equal to"),
               "text_contains" : _("contains"),
               "text_condition" : _("condition"),
+              "text_condition_subfield" : _("when other subfield"),
+              "text_condition_subfield_delete" : _("when subfield"),
               "text_filter_fields": _("Apply only to specific field instances"),
               "text_value" : _("value")
              }
@@ -732,27 +765,29 @@ div .boxleft_2 {
 
         if status == 0:
             body = """
-                   <div class="clean-ok"><div>Changes have been sent to the server. It will take some time before they are applied. You can <a href=%s/record/multiedit>reset </a> the editor.</div>
-                   """ % (CFG_SITE_URL)
+                   <div class="clean-ok"><div>Changes have been sent to the server. It will take some time before they are applied. You can <a href=%s/%s/multiedit>reset </a> the editor.</div>
+                   """ % (CFG_SITE_URL, CFG_SITE_RECORD)
         elif status in [1, 2]:
             body = """
                    <div class="clean-ok">You are submitting a file that manipulates more than %s records. Your job will therefore be processed only during <strong>%s</strong>. <br /><br />
             If you are not happy about this, please contact %s, quoting your file <strong>%s</strong> <br /><br />
-            You can <a href=%s/record/multiedit>reset</a> the editor.</div>
+            You can <a href=%s/%s/multiedit>reset</a> the editor.</div>
                    """ % (CFG_BIBEDITMULTI_LIMIT_INSTANT_PROCESSING,
                           CFG_BIBEDITMULTI_LIMIT_DELAYED_PROCESSING_TIME,
                           CFG_SITE_ADMIN_EMAIL,
                           file_path,
-                          CFG_SITE_URL)
+                          CFG_SITE_URL,
+                          CFG_SITE_RECORD)
         else:
             body = """
                    <div class="clean-error">Sorry, you are submitting a file that manipulates more than %s records. You don't have enough rights for this.
                    <br /> <br />
                    If you are not happy about this, please contact %s, quoting your file %s <br /><br />
-                   You can <a href=%s/record/multiedit>reset</a> the editor.</div>
+                   You can <a href=%s/%s/multiedit>reset</a> the editor.</div>
                    """ % (CFG_BIBEDITMULTI_LIMIT_DELAYED_PROCESSING,
                           CFG_SITE_ADMIN_EMAIL,
                           file_path,
-                          CFG_SITE_URL)
+                          CFG_SITE_URL,
+                          CFG_SITE_RECORD)
         return body
 

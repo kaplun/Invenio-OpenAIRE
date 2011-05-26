@@ -35,7 +35,8 @@ from optparse import OptionParser, OptionGroup, OptionValueError
 from tempfile import mkstemp
 
 from invenio.errorlib import register_exception
-from invenio.config import CFG_TMPDIR, CFG_SITE_URL, CFG_WEBSUBMIT_FILEDIR
+from invenio.config import CFG_TMPDIR, CFG_SITE_URL, CFG_WEBSUBMIT_FILEDIR, \
+    CFG_SITE_RECORD
 from invenio.bibdocfile import BibRecDocs, BibDoc, InvenioWebSubmitFileError, \
     nice_size, check_valid_url, clean_url, get_docname_from_url, \
     guess_format_from_url, KEEP_OLD_VALUE, decompose_bibdocfile_fullpath, \
@@ -261,7 +262,7 @@ def cli_slow_match_single_docid(options, docid, recids=None, docids=None):
     match or not."""
     debug('cli_slow_match_single_docid checking: %s' % docid)
     empty_docs = getattr(options, 'empty_docs', None)
-    docname = getattr(options, 'docname', None)
+    docname = cli2docname(options)
     if recids is None:
         recids = cli_quick_match_all_recids(options)
     bibdoc = BibDoc(docid)
@@ -446,7 +447,7 @@ Examples:
     query_options.add_option("--with-record-creation-date", action="callback", callback=_date_range_callback, dest="cd_rec", nargs=1, type="string", default=(None, None), help="matches records created between date1 and date2; dates can be expressed relatively", metavar="date1,date2")
     query_options.add_option("--with-document-modification-date", action="callback", callback=_date_range_callback, dest="md_doc", nargs=1, type="string", default=(None, None), help="matches documents modified between date1 and date2; dates can be expressed relatively", metavar="date1,date2")
     query_options.add_option("--with-document-creation-date", action="callback", callback=_date_range_callback, dest="cd_doc", nargs=1, type="string", default=(None, None), help="matches documents created between date1 and date2; dates can be expressed relatively", metavar="date1,date2")
-    query_options.add_option("--url", dest="url", help='matches the document referred by the URL, e.g. "%s/record/1/files/foobar.pdf?version=2"' % CFG_SITE_URL)
+    query_options.add_option("--url", dest="url", help='matches the document referred by the URL, e.g. "%s/%s/1/files/foobar.pdf?version=2"' % (CFG_SITE_URL, CFG_SITE_RECORD))
     query_options.add_option("--path", dest="path", help='matches the document referred by the internal filesystem path, e.g. %s/g0/1/foobar.pdf\\;1' % CFG_WEBSUBMIT_FILEDIR)
     query_options.add_option("--with-docname", dest="docname", help='matches documents with the given docname (accept wildcards)')
     query_options.add_option("--with-doctype", dest="doctype", help='matches documents with the given doctype')
@@ -622,9 +623,9 @@ def cli_set_batch(options):
     """Change in batch the doctype, description, comment and restriction."""
     ffts = {}
     doctype = getattr(options, 'set_doctype', None)
-    description = getattr(options, 'set_description', None)
-    comment = getattr(options, 'set_comment', None)
-    restriction = getattr(options, 'set_restriction', None)
+    description = cli2description(options)
+    comment = cli2comment(options)
+    restriction = cli2restriction(options)
     with_format = getattr(options, 'format', None)
     for docid in cli_docids_iterator(options):
         bibdoc = BibDoc(docid)

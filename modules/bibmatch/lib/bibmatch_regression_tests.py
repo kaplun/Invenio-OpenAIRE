@@ -23,6 +23,7 @@
 
 __revision__ = "$Id$"
 
+from invenio.config import CFG_SITE_RECORD
 from invenio.testutils import make_test_suite, run_test_suite
 from invenio.bibrecord import create_records, record_has_field
 from invenio.bibmatch_engine import match_records, transform_input_to_marcxml, \
@@ -378,7 +379,7 @@ class BibMatchTest(unittest.TestCase):
     <subfield code="a">Siopsis, George</subfield>
   </datafield>
   <datafield tag="856" ind1="4" ind2=" ">
-    <subfield code="u">http://137.138.33.172/record/92/files/0606096.pdf</subfield>
+    <subfield code="u">http://137.138.33.172/%s/92/files/0606096.pdf</subfield>
   </datafield>
   <datafield tag="909" ind1="C" ind2="4">
     <subfield code="c">006</subfield>
@@ -411,7 +412,7 @@ class BibMatchTest(unittest.TestCase):
 </record>
 
 </collection>
-"""
+""" % CFG_SITE_RECORD
         return
 
 
@@ -475,6 +476,14 @@ class BibMatchTest(unittest.TestCase):
         records = create_records(self.recxml4)
         [dummy1, dummy2, ambigrecs, dummy3] = match_records(records, qrystrs=[("", "[088__a] [035__a]")])
         self.assertEqual(1, len(ambigrecs))
+
+    def test_check_collection(self):
+        """bibmatch - check collection"""
+        records = create_records(self.recxml3)
+        [nomatchrecs, dummy1, dummy2, dummy3] = match_records(records, collections=["Articles"])
+        self.assertEqual(1, len(nomatchrecs))
+        [dummy1, matchedrecs, dummy2, dummy3] = match_records(records, collections=["Books"])
+        self.assertEqual(1, len(matchedrecs))
 
 TEST_SUITE = make_test_suite(BibMatchTest)
 

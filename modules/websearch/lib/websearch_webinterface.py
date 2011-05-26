@@ -82,16 +82,18 @@ from invenio.config import \
      CFG_WEBSEARCH_USE_ALEPH_SYSNOS, \
      CFG_WEBSEARCH_RSS_I18N_COLLECTIONS, \
      CFG_INSPIRE_SITE, \
-     CFG_WEBSEARCH_WILDCARD_LIMIT
+     CFG_WEBSEARCH_WILDCARD_LIMIT, \
+     CFG_SITE_RECORD
 from invenio.dbquery import Error
 from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 from invenio.urlutils import redirect_to_url, make_canonical_urlargd, drop_default_urlargd
+from invenio.htmlutils import get_mathjax_header
 from invenio.webuser import getUid, page_not_authorized, get_user_preferences, \
     collect_user_info, logoutUser, isUserSuperAdmin
 from invenio.websubmit_webinterface import WebInterfaceFilesPages
 from invenio.webcomment_webinterface import WebInterfaceCommentsPages
 from invenio.bibcirculation_webinterface import WebInterfaceHoldingsPages
-from invenio.webpage import page, create_error_box
+from invenio.webpage import page, pageheaderonly, create_error_box
 from invenio.messages import gettext_set_language
 from invenio.search_engine import check_user_can_view_record, \
      collection_reclist_cache, \
@@ -127,6 +129,7 @@ from invenio.errorlib import register_exception
 from invenio.bibedit_webinterface import WebInterfaceEditPages
 from invenio.bibeditmulti_webinterface import WebInterfaceMultiEditPages
 from invenio.bibmerge_webinterface import WebInterfaceMergePages
+from invenio.search_engine import get_record
 
 import invenio.template
 websearch_templates = invenio.template.load('websearch')
@@ -200,7 +203,7 @@ class WebInterfaceUnAPIPages(WebInterfaceDirectory):
                 'mods' : 'xo'
             }.get(argd['format'], argd['format'])
             if format in formats:
-                redirect_to_url(req, '%s/record/%s/export/%s' % (CFG_SITE_URL, argd['id'], format))
+                redirect_to_url(req, '%s/%s/%s/export/%s' % (CFG_SITE_URL, CFG_SITE_RECORD, argd['id'], format))
             else:
                 raise apache.SERVER_RETURN, apache.HTTP_NOT_ACCEPTABLE
         elif argd['id']:
@@ -241,13 +244,13 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
         """This handler parses dynamic URLs (/author/John+Doe)."""
         return WebInterfaceAuthorPages(component), path
 
-
     def __call__(self, req, form):
         """Serve the page in the given language."""
         is_bibauthorid = False
         bibauthorid_template = None
         personid_status_cacher = None
         userinfo = collect_user_info(req)
+        metaheaderadd = ""
 
         try:
             from invenio.bibauthorid_webapi import search_person_ids_by_name
@@ -265,7 +268,7 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
             from invenio.bibauthorid_config import AID_ON_AUTHORPAGES
             bibauthorid_template = invenio.template.load('bibauthorid')
 #            from invenio.access_control_admin import acc_find_user_role_actions
-            
+
             if not AID_ENABLED or not AID_ON_AUTHORPAGES:
                 is_bibauthorid = False
             else:
@@ -293,11 +296,23 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
         names_dict = {}
         db_names_dict = {}
         _ = gettext_set_language(ln)
+        title_message = "Author Details"
 
         #let's see what takes time..
         time1 = time.time()
         genstart = time1
         time2 = time.time()
+
+        if is_bibauthorid:
+            metaheaderadd = bibauthorid_template.tmpl_meta_includes()
+
+        # Start the page in clean manner:
+        req.content_type = "text/html"
+        req.send_http_header()
+        req.write(pageheaderonly(req=req, title=title_message,
+                                 metaheaderadd=metaheaderadd,
+                                 language=ln))
+        req.write(websearch_templates.tmpl_search_pagestart(ln=ln))
 
         if is_bibauthorid:
             personid_status_cacher = get_personid_status_cacher()
@@ -363,10 +378,9 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
             else:
                 test_results = [i for i in sorted_results if i[1][0][2] > .8]
 
-
             if len(test_results) == 1:
                 self.personid = test_results[0][0]
-            #@todo: Show selection of possible Person entities if len > 1
+
             elif len(test_results) > 1:
                 if bibauthorid_template and nquery:
                     authors = []
@@ -380,26 +394,68 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
                                         authorpapers[0:4]])
 
                     srch = bibauthorid_template.tmpl_author_search
-                    mha = bibauthorid_template.tmpl_meta_includes()
-                    body = srch(nquery, authors, author_papges_mode=True)
-                    title = _("Did you mean...")
-                    return page(title=title,
-                                metaheaderadd=mha,
-                                body=body,
-                                req=req,
-                                language=ln)
-
+                    body = srch(nquery, authors, author_pages_mode=True)
+                    req.write(body)
+                    return
         # start page
-        req.content_type = "text/html"
-        req.send_http_header()
-        uid = getUid(req)
-        page_start(req, "hb", "", "", ln, uid)
+#        req.content_type = "text/html"
+#        req.send_http_header()
+#        uid = getUid(req)
+#        page_start(req, "hb", "", "", ln, uid)
 
-        if self.personid < 0 or not is_bibauthorid:
+        if self.personid < 0 and is_bibauthorid:
             # Well, no person. Fall back to the exact author name search then.
-            self.authorname = self.pageparam
+            ptitle = ''
+            if recid:
+                try:
+                    ptitle = get_record(recid)['245'][0][0][0][1]
+                except (IndexError,TypeError):
+                    ptitle = '"Title not available"'
 
-            if not self.authorname:
+            self.authorname = self.pageparam
+            title = ''
+            pmsg = ''
+
+            if ptitle:
+                pmsg = " on paper '%s'" % ptitle
+
+            # We're sorry we're introducing html tags where they weren't before. XXX
+            message = ""
+
+            if CFG_INSPIRE_SITE:
+                message += ("<p>We are in the process of attributing papers to people so that we can "
+                            "improve publication lists.</p>\n")
+
+            message += ("<p>We have not generated the publication list for author '%s'%s.  Please be patient as we "
+                        "continue to match people to author names and publications. '%s' may be attributed in the next "
+                        "few weeks.</p>" % (self.pageparam, pmsg, self.pageparam))
+
+            req.write('<div id="header">%s</div><br>' % title)
+            req.write('%s <br>' % message)
+
+            if not nquery:
+                nquery = self.pageparam
+
+            if not authors:
+                authors = []
+                sorted_results = search_person_ids_by_name(nquery)
+
+                for results in sorted_results:
+                    pid = results[0]
+                    authorpapers = get_papers_by_person_id(pid, -1)
+                    authorpapers = sorted(authorpapers, key=itemgetter(0),
+                                          reverse=True)
+                    authors.append([results[0], results[1],
+                                    authorpapers[0:4]])
+
+            srch = bibauthorid_template.tmpl_author_search
+            body = srch(nquery, authors, author_pages_mode=True)
+            req.write(body)
+            return
+#            return self._psearch(req, form, is_fallback=True, fallback_query=self.pageparam,  fallback_title=title, fallback_message=message)
+
+        elif self.personid < 0 and not is_bibauthorid:
+            if not self.pageparam:
                 return websearch_templates.tmpl_author_information(req, {},
                                                             self.authorname,
                                                             0, {}, {}, {},
@@ -408,6 +464,7 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
                                                             bibauthorid_data,
                                                             ln)
 
+            self.authorname = self.pageparam
             #search the publications by this author
             pubs = perform_request_search(req=None, p=self.authorname, f="exactauthor")
             names_dict[self.authorname] = len(pubs)
@@ -524,14 +581,13 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
         #get cited by..
         citedbylist = get_cited_by_list(pubs)
         person_link = None
-        
+
 
         if (is_bibauthorid
             and self.personid >= 0
             and "precached_viewclaimlink" in userinfo
             and "precached_usepaperattribution" in userinfo
             and "precached_usepaperclaim" in userinfo
-            and userinfo["precached_viewclaimlink"]
             and (userinfo["precached_usepaperclaim"]
                  or userinfo["precached_usepaperattribution"])
             ):
@@ -596,7 +652,19 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
 #        req.write(simauthbox)
         if verbose == 9:
             req.write("<br/>all: " + str(time.time() - genstart) + "<br/>")
+
         return page_end(req, 'hb', ln)
+
+    def _psearch(self, req, form, is_fallback=True, fallback_query='',  fallback_title='', fallback_message=''):
+        html = []
+        h = html.append
+        if fallback_title:
+                h('<div id="header">%s</div><br>' % fallback_title)
+        if fallback_message:
+                h('%s <br>' % fallback_message)
+        h(' We may have \'%s\' partially matched; <a href=/person/search?q=%s>click here</a> ' % (fallback_query, fallback_query))
+        h('to see what we have so far.  (Note: this is likely to update frequently.')
+        return "\n".join(html)
 
 
     def get_institute_pub_dict(self, recids, names_list):
@@ -652,7 +720,7 @@ class WebInterfaceAuthorPages(WebInterfaceDirectory):
 
 
 class WebInterfaceRecordPages(WebInterfaceDirectory):
-    """ Handling of a /record/<recid> URL fragment """
+    """ Handling of a /CFG_SITE_RECORD/<recid> URL fragment """
 
     _exports = ['', 'files', 'reviews', 'comments', 'usage',
                 'references', 'export', 'citations', 'holdings', 'edit',
@@ -725,7 +793,7 @@ class WebInterfaceRecordPages(WebInterfaceDirectory):
         else:
             return out
 
-    # Return the same page wether we ask for /record/123 or /record/123/
+    # Return the same page wether we ask for /CFG_SITE_RECORD/123 or /CFG_SITE_RECORD/123/
     index = __call__
 
 class WebInterfaceRecordRestrictedPages(WebInterfaceDirectory):
@@ -803,7 +871,7 @@ class WebInterfaceRecordRestrictedPages(WebInterfaceDirectory):
         else:
             return out
 
-    # Return the same page wether we ask for /record/123 or /record/123/
+    # Return the same page wether we ask for /CFG_SITE_RECORD/123 or /CFG_SITE_RECORD/123/
     index = __call__
 
 class WebInterfaceSearchResultsPages(WebInterfaceDirectory):
@@ -994,9 +1062,9 @@ class WebInterfaceLegacySearchPages(WebInterfaceDirectory):
         argd = wash_search_urlargd(form)
 
         # We either jump into the generic search form, or the specific
-        # /record/... display if a recid is requested
+        # /CFG_SITE_RECORD/... display if a recid is requested
         if argd['recid'] != -1:
-            target = '/record/%d' % argd['recid']
+            target = '/%s/%d' % (CFG_SITE_RECORD,argd['recid'])
             del argd['recid']
 
         else:
@@ -1073,19 +1141,19 @@ class WebInterfaceSearchInterfacePages(WebInterfaceDirectory):
             return answer, []
 
 
-        elif component == 'record' and path and path[0] == 'merge':
+        elif component == CFG_SITE_RECORD and path and path[0] == 'merge':
             return WebInterfaceMergePages(), path[1:]
 
-        elif component == 'record' and path and path[0] == 'edit':
+        elif component == CFG_SITE_RECORD and path and path[0] == 'edit':
             return WebInterfaceEditPages(), path[1:]
 
-        elif component == 'record' and path and path[0] == 'multiedit':
+        elif component == CFG_SITE_RECORD and path and path[0] == 'multiedit':
             return WebInterfaceMultiEditPages(), path[1:]
 
-        elif component == 'record' or component == 'record-restricted':
+        elif component == CFG_SITE_RECORD or component == 'record-restricted':
             try:
                 if CFG_WEBSEARCH_USE_ALEPH_SYSNOS:
-                    # let us try to recognize /record/<SYSNO> style of URLs:
+                    # let us try to recognize /<CFG_SITE_RECORD>/<SYSNO> style of URLs:
                     x = get_mysql_recid_from_aleph_sysno(path[0])
                     if x:
                         recid = x
@@ -1094,18 +1162,18 @@ class WebInterfaceSearchInterfacePages(WebInterfaceDirectory):
                 else:
                     recid = int(path[0])
             except IndexError:
-                # display record #1 for URL /record without a number
+                # display record #1 for URL /CFG_SITE_RECORD without a number
                 recid = 1
             except ValueError:
                 if path[0] == '':
-                    # display record #1 for URL /record/ without a number
+                    # display record #1 for URL /CFG_SITE_RECORD/ without a number
                     recid = 1
                 else:
-                    # display page not found for URLs like /record/foo
+                    # display page not found for URLs like /CFG_SITE_RECORD/foo
                     return None, []
 
             if recid <= 0:
-                # display page not found for URLs like /record/-5 or /record/0
+                # display page not found for URLs like /CFG_SITE_RECORD/-5 or /CFG_SITE_RECORD/0
                 return None, []
 
             format = None
@@ -1123,7 +1191,7 @@ class WebInterfaceSearchInterfacePages(WebInterfaceDirectory):
 #                    tab = ''
 #                    format = path[1]
                 else:
-                    # display page not found for URLs like /record/references
+                    # display page not found for URLs like /CFG_SITE_RECORD/references
                     # for a collection where 'references' tabs is not visible
                     return None, []
 
@@ -1329,9 +1397,7 @@ def display_collection(req, c, aas, verbose, ln):
         rssurl += '?' + '&amp;'.join(rssurl_params)
 
     if 'hb' in CFG_WEBSEARCH_USE_MATHJAX_FOR_FORMATS:
-        metaheaderadd = """
-<script src='/MathJax/MathJax.js' type='text/javascript'></script>
-"""
+        metaheaderadd = get_mathjax_header()
     else:
         metaheaderadd = ''
 
@@ -1440,7 +1506,8 @@ class WebInterfaceRSSFeedServicePages(WebInterfaceDirectory):
                                                       next_url=next_url,
                                                       first_url=first_url, last_url=last_url,
                                                       nb_found=nb_found,
-                                                      jrec=argd['jrec'], rg=argd['rg']) + '\n'
+                                                      jrec=argd['jrec'], rg=argd['rg'],
+                                                      cc=argd['cc']) + '\n'
             req.write(rss_prologue)
             rss_body = format_records(recIDs,
                                       of='xr',
@@ -1480,7 +1547,7 @@ class WebInterfaceRSSFeedServicePages(WebInterfaceDirectory):
 
 
 class WebInterfaceRecordExport(WebInterfaceDirectory):
-    """ Handling of a /record/<recid>/export/<format> URL fragment """
+    """ Handling of a /<CFG_SITE_RECORD>/<recid>/export/<format> URL fragment """
 
     _exports = output_formats
 
@@ -1539,5 +1606,5 @@ class WebInterfaceRecordExport(WebInterfaceDirectory):
         else:
             return out
 
-    # Return the same page wether we ask for /record/123/export/xm or /record/123/export/xm/
+    # Return the same page wether we ask for /CFG_SITE_RECORD/123/export/xm or /CFG_SITE_RECORD/123/export/xm/
     index = __call__

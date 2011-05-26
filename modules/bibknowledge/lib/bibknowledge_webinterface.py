@@ -64,6 +64,7 @@ class WebInterfaceBibKnowledgePages(WebInterfaceDirectory):
         ln = argd['ln']
         kb = argd['kb']
         search = argd['search']
+        term = argd['term']
         descriptiontoo = argd['descriptiontoo']
         action = argd['action']
         chosen_option = argd['chosen_option']
@@ -83,7 +84,6 @@ class WebInterfaceBibKnowledgePages(WebInterfaceDirectory):
         delete_mapping = argd['delete_mapping']
         kbname = argd['kbname']
         format = argd['format']
-        term = argd['term']
         limit = argd['limit']
 
         req.argd = argd #needed by some lower level modules
@@ -93,7 +93,8 @@ class WebInterfaceBibKnowledgePages(WebInterfaceDirectory):
             return bibknowledgeadmin.kb_upload(req, kb=kb, ln=ln)
         #check if this is "export"
         if self.extrapath == "export":
-            return bibknowledgeadmin.kb_export(req, kbname=kbname, format=format, ln=ln, searchvalue=term, limit=limit)
+            return bibknowledgeadmin.kb_export(req, kbname=kbname, format=format, searchvalue=term, ln=ln, limit=limit)
+
         #first check if this is a specific action
         if action == "new":
             return bibknowledgeadmin.kb_add(req, kbtype=kbtype, sortby=sortby, ln=ln)

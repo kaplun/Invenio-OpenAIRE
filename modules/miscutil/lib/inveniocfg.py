@@ -31,7 +31,7 @@ Options to finish your installation:
    --create-tables          create DB tables for Invenio
    --load-webstat-conf      load the WebStat configuration
    --drop-tables            drop DB tables of Invenio
-   --check-openoffice-dir   check for correctly set up of openoffice temporary directory
+   --check-openoffice       check for correctly set up of openoffice temporary directory
 
 Options to set up and test a demo site:
    --create-demo-site       create demo site
@@ -124,7 +124,9 @@ def convert_conf_option(option_name, option_value):
                        'CFG_BATCHUPLOADER_WEB_ROBOT_RIGHTS',
                        'CFG_SITE_EMERGENCY_EMAIL_ADDRESSES',
                        'CFG_BIBMATCH_FUZZY_WORDLIMITS',
-                       'CFG_BIBMATCH_QUERY_TEMPLATES']:
+                       'CFG_BIBMATCH_QUERY_TEMPLATES',
+                       'CFG_WEBSEARCH_SYNONYM_KBRS',
+                       'CFG_BIBINDEX_SYNONYM_KBRS']:
         option_value = option_value[1:-1]
 
     ## 3cbis) very special cases: dicts with backward compatible string
@@ -299,7 +301,7 @@ def cli_cmd_update_dbexec(conf):
 def cli_cmd_update_bibconvert_tpl(conf):
     """
     Update bibconvert/config/*.tpl files looking for 856
-    http://.../record/ lines, replacing URL with CFG_SITE_URL taken
+    http://.../CFG_SITE_RECORD lines, replacing URL with CFG_SITE_URL taken
     from conf file.  Note: this edits tpl files in situ, taking a
     backup first.  Use only when you know what you are doing.
     """
@@ -315,10 +317,11 @@ def cli_cmd_update_bibconvert_tpl(conf):
             shutil.copy(tplfile, tplfile + '.OLD')
             out = ''
             for line in open(tplfile, 'r').readlines():
-                match = re.search(r'^(.*)http://.*?/record/(.*)$', line)
+                match = re.search(r'^(.*)http://.*?/%s/(.*)$' % conf.get("Invenio", 'CFG_SITE_RECORD'), line)
                 if match:
-                    out += "%s%s/record/%s\n" % (match.group(1),
+                    out += "%s%s/%s/%s\n" % (match.group(1),
                                                  conf.get("Invenio", 'CFG_SITE_URL'),
+                                                 conf.get("Invenio", 'CFG_SITE_RECORD'),
                                                  match.group(2))
                 else:
                     out += line
@@ -507,57 +510,23 @@ def cli_cmd_reset_fieldnames(conf):
 
     print ">>> I18N field names reset successfully."
 
-def cli_check_openoffice_dir(conf):
+def cli_check_openoffice(conf):
     """
     If OpenOffice.org integration is enabled, checks whether the system is
     properly configured.
     """
-    from invenio.textutils import wrap_text_in_a_box
-    from invenio.websubmit_file_converter import check_openoffice_tmpdir, \
-        InvenioWebSubmitFileConverterError, CFG_OPENOFFICE_TMPDIR
-    from invenio.config import CFG_OPENOFFICE_USER, \
-        CFG_PATH_OPENOFFICE_PYTHON, \
-        CFG_OPENOFFICE_SERVER_HOST, \
-        CFG_BIBSCHED_PROCESS_USER
-    from invenio.bibtask import guess_apache_process_user, \
-        check_running_process_user
+    from invenio.bibtask import check_running_process_user
+    from invenio.websubmit_file_converter import can_unoconv, get_file_converter_logger
+    logger = get_file_converter_logger()
+    for handler in logger.handlers:
+        logger.removeHandler(handler)
     check_running_process_user()
-    print ">>> Checking if OpenOffice is correctly integrated...",
-    if CFG_OPENOFFICE_SERVER_HOST:
-        try:
-            check_openoffice_tmpdir()
-        except InvenioWebSubmitFileConverterError, err:
-            print wrap_text_in_a_box("""\
-OpenOffice.org can't properly create files in the OpenOffice.org temporary
-directory %(tmpdir)s, as the user %(nobody)s (as configured in
-CFG_OPENOFFICE_USER invenio(-local).conf variable): %(err)s.
-
-
-In your /etc/sudoers file, you should authorize the %(apache)s user to run
- %(python)s as %(nobody)s user as in:
-
-
-%(apache)s ALL=(%(nobody)s) NOPASSWD: %(python)s
-
-
-You should then run the following commands:
-
-
-$ sudo mkdir -p %(tmpdir)s
-
-$ sudo chown %(nobody)s %(tmpdir)s
-
-$ sudo chmod 755 %(tmpdir)s""" % {
-            'tmpdir' : CFG_OPENOFFICE_TMPDIR,
-            'nobody' : CFG_OPENOFFICE_USER,
-            'err' : err,
-            'apache' : CFG_BIBSCHED_PROCESS_USER or guess_apache_process_user(),
-            'python' : CFG_PATH_OPENOFFICE_PYTHON
-            })
-            sys.exit(1)
+    print ">>> Checking if Libre/OpenOffice.org is correctly integrated...",
+    sys.stdout.flush()
+    if can_unoconv(True):
         print "ok"
     else:
-        print "OpenOffice.org integration not enabled"
+        sys.exit(1)
 
 def test_db_connection():
     """
@@ -1188,8 +1157,8 @@ def main():
             elif opt == '--drop-tables':
                 cli_cmd_drop_tables(conf)
                 done = True
-            elif opt == '--check-openoffice-dir':
-                cli_check_openoffice_dir(conf)
+            elif opt == '--check-openoffice':
+                cli_check_openoffice(conf)
                 done = True
             elif opt == '--create-demo-site':
                 cli_cmd_create_demo_site(conf)

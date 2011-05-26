@@ -35,7 +35,8 @@ from invenio.config import \
      CFG_SITE_URL, \
      CFG_ETCDIR, \
      CFG_BINDIR, \
-     CFG_LOGDIR
+     CFG_LOGDIR, \
+     CFG_SITE_RECORD
 from invenio.oai_harvest_config import CFG_OAI_POSSIBLE_POSTMODES
 from invenio.bibrankadminlib import \
      write_outcome, \
@@ -296,7 +297,7 @@ def perform_request_editsource(oai_src_id=None, oai_src_name='',
 def perform_request_addsource(oai_src_name=None, oai_src_baseurl='',
                               oai_src_prefix='', oai_src_frequency='',
                               oai_src_lastrun='', oai_src_config='',
-                              oai_src_post='', ln=CFG_SITE_LANG,
+                              oai_src_post=[], ln=CFG_SITE_LANG,
                               confirm= -1, oai_src_sets=None,
                               oai_src_bibfilter=''):
     """creates html form to add a new source"""
@@ -671,7 +672,7 @@ def build_history_row(item, ln, show_selection, show_oai_source, show_record_ids
             cssclass=cssclass)
 
         record_details_link = create_html_link(CFG_SITE_URL + \
-                                               "/record/" + str(item.record_id),
+                                               "/"+ CFG_SITE_RECORD +"/" + str(item.record_id),
                                                urlargd={'ln': ln},
                                                link_label=str(item.record_id))
         cssclass = get_cssclass(cssclass)
@@ -1252,7 +1253,7 @@ def add_oai_src(oai_src_name, oai_src_baseurl, oai_src_prefix, oai_src_frequency
             lastrun_mode = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             # lastrun_mode = "'"+lastrun_mode+"'"
         run_sql("INSERT INTO oaiHARVEST (id, baseurl, metadataprefix, arguments, comment,  bibconvertcfgfile,  name,  lastrun,  frequency,  postprocess,  bibfilterprogram,  setspecs) VALUES (0, %s, %s, NULL, NULL, %s, %s, %s, %s, %s, %s, %s)", \
-                (oai_src_baseurl, oai_src_prefix, oai_src_config, oai_src_name, lastrun_mode, oai_src_frequency, oai_src_post, oai_src_bibfilter, " ".join(oai_src_sets)))
+                (oai_src_baseurl, oai_src_prefix, oai_src_config, oai_src_name, lastrun_mode, oai_src_frequency, '-'.join(oai_src_post), oai_src_bibfilter, " ".join(oai_src_sets)))
         return (1, "")
     except StandardError, e:
         return (0, e)
