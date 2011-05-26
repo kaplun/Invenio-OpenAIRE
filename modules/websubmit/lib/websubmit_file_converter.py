@@ -557,7 +557,7 @@ In your /etc/sudoers file, you should authorize the %(apache)s user to run
  %(unoconv)s as %(nobody)s user as in:
 
 
-%(apache)s ALL=(%(nobody)s) NOPASSWD: %(python)s %(unoconv)s
+%(apache)s ALL=(%(nobody)s) NOPASSWD: %(python)s
 
 
 You should then run the following commands:

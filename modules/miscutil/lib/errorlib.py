@@ -39,7 +39,14 @@ from invenio.miscutil_config import CFG_MISCUTIL_ERROR_MESSAGES
 from invenio.urlutils import wash_url_argument
 from invenio.messages import wash_language, gettext_set_language
 from invenio.dateutils import convert_datestruct_to_datetext
-from invenio.dbquery import run_sql
+try:
+    from invenio.dbquery import run_sql
+except Exception, err:
+    from warnings import warn
+    warn("ERROR: when importing run_sql: %s" % err)
+    ## DB errors!
+    def run_sql(*args, **argd):
+        pass
 
 
 ## Regular expression to match possible password related variable that should
