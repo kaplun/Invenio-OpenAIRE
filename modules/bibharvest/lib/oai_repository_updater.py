@@ -65,7 +65,7 @@ DATAFIELD_SET_HEAD = \
                    (CFG_OAI_SET_FIELD[0:3],
                     CFG_OAI_SET_FIELD[3:4].replace('_', ' '),
                     CFG_OAI_SET_FIELD[4:5].replace('_', ' '))
-DATAFIELD_ID_HEAD  = \
+DATAFIELD_ID_HEAD = \
                   "<datafield tag=\"%s\" ind1=\"%s\" ind2=\"%s\">" % \
                   (CFG_OAI_ID_FIELD[0:3],
                    CFG_OAI_ID_FIELD[3:4].replace('_', ' '),
@@ -81,7 +81,7 @@ def get_set_definitions(set_spec):
     set_definitions = []
 
     query = "select setName, setDefinition from oaiREPOSITORY where setSpec=%s"
-    res = run_sql(query, (set_spec, ))
+    res = run_sql(query, (set_spec,))
 
     for (set_name, set_definition) in res:
         params = parse_set_definition(set_definition)
@@ -171,7 +171,7 @@ def get_set_name_for_set_spec(set_spec):
                  setName
     """
     query = "select setName from oaiREPOSITORY where setSpec=%s and setName!=''"
-    res = run_sql(query, (set_spec, ))
+    res = run_sql(query, (set_spec,))
     if len(res) > 0:
         return res[0][0]
     else:
@@ -281,7 +281,7 @@ def print_repository_status(write_message=write_message,
         if verbose > 1:
             row += \
                 " " * max(9 - len(str(nb_add_recids)), 0) + '+' + str(nb_add_recids) + \
-                " " * max(7 - len(str(nb_remove_recids)), 0) + '-' + str(nb_remove_recids) + " = " +\
+                " " * max(7 - len(str(nb_remove_recids)), 0) + '-' + str(nb_remove_recids) + " = " + \
                 " " * max(7 - len(str(nb_should_recids)), 0) + str(nb_should_recids)
         write_message(row)
 
@@ -504,9 +504,7 @@ def main():
                                 verbose=mode)
         return
 
-    task_init(authorization_action='runoairepository',
-            authorization_msg="OAI Archive Task Submission",
-            description="Examples:\n"
+    task_init(description="Examples:\n"
                 " Expose records according to sets defined in OAI Repository admin interface\n"
                 "   $ oairepositoryupdater \n"
                 " Expose records according to sets defined in OAI Repository admin interface and update them every day\n"

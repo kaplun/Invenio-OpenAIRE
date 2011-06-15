@@ -38,7 +38,7 @@ try:
     from invenio.bibdocfile import BibDoc
     from invenio.bibsched import gc_tasks
 except ImportError, e:
-    print "Error: %s" % (e, )
+    print "Error: %s" % (e,)
     sys.exit(1)
 
 # configure variables
@@ -56,7 +56,7 @@ CFG_MAX_ATIME_RM_OAI = 28
 # After how many days to zip obsolete bibharvest fmt xml files
 CFG_MAX_ATIME_ZIP_OAI = 7
 # After how many days to remove deleted bibdocs
-CFG_DELETED_BIBDOC_MAXLIFE = 365*10
+CFG_DELETED_BIBDOC_MAXLIFE = 365 * 10
 # AFter how many day to remove old cached webjournal files
 CFG_WEBJOURNAL_TTL = 7
 # After how many days to zip obsolete bibsword xml log files
@@ -188,13 +188,13 @@ def clean_bibxxx():
                             ON %(bibxxx)s.id=%(bibrec_bibxxx)s.id_bibxxx
                      WHERE %(bibrec_bibxxx)s.id_bibrec IS NULL""" % \
                         {'bibxxx': bibxxx,
-                         'bibrec_bibxxx': bibrec_bibxxx,})[0][0]
+                         'bibrec_bibxxx': bibrec_bibxxx, })[0][0]
         run_sql("""DELETE %(bibxxx)s FROM %(bibxxx)s
                      LEFT JOIN %(bibrec_bibxxx)s
                             ON %(bibxxx)s.id=%(bibrec_bibxxx)s.id_bibxxx
                      WHERE %(bibrec_bibxxx)s.id_bibrec IS NULL""" % \
                         {'bibxxx': bibxxx,
-                         'bibrec_bibxxx': bibrec_bibxxx,})
+                         'bibrec_bibxxx': bibrec_bibxxx, })
         if task_get_option('verbose') >= 9:
             write_message(""" - %d unreferenced %s values cleaned""" % \
                           (num_unref_values, bibxxx))
@@ -211,7 +211,7 @@ def clean_documents():
         bibdoc = BibDoc(record[0])
         bibdoc.expunge()
         write_message("DELETE FROM bibdoc WHERE id=%i" % int(record[0]), verbose=9)
-        run_sql("DELETE FROM bibdoc WHERE id=%s", (record[0], ))
+        run_sql("DELETE FROM bibdoc WHERE id=%s", (record[0],))
     write_message("""%s obsoleted deleted documents cleaned""" % len(records))
     write_message("""CLEANING OF OBSOLETED DELETED DOCUMENTS FINISHED""")
     return len(records)
@@ -283,9 +283,9 @@ def guest_user_garbage_collector():
     write_message("- deleting expired sessions")
     timelimit = time.time()
     write_message("  DELETE FROM session WHERE"
-        " session_expiry < %d \n" % (timelimit, ), verbose=9)
+        " session_expiry < %d \n" % (timelimit,), verbose=9)
     delcount['session'] += run_sql("DELETE FROM session WHERE"
-        " session_expiry < %s """ % (timelimit, ))
+        " session_expiry < %s """ % (timelimit,))
 
 
     # 1b - DELETE GUEST USERS WITHOUT SESSION
@@ -305,15 +305,15 @@ def guest_user_garbage_collector():
         for i in range(0, len(result), CFG_MYSQL_ARGUMENTLIST_SIZE):
             # create string of uids
             uidstr = ''
-            for (id_user, ) in result[i:i+CFG_MYSQL_ARGUMENTLIST_SIZE]:
+            for (id_user,) in result[i:i + CFG_MYSQL_ARGUMENTLIST_SIZE]:
                 if uidstr: uidstr += ','
-                uidstr += "%s" % (id_user, )
+                uidstr += "%s" % (id_user,)
 
             # delete users
             write_message("  DELETE FROM user WHERE"
                 " id IN (TRAVERSE LAST RESULT) AND email = '' \n", verbose=9)
             delcount['user'] += run_sql("DELETE FROM user WHERE"
-                " id IN (%s) AND email = ''" % (uidstr, ))
+                " id IN (%s) AND email = ''" % (uidstr,))
 
 
     # 2 - DELETE QUERIES NOT ATTACHED TO ANY USER
@@ -336,9 +336,9 @@ def guest_user_garbage_collector():
     # delete in user_query one by one
     write_message("  DELETE FROM user_query WHERE"
         " id_user = 'TRAVERSE LAST RESULT' \n", verbose=9)
-    for (id_user, ) in result:
+    for (id_user,) in result:
         delcount['user_query'] += run_sql("""DELETE FROM user_query
-            WHERE id_user = %s""" % (id_user, ))
+            WHERE id_user = %s""" % (id_user,))
 
     # delete the actual queries
     write_message("- deleting queries not attached to any user")
@@ -354,8 +354,8 @@ def guest_user_garbage_collector():
 
     # delete queries one by one
     write_message("""  DELETE FROM query WHERE id = 'TRAVERSE LAST RESULT \n""", verbose=9)
-    for (id_user, ) in result:
-        delcount['query'] += run_sql("""DELETE FROM query WHERE id = %s""", (id_user, ))
+    for (id_user,) in result:
+        delcount['query'] += run_sql("""DELETE FROM query WHERE id = %s""", (id_user,))
 
 
     # 3 - DELETE BASKETS NOT OWNED BY ANY USER
@@ -377,11 +377,11 @@ def guest_user_garbage_collector():
     write_message("""  DELETE FROM bskBASKET WHERE id = 'TRAVERSE LAST RESULT' """, verbose=9)
     write_message("""  DELETE FROM bskREC WHERE id_bskBASKET = 'TRAVERSE LAST RESULT'""", verbose=9)
     write_message("""  DELETE FROM bskRECORDCOMMENT WHERE id_bskBASKET = 'TRAVERSE LAST RESULT' \n""", verbose=9)
-    for (id_basket, ) in result:
-        delcount['user_bskBASKET'] += run_sql("""DELETE FROM user_bskBASKET WHERE id_bskBASKET = %s""", (id_basket, ))
-        delcount['bskBASKET'] += run_sql("""DELETE FROM bskBASKET WHERE id = %s""", (id_basket, ))
-        delcount['bskREC'] += run_sql("""DELETE FROM bskREC WHERE id_bskBASKET = %s""", (id_basket, ))
-        delcount['bskRECORDCOMMENT'] += run_sql("""DELETE FROM bskRECORDCOMMENT WHERE id_bskBASKET = %s""", (id_basket, ))
+    for (id_basket,) in result:
+        delcount['user_bskBASKET'] += run_sql("""DELETE FROM user_bskBASKET WHERE id_bskBASKET = %s""", (id_basket,))
+        delcount['bskBASKET'] += run_sql("""DELETE FROM bskBASKET WHERE id = %s""", (id_basket,))
+        delcount['bskREC'] += run_sql("""DELETE FROM bskREC WHERE id_bskBASKET = %s""", (id_basket,))
+        delcount['bskRECORDCOMMENT'] += run_sql("""DELETE FROM bskRECORDCOMMENT WHERE id_bskBASKET = %s""", (id_basket,))
     write_message(""" SELECT DISTINCT ext.id, rec.id_bibrec_or_bskEXTREC FROM bskEXTREC AS ext \nLEFT JOIN bskREC AS rec ON ext.id=-rec.id_bibrec_or_bskEXTREC WHERE id_bibrec_or_bskEXTREC is NULL""", verbose=9)
     try:
         result = run_sql("""SELECT DISTINCT ext.id FROM bskEXTREC AS ext
@@ -392,7 +392,7 @@ def guest_user_garbage_collector():
     write_message(result, verbose=9)
     write_message("""  DELETE FROM bskEXTREC WHERE id = 'TRAVERSE LAST RESULT' """, verbose=9)
     write_message("""  DELETE FROM bskEXTFMT WHERE id_bskEXTREC = 'TRAVERSE LAST RESULT' \n""", verbose=9)
-    for (id_basket, ) in result:
+    for (id_basket,) in result:
         delcount['bskEXTREC'] += run_sql("""DELETE FROM bskEXTREC WHERE id=%s""", (id_basket,))
         delcount['bskEXTFMT'] += run_sql("""DELETE FROM bskEXTFMT WHERE id_bskEXTREC=%s""", (id_basket,))
 
@@ -405,9 +405,9 @@ def guest_user_garbage_collector():
     write_message(result, verbose=9)
 
     # delete all these entries
-    for (id_user, ) in result:
+    for (id_user,) in result:
         write_message("""DELETE FROM user_query_basket WHERE id_user = 'TRAVERSE LAST RESULT """, verbose=9)
-        delcount['user_query_basket'] += run_sql("""DELETE FROM user_query_basket WHERE id_user = %s """, (id_user, ))
+        delcount['user_query_basket'] += run_sql("""DELETE FROM user_query_basket WHERE id_user = %s """, (id_user,))
 
     # 5 - delete expired mailcookies
     write_message("""mail_cookie_gc()""", verbose=9)
@@ -423,27 +423,25 @@ def guest_user_garbage_collector():
 
     # print STATISTICS
     write_message("""- statistics about deleted data: """)
-    write_message("""  %7s sessions.""" % (delcount['session'], ))
-    write_message("""  %7s users.""" % (delcount['user'], ))
-    write_message("""  %7s user_queries.""" % (delcount['user_query'], ))
-    write_message("""  %7s queries.""" % (delcount['query'], ))
-    write_message("""  %7s baskets.""" % (delcount['bskBASKET'], ))
-    write_message("""  %7s user_baskets.""" % (delcount['user_bskBASKET'], ))
-    write_message("""  %7s basket_records.""" % (delcount['bskREC'], ))
-    write_message("""  %7s basket_external_records.""" % (delcount['bskEXTREC'], ))
-    write_message("""  %7s basket_external_formats.""" % (delcount['bskEXTFMT'], ))
-    write_message("""  %7s basket_comments.""" % (delcount['bskRECORDCOMMENT'], ))
-    write_message("""  %7s user_query_baskets.""" % (delcount['user_query_basket'], ))
-    write_message("""  %7s mail_cookies.""" % (delcount['mail_cookie'], ))
+    write_message("""  %7s sessions.""" % (delcount['session'],))
+    write_message("""  %7s users.""" % (delcount['user'],))
+    write_message("""  %7s user_queries.""" % (delcount['user_query'],))
+    write_message("""  %7s queries.""" % (delcount['query'],))
+    write_message("""  %7s baskets.""" % (delcount['bskBASKET'],))
+    write_message("""  %7s user_baskets.""" % (delcount['user_bskBASKET'],))
+    write_message("""  %7s basket_records.""" % (delcount['bskREC'],))
+    write_message("""  %7s basket_external_records.""" % (delcount['bskEXTREC'],))
+    write_message("""  %7s basket_external_formats.""" % (delcount['bskEXTFMT'],))
+    write_message("""  %7s basket_comments.""" % (delcount['bskRECORDCOMMENT'],))
+    write_message("""  %7s user_query_baskets.""" % (delcount['user_query_basket'],))
+    write_message("""  %7s mail_cookies.""" % (delcount['mail_cookie'],))
     write_message("""  %7s non confirmed email addresses.""" % delcount['email_addresses'])
-    write_message("""  %7s role_memberships.""" % (delcount['role_membership'], ))
+    write_message("""  %7s role_memberships.""" % (delcount['role_membership'],))
     write_message("""CLEANING OF GUEST SESSIONS FINISHED""")
 
 def main():
     """Main that construct all the bibtask."""
-    task_init(authorization_action='runinveniogc',
-            authorization_msg="InvenioGC Task Submission",
-            help_specific_usage="  -l, --logs\t\tClean old logs and temporary files.\n" \
+    task_init(help_specific_usage="  -l, --logs\t\tClean old logs and temporary files.\n" \
                 "  -g, --guests\t\tClean expired guest user related information. [default action]\n" \
                 "  -b, --bibxxx\t\tClean unreferenced bibliographic values in bibXXx tables.\n" \
                 "  -c, --cache\t\tClean cache by removing old files.\n" \

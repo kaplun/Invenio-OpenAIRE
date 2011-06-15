@@ -27,8 +27,8 @@ import sys
 try:
     from invenio.dbquery import run_sql
     from invenio.config import \
-         CFG_SITE_URL,\
-         CFG_TMPDIR,\
+         CFG_SITE_URL, \
+         CFG_TMPDIR, \
          CFG_BINDIR
 
     from invenio.intbitset import intbitset
@@ -66,9 +66,9 @@ def bibreformat_task(fmt, sql, sql_queries, cds_query, process_format, process, 
 
     recIDs = recids
 
-    if cds_query['field']      != "" or  \
+    if cds_query['field'] != "" or  \
        cds_query['collection'] != "" or  \
-       cds_query['pattern']    != "":
+       cds_query['pattern'] != "":
 
         write_message("Querying database (CDS query)...")
 
@@ -104,9 +104,9 @@ def bibreformat_task(fmt, sql, sql_queries, cds_query, process_format, process, 
 
 ### Initialize main loop
 
-    total_rec   = 0     # Total number of records
-    tbibformat  = 0     # time taken up by external call
-    tbibupload  = 0     # time taken up by external call
+    total_rec = 0     # Total number of records
+    tbibformat = 0     # time taken up by external call
+    tbibupload = 0     # time taken up by external call
 
 
 ### Iterate over all records prepared in lists I (option)
@@ -187,8 +187,8 @@ def iterate_over_new(list, fmt):
     global total_rec
 
     formatted_records = ''      # (string-)List of formatted record of an iteration
-    tbibformat  = 0     # time taken up by external call
-    tbibupload  = 0     # time taken up by external call
+    tbibformat = 0     # time taken up by external call
+    tbibupload = 0     # time taken up by external call
     start_date = task_get_task_param('task_starting_time') # Time at which the record was formatted
 
     tot = len(list)
@@ -215,12 +215,12 @@ def iterate_over_new(list, fmt):
 def iterate_over_old(list, fmt):
     "Iterate over list of IDs"
 
-    n_rec       = 0
-    n_max       = 10000
+    n_rec = 0
+    n_max = 10000
     xml_content = ''        # hold the contents
-    tbibformat  = 0     # time taken up by external call
-    tbibupload  = 0     # time taken up by external call
-    total_rec      = 0          # Number of formatted records
+    tbibformat = 0     # time taken up by external call
+    tbibupload = 0     # time taken up by external call
+    total_rec = 0          # Number of formatted records
 
     for record in list:
 
@@ -252,7 +252,7 @@ def iterate_over_old(list, fmt):
 
                 finalfilename = "%s/rec_fmt_%s.xml" % (CFG_TMPDIR, time.strftime('%Y%m%d_%H%M%S'))
                 filename = "%s/bibreformat.xml" % CFG_TMPDIR
-                filehandle = open(filename ,"w")
+                filehandle = open(filename , "w")
                 filehandle.write(xml_content)
                 filehandle.close()
 
@@ -266,7 +266,7 @@ def iterate_over_old(list, fmt):
                 os.system(command)
 
                 t22 = os.times()[4]
-                message = "END bibformat external call (time elapsed:%2f)" % (t22-t11)
+                message = "END bibformat external call (time elapsed:%2f)" % (t22 - t11)
                 write_message(message, verbose=9)
                 task_sleep_now_if_required(can_stop_too=True)
                 tbibformat = tbibformat + (t22 - t11)
@@ -283,10 +283,10 @@ def iterate_over_old(list, fmt):
                 write_message("Task #%s submitted" % task_id)
 
                 t22 = os.times()[4]
-                message = "END bibupload external call (time elapsed:%2f)" % (t22-t11)
+                message = "END bibupload external call (time elapsed:%2f)" % (t22 - t11)
                 write_message(message, verbose=9)
 
-                tbibupload = tbibupload + (t22- t11)
+                tbibupload = tbibupload + (t22 - t11)
 
                 n_rec = 0
                 xml_content = ''
@@ -300,7 +300,7 @@ def iterate_over_old(list, fmt):
 
         finalfilename = "%s/rec_fmt_%s.xml" % (CFG_TMPDIR, time.strftime('%Y%m%d_%H%M%S'))
         filename = "%s/bibreformat.xml" % CFG_TMPDIR
-        filehandle = open(filename ,"w")
+        filehandle = open(filename , "w")
         filehandle.write(xml_content)
         filehandle.close()
 
@@ -362,19 +362,19 @@ def task_run_core():
         cds_query['collection'] = ""
 
     if task_has_option("field"):
-        cds_query['field']      = task_get_option('field')
+        cds_query['field'] = task_get_option('field')
     else:
-        cds_query['field']      = ""
+        cds_query['field'] = ""
 
     if task_has_option("pattern"):
-        cds_query['pattern']      = task_get_option('pattern')
+        cds_query['pattern'] = task_get_option('pattern')
     else:
-        cds_query['pattern']      = ""
+        cds_query['pattern'] = ""
 
     if task_has_option("matching"):
-        cds_query['matching']      = task_get_option('matching')
+        cds_query['matching'] = task_get_option('matching')
     else:
-        cds_query['matching']      = ""
+        cds_query['matching'] = ""
 
     recids = intbitset()
     if task_has_option("recids"):
@@ -395,9 +395,7 @@ def task_run_core():
 
 def main():
     """Main that construct all the bibtask."""
-    task_init(authorization_action='runbibformat',
-            authorization_msg="BibReformat Task Submission",
-            description="""
+    task_init(description="""
 BibReformat formats the records and saves the produced outputs for
 later retrieval.
 
@@ -478,13 +476,13 @@ def task_submit_elaborate_specific_parameter(key, value, opts, args):
         task_set_option("noprocess", 1)
     elif key in ("-f", "--field"):
         task_set_option("field", value)
-    elif key in ("-p","--pattern"):
+    elif key in ("-p", "--pattern"):
         task_set_option("pattern", value)
     elif key in ("-m", "--matching"):
         task_set_option("matching", value)
-    elif key in ("-o","--format"):
+    elif key in ("-o", "--format"):
         task_set_option("format", value)
-    elif key in ("-i","--id"):
+    elif key in ("-i", "--id"):
         task_set_option("recids", value)
     else:
         return False

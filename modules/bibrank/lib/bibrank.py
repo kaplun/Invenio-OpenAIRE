@@ -104,7 +104,7 @@ def split_ranges(parse_string):
     for rang in ranges:
         tmp_recIDs = rang.split("-")
 
-        if len(tmp_recIDs)==1:
+        if len(tmp_recIDs) == 1:
             recIDs.append([int(tmp_recIDs[0]), int(tmp_recIDs[0])])
         else:
             if int(tmp_recIDs[0]) > int(tmp_recIDs[1]): # sanity check
@@ -117,10 +117,10 @@ def split_ranges(parse_string):
 def get_date_range(var):
     "Returns the two dates contained as a low,high tuple"
     limits = var.split(",")
-    if len(limits)==1:
+    if len(limits) == 1:
         low = get_datetime(limits[0])
         return low, None
-    if len(limits)==2:
+    if len(limits) == 2:
         low = get_datetime(limits[0])
         high = get_datetime(limits[1])
         return low, high
@@ -168,9 +168,7 @@ def task_run_core():
 
 def main():
     """Main that construct all the bibtask."""
-    task_init(authorization_action='runbibrank',
-            authorization_msg="BibRank Task Submission",
-            description="""Ranking examples:
+    task_init(description="""Ranking examples:
        bibrank -wjif -a --id=0-30000,30001-860000 --verbose=9
        bibrank -wjif -d --modified='2002-10-27 13:57:26'
        bibrank -wjif --rebalance --collection=Articles
@@ -238,7 +236,7 @@ def task_submit_elaborate_specific_parameter(key, value, opts, dummy):
     """Elaborate a specific parameter of CLI bibrank."""
     if key in ("-a", "--add"):
         task_set_option("cmd", "add")
-        if ("-x","") in opts or ("--del","") in opts:
+        if ("-x", "") in opts or ("--del", "") in opts:
             raise StandardError, "--add incompatible with --del"
     elif key in ("--run", "-w"):
         task_set_option("run", [])

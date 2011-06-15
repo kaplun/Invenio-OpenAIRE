@@ -965,7 +965,7 @@ def compare_timestamps_with_tolerance(timestamp1,
         "%Y-%m-%d %H:%M:%S"))
     # now compare them:
     if timestamp1_seconds < timestamp2_seconds - tolerance:
-        return - 1
+        return -1
     elif timestamp1_seconds > timestamp2_seconds + tolerance:
         return 1
     else:
@@ -1163,9 +1163,7 @@ def main():
     # mode.
     task_set_option("repository", None)
     task_set_option("dates", None)
-    task_init(authorization_action='runoaiharvest',
-              authorization_msg="oaiharvest Task Submission",
-              description="""
+    task_init(description="""
 Harvest records from OAI sources.
 Manual vs automatic harvesting:
    - Manual harvesting retrieves records from the specified URL,

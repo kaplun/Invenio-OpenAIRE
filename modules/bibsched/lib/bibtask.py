@@ -92,8 +92,8 @@ _TASK_PARAMS = {
 _OPTIONS = {}
 
 # Which tasks don't need to ask the user for authorization?
-CFG_VALID_PROCESSES_NO_AUTH_NEEDED = ("bibupload", )
-CFG_TASK_IS_NOT_A_DEAMON = ("bibupload", )
+CFG_VALID_PROCESSES_NO_AUTH_NEEDED = ("bibupload",)
+CFG_TASK_IS_NOT_A_DEAMON = ("bibupload",)
 
 def fix_argv_paths(paths, argv=None):
     """Given the argv vector of cli parameters, and a list of path that
@@ -193,7 +193,7 @@ def task_low_level_submission(name, user, *argv):
     except Exception:
         register_exception(alert_admin=True)
         if task_id:
-            run_sql("""DELETE FROM schTASK WHERE id=%s""", (task_id, ))
+            run_sql("""DELETE FROM schTASK WHERE id=%s""", (task_id,))
         raise
     return task_id
 
@@ -208,8 +208,8 @@ def setup_loggers(task_id=None):
         logger.removeHandler(handler)
     formatter = logging.Formatter('%(asctime)s --> %(message)s', '%Y-%m-%d %H:%M:%S')
     if task_id is not None:
-        err_logger = logging.handlers.RotatingFileHandler(os.path.join(CFG_LOGDIR, 'bibsched_task_%d.err' % _TASK_PARAMS['task_id']), 'a', 1*1024*1024, 10)
-        log_logger = logging.handlers.RotatingFileHandler(os.path.join(CFG_LOGDIR, 'bibsched_task_%d.log' % _TASK_PARAMS['task_id']), 'a', 1*1024*1024, 10)
+        err_logger = logging.handlers.RotatingFileHandler(os.path.join(CFG_LOGDIR, 'bibsched_task_%d.err' % _TASK_PARAMS['task_id']), 'a', 1 * 1024 * 1024, 10)
+        log_logger = logging.handlers.RotatingFileHandler(os.path.join(CFG_LOGDIR, 'bibsched_task_%d.log' % _TASK_PARAMS['task_id']), 'a', 1 * 1024 * 1024, 10)
         log_logger.setFormatter(formatter)
         log_logger.setLevel(logging.DEBUG)
         err_logger.setFormatter(formatter)
@@ -229,8 +229,6 @@ def setup_loggers(task_id=None):
 
 
 def task_init(
-    authorization_action="",
-    authorization_msg="",
     description="",
     help_specific_usage="",
     version=__revision__,
@@ -303,12 +301,12 @@ def task_init(
                 task_update_status("ERROR")
             raise
 
-    write_message('argv=%s' % (argv, ), verbose=9)
-    write_message('_OPTIONS=%s' % (_OPTIONS, ), verbose=9)
-    write_message('_TASK_PARAMS=%s' % (_TASK_PARAMS, ), verbose=9)
+    write_message('argv=%s' % (argv,), verbose=9)
+    write_message('_OPTIONS=%s' % (_OPTIONS,), verbose=9)
+    write_message('_TASK_PARAMS=%s' % (_TASK_PARAMS,), verbose=9)
 
     if to_be_submitted:
-        _task_submit(argv, authorization_action, authorization_msg)
+        _task_submit(argv)
     else:
         try:
             if task_get_task_param('profile'):
@@ -435,7 +433,7 @@ def _task_build_params(
                 _TASK_PARAMS["task_specific_name"] = opt[1]
             elif opt[0] in ("-L", "--limit"):
                 _TASK_PARAMS["runtime_limit"] = parse_runtime_limit(opt[1])
-            elif opt[0] in ("--profile", ):
+            elif opt[0] in ("--profile",):
                 _TASK_PARAMS["profile"] += opt[1].split(',')
             elif opt[0] in ("--post-process"):
                 _TASK_PARAMS["post-process"] += [opt[1]];
@@ -534,10 +532,10 @@ def get_datetime(var, format_string="%Y-%m-%d %H:%M:%S"):
        It can handle normal date strings and shifts with respect
        to now."""
     date = time.time()
-    factors = {"d":24*3600, "h":3600, "m":60, "s":1}
+    factors = {"d":24 * 3600, "h":3600, "m":60, "s":1}
     m = _RE_SHIFT.match(var)
     if m:
-        sign = m.groups()[0] == "-" and -1 or 1
+        sign = m.groups()[0] == "-" and - 1 or 1
         factor = factors[m.groups()[2]]
         value = float(m.groups()[1])
         date = time.localtime(date + sign * factor * value)
@@ -575,89 +573,12 @@ def task_sleep_now_if_required(can_stop_too=False):
                 task_update_status("STOPPED")
                 sys.exit(0)
 
-def authenticate(user, authorization_action, authorization_msg=""):
-    """Authenticate the user against the user database.
-    Check for its password, if it exists.
-    Check for authorization_action access rights.
-    Return user name upon authorization success,
-    do system exit upon authorization failure.
-    """
-    # With SSO it's impossible to check for pwd
-    if CFG_EXTERNAL_AUTH_USING_SSO or os.path.basename(sys.argv[0]) in CFG_VALID_PROCESSES_NO_AUTH_NEEDED:
-        return user
-    if authorization_msg:
-        print authorization_msg
-        print "=" * len(authorization_msg)
-    if user == "":
-        print >> sys.stdout, "\rUsername: ",
-        try:
-            user = sys.stdin.readline().lower().strip()
-        except EOFError:
-            sys.stderr.write("\n")
-            sys.exit(1)
-        except KeyboardInterrupt:
-            sys.stderr.write("\n")
-            sys.exit(1)
-    else:
-        print >> sys.stdout, "\rUsername:", user
-    ## first check user:
-    # p_un passed may be an email or a nickname:
-    res = run_sql("select id from user where email=%s", (user,), 1) + \
-        run_sql("select id from user where nickname=%s", (user,), 1)
-    if not res:
-        print "Sorry, %s does not exist." % user
-        sys.exit(1)
-    else:
-        uid = res[0][0]
-        ok = False
-        login_method = get_user_preferences(uid)['login_method']
-        if not CFG_EXTERNAL_AUTHENTICATION[login_method]:
-            #Local authentication, let's see if we want passwords.
-            res = run_sql("select id from user where id=%s "
-                    "and password=AES_ENCRYPT(email,'')",
-            (uid,), 1)
-            if res:
-                ok = True
-        if not ok:
-            try:
-                password_entered = getpass.getpass()
-            except EOFError:
-                sys.stderr.write("\n")
-                sys.exit(1)
-            except KeyboardInterrupt:
-                sys.stderr.write("\n")
-                sys.exit(1)
-            if not CFG_EXTERNAL_AUTHENTICATION[login_method]:
-                res = run_sql("select id from user where id=%s "
-                        "and password=AES_ENCRYPT(email, %s)",
-                (uid, password_entered), 1)
-                if res:
-                    ok = True
-            else:
-                if CFG_EXTERNAL_AUTHENTICATION[login_method].auth_user(get_email(uid), password_entered):
-                    ok = True
-        if not ok:
-            print "Sorry, wrong credentials for %s." % user
-            sys.exit(1)
-        else:
-            ## secondly check authorization for the authorization_action:
-            (auth_code, auth_message) = acc_authorize_action(uid, authorization_action)
-            if auth_code != 0:
-                print auth_message
-                sys.exit(1)
-            return user
-
-def _task_submit(argv, authorization_action, authorization_msg):
+def _task_submit(argv):
     """Submits task to the BibSched task queue.  This is what people will
         be invoking via command line."""
 
     ## check as whom we want to submit?
     check_running_process_user()
-
-    ## sanity check: remove eventual "task" option:
-
-    ## authenticate user:
-    _TASK_PARAMS['user'] = authenticate(_TASK_PARAMS["user"], authorization_action, authorization_msg)
 
     ## submit task:
     if _TASK_PARAMS['task_specific_name']:
@@ -681,7 +602,7 @@ def _task_get_options(task_id, task_name):
     queue table."""
     out = {}
     res = run_sql("SELECT arguments FROM schTASK WHERE id=%s AND proc LIKE %s",
-        (task_id, task_name+'%'))
+        (task_id, task_name + '%'))
     try:
         out = marshal.loads(res[0][0])
     except:
@@ -689,7 +610,7 @@ def _task_get_options(task_id, task_name):
             % (task_name, task_id), sys.stderr)
         task_update_status('ERROR')
         sys.exit(1)
-    write_message('Options retrieved: %s' % (out, ), verbose=9)
+    write_message('Options retrieved: %s' % (out,), verbose=9)
     return out
 
 def _task_run(task_run_fnc):
@@ -729,12 +650,12 @@ def _task_run(task_run_fnc):
                 new_runtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_TASK_PARAMS['runtime_limit'][0][0]))
             else:
                 new_runtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(_TASK_PARAMS['runtime_limit'][1][0]))
-            progress = run_sql("SELECT progress FROM schTASK WHERE id=%s", (_TASK_PARAMS['task_id'], ))
+            progress = run_sql("SELECT progress FROM schTASK WHERE id=%s", (_TASK_PARAMS['task_id'],))
             if progress:
                 progress = progress[0][0]
             else:
                 progress = ''
-            g =  re.match(r'Postponed (\d+) time\(s\)', progress)
+            g = re.match(r'Postponed (\d+) time\(s\)', progress)
             if g:
                 postponed_times = int(g.group(1))
             else:
@@ -778,7 +699,7 @@ def _task_run(task_run_fnc):
                 run_sql("UPDATE schTASK SET runtime=%s, status='WAITING', progress='' WHERE id=%s", (new_runtime, _TASK_PARAMS['task_id']))
                 write_message("Task #%d finished and resubmitted." % _TASK_PARAMS['task_id'])
             elif task_status == 'STOPPED':
-                run_sql("UPDATE schTASK SET status='WAITING', progress='' WHERE id=%s", (_TASK_PARAMS['task_id'], ))
+                run_sql("UPDATE schTASK SET status='WAITING', progress='' WHERE id=%s", (_TASK_PARAMS['task_id'],))
                 write_message("Task #%d stopped and resubmitted." % _TASK_PARAMS['task_id'])
             else:
                 ## We keep the bad result and we resubmit with another id.

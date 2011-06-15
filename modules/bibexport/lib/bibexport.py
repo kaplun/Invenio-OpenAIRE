@@ -131,13 +131,11 @@ def task_submit_elaborate_specific_parameter(key, value, opts, args):
 
 def main():
     """Main function that constructs full bibtask."""
-    task_init(authorization_action='runbibexport',
-              authorization_msg="BibExport Task Submission",
-              help_specific_usage="""Export options:
+    task_init(help_specific_usage="""Export options:
   -w,  --wjob=j1[,j2]\tRun specific exporting jobs j1, j2, etc (e.g. 'sitemap').
 """,
               version=__revision__,
-              specific_params=("w:", ["wjob=",]),
+              specific_params=("w:", ["wjob=", ]),
               task_submit_elaborate_specific_parameter_fnc=task_submit_elaborate_specific_parameter,
               task_submit_check_options_fnc=task_submit_check_options,
               task_run_fnc=task_run_core)

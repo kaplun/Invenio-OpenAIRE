@@ -50,9 +50,7 @@ _RECIDS_NUMBER = 0
 
 def bibclassify_daemon():
     """Constructs the BibClassify bibtask."""
-    task_init(authorization_action='runbibclassify',
-        authorization_msg="BibClassify Task Submission",
-        description="Extract keywords and create a BibUpload "
+    task_init(description="Extract keywords and create a BibUpload "
             "task.\nExamples:\n"
             "    $ bibclassify\n"
             "    $ bibclassify -i 79 -k HEP\n"
@@ -144,7 +142,7 @@ def _get_recids_foreach_ontology(recids=None, collections=None, taxonomy=None):
                 modified_records = intbitset(run_sql("SELECT id FROM bibrec"))
             else:
                 modified_records = intbitset(run_sql("SELECT id FROM bibrec "
-                    "WHERE modification_date >= %s", (date_last_run, )))
+                    "WHERE modification_date >= %s", (date_last_run,)))
 
             records &= modified_records
             if records:

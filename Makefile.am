@@ -543,5 +543,7 @@ update-v1.0.0-rc0-tables: # from v1.0.0-rc0 to next release
 	echo "INSERT INTO sbmFUNDESC VALUES ('Move_Photos_to_Storage','iconformat');" | ${prefix}/bin/dbexec
 	echo "INSERT INTO format (name, code, description, content_type, visibility) VALUES ('Podcast', 'xp', 'Sample format suitable for multimedia feeds, such as podcasts', 'application/rss+xml', 0);" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE accMAILCOOKIE ADD INDEX expiration (expiration);" | ${prefix}/bin/dbexec
+	echo "DELETE a, aaa FROM accACTION a LEFT JOIN accROLE_accACTION_accARGUMENT aaa ON a.id = aaa.id_accACTION WHERE a.name LIKE 'run%';" | ${prefix}/bin/dbexec
+	
 
 CLEANFILES = *~ *.pyc *.tmp

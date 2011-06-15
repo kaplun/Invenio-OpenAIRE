@@ -60,7 +60,7 @@ def update_expired_loan(loan_id):
                       status = 'expired',
                       overdue_letter_date = NOW()
                where id = %s
-               """, (loan_id, ))
+               """, (loan_id,))
 
 def get_overdue_letters_info(loan_id):
     """
@@ -77,7 +77,7 @@ def get_overdue_letters_info(loan_id):
                             DATE_FORMAT(overdue_letter_date,'%%Y-%%m-%%d')
                        from crcLOAN
                       where id=%s""",
-                  (loan_id, ))
+                  (loan_id,))
 
     return res[0]
 
@@ -178,13 +178,11 @@ def main():
     """
     main()
     """
-    task_init(authorization_action='runbibcirculation',
-              authorization_msg="BibCirculation Task Submission",
-              description="""Examples:
+    task_init(description="""Examples:
               %s -u admin
               """ % (sys.argv[0],),
               version=__revision__,
-              task_run_fnc = task_run_core)
+              task_run_fnc=task_run_core)
 
 if __name__ == '__main__':
     main()

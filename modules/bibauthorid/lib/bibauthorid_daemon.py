@@ -75,9 +75,7 @@ _RECIDS_NUMBER = 0
 
 def bibauthorid_daemon():
     """Constructs the Bibauthorid bibtask."""
-    bibtask.task_init(authorization_action='runbibclassify',
-        authorization_msg="Bibauthorid Task Submission",
-        description="""
+    bibtask.task_init(description="""
 Purpose:
   Disambiguate Authors and find their identities.
 Examples:
@@ -736,16 +734,16 @@ def _update_authorid_universe(record_ids=None, all_records=False):
             bibtask.write_message("Update authorid will operate on %s records."
                                   % (len(recently_modified)), stream=sys.stdout,
                                   verbose=0)
-    
+
             if not recently_modified:
                 bibtask.write_message("Update authorid: Nothing to do",
                                       stream=sys.stdout, verbose=0)
                 return
-    
+
             for rec in recently_modified:
                 updated_records.append(rec[0])
                 dat.update_log("rec_updates", rec[0])
-    
+
         else:
             bibtask.write_message("Update authorid: Nothing to do",
                                   stream=sys.stdout, verbose=0)

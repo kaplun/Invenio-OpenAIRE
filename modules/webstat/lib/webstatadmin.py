@@ -31,9 +31,7 @@ from invenio.config import CFG_SITE_RECORD
 
 def main():
     """Main dealing with all the BibTask magic."""
-    task_init(authorization_action="runwebstatadmin",
-              authorization_msg="Webstat Administrator",
-              description="Description: %s Creates/deletes custom events. Can be set\n"
+    task_init(description="Description: %s Creates/deletes custom events. Can be set\n"
                           "             to cache key events and previously defined custom events.\n" % sys.argv[0],
               help_specific_usage="  -n, --new-event=ID            create a new custom event with the human-readable ID\n"
                                   "  -r, --remove-event=ID         remote the custom event with id ID and all its data\n"
@@ -203,7 +201,7 @@ display-your-searches-url = "/youralerts/display"
                             cols.append("")
                         cols[index] = value
                 if name:
-                    res = run_sql("SELECT COUNT(id) FROM staEVENT WHERE id = %s", (name, ))
+                    res = run_sql("SELECT COUNT(id) FROM staEVENT WHERE id = %s", (name,))
                     if res[0][0] == 0:
                         # name does not exist, create customevent
                         webstat.create_customevent(name, name, cols)

@@ -125,9 +125,7 @@ def task_run_core():
 
 def main():
     """ Main that constructs all the bibtask. """
-    task_init(authorization_action='runbatchuploader',
-            authorization_msg="Batch Uploader",
-            description="""Description:
+    task_init(description="""Description:
     The batch uploader has two different run modes.
     If --metadata is specified (by default) then all files in folders insert,
     append, correct and replace are uploaded using the corresponding mode.

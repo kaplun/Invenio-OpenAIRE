@@ -35,7 +35,7 @@ def fib(n):
     """Returns Fibonacci number for 'n'."""
     out = 1
     if n >= 2:
-        out = fib(n-2) + fib(n-1)
+        out = fib(n - 2) + fib(n - 1)
     return out
 
 def task_submit_elaborate_specific_parameter(key, value, opts, args):
@@ -76,9 +76,7 @@ def task_run_core():
 
 def main():
     """Main that construct all the bibtask."""
-    task_init(authorization_action='runbibtaskex',
-            authorization_msg="BibTaskEx Task Submission",
-            help_specific_usage="""  -n,  --number         Print Fibonacci numbers for up to NUM. [default=30]\n""",
+    task_init(help_specific_usage="""  -n,  --number         Print Fibonacci numbers for up to NUM. [default=30]\n""",
             version=__revision__,
             specific_params=("n:",
                 ["number="]),

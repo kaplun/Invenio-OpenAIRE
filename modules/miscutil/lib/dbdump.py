@@ -136,7 +136,7 @@ def _dbdump_run_task_core():
     output_dir = task_get_option('output', CFG_LOGDIR)
     output_num = task_get_option('number', 5)
     output_fil_prefix = CFG_DATABASE_NAME + '-dbdump-'
-    output_fil_suffix = task_get_task_param('task_starting_time').replace(' ','_') + '.sql'
+    output_fil_suffix = task_get_task_param('task_starting_time').replace(' ', '_') + '.sql'
     output_fil = output_fil_prefix + output_fil_suffix
     write_message("Reading parameters ended")
     # make dump:
@@ -155,9 +155,7 @@ def _dbdump_run_task_core():
 
 def main():
     """Main that construct all the bibtask."""
-    task_init(authorization_action='rundbdump',
-              authorization_msg="DB Dump Task Submission",
-              help_specific_usage="""\
+    task_init(help_specific_usage="""\
   -o, --output=DIR      Output directory. [default=%s]
   -n, --number=NUM      Keep up to NUM previous dump files. [default=5]
 """ % CFG_LOGDIR,

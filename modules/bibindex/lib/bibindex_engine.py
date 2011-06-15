@@ -86,8 +86,8 @@ else:
 
 ## precompile some often-used regexp for speed reasons:
 re_subfields = re.compile('\$\$\w')
-re_block_punctuation_begin = re.compile(r"^"+CFG_BIBINDEX_CHARS_PUNCTUATION+"+")
-re_block_punctuation_end = re.compile(CFG_BIBINDEX_CHARS_PUNCTUATION+"+$")
+re_block_punctuation_begin = re.compile(r"^" + CFG_BIBINDEX_CHARS_PUNCTUATION + "+")
+re_block_punctuation_end = re.compile(CFG_BIBINDEX_CHARS_PUNCTUATION + "+$")
 re_punctuation = re.compile(CFG_BIBINDEX_CHARS_PUNCTUATION)
 re_separators = re.compile(CFG_BIBINDEX_CHARS_ALPHANUMERIC_SEPARATORS)
 re_datetime_shift = re.compile("([-\+]{0,1})([\d]+)([dhms])")
@@ -172,7 +172,7 @@ def get_field_tags(field):
     query = """SELECT t.value FROM tag AS t, field_tag AS ft, field AS f
                 WHERE f.code=%s AND ft.id_field=f.id AND t.id=ft.id_tag
                 ORDER BY ft.score DESC"""
-    res = run_sql(query, (field, ))
+    res = run_sql(query, (field,))
     return [row[0] for row in res]
 
 def get_words_from_journal_tag(recID, tag):
@@ -205,12 +205,12 @@ def get_words_from_journal_tag(recID, tag):
     lwords = []
     for dpubinfo in dpubinfos.values():
         # index all journal subfields separately
-        for tag,val in dpubinfo.items():
+        for tag, val in dpubinfo.items():
             lwords.append(val)
         # index journal standard format:
         pubinfo = CFG_JOURNAL_PUBINFO_STANDARD_FORM
-        for tag,val in dpubinfo.items():
-            pubinfo = pubinfo.replace(tag,val)
+        for tag, val in dpubinfo.items():
+            pubinfo = pubinfo.replace(tag, val)
         if CFG_JOURNAL_TAG[:-1] in pubinfo:
             # some subfield was missing, do nothing
             pass
@@ -250,7 +250,7 @@ def get_words_from_date_tag(datestring, stemming_language=None):
         # maybe there are whitespaces, so break these too
         out.append(dateword)
         parts = dateword.split('-')
-        for nb in range(1,len(parts)):
+        for nb in range(1, len(parts)):
             out.append("-".join(parts[:nb]))
     return out
 
@@ -614,7 +614,7 @@ def get_index_id_from_index_name(index_name):
     out = 0
     query = """SELECT w.id FROM idxINDEX AS w
                 WHERE w.name=%s LIMIT 1"""
-    res = run_sql(query, (index_name, ), 1)
+    res = run_sql(query, (index_name,), 1)
     if res:
         out = res[0][0]
     return out
@@ -623,7 +623,7 @@ def get_index_name_from_index_id(index_id):
     """Returns the words/phrase index name for INDEXID.
        Returns '' in case there is no words table for this indexid.
        Example: field=9, output='fulltext'."""
-    res = run_sql("SELECT name FROM idxINDEX WHERE id=%s", (index_id, ))
+    res = run_sql("SELECT name FROM idxINDEX WHERE id=%s", (index_id,))
     if res:
         return res[0][0]
     return ''
@@ -637,7 +637,7 @@ def get_index_tags(indexname):
     query = """SELECT f.code FROM idxINDEX AS w, idxINDEX_field AS wf,
     field AS f WHERE w.name=%s AND w.id=wf.id_idxINDEX
     AND f.id=wf.id_field"""
-    res = run_sql(query, (indexname, ))
+    res = run_sql(query, (indexname,))
     for row in res:
         out.extend(get_field_tags(row[0]))
     return out
@@ -660,7 +660,7 @@ def split_ranges(parse_string):
     for arange in ranges:
         tmp_recIDs = arange.split("-")
 
-        if len(tmp_recIDs)==1:
+        if len(tmp_recIDs) == 1:
             recIDs.append([int(tmp_recIDs[0]), int(tmp_recIDs[0])])
         else:
             if int(tmp_recIDs[0]) > int(tmp_recIDs[1]): # sanity check
@@ -692,10 +692,10 @@ def get_word_tables(tables):
 def get_date_range(var):
     "Returns the two dates contained as a low,high tuple"
     limits = var.split(",")
-    if len(limits)==1:
+    if len(limits) == 1:
         low = get_datetime(limits[0])
         return low, None
-    if len(limits)==2:
+    if len(limits) == 2:
         low = get_datetime(limits[0])
         high = get_datetime(limits[1])
         return low, high
@@ -835,7 +835,7 @@ class WordTable:
                 run_sql(query, (group[0], group[1]))
 
         nb_words_total = len(self.value)
-        nb_words_report = int(nb_words_total/10.0)
+        nb_words_report = int(nb_words_total / 10.0)
         nb_words_done = 0
         for word in self.value.keys():
             self.put_word_into_db(word)
@@ -904,7 +904,7 @@ class WordTable:
 
         set = self.load_old_recIDs(word)
         if set is not None: # merge the word recIDs found in memory:
-            if not self.merge_with_old_recIDs(word,set):
+            if not self.merge_with_old_recIDs(word, set):
                 # nothing to update:
                 write_message("......... unchanged hitlist for ``%s''" % word, verbose=9)
                 pass
@@ -984,8 +984,8 @@ class WordTable:
             chunksize_count = 0
             while i_low <= arange[1]:
                 # calculate chunk group of recIDs and treat it:
-                i_high = min(i_low+opt_flush-flush_count-1,arange[1])
-                i_high = min(i_low+chunksize-chunksize_count-1, i_high)
+                i_high = min(i_low + opt_flush - flush_count - 1, arange[1])
+                i_high = min(i_low + chunksize - chunksize_count - 1, i_high)
                 try:
                     self.chk_recID_range(i_low, i_high)
                 except StandardError, e:
@@ -1015,12 +1015,12 @@ class WordTable:
                     self.clean()
                     write_message("%s backing up" % (self.tablename))
                     flush_count = 0
-                    self.log_progress(time_started,records_done,records_to_go)
+                    self.log_progress(time_started, records_done, records_to_go)
                 # iterate:
                 i_low = i_high + 1
         if flush_count > 0:
             self.put_into_db()
-            self.log_progress(time_started,records_done,records_to_go)
+            self.log_progress(time_started, records_done, records_to_go)
 
     def add_recIDs_by_date(self, dates, opt_flush):
         """Add records that were modified between DATES[0] and DATES[1].
@@ -1030,7 +1030,7 @@ class WordTable:
         if not dates:
             table_id = self.tablename[-3:-1]
             query = """SELECT last_updated FROM idxINDEX WHERE id=%s"""
-            res = run_sql(query, (table_id, ))
+            res = run_sql(query, (table_id,))
             if not res:
                 return
             if not res[0][0]:
@@ -1042,30 +1042,30 @@ class WordTable:
                               WHERE b.modification_date >= %s""",
                           (dates[0],)))
             if self.is_fulltext_index:
-                res |= intbitset(run_sql("""SELECT id_bibrec FROM bibrec_bibdoc JOIN bibdoc ON id_bibdoc=id WHERE text_extraction_date <= modification_date AND modification_date >= %s AND status<>'DELETED'""", (dates[0], )))
+                res |= intbitset(run_sql("""SELECT id_bibrec FROM bibrec_bibdoc JOIN bibdoc ON id_bibdoc=id WHERE text_extraction_date <= modification_date AND modification_date >= %s AND status<>'DELETED'""", (dates[0],)))
         elif dates[0] is None:
             res = intbitset(run_sql("""SELECT b.id FROM bibrec AS b
                               WHERE b.modification_date <= %s""",
                           (dates[1],)))
             if self.is_fulltext_index:
-                res |= intbitset(run_sql("""SELECT id_bibrec FROM bibrec_bibdoc JOIN bibdoc ON id_bibdoc=id WHERE text_extraction_date <= modification_date AND modification_date <= %s AND status<>'DELETED'""", (dates[1], )))
+                res |= intbitset(run_sql("""SELECT id_bibrec FROM bibrec_bibdoc JOIN bibdoc ON id_bibdoc=id WHERE text_extraction_date <= modification_date AND modification_date <= %s AND status<>'DELETED'""", (dates[1],)))
         else:
             res = intbitset(run_sql("""SELECT b.id FROM bibrec AS b
                               WHERE b.modification_date >= %s AND
                                     b.modification_date <= %s""",
                           (dates[0], dates[1])))
             if self.is_fulltext_index:
-                res |= intbitset(run_sql("""SELECT id_bibrec FROM bibrec_bibdoc JOIN bibdoc ON id_bibdoc=id WHERE text_extraction_date <= modification_date AND modification_date >= %s AND modification_date <= %s AND status<>'DELETED'""", (dates[0], dates[1], )))
+                res |= intbitset(run_sql("""SELECT id_bibrec FROM bibrec_bibdoc JOIN bibdoc ON id_bibdoc=id WHERE text_extraction_date <= modification_date AND modification_date >= %s AND modification_date <= %s AND status<>'DELETED'""", (dates[0], dates[1],)))
         alist = create_range_list(list(res))
         if not alist:
-            write_message( "No new records added. %s is up to date" % self.tablename)
+            write_message("No new records added. %s is up to date" % self.tablename)
         else:
             self.add_recIDs(alist, opt_flush)
 
     def add_recID_range(self, recID1, recID2):
         """Add records from RECID1 to RECID2."""
         wlist = {}
-        self.recIDs_in_mem.append([recID1,recID2])
+        self.recIDs_in_mem.append([recID1, recID2])
         # special case of author indexes where we also add author
         # canonical IDs:
         if self.index_name in ('author', 'firstauthor', 'exactauthor', 'exactfirstauthor'):
@@ -1102,7 +1102,7 @@ class WordTable:
                         for bibdocfile in BibRecDocs(recid).list_latest_files():
                             res.add((recid, bibdocfile.get_url()))
                 for row in res:
-                    recID,phrase = row
+                    recID, phrase = row
                     if not wlist.has_key(recID):
                         wlist[recID] = []
                     new_words = get_words_function(phrase, stemming_language=self.stemming_language) # ,self.separators
@@ -1160,13 +1160,13 @@ class WordTable:
         if time_elapsed == 0 or done > todo:
             return
 
-        time_recs_per_min = done/(time_elapsed/60.0)
+        time_recs_per_min = done / (time_elapsed / 60.0)
         write_message("%d records took %.1f seconds to complete.(%1.f recs/min)"\
                 % (done, time_elapsed, time_recs_per_min))
 
         if time_recs_per_min:
             write_message("Estimated runtime: %.1f minutes" % \
-                    ((todo-done)/time_recs_per_min))
+                    ((todo - done) / time_recs_per_min))
 
     def put(self, recID, word, sign):
         """Adds/deletes a word to the word list."""
@@ -1188,7 +1188,7 @@ class WordTable:
         """
         count = 0
         for arange in recIDs:
-            self.del_recID_range(arange[0],arange[1])
+            self.del_recID_range(arange[0], arange[1])
             count = count + arange[1] - arange[0]
         self.put_into_db()
 
@@ -1197,7 +1197,7 @@ class WordTable:
            and high from memory words index table."""
         write_message("%s fetching existing words for records #%d-#%d started" % \
                 (self.tablename, low, high), verbose=3)
-        self.recIDs_in_mem.append([low,high])
+        self.recIDs_in_mem.append([low, high])
         query = """SELECT id_bibrec,termlist FROM %sR as bb WHERE bb.id_bibrec
         BETWEEN %%s AND %%s""" % (self.tablename[:-1])
         recID_rows = run_sql(query, (low, high))
@@ -1279,8 +1279,8 @@ class WordTable:
             chunksize_count = 0
             while i_low <= arange[1]:
                 # calculate chunk group of recIDs and treat it:
-                i_high = min(i_low+opt_flush-flush_count-1,arange[1])
-                i_high = min(i_low+chunksize-chunksize_count-1, i_high)
+                i_high = min(i_low + opt_flush - flush_count - 1, arange[1])
+                i_high = min(i_low + chunksize - chunksize_count - 1, i_high)
 
                 try:
                     self.fix_recID_range(i_low, i_high)
@@ -1301,12 +1301,12 @@ class WordTable:
                     self.put_into_db("emergency")
                     self.clean()
                     flush_count = 0
-                    self.log_progress(time_started,records_done,records_to_go)
+                    self.log_progress(time_started, records_done, records_to_go)
                 # iterate:
                 i_low = i_high + 1
         if flush_count > 0:
             self.put_into_db("emergency")
-            self.log_progress(time_started,records_done,records_to_go)
+            self.log_progress(time_started, records_done, records_to_go)
         write_message("%s inconsistencies repaired." % self.tablename)
 
     def chk_recID_range(self, low, high):
@@ -1315,8 +1315,8 @@ class WordTable:
         query = """SELECT COUNT(*) FROM %sR WHERE type <> 'CURRENT'
         AND id_bibrec BETWEEN %%s AND %%s""" % self.tablename[:-1]
         res = run_sql(query, (low, high), 1)
-        if res[0][0]==0:
-            write_message("%s for %d-%d is in consistent state" % (self.tablename,low,high))
+        if res[0][0] == 0:
+            write_message("%s for %d-%d is in consistent state" % (self.tablename, low, high))
             return # okay, words table is consistent
 
         ## inconsistency detected!
@@ -1347,7 +1347,7 @@ class WordTable:
         res = run_sql(query, (low, high))
         for row in res:
             if not state.has_key(row[0]):
-                state[row[0]]=[]
+                state[row[0]] = []
             state[row[0]].append(row[1])
 
         ok = 1 # will hold info on whether we will be able to repair
@@ -1361,18 +1361,18 @@ class WordTable:
                         write_message("EMERGENCY: Inconsistency in index record %d detected" % recID)
                         query = """DELETE FROM %sR
                         WHERE id_bibrec=%%s""" % self.tablename[:-1]
-                        run_sql(query, (recID, ))
+                        run_sql(query, (recID,))
                         write_message("EMERGENCY: Inconsistency in record %d repaired." % recID)
 
             else:
                 if 'FUTURE' in state[recID] and not 'CURRENT' in state[recID]:
-                    self.recIDs_in_mem.append([recID,recID])
+                    self.recIDs_in_mem.append([recID, recID])
 
                     # Get the words file
                     query = """SELECT type,termlist FROM %sR
                     WHERE id_bibrec=%%s""" % self.tablename[:-1]
                     write_message(query, verbose=9)
-                    res = run_sql(query, (recID, ))
+                    res = run_sql(query, (recID,))
                     for row in res:
                         wlist = deserialize_via_marshal(row[1])
                         write_message("Words are %s " % wlist, verbose=9)
@@ -1400,9 +1400,7 @@ class WordTable:
 
 def main():
     """Main that construct all the bibtask."""
-    task_init(authorization_action='runbibindex',
-            authorization_msg="BibIndex Task Submission",
-            description="""Examples:
+    task_init(description="""Examples:
 \t%s -a -i 234-250,293,300-500 -u admin@localhost
 \t%s -a -w author,fulltext -M 8192 -v3
             \t%s -d -m +4d -A on --flush=10000\n""" % ((sys.argv[0],) * 3), help_specific_usage=""" Indexing options:
@@ -1462,7 +1460,7 @@ def task_submit_elaborate_specific_parameter(key, value, opts, args):
     """
     if key in ("-a", "--add"):
         task_set_option("cmd", "add")
-        if ("-x","") in opts or ("--del","") in opts:
+        if ("-x", "") in opts or ("--del", "") in opts:
             raise StandardError, "Can not have --add and --del at the same time!"
     elif key in ("-k", "--check"):
         task_set_option("cmd", "check")
@@ -1596,7 +1594,7 @@ def task_run_core():
                     recIDs = perform_request_search(c=l_of_colls)
                     recIDs_range = []
                     for recID in recIDs:
-                        recIDs_range.append([recID,recID])
+                        recIDs_range.append([recID, recID])
                     wordTable.del_recIDs(recIDs_range)
                     task_sleep_now_if_required(can_stop_too=True)
                 else:
@@ -1613,7 +1611,7 @@ def task_run_core():
                     recIDs = perform_request_search(c=l_of_colls)
                     recIDs_range = []
                     for recID in recIDs:
-                        recIDs_range.append([recID,recID])
+                        recIDs_range.append([recID, recID])
                     wordTable.add_recIDs(recIDs_range, task_get_option("flush"))
                     task_sleep_now_if_required(can_stop_too=True)
                 else:
@@ -1665,7 +1663,7 @@ def task_run_core():
                     recIDs = perform_request_search(c=l_of_colls)
                     recIDs_range = []
                     for recID in recIDs:
-                        recIDs_range.append([recID,recID])
+                        recIDs_range.append([recID, recID])
                     wordTable.del_recIDs(recIDs_range)
                     task_sleep_now_if_required(can_stop_too=True)
                 else:
@@ -1682,7 +1680,7 @@ def task_run_core():
                     recIDs = perform_request_search(c=l_of_colls)
                     recIDs_range = []
                     for recID in recIDs:
-                        recIDs_range.append([recID,recID])
+                        recIDs_range.append([recID, recID])
                     wordTable.add_recIDs(recIDs_range, task_get_option("flush"))
                     task_sleep_now_if_required(can_stop_too=True)
                 else:
@@ -1734,7 +1732,7 @@ def task_run_core():
                     recIDs = perform_request_search(c=l_of_colls)
                     recIDs_range = []
                     for recID in recIDs:
-                        recIDs_range.append([recID,recID])
+                        recIDs_range.append([recID, recID])
                     wordTable.del_recIDs(recIDs_range)
                     task_sleep_now_if_required(can_stop_too=True)
                 else:
@@ -1751,7 +1749,7 @@ def task_run_core():
                     recIDs = perform_request_search(c=l_of_colls)
                     recIDs_range = []
                     for recID in recIDs:
-                        recIDs_range.append([recID,recID])
+                        recIDs_range.append([recID, recID])
                     wordTable.add_recIDs(recIDs_range, task_get_option("flush"))
                     task_sleep_now_if_required(can_stop_too=True)
                 else:
