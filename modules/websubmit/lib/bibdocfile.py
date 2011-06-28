@@ -116,9 +116,6 @@ from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, \
     CFG_SITE_RECORD
 from invenio.websubmit_config import CFG_WEBSUBMIT_ICON_SUBFORMAT_RE, \
     CFG_WEBSUBMIT_DEFAULT_ICON_SUBFORMAT
-import invenio.template
-websubmit_templates = invenio.template.load('websubmit')
-websearch_templates = invenio.template.load('websearch')
 
 #: block size when performing I/O.
 CFG_BIBDOCFILE_BLOCK_SIZE = 1024 * 8
@@ -1053,64 +1050,6 @@ class BibRecDocs:
             docfiles += bibdoc.list_latest_files(list_hidden=list_hidden)
         return docfiles
 
-    def display(self, docname="", version="", doctype="", ln=CFG_SITE_LANG, verbose=0, display_hidden=True):
-        """
-        Returns an HTML representation of the the attached documents.
-
-        @param docname: if set, include only the requested document.
-        @type docname: string
-        @param version: if not set, only the last version will be displayed. If
-            'all', all versions will be displayed.
-        @type version: string (integer or 'all')
-        @param doctype: is set, include only documents of the requested type.
-        @type doctype: string
-        @param ln: the language code.
-        @type ln: string
-        @param verbose: if greater than 0, includes debug information.
-        @type verbose: integer
-        @param display_hidden: whether to include hidden files as well.
-        @type display_hidden: bool
-        @return: the formatted representation.
-        @rtype: HTML string
-        """
-        t = ""
-        if docname:
-            try:
-                bibdocs = [self.get_bibdoc(docname)]
-            except InvenioWebSubmitFileError:
-                bibdocs = self.list_bibdocs(doctype)
-        else:
-            bibdocs = self.list_bibdocs(doctype)
-        if bibdocs:
-            types = list_types_from_array(bibdocs)
-            fulltypes = []
-            for mytype in types:
-                if mytype in ('Plot', 'PlotMisc'):
-                    # FIXME: quick hack to ignore plot-like doctypes
-                    # on Files tab
-                    continue
-                fulltype = {
-                            'name' : mytype,
-                            'content' : [],
-                           }
-                for bibdoc in bibdocs:
-                    if mytype == bibdoc.get_type():
-                        fulltype['content'].append(bibdoc.display(version,
-                            ln=ln, display_hidden=display_hidden))
-                fulltypes.append(fulltype)
-
-            if verbose >= 9:
-                verbose_files = str(self)
-            else:
-                verbose_files = ''
-
-            t = websubmit_templates.tmpl_bibrecdoc_filelist(
-                  ln=ln,
-                  types = fulltypes,
-                  verbose_files=verbose_files
-                )
-        return t
-
     def fix(self, docname):
         """
         Algorithm that transform a broken/old bibdoc into a coherent one.
@@ -1971,59 +1910,6 @@ class BibDoc:
             if subformat_re.match(docfile.get_subformat()):
                 self.delete_file(docfile.get_format(), docfile.get_version())
 
-    def display(self, version="", ln=CFG_SITE_LANG, display_hidden=True):
-        """
-        Returns an HTML representation of the this document.
-
-        @param version: if not set, only the last version will be displayed. If
-            'all', all versions will be displayed.
-        @type version: string (integer or 'all')
-        @param ln: the language code.
-        @type ln: string
-        @param display_hidden: whether to include hidden files as well.
-        @type display_hidden: bool
-        @return: the formatted representation.
-        @rtype: HTML string
-        """
-        t = ""
-        if version == "all":
-            docfiles = self.list_all_files(list_hidden=display_hidden)
-        elif version != "":
-            version = int(version)
-            docfiles = self.list_version_files(version, list_hidden=display_hidden)
-        else:
-            docfiles = self.list_latest_files(list_hidden=display_hidden)
-        icon = self.get_icon(display_hidden=display_hidden)
-        if icon:
-            imageurl = icon.get_url()
-        else:
-            imageurl = "%s/img/smallfiles.gif" % CFG_SITE_URL
-
-        versions = []
-        for version in list_versions_from_array(docfiles):
-            currversion = {
-                            'version' : version,
-                            'previous' : 0,
-                            'content' : []
-                          }
-            if version == self.get_latest_version() and version != 1:
-                currversion['previous'] = 1
-            for docfile in docfiles:
-                if docfile.get_version() == version:
-                    currversion['content'].append(docfile.display(ln = ln))
-            versions.append(currversion)
-
-        if versions:
-            return websubmit_templates.tmpl_bibdoc_filelist(
-                ln = ln,
-                versions = versions,
-                imageurl = imageurl,
-                docname = self.docname,
-                recid = self.recid
-                )
-        else:
-            return ""
-
     def change_name(self, newname):
         """
         Renames this document name.
@@ -2693,20 +2579,6 @@ class BibDocFile:
         out += '%s:%s:%s:%s:flags=%s\n' % (self.recid, self.docid, self.version, self.format, self.flags)
         out += '%s:%s:%s:%s:etag=%s\n' % (self.recid, self.docid, self.version, self.format, self.etag)
         return out
-
-    def display(self, ln = CFG_SITE_LANG):
-        """Returns a formatted representation of this docfile."""
-        return websubmit_templates.tmpl_bibdocfile_filelist(
-                 ln = ln,
-                 recid = self.recid,
-                 version = self.version,
-                 md = self.md,
-                 name = self.name,
-                 superformat = self.superformat,
-                 subformat = self.subformat,
-                 nice_size = nice_size(self.size),
-                 description = self.description or ''
-               )
 
     def is_restricted(self, user_info):
         """Returns restriction state. (see acc_authorize_action return values)"""
