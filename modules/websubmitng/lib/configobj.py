@@ -1,5 +1,7 @@
 # configobj.py
 # A config file reader/writer that supports nested sections in config files.
+# This file is a modified version of the original configobj.
+# Take the diff with the original to notice the changes.
 # Copyright (C) 2005-2010 Michael Foord, Nicola Larosa
 # E-mail: fuzzyman AT voidspace DOT org DOT uk
 #         nico AT tekNico DOT net
@@ -1320,7 +1322,7 @@ class ConfigObj(Section):
         if self._errors:
             info = "at line %s." % self._errors[0].line_number
             if len(self._errors) > 1:
-                msg = "Parsing failed with several errors.\nFirst error %s" % info
+                msg = "Parsing failed with several errors.\nFirst error %s\nError: %s\n" % (info, self._errors[0])
                 error = ConfigObjError(msg)
             else:
                 error = self._errors[0]
@@ -1529,6 +1531,31 @@ class ConfigObj(Section):
         else:
             return value
 
+    def _find_set_value(self, section, key_to_match):
+        """
+        Recursively searches for the input key in self.
+        If found, returns the value corresponding to the input key.
+        Else, returns none.
+        """
+        for (key, val) in section.items():
+            if key == key_to_match: 
+                return val
+            elif type(val) is Section:
+                matched_value = self._find_set_value(val, key_to_match)
+                if matched_value is not None: return matched_value
+
+    def _check_and_process_if_key_overridden(self, key, this_section):
+       """
+       If the key is over-riding the existing key(key starts with '^'), 
+       remove the existing entry.
+       Return the actual key(by removing the special character '^').
+       """
+       if key.startswith('^'):
+           key = key[1:]
+           if key and key in this_section:
+               this_section.pop(key)
+       return key
+
 
     def _parse(self, infile):
         """Actually parse the config file."""
@@ -1562,6 +1589,12 @@ class ConfigObj(Section):
                 done_start = True
                 
             reset_comment = True
+            # check for included .ini files
+            if sline.startswith('include '):
+                if sline[8:]:
+                    included_dict = ConfigObj(sline[8:])
+                    self.merge(included_dict)
+                    continue
             # first we check if it's a section marker
             mat = self._sectionmarker.match(line)
             if mat is not None:
@@ -1595,17 +1628,42 @@ class ConfigObj(Section):
                                        NestingError, infile, cur_index)
                     
                 sect_name = self._unquote(sect_name)
+       
+                sect_name = self._check_and_process_if_key_overridden(sect_name, parent)
+
                 if sect_name in parent:
                     self._handle_error('Duplicate section name at line %s.',
                                        DuplicateError, infile, cur_index)
                     continue
-                
-                # create the new section
-                this_section = Section(
-                    parent,
-                    cur_depth,
-                    self,
-                    name=sect_name)
+
+                # If the value of the section should be substituted, 
+                # substitute with the appropriate value.
+                if sect_name.startswith('$') and sect_name[1:]:
+                    sect_name = sect_name[1:]
+                    if sect_name in parent:
+                        self._handle_error(
+                            'Duplicate Section name at line %s.',
+                            DuplicateError, infile, cur_index)
+                        continue
+                    sect_value = self._find_set_value(self, sect_name)
+                    if sect_value is None:
+                        self._handle_error('Cannot find the section name to $-Substitute  %s.',
+                                            ParseError, infile, cur_index)
+                    else: 
+                        # Take a deep copy of the sect_value and set it.
+                        this_section = Section(
+                            parent,
+                            cur_depth,
+                            self,
+                            indict=sect_value.dict(),
+                            name=sect_name)
+                else: 
+                    # create the new section
+                    this_section = Section(
+                        parent,
+                        cur_depth,
+                        self,
+                        name=sect_name)
                 parent[sect_name] = this_section
                 parent.inline_comments[sect_name] = comment
                 parent.comments[sect_name] = comment_list
@@ -1626,8 +1684,33 @@ class ConfigObj(Section):
                 (indent, key, value) = mat.groups()
                 if indent and (self.indent_type is None):
                     self.indent_type = indent
+
+                #
+                key = self._unquote(key)
+               
+                key = self._check_and_process_if_key_overridden(key, this_section)
+                
+                if key in this_section:
+                    self._handle_error(
+                        'Duplicate keyword name at line %s.',
+                        DuplicateError, infile, cur_index)
+                    continue
+
+                # If the value of the key should be substituted, 
+                # substitute with the appropriate value.
+                if key.startswith('$') and key[1:]:
+                    key = key[1:]
+                    if key in this_section:
+                        self._handle_error(
+                            'Duplicate keyword name at line %s.',
+                            DuplicateError, infile, cur_index)
+                        continue
+                    value = self._find_set_value(self, key)
+                    if value is None:
+                        self._handle_error('Cannot find the key to $-Substitute  %s.',
+                                            ParseError, infile, cur_index)
                 # check for a multiline value
-                if value[:3] in ['"""', "'''"]:
+                elif value[:3] in ['"""', "'''"]:
                     try:
                         value, comment, cur_index = self._multiline(
                             value, infile, cur_index, maxline)
@@ -1671,13 +1754,6 @@ class ConfigObj(Section):
                                 'Parse error in value at line %s.',
                                 ParseError, infile, cur_index)
                             continue
-                #
-                key = self._unquote(key)
-                if key in this_section:
-                    self._handle_error(
-                        'Duplicate keyword name at line %s.',
-                        DuplicateError, infile, cur_index)
-                    continue
                 # add the key.
                 # we set unrepr because if we have got this far we will never
                 # be creating a new section
@@ -1727,6 +1803,7 @@ class ConfigObj(Section):
         line = infile[cur_index]
         cur_index += 1
         message = text % cur_index
+        message += "\nFilename: %s\n" % self.filename
         error = ErrorClass(message, cur_index, line)
         if self.raise_errors:
             # raise the error - parsing stops here
