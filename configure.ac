@@ -855,6 +855,16 @@ AC_CONFIG_FILES([config.nice  \
      modules/websubmit/lib/functions/Makefile \
      modules/websubmit/web/Makefile \
      modules/websubmit/web/admin/Makefile \
+     modules/websubmitng/Makefile \
+     modules/websubmitng/etc/Makefile \
+     modules/websubmitng/lib/Makefile \
+     modules/websubmitbezirg/Makefile \
+     modules/websubmitbezirg/etc/Makefile \
+     modules/websubmitbezirg/lib/Makefile \
+     modules/websubmitbezirg/lib/websubmitbezirg_elements/Makefile \
+     modules/websubmitbezirg/lib/websubmitbezirg_checks/Makefile \
+     modules/websubmitbezirg/lib/websubmitbezirg_processes/Makefile \
+     modules/websubmitbezirg/web/Makefile \
      ])
 
 ## Finally, write output files:

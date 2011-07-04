@@ -15,6 +15,16 @@
 ## along with Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
-SUBDIRS = bibauthorid bibcatalog bibcheck bibcirculation bibclassify bibconvert bibedit bibencode bibexport bibharvest bibknowledge bibmatch bibmerge bibsched bibsword bibindex bibrank bibupload bibformat elmsubmit miscutil webstyle websession webhelp webbasket webalert websearch websubmit webaccess webmessage webstat webcomment webjournal websubmitng websubmitbezirg
+SUBDIRS = websubmitbezirg_elements websubmitbezirg_checks websubmitbezirg_processes
 
-CLEANFILES = *~
+pylibdir = $(libdir)/python/invenio
+
+pylib_DATA = websubmitbezirg_webinterface.py \
+			 websubmitbezirg_engine.py \
+             websubmitbezirg_config.py \
+	         workflow_engine.py
+
+
+EXTRA_DIST = $(pylib_DATA)
+
+CLEANFILES = *~ *.tmp *.pyc

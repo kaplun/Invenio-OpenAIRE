@@ -906,6 +906,7 @@ WSGIRestrictStdout Off
         AliasMatch /sitemap-(.*) %(webdir)s/sitemap-$1
         Alias /robots.txt %(webdir)s/robots.txt
         Alias /favicon.ico %(webdir)s/favicon.ico
+	Alias /websubmitbezirg-static/ %(webdir)s/websubmitbezirg-static/
         WSGIDaemonProcess invenio processes=5 threads=1 display-name=%%{GROUP} inactivity-timeout=3600 maximum-requests=10000
         WSGIImportScript %(wsgidir)s/invenio.wsgi process-group=invenio application-group=%%{GLOBAL}
         WSGIScriptAlias / %(wsgidir)s/invenio.wsgi
@@ -981,6 +982,7 @@ WSGIRestrictStdout Off
         AliasMatch /sitemap-(.*) %(webdir)s/sitemap-$1
         Alias /robots.txt %(webdir)s/robots.txt
         Alias /favicon.ico %(webdir)s/favicon.ico
+	Alias /websubmitbezirg-static/ %(webdir)s/websubmitbezirg-static/
         WSGIScriptAlias / %(wsgidir)s/invenio.wsgi
         WSGIPassAuthorization On
         %(xsendfile_directive)s
