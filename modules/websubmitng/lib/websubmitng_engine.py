@@ -32,9 +32,9 @@ import sys
 import cPickle
 
 from invenio.textutils import encode_for_xml
-from invenio.config import CFG_ETCDIR
+from invenio.config import CFG_ETCDIR, CFG_PREFIX
 from invenio.dbquery import run_sql
-from configobj import ConfigObj
+from invenio.configobj import ConfigObj
 from websubmitng_elements import *
 from websubmitng_fields import *
 from websubmitng_callables import *
@@ -50,7 +50,7 @@ else:
     import json
 
 CFG_WEBSUBMITNG_ETCDIR = os.path.join(CFG_ETCDIR, 'websubmitng')
-
+CFG_WEBSUBMITNG_VARDIR = os.path.join(CFG_PREFIX, 'var', 'data', 'submitng')
 def python2xml(obj, indent=0):
     """
     <?xml version="1.0"?>
@@ -119,17 +119,17 @@ class WebSubmitSession(dict):
         self.__doctype = doctype
         if self.__session_id is None:
             self.create_session(doctype)
-        self.__curdir = os.path.join(CFG_WEBSUBMITNG_ETCDIR, doctype, str(self.__session_id))
+        self.__curdir = os.path.join(CFG_WEBSUBMITNG_VARDIR, doctype, str(self.__session_id))
         self.__session_json = os.path.join(self.__curdir, 'session.json')
         self.__session_pickled = os.path.join(self.__curdir, 'session.pickled')
         self.__aliases = []
         wfe = self.load()
         self.dump(wfe)
 
-    #def __setitem__(self, key, value):     
+    #def __setitem__(self, key, value):
     #    wfe = self.load()
     #    dict.__setitem__(self, key, value)
-    #    session = wfe.getObjects().next()[1] 
+    #    session = wfe.getObjects().next()[1]
     #We can get, but, how to set the session object in wfe?
     #    try:
     #        self.dump(wfe)
@@ -179,14 +179,14 @@ class WebSubmitSession(dict):
                 pass
             finally:
                 fcntl.lockf(session_pickled_file.fileno(), fcntl.LOCK_UN)
-                session_pickled_file.close() 
+                session_pickled_file.close()
         elif os.path.exists('%s.tar.bz2' % self.__curdir):
-            raise InvenioWebSubmitNGSessionError("Session %s for doctype %s has already been closed" % 
+            raise InvenioWebSubmitNGSessionError("Session %s for doctype %s has already been closed" %
                                                  (str(self.__session_id), self.__doctype))
         return wfe
-  
+
     def create_session(self, doctype):
-        path = os.path.join(CFG_WEBSUBMITNG_ETCDIR, doctype)
+        path = os.path.join(CFG_WEBSUBMITNG_VARDIR, doctype)
         self.__session_id = uuid4()
         self.__curdir = os.path.join(path, str(self.__session_id))
         os.makedirs(self.__curdir)
@@ -195,8 +195,8 @@ class WebSubmitSession(dict):
     def add_alias(self, alias):
         if alias not in self.__aliases:
             self.__aliases.append(alias)
-            alias_path = os.path.join(CFG_WEBSUBMITNG_ETCDIR, self.doctype, '%s_%s' % 
-                                      (alias_path, str(self.__session_id))) 
+            alias_path = os.path.join(CFG_WEBSUBMITNG_VARDIR, self.doctype, '%s_%s' %
+                                      (alias_path, str(self.__session_id)))
             os.symlink(self.__curdir, alias_path)
 
     def close_session(self):
@@ -209,7 +209,7 @@ class WebSubmitSession(dict):
                 os.remove(alias)
             except:
                 register_exception(user_info=self['user_info']) #?
-            alias_path = os.path.join(CFG_WEBSUBMITNG_ETCDIR, self.doctype, '%s_%s' % 
+            alias_path = os.path.join(CFG_WEBSUBMITNG_VARDIR, self.doctype, '%s_%s' %
                                       (alias_path, str(self.__session_id)))
             os.symlink('%s.tar.bz2' % self.__curdir, '%s.tar.bz2' % alias_path)
 
@@ -252,13 +252,13 @@ class WebSubmitSubmission(object):
     def _load(self, doctype, session):
         """
         ConfigObj to load the .ini file corresponding to the doctype as a dictionary.
-        Use the dictionary to load the sections corresponding to the 
-        interfaces and the workflows. 
+        Use the dictionary to load the sections corresponding to the
+        interfaces and the workflows.
 
-        Code corresponding to loading any other sections that can be specified 
+        Code corresponding to loading any other sections that can be specified
         in the .ini configuration files can be included in this method.
         """
-        doctype_file = doctype + '.ini' # doctype_file should be a .ini file.
+        doctype_file = os.path.join(CFG_ETCDIR, 'websubmitng', doctype + '.ini') # doctype_file should be a .ini file.
         config = {}
         try:
             # file_error is set to true so that IOError is raised if the file is not found.
@@ -266,7 +266,7 @@ class WebSubmitSubmission(object):
             # dealing only with config 'files', and thus, only 'files' are accepted.
             config = ConfigObj(infile=doctype_file, file_error=True)
         except IOError as err:
-            raise Exception("IOError has occured: " + str(err) + 
+            raise Exception("IOError has occured: " + str(err) +
                             "   Path: " + str(os.path.abspath('')))
         except SyntaxError as err:
             raise Exception("Syntax error: " + str(err))
@@ -330,7 +330,7 @@ class WebSubmitSubmission(object):
         """
         value_string = value
         while value_string[-1] in [')',',',' ']:
-            value_string = value_string[:-1] 
+            value_string = value_string[:-1]
         value_string += ", name='" + key + "', session=session)"
         obj = eval(value_string)
         return obj
@@ -346,4 +346,4 @@ class WebSubmitSubmission(object):
         return self.__workflows
 
     interfaces = property(get_interfaces)
-    workflows = property(get_workflows) 
+    workflows = property(get_workflows)
