@@ -304,7 +304,7 @@ def websubmit_legacy_getfile(req, form):
             ## Let's obtain the recid from the docid
             if docid:
                 try:
-                    bibdoc = BibDoc(docid=docid)
+                    bibdoc = BibDoc.create_instance(docid=docid)
                     recid = bibdoc.get_recid()
                 except InvenioWebSubmitFileError, e:
                     return warningMsg(_("An error has happened in trying to retrieve the requested file."), req, CFG_SITE_NAME, ln)
@@ -314,7 +314,7 @@ def websubmit_legacy_getfile(req, form):
             if not name and docid:
                 ## Let's obtain the name from the docid
                 try:
-                    bibdoc = BibDoc(docid)
+                    bibdoc = BibDoc.create_instance(docid)
                     name = bibdoc.get_docname()
                 except InvenioWebSubmitFileError, e:
                     return warningMsg(_("An error has happened in trying to retrieving the requested file."), req, CFG_SITE_NAME, ln)

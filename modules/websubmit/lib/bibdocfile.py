@@ -113,9 +113,11 @@ from invenio.config import CFG_SITE_LANG, CFG_SITE_URL, \
     CFG_WEBSUBMIT_STORAGEDIR, \
     CFG_BIBDOCFILE_USE_XSENDFILE, \
     CFG_BIBDOCFILE_MD5_CHECK_PROBABILITY, \
-    CFG_SITE_RECORD
+    CFG_SITE_RECORD, CFG_PYLIBDIR
+
 from invenio.websubmit_config import CFG_WEBSUBMIT_ICON_SUBFORMAT_RE, \
     CFG_WEBSUBMIT_DEFAULT_ICON_SUBFORMAT
+from invenio.pluginutils import PluginContainer
 
 #: block size when performing I/O.
 CFG_BIBDOCFILE_BLOCK_SIZE = 1024 * 8
@@ -581,7 +583,7 @@ class BibRecDocs:
 
     def deleted_p(self):
         """
-        @return: True if the corresponding record has been deleted.
+        @return: True if the correxsponding record has been deleted.
         @rtype: bool
         """
         from invenio.search_engine import record_exists
@@ -664,7 +666,7 @@ class BibRecDocs:
                          bibdoc ON id=id_bibdoc WHERE id_bibrec=%s AND
                          status<>'DELETED' ORDER BY docname ASC""", (self.id,))
         for row in res:
-            cur_doc = BibDoc(docid=row[0], recid=self.id, doctype=row[1], human_readable=self.human_readable)
+            cur_doc = BibDoc.create_instance(docid=row[0], recid=self.id, doctype=row[1], human_readable=self.human_readable)
             self.bibdocs.append(cur_doc)
 
     def list_bibdocs(self, doctype=''):
@@ -882,7 +884,7 @@ class BibRecDocs:
             if docname in self.get_bibdoc_names():
                 raise InvenioWebSubmitFileError, "%s has already a bibdoc with docname %s" % (self.id, docname)
             else:
-                bibdoc = BibDoc(recid=self.id, doctype=doctype, docname=docname, human_readable=self.human_readable)
+                bibdoc = BibDoc.create_instance(recid=self.id, doctype=doctype, docname=docname, human_readable=self.human_readable)
                 self.build_bibdoc_list()
                 return bibdoc
         except Exception, e:
@@ -1334,7 +1336,7 @@ class BibDoc:
     @raise InvenioWebSubmitFileError: in case of error.
     """
 
-    def __init__ (self, docid=None, recid=None, docname=None, doctype='Main', human_readable=False):
+    def __init__(self, docid=None, recid=None, docname=None, doctype='Main', human_readable=False, initial_data=None):
         """Constructor of a bibdoc. At least the docid or the recid/docname
         pair is needed."""
         # docid is known, the document already exists
@@ -1345,50 +1347,25 @@ class BibDoc:
         self.related_files = []
         self.human_readable = human_readable
         if docid:
-            if not recid:
-                res = run_sql("SELECT id_bibrec,type FROM bibrec_bibdoc WHERE id_bibdoc=%s LIMIT 1", (docid,), 1)
-                if res:
-                    recid = res[0][0]
-                    doctype = res[0][1]
-                else:
-                    res = run_sql("SELECT id_bibdoc1,type FROM bibdoc_bibdoc WHERE id_bibdoc2=%s LIMIT 1", (docid,), 1)
-                    if res:
-                        main_docid = res[0][0]
-                        doctype = res[0][1]
-                        res = run_sql("SELECT id_bibrec,type FROM bibrec_bibdoc WHERE id_bibdoc=%s LIMIT 1", (main_docid,), 1)
-                        if res:
-                            recid = res[0][0]
-                        else:
-                            raise InvenioWebSubmitFileError, "The docid %s associated with docid %s is not associated with any record" % (main_docid, docid)
-                    else:
-                        raise InvenioWebSubmitFileError, "The docid %s is not associated to any recid or other docid" % docid
-            else:
-                res = run_sql("SELECT type FROM bibrec_bibdoc WHERE id_bibrec=%s AND id_bibdoc=%s LIMIT 1", (recid, docid,), 1)
-                if res:
-                    doctype = res[0][0]
-                else:
-                    #this bibdoc isn't associated with the corresponding bibrec.
-                    raise InvenioWebSubmitFileError, "Docid %s is not associated with the recid %s" % (docid, recid)
-            # gather the other information
-            res = run_sql("SELECT id,status,docname,creation_date,modification_date,text_extraction_date,more_info FROM bibdoc WHERE id=%s LIMIT 1", (docid,), 1)
-            if res:
-                self.cd = res[0][3]
-                self.md = res[0][4]
-                self.td = res[0][5]
-                self.recid = recid
-                self.docname = res[0][2]
-                self.id = docid
-                self.status = res[0][1]
-                self.more_info = BibDocMoreInfo(docid, blob_to_string(res[0][6]))
-                self.basedir = _make_base_dir(self.id)
-                self.doctype = doctype
-            else:
-                # this bibdoc doesn't exist
-                raise InvenioWebSubmitFileError, "The docid %s does not exist." % docid
+            if initial_data == None:
+                initial_data = BibDoc._retrieve_data(docid, recid)
+
+            self.cd = initial_data["cd"]
+            self.md = initial_data["md"]
+            self.td = initial_data["td"]
+            self.recid = initial_data["recid"]
+            self.docname = initial_data["docname"]
+            self.id = initial_data["id"]
+            self.status = initial_data["status"]
+            self.more_info = initial_data["more_info"]
+            self.basedir = initial_data["basedir"]
+            self.doctype = initial_data["doctype"]
         # else it is a new document
         else:
             if not docname:
-                raise InvenioWebSubmitFileError, "You should specify the docname when creating a new bibdoc"
+#               raise InvenioWebSubmitFileError, "You should specify the docname when creating a new bibdoc"
+                import traceback
+                raise InvenioWebSubmitFileError, "You should specify the docname when creating a new bibdoc (docid=" + str(docid) + ", recid=" + str(recid) + ", docname=" + str(docname) + ", doctype=" + str(doctype) + ", human_readable=" + str(human_readable) + ", initial_data=" + repr(initial_data) + ")" + "\n".join(traceback.format_stack())
             else:
                 self.recid = recid
                 self.doctype = doctype
@@ -1443,6 +1420,96 @@ class BibDoc:
         # link with related_files
         self._build_related_file_list()
 
+    @staticmethod
+    def _retrieve_data(docid = None, recid = None):
+        """
+           Filling information about a document from the database entry
+        """
+        if not recid:
+            res = run_sql("SELECT id_bibrec, type FROM bibrec_bibdoc WHERE id_bibdoc=%s LIMIT 1", (docid,), 1)
+            if res:
+                recid = res[0][0]
+                doctype = res[0][1]
+            else:
+                res = run_sql("SELECT id_bibdoc1,type FROM bibdoc_bibdoc WHERE id_bibdoc2=%s LIMIT 1", (docid,), 1)
+                if res:
+                    main_docid = res[0][0]
+                    doctype = res[0][1]
+                    res = run_sql("SELECT id_bibrec,type FROM bibrec_bibdoc WHERE id_bibdoc=%s LIMIT 1", (main_docid,), 1)
+                    if res:
+                        recid = res[0][0]
+                    else:
+                        raise InvenioWebSubmitFileError, "The docid %s associated with docid %s is not associated with any record" % (main_docid, docid)
+                else:
+                    raise InvenioWebSubmitFileError, "The docid %s is not associated to any recid or other docid" % docid
+        else:
+            res = run_sql("SELECT type FROM bibrec_bibdoc WHERE id_bibrec=%s AND id_bibdoc=%s LIMIT 1", (recid, docid,), 1)
+            if res:
+                doctype = res[0][0]
+            else:
+                #this bibdoc isn't associated with the corresponding bibrec.
+                raise InvenioWebSubmitFileError, "Docid %s is not associated with the recid %s" % (docid, recid)
+        # gather the other information
+        res = run_sql("SELECT id,status,docname,creation_date,modification_date,text_extraction_date,more_info FROM bibdoc WHERE id=%s LIMIT 1", (docid,), 1)
+        container = {}
+        if res:
+            container["cd"] = res[0][3]
+            container["md"] = res[0][4]
+            container["td"] = res[0][5]
+            container["recid"] = recid
+            container["docname"] = res[0][2]
+            container["id"] = docid
+            container["status"] = res[0][1]
+            container["more_info"] = BibDocMoreInfo(docid, blob_to_string(res[0][6]))
+            container["basedir"] = _make_base_dir(container["id"])
+            container["doctype"] = doctype
+        else:
+            # this bibdoc doesn't exist
+            raise InvenioWebSubmitFileError, "The docid %s does not exist." % docid
+
+        return container
+
+    @staticmethod
+    def create_instance(docid=None, recid=None, docname=None,
+                        doctype='Main', human_readable=False):
+
+        # first try to retrieve existing record based on obtained data
+        data = None
+        if docid != None:
+            data = BibDoc._retrieve_data(docid, recid)
+            doctype = data["doctype"]
+
+        # now check if the doctype is supported by any particular plugin
+        def plugin_bldr(plugin_name, plugin_code):
+            """Preparing the plugin dictionary structure"""
+            ret = {}
+            ret['create_instance'] = getattr(plugin_code, "create_instance", None)
+            ret['supports'] = getattr(plugin_code, "supports", None)
+            return ret
+
+        #rint os.path.join(CFG_PYLIBDIR,
+        #                    'invenio', 'bibdocfile_plugins', 'bom_*.py')
+
+        bibdoc_plugins = PluginContainer(
+            os.path.join(CFG_PYLIBDIR,
+                     'invenio', 'bibdocfile_plugins', 'bom_*.py'),
+            plugin_builder=plugin_bldr)
+
+        # Loading plugins
+
+        for plugin_name, plugin in bibdoc_plugins.iteritems():
+            if plugin['supports'](doctype):
+                return plugin['create_instance'](docid=docid,
+                                                 recid=recid,
+                                                 docname=docname,
+                                                 doctype=doctype,
+                                                 human_readable=human_readable,
+                                                 initial_data=data)
+
+        return BibDoc(docid=docid, recid=recid, docname=docname,
+                      doctype=doctype, human_readable=human_readable,
+                      initial_data=data)
+
     def __repr__(self):
         """
         @return: the canonical string representation of the C{BibDoc}.
@@ -1495,77 +1562,7 @@ class BibDoc:
         """
         return self.status
 
-    def get_text(self, version=None):
-        """
-        @param version: the requested version. If not set, the latest version
-            will be used.
-        @type version: integer
-        @return: the textual content corresponding to the specified version
-            of the document.
-        @rtype: string
-        """
-        if version is None:
-            version = self.get_latest_version()
-        if self.has_text(version):
-            return open(os.path.join(self.basedir, '.text;%i' % version)).read()
-        else:
-            return ""
 
-    def get_text_path(self, version=None):
-        """
-        @param version: the requested version. If not set, the latest version
-            will be used.
-        @type version: int
-        @return: the full path to the textual content corresponding to the specified version
-            of the document.
-        @rtype: string
-        """
-        if version is None:
-            version = self.get_latest_version()
-        if self.has_text(version):
-            return os.path.join(self.basedir, '.text;%i' % version)
-        else:
-            return ""
-
-    def extract_text(self, version=None, perform_ocr=False, ln='en'):
-        """
-        Try what is necessary to extract the textual information of a document.
-
-        @param version: the version of the document for which text is required.
-            If not specified the text will be retrieved from the last version.
-        @type version: integer
-        @param perform_ocr: whether to perform OCR.
-        @type perform_ocr: bool
-        @param ln: a two letter language code to give as a hint to the OCR
-            procedure.
-        @type ln: string
-        @raise InvenioWebSubmitFileError: in case of error.
-        @note: the text is extracted and cached for later use. Use L{get_text}
-            to retrieve it.
-        """
-        from invenio.websubmit_file_converter import get_best_format_to_extract_text_from, convert_file, InvenioWebSubmitFileConverterError
-        if version is None:
-            version = self.get_latest_version()
-        docfiles = self.list_version_files(version)
-        ## We try to extract text only from original or OCRed documents.
-        filenames = [docfile.get_full_path() for docfile in docfiles if 'CONVERTED' not in docfile.flags or 'OCRED' in docfile.flags]
-        try:
-            filename = get_best_format_to_extract_text_from(filenames)
-        except InvenioWebSubmitFileConverterError:
-            ## We fall back on considering all the documents
-            filenames = [docfile.get_full_path() for docfile in docfiles]
-            try:
-                filename = get_best_format_to_extract_text_from(filenames)
-            except InvenioWebSubmitFileConverterError:
-                open(os.path.join(self.basedir, '.text;%i' % version), 'w').write('')
-                return
-        try:
-            convert_file(filename, os.path.join(self.basedir, '.text;%i' % version), '.txt', perform_ocr=perform_ocr, ln=ln)
-            if version == self.get_latest_version():
-                run_sql("UPDATE bibdoc SET text_extraction_date=NOW() WHERE id=%s", (self.id, ))
-        except InvenioWebSubmitFileConverterError, e:
-            register_exception(alert_admin=True, prefix="Error in extracting text from bibdoc %i, version %i" % (self.id, version))
-            raise InvenioWebSubmitFileError, str(e)
 
     def touch(self):
         """
@@ -2134,38 +2131,6 @@ class BibDoc:
         """
         return self.id
 
-    def pdf_a_p(self):
-        """
-        @return: True if this document contains a PDF in PDF/A format.
-        @rtype: bool"""
-        return self.has_flag('PDF/A', 'pdf')
-
-    def has_text(self, require_up_to_date=False, version=None):
-        """
-        Return True if the text of this document has already been extracted.
-
-        @param require_up_to_date: if True check the text was actually
-            extracted after the most recent format of the given version.
-        @type require_up_to_date: bool
-        @param version: a version for which the text should have been
-            extracted. If not specified the latest version is considered.
-        @type version: integer
-        @return: True if the text has already been extracted.
-        @rtype: bool
-        """
-        if version is None:
-            version = self.get_latest_version()
-        if os.path.exists(os.path.join(self.basedir, '.text;%i' % version)):
-            if not require_up_to_date:
-                return True
-            else:
-                docfiles = self.list_version_files(version)
-                text_md = datetime.fromtimestamp(os.path.getmtime(os.path.join(self.basedir, '.text;%i' % version)))
-                for docfile in docfiles:
-                    if text_md <= docfile.md:
-                        return False
-                return True
-        return False
 
     def get_file(self, format, version=""):
         """
@@ -2410,7 +2375,7 @@ class BibDoc:
             if row[2] != 'DELETED':
                 if not self.related_files.has_key(doctype):
                     self.related_files[doctype] = []
-                cur_doc = BibDoc(docid=docid, human_readable=self.human_readable)
+                cur_doc = BibDoc.create_instance(docid=docid, human_readable=self.human_readable)
                 self.related_files[doctype].append(cur_doc)
 
     def get_total_size_latest_version(self):
@@ -3201,7 +3166,7 @@ def decompose_bibdocfile_fullpath(fullpath):
     dirname, base, extension, version = decompose_file_with_version(fullpath)
     try:
         docid = int(dirname.split('/')[-1])
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         recid = bibdoc.get_recid()
         docname = bibdoc.get_docname()
         return recid, docname, extension, version
@@ -3243,7 +3208,7 @@ def decompose_bibdocfile_very_old_url(url):
                 params = cgi.parse_qs(params)
                 if 'docid' in params:
                     docid = int(params['docid'][0])
-                    bibdoc = BibDoc(docid)
+                    bibdoc = BibDoc.create_instance(docid)
                     recid = bibdoc.get_recid()
                     docname = bibdoc.get_docname()
                 elif 'recid' in params:

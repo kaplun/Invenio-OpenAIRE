@@ -265,7 +265,7 @@ def cli_slow_match_single_docid(options, docid, recids=None, docids=None):
     docname = cli2docname(options)
     if recids is None:
         recids = cli_quick_match_all_recids(options)
-    bibdoc = BibDoc(docid)
+    bibdoc = BibDoc.create_instance(docid)
     if docname and not fnmatch.fnmatchcase(bibdoc.get_docname(), docname):
         debug('docname %s does not match the pattern %s' % (repr(bibdoc.get_docname()), repr(docname)))
         return False
@@ -333,7 +333,7 @@ def cli2docname(options, docid=None, url=None):
     """Given the command line options and optional precalculated docid
     returns the corresponding docname."""
     if docid:
-        bibdoc = BibDoc(docid=docid)
+        bibdoc = BibDoc.create_instance(docid=docid)
         return bibdoc.get_docname()
     docname = getattr(options, 'docname', None)
     if docname is not None:
@@ -628,7 +628,7 @@ def cli_set_batch(options):
     restriction = cli2restriction(options)
     with_format = getattr(options, 'format', None)
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         recid = bibdoc.get_recid()
         docname = bibdoc.get_docname()
         fft = []
@@ -666,10 +666,10 @@ def cli_textify(options):
     else:
         additional = ''
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         print 'Extracting text for docid %s%s...' % (docid, additional),
         sys.stdout.flush()
-        if force or not bibdoc.has_text(require_up_to_date=True):
+        if force or (hasattr(bibdoc, "has_text") and not bibdoc.has_text(require_up_to_date=True)):
             try:
                 bibdoc.extract_text(perform_ocr=perform_ocr)
                 print "DONE"
@@ -682,7 +682,7 @@ def cli_rename(options):
     """Rename a docname within a recid."""
     new_docname = getattr(options, 'new_docname', None)
     docid = cli2docid(options)
-    bibdoc = BibDoc(docid)
+    bibdoc = BibDoc.create_instance(docid)
     docname = bibdoc.get_docname()
     recid = bibdoc.get_recid()
     ffts = {recid : [{'docname' : docname, 'new_docname' : new_docname}]}
@@ -795,7 +795,7 @@ def cli_delete(options):
     """Delete the given docid_set."""
     ffts = {}
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         docname = bibdoc.get_docname()
         recid = bibdoc.get_recid()
         if recid not in ffts:
@@ -809,7 +809,7 @@ def cli_delete_file(options):
     docid = cli2docid(options)
     recid = cli2recid(options, docids=intbitset([docid]))
     format = cli2format(options)
-    docname = BibDoc(docid).get_docname()
+    docname = BibDoc.create_instance(docid).get_docname()
     version = getattr(options, 'version', None)
     ffts = {recid : [{'docname' : docname, 'version' : version, 'format' : format, 'doctype' : 'DELETE-FILE'}]}
     return bibupload_ffts(ffts)
@@ -818,7 +818,7 @@ def cli_revert(options):
     """Revert a bibdoc to a given version."""
     docid = cli2docid(options)
     recid = cli2recid(options, docids=intbitset([docid]))
-    docname = BibDoc(docid).get_docname()
+    docname = BibDoc.create_instance(docid).get_docname()
     version = getattr(options, 'version', None)
     try:
         version = int(version)
@@ -842,7 +842,7 @@ def cli_undelete(options):
     fix_marc = intbitset()
     setattr(options, 'deleted_docs', 'only')
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         if bibdoc.get_status() == 'DELETED' and fnmatch.fnmatch(bibdoc.get_docname(), docname):
             to_be_undeleted.add(docid)
             fix_marc.add(bibdoc.get_recid())
@@ -850,7 +850,7 @@ def cli_undelete(options):
             print '%s (docid %s from recid %s) will be undeleted to restriction: %s' % (bibdoc.get_docname(), docid, bibdoc.get_recid(), restriction)
     wait_for_user("I'll proceed with the undeletion")
     for docid in to_be_undeleted:
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         bibdoc.undelete(restriction)
     cli_fix_marc(options, explicit_recid_set=fix_marc)
     print wrap_text_in_a_box("%s bibdoc successfuly undeleted with status '%s'" % (count, restriction), style="conclusion")
@@ -864,7 +864,7 @@ def cli_get_info(options):
     debug('deleted_docs: %s' % deleted_docs)
     if getattr(options, 'docids', None):
         for docid in cli_docids_iterator(options):
-            sys.stdout.write(str(BibDoc(docid, human_readable=human_readable)))
+            sys.stdout.write(str(BibDoc.create_instance(docid, human_readable=human_readable)))
     else:
         for recid in cli_recids_iterator(options):
             sys.stdout.write(str(BibRecDocs(recid, deleted_too=deleted_docs, human_readable=human_readable)))
@@ -873,7 +873,7 @@ def cli_purge(options):
     """Purge the matched docids."""
     ffts = {}
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         recid = bibdoc.get_recid()
         docname = bibdoc.get_docname()
         if recid:
@@ -889,7 +889,7 @@ def cli_expunge(options):
     """Expunge the matched docids."""
     ffts = {}
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         recid = bibdoc.get_recid()
         docname = bibdoc.get_docname()
         if recid:
@@ -904,7 +904,7 @@ def cli_expunge(options):
 def cli_get_history(options):
     """Print the history of a docid_set."""
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         history = bibdoc.get_history()
         for row in history:
             print_info(bibdoc.get_recid(), docid, row)
@@ -915,7 +915,7 @@ def cli_get_disk_usage(options):
     total_size = 0
     total_latest_size = 0
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         size = bibdoc.get_total_size()
         total_size += size
         latest_size = bibdoc.get_total_size_latest_version()
@@ -939,7 +939,7 @@ def cli_check_md5(options):
     """Check the md5 sums of a docid_set."""
     failures = 0
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         if bibdoc.md5s.check():
             print_info(bibdoc.get_recid(), docid, 'checksum OK')
         else:
@@ -955,7 +955,7 @@ def cli_check_md5(options):
 def cli_update_md5(options):
     """Update the md5 sums of a docid_set."""
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         if bibdoc.md5s.check():
             print_info(bibdoc.get_recid(), docid, 'checksum OK')
         else:
@@ -978,7 +978,7 @@ def cli_hide(options):
     else:
         versions = intbitset(trailing_bits=True)
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         recid = bibdoc.get_recid()
         if recid:
             for bibdocfile in bibdoc.list_all_files():
@@ -992,7 +992,7 @@ def cli_hide(options):
                     print '%s (docid: %s, recid: %s) will be hidden' % (bibdocfile.get_full_name(), docid, recid)
     wait_for_user('Proceeding to hide the matched documents...')
     for docid, documents in documents_to_be_hidden.iteritems():
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         for version, format in documents:
             bibdoc.set_flag('HIDDEN', format, version)
     return cli_fix_marc(options, to_be_fixed)
@@ -1010,7 +1010,7 @@ def cli_unhide(options):
     else:
         versions = intbitset(trailing_bits=True)
     for docid in cli_docids_iterator(options):
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         recid = bibdoc.get_recid()
         if recid:
             for bibdocfile in bibdoc.list_all_files():
@@ -1024,7 +1024,7 @@ def cli_unhide(options):
                     print '%s (docid: %s, recid: %s) will be unhidden' % (bibdocfile.get_full_name(), docid, recid)
     wait_for_user('Proceeding to unhide the matched documents...')
     for docid, documents in documents_to_be_unhidden.iteritems():
-        bibdoc = BibDoc(docid)
+        bibdoc = BibDoc.create_instance(docid)
         for version, format in documents:
             bibdoc.unset_flag('HIDDEN', format, version)
     return cli_fix_marc(options, to_be_fixed)

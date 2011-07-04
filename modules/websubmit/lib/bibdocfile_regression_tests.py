@@ -30,7 +30,7 @@ from invenio.config import \
         CFG_PREFIX, \
         CFG_WEBSUBMIT_FILEDIR, \
         CFG_SITE_RECORD
-
+import invenio.template
 
 
 class BibRecDocsTest(unittest.TestCase):
@@ -64,7 +64,9 @@ class BibRecDocsTest(unittest.TestCase):
         #get total size latest version
         self.assertEqual(my_bibrecdoc.get_total_size_latest_version(), 1647591)
         #display
-        value = my_bibrecdoc.display(docname='img_test', version='', doctype='', ln='en', verbose=0, display_hidden=True)
+        tmpl = invenio.template.load("bibdocfile")
+        value = tmpl.tmpl_display_bibrecdocs(my_bibrecdoc, docname='img_test', version='', doctype='', ln='en', verbose=0, display_hidden=True)
+
         self.assert_("<small><b>Main</b>" in value)
         #get xml 8564
         value = my_bibrecdoc.get_xml_8564()
@@ -126,7 +128,8 @@ class BibDocsTest(unittest.TestCase):
         #list version files
         self.assertEqual(len(my_new_bibdoc.list_version_files(1, list_hidden=True)), 1)
         #display
-        value = my_new_bibdoc.display(version='', ln='en', display_hidden=True)
+        tmpl = invenio.template.load("bibdocfile")
+        value = tmpl.tmpl_display_bibdoc(my_new_bibdoc, version='', ln='en', display_hidden=True)
         self.assert_('>test add new file<' in value)
         #format already exist
         self.assertEqual(my_new_bibdoc.format_already_exists_p('.jpg'), True)
@@ -234,7 +237,8 @@ class BibDocFilesTest(unittest.TestCase):
         #check
         self.assertEqual(my_new_bibdocfile.check(), True)
         #display
-        value = my_new_bibdocfile.display(ln='en')
+        tmpl = invenio.template.load("bibdocfile")
+        value = tmpl.tmpl_display_bibdocfile(my_new_bibdocfile, ln='en')
         assert 'files/img_test.jpg?version=1">' in value
         #hidden?
         self.assertEqual(my_new_bibdocfile.hidden_p(), False)

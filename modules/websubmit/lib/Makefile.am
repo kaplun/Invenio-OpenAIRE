@@ -47,6 +47,10 @@ metadataplugin_DATA = __init__.py \
                       wsm_pyexiv2_plugin.py \
                       wsm_pdftk_plugin.py
 
+bibdocfileplugindir = $(libdir)/python/invenio/bibdocfile_plugins
+bibdocfileplugin_DATA = __init__.py \
+		        bom_textdoc.py
+
 noinst_DATA = fulltext_files_migration_kit.py icon_migration_kit.py
 
 EXTRA_DIST = $(pylib_DATA) $(metadataplugin_DATA) $(noinst_DATA)

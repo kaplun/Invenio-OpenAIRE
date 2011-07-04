@@ -275,14 +275,17 @@ def get_words_from_fulltext(url_direct_or_indirect, stemming_language=None):
             bibdoc = bibdocfile_url_to_bibdoc(url_direct_or_indirect)
             perform_ocr = bool(re_perform_ocr.match(bibdoc.get_docname()))
             write_message("... will extract words from %s (docid: %s) %s" % (bibdoc.get_docname(), bibdoc.get_id(), perform_ocr and 'with OCR' or ''), verbose=2)
-            if not bibdoc.has_text(require_up_to_date=True):
+            if hasattr(bibdoc, "has_text") and not bibdoc.has_text(require_up_to_date=True):
                 bibdoc.extract_text(perform_ocr=perform_ocr)
             if CFG_SOLR_URL:
                 # we are relying on Solr to provide full-text indexing, so do
                 # nothing here (FIXME: dispatch indexing to Solr)
                 return []
             else:
-                return get_words_from_phrase(bibdoc.get_text(), stemming_language)
+                text = ""
+                if hasattr(bibdoc, "get_text"):
+                    text = bibdoc.get_text()
+                return get_words_from_phrase(text, stemming_language)
         else:
             if CFG_BIBINDEX_FULLTEXT_INDEX_LOCAL_FILES_ONLY:
                 write_message("... %s is external URL but indexing only local files" % url_direct_or_indirect, verbose=2)
