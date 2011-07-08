@@ -86,6 +86,8 @@ class SimulatedModPythonRequest(object):
         self.__errors = environ['wsgi.errors']
         self.__headers_in = table([])
         self.__tainted = False
+        self.track_writings = False
+        self.__what_was_written = ""
         for key, value in environ.iteritems():
             if key.startswith('HTTP_'):
                 self.__headers_in[key[len('HTTP_'):].replace('_', '-')] = value
@@ -148,6 +150,8 @@ class SimulatedModPythonRequest(object):
             try:
                 if not self.__write_error:
                     self.__write(self.__buffer)
+                    if self.track_writings:
+                        self.__what_was_written += self.__buffer
             except IOError, err:
                 if "failed to write data" in str(err) or "client connection closed" in str(err):
                     ## Let's just log this exception without alerting the admin:
@@ -320,6 +324,9 @@ class SimulatedModPythonRequest(object):
     def get_referer(self):
         return self.headers_in.get('referer')
 
+    def get_what_was_written(self):
+        return self.__what_was_written
+
     def __str__(self):
         from pprint import pformat
         out = ""
@@ -363,6 +370,7 @@ class SimulatedModPythonRequest(object):
     remote_ip = property(get_remote_ip)
     remote_host = property(get_remote_host)
     referer = property(get_referer)
+    what_was_written = property(get_what_was_written)
 
 def alert_admin_for_server_status_p(status, referer):
     """

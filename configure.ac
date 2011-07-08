@@ -491,7 +491,7 @@ AC_PATH_PROG(FFPROBE, ffprobe)
 if test -z "$FFMPEG"; then
    AC_MSG_WARN([
    FFmpeg was not found in your PATH. It is used by the BibEncode
-   module to for video encoding. 
+   module to for video encoding.
    You can continue without but you will not be able to use BibEncode
    and no video submission workflows are thereby possible.
    We recommend you to install it first if you would like to support video
@@ -504,7 +504,7 @@ AC_PATH_PROG(MEDIAINFO, mediainfo)
 if test -z "$MEDIAINFO"; then
    AC_MSG_WARN([
    Mediainfo was not found in your PATH. It is used by the BibEncode
-   module to for video encoding and media metadata handling. 
+   module to for video encoding and media metadata handling.
    You can continue without but you will not be able to use BibEncode
    and no video submission workflows are thereby possible.
    We recommend you to install it first if you would like to support video
@@ -653,6 +653,7 @@ AC_CONFIG_FILES([config.nice  \
      modules/bibharvest/doc/Makefile \
      modules/bibharvest/doc/admin/Makefile \
      modules/bibharvest/doc/hacking/Makefile \
+     modules/bibharvest/etc/Makefile \
      modules/bibharvest/lib/Makefile \
      modules/bibharvest/web/Makefile \
      modules/bibharvest/web/admin/Makefile \
