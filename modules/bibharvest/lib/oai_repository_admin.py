@@ -377,7 +377,6 @@ def modify_oai_set(oai_set_id, oai_set_name, oai_set_spec,
                    oai_set_m3, oai_set_op1, oai_set_op2):
     """Modifies a row's parameters"""
 
-    try:
         set_definition = 'c=' + oai_set_collection + ';' + \
                          'p1=' + oai_set_p1  + ';' + \
                          'f1=' + oai_set_f1  + ';' + \

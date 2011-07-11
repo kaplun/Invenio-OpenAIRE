@@ -2671,7 +2671,6 @@ CREATE TABLE IF NOT EXISTS oaiREPOSITORY (
   setCollection varchar(255) NOT NULL default '',
   setDescription text NOT NULL default '',
   setDefinition text NOT NULL default '',
-  setRecList longblob,
   p1 text NOT NULL default '',
   f1 text NOT NULL default '',
   m1 text NOT NULL default '',
@@ -2681,6 +2680,7 @@ CREATE TABLE IF NOT EXISTS oaiREPOSITORY (
   p3 text NOT NULL default '',
   f3 text NOT NULL default '',
   m3 text NOT NULL default '',
+  last_updated datetime NOT NULL default '1970-01-01';
   PRIMARY KEY (id)
 ) ENGINE=MyISAM;
 
