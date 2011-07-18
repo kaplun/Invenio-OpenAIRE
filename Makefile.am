@@ -71,6 +71,10 @@ kwalitee-check-sql-queries:
 	@find $(top_srcdir) -name '*.py' -exec grep -HEin 'run_sql.* % ' {} \; 2> /dev/null
 	@echo "* Done."
 
+kwalitee-check-eval:
+	@echo "* Listing potentially dangerous eval statement:"
+	@find $(top_srcdir) -name '*.py' -exec grep -HEin '\beval\s*\(' {} \; 2> /dev/null
+
 etags:
 	\rm -f $(top_srcdir)/TAGS
 	(cd $(top_srcdir) && find $(top_srcdir) -name "*.py" -print | xargs etags)
