@@ -215,6 +215,12 @@ except:
     register_exception(alert_admin=True, subject='EMERGENCY')
     WebInterfaceNGSubmitPages = WebInterfaceDumbPages
 
+try:
+    from invenio.websubmitbezirg_webinterface import WebInterfaceBezirgSubmitPages
+except:
+    register_exception(alert_admin=True, subject='EMERGENCY')
+    WebInterfaceBezirgSubmitPages = WebInterfaceDumbPages
+
 if CFG_DEVEL_SITE:
     try:
         from invenio.httptest_webinterface import WebInterfaceHTTPTestPages
@@ -255,6 +261,7 @@ class WebInterfaceInvenio(WebInterfaceSearchInterfacePages):
         'bibsword',
         'person',
         'submitng',
+        'websubmitbezirg',
         ] + test_exports
 
     def __init__(self):
@@ -285,6 +292,7 @@ class WebInterfaceInvenio(WebInterfaceSearchInterfacePages):
     bibsword = WebInterfaceSword()
     person = WebInterfaceBibAuthorIDPages()
     submitng = WebInterfaceNGSubmitPages()
+    websubmitbezirg = WebInterfaceBezirgSubmitPages()
 
 # This creates the 'handler' function, which will be invoked directly
 # by mod_python.
