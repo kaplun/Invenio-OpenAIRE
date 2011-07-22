@@ -58,7 +58,7 @@ from invenio.errorlib import register_exception
 from invenio.bibformat_elements.bfe_fulltext import sort_alphanumerically
 from invenio.websubmit_functions.Report_Number_Generation import create_reference
 
-RE_AUTHOR_ROW = re.compile(u'^\w{2,}(\s+\w{1,})*,\s*\w{1,}(\s+\w{1,})*\s*(:\s*\w{2,}.*)?$', re.U)
+RE_AUTHOR_ROW = re.compile(u'^\w{2,}(\s+\w{2,})*\s*,\s*(\w{2,}|\w\.)(\s+\w{1,}|\s+\w\.)*\s*(:\s*\w{2,}.*)?$', re.U)
 RE_PAGES = re.compile('\d+(-\d+)?')
 
 def _(foo):
