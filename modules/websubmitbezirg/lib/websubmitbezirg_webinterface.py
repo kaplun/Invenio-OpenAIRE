@@ -59,9 +59,13 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
         def init_submission(req, form, component, path):
             doctype = path[0]
             action = path[1]
-            if os.path.exists(os.path.join(APP_WEB_DIR, doctype, action)):
+            if os.path.exists(os.path.join(APP_WEB_DIR, doctype, action, "bootstrap.js")):
                 uuid = uuid4()
                 redirect_to_url(req, req.uri + '/' + str(uuid))
+            elif os.path.exists(os.path.join(APP_WEB_DIR, doctype, action)):
+                title = "Error"
+                html = "Empty action, no submission"
+                return page(title, html)
             else:
                 title = "Error"
                 html = "No such doctype/action"

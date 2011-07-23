@@ -1,4 +1,5 @@
 from engine import *
+from checks import *
 
 Interface(
     Title(),
@@ -7,7 +8,9 @@ Interface(
     Published(),
     NoPages(),
     Language(),
-    Submit()
+    Submit(),
+    Email(Name="email1"),
+    Url(Name="url1")
 )
 
 

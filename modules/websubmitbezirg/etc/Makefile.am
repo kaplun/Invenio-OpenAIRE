@@ -18,7 +18,8 @@
 submission_configdir = $(sysconfdir)/websubmitbezirg
 submission_config_DATA = build.py \
 	elements.py \
-	engine.py
+	checks.py \
+	engine.py 
 
 EXTRA_DIST = $(submission_config_DATA)
 
