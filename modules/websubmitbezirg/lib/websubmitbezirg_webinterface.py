@@ -86,7 +86,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
 
                 metaheaderadd = '<link rel="stylesheet" href="%(url)s/bootstrap.css" type="text/css" /> <meta name="pygwt:module" content="%(url)s/bootstrap">' % {"url": submission_url}
 
-                html += '<script language="javascript" src="%s/bootstrap.js"></script> <div id="bootstrap"></div>' % (submission_url)
+                html += '<script language="javascript" src="%s/bootstrap.js"></script> <div id="bootstrap"></div><div style="display:none" id="_doctype">%s</div><div style="display:none" id="_action">%s</div>' % (submission_url, doctype, action)
 
                 return page(title, html, metaheaderadd= metaheaderadd)
             else:
@@ -95,7 +95,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                 return page(title, html)
 
 
-        def rpc(req, form):
+        def validate_submission(req, form):
             pass
 
 
@@ -104,7 +104,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                               ('submit',1): list_actions,    # /websubmitbezirg/submit/DOCTYPE
                               ('submit',2): init_submission,   # /websubmitbezirg/submit/ACTION
                               ('submit',3): resume_submission,  # /websubmitbezirg/submit/ACTION/UUID
-                              ('rpc', 0): rpc # jsonrpc
+                              ('validate', 0): validate_submission # jsonrpc
                               }
             for url,callback in dispatch_table.iteritems():
                 if url[0] == component and url[1] == len(path):

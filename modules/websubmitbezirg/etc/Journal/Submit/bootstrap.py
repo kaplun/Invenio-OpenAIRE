@@ -8,7 +8,6 @@ Interface(
     Published(),
     NoPages(),
     Language(),
-    Submit(),
     Email(Name="email1"),
     Url(Name="url1")
 )

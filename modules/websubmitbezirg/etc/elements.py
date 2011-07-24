@@ -55,11 +55,6 @@ class Language(VerticalPanel):
         self.add(c)
         self.add(f)
 
-class Submit(Button):
-    def __init__(self, **kwargs):
-        super(Submit,self).__init__("submit", **kwargs)
-
-        
 class Published(HorizontalPanel):
     def __init__(self):
         super(Published,self).__init__()
@@ -73,6 +68,7 @@ class Checkable(HorizontalPanel):
     def __init__(self, Name, Check, Msg, Element=None, **kwargs):
         super(Checkable, self).__init__()
         check = Check
+
         element = Element(Name=Name, **kwargs)
         check_label = Label(Msg)
         check_label.setVisible(False)
@@ -81,56 +77,47 @@ class Checkable(HorizontalPanel):
             def runCheck(self, sender):
                 valid = check(element.getText())
                 if valid:
+                    element.setID("valid")
                     check_label.setVisible(False)
                 else:
+                    element.setID("invalid")
                     check_label.setVisible(True)
                 return valid
             def onFocus(self, sender):
                 pass
             def onLostFocus(self, sender):
-                if not self.runCheck(sender):
+                valid = self.runCheck(sender)
+                if not valid:
                     element.addKeyboardListener(self) 
+                return valid
             def onKeyUp(self, sender, keyCode, modifiers):
-                self.runCheck(sender)
+                valid = self.runCheck(sender)
+                return valid
             def onKeyDown(self, sender, keyCode, modifiers):
                 pass
             def onKeyPress(self, sender, keyCode, modifiers):
                 pass
         element.addFocusListener(CheckableListener())
+
         self.add(element)
         self.add(check_label)
 
-
-
-class CTextArea(Checkable):
+class CheckableTextArea(Checkable):
     def __init__(self, Name, Check, Msg, **kwargs):
-        super(CTextArea, self).__init__(Name, Check, Msg, TextArea, **kwargs)
+        super(CheckableTextArea, self).__init__(Name, Check, Msg, TextArea, **kwargs)
 
-class CTextBox(Checkable):
+class CheckableTextBox(Checkable):
     def __init__(self, Name, Check, Msg, **kwargs):
-        super(CTextBox, self).__init__(Name, Check, Msg, TextBox, **kwargs)
+        super(CheckableTextBox, self).__init__(Name, Check, Msg, TextBox, **kwargs)
 
-
-class EmailBox(CTextBox):
+class Email(CheckableTextBox):
     def __init__(self, Name, Check=validateEmail, Msg="Not Valid Email", **kwargs):
-        super(EmailBox, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs)
-
-class UrlBox(CTextBox):
-    def __init__(self, Name, Check=validateURL, Msg="Not Valid URL", Text="http://", **kwargs):
-        super(UrlBox, self).__init__(Name=Name, Check=Check, Msg=Msg, Text=Text, **kwargs)
-
-class Email(HorizontalPanel):
-    def __init__(self, Name, Check=validateEmail, Msg="Not Valid Email", **kwargs):
-        super(Email, self).__init__()
+        super(Email, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs )
         l = Label("Email:")
-        email = EmailBox(Name=Name, Check=Check, Msg=Msg, **kwargs)
-        self.add(l)
-        self.add(email)
+        self.insert(l,0)
 
-class Url(HorizontalPanel):
-    def __init__(self, Name, Check=validateURL, Msg="Not Valid URL", **kwargs):
-        super(Url, self).__init__()
+class Url(CheckableTextBox):
+    def __init__(self, Name, Check=validateUrl, Msg="Not Valid URL", **kwargs):
+        super(Url, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs )
         l = Label("URL:")
-        email = UrlBox(Name=Name, Check=Check, Msg=Msg, **kwargs)
-        self.add(l)
-        self.add(email)
+        self.insert(l,0)
