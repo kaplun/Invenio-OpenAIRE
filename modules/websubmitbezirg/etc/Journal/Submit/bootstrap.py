@@ -1,5 +1,9 @@
-from engine import *
-from checks import *
+try:
+    from engine import *
+    from elements import *
+except:
+    pass
+
 
 Interface(
     Title(),

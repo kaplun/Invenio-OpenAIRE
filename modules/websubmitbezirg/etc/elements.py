@@ -1,42 +1,50 @@
-from pyjamas.ui.VerticalPanel import VerticalPanel
-from pyjamas.ui.HorizontalPanel import HorizontalPanel
-from pyjamas.ui.TextArea import TextArea
-from pyjamas.ui.TextBox import TextBox
-from pyjamas.ui.Label import Label
-from pyjamas.ui.FileUpload import FileUpload
-from pyjamas.ui.ListBox import ListBox
-from pyjamas.ui.Button import Button
-from pyjamas.ui.Calendar import DateField, Calendar, CalendarPopup
+import sys
+if sys.version_info[3] == 'pyjamas':
+    from pyjamas.ui.VerticalPanel import VerticalPanel
+    from pyjamas.ui.HorizontalPanel import HorizontalPanel
+    from pyjamas.ui.TextArea import TextArea
+    from pyjamas.ui.TextBox import TextBox
+    from pyjamas.ui.Label import Label
+    from pyjamas.ui.FileUpload import FileUpload
+    from pyjamas.ui.ListBox import ListBox
+    from pyjamas.ui.Button import Button
+    from pyjamas.ui.Calendar import DateField, Calendar, CalendarPopup
+else:
+    class NullClass(object):
+        def __init__(self, *args, **kwargs):
+            if 'Name' in kwargs:
+                self.__name = kwargs['Name']
+            else:
+                self.__name = None
+        def getName(self):
+            return self.__name
+    VerticalPanel=HorizontalPanel=TextArea=TextBox=Label=FileUpload=ListBox=Button=DateField=NullClass
 
 from checks import *
 
 class Title(HorizontalPanel):
-    def __init__(self):
-        super(Title,self).__init__()
+    def onModuleLoad(self):
         l = Label("Title:")
         t = TextArea()
         self.add(l)
         self.add(t)
 
 class Author(HorizontalPanel):
-    def __init__(self):
-        super(Author,self).__init__()
+    def onModuleLoad(self):
         l = Label("Author:")
         t = TextArea()
         self.add(l)
         self.add(t)
 
 class Abstract(HorizontalPanel):
-    def __init__(self):
-        super(Abstract,self).__init__()
+    def onModuleLoad(self):
         l = Label("Abstract:")
         t = TextArea()
         self.add(l)
         self.add(t)
 
 class NoPages(VerticalPanel):
-    def __init__(self):
-        super(NoPages,self).__init__()
+    def onModuleLoad(self):
         l = Label("NoPages:")
         t = TextBox()
         self.add(l)
@@ -44,8 +52,7 @@ class NoPages(VerticalPanel):
         
     
 class Language(VerticalPanel):
-    def __init__(self):
-        super(Language,self).__init__()
+    def onModuleLoad(self):
         l = Label("Language:")
         c = ListBox()
         c.addItem("English")
@@ -56,8 +63,7 @@ class Language(VerticalPanel):
         self.add(f)
 
 class Published(HorizontalPanel):
-    def __init__(self):
-        super(Published,self).__init__()
+    def onModuleLoad(self):
         l = Label("Published:")
         df = DateField()
         self.add(l)
@@ -66,29 +72,30 @@ class Published(HorizontalPanel):
 
 class Checkable(HorizontalPanel):
     def __init__(self, Name, Check, Msg, Element=None, **kwargs):
-        super(Checkable, self).__init__()
-        check = Check
-
-        element = Element(Name=Name, **kwargs)
-        check_label = Label(Msg)
-        check_label.setVisible(False)
+        if sys.version_info[3] == 'pyjamas':
+            super(Checkable, self).__init__()
+        else:
+            super(Checkable, self).__init__(Name=Name, **kwargs)
+        self.checkFunction = checkFunction = Check
+        self.checkLabel = checkLabel = Label(Msg)
+        self.checkElement = checkElement = Element(Name=Name, **kwargs)
 
         class CheckableListener:
             def runCheck(self, sender):
-                valid = check(element.getText())
+                valid = checkFunction(checkElement.getText())
                 if valid:
-                    element.setID("valid")
-                    check_label.setVisible(False)
+                    checkElement.setID("valid")
+                    checkLabel.setVisible(False)
                 else:
-                    element.setID("invalid")
-                    check_label.setVisible(True)
+                    checkElement.setID("invalid")
+                    checkLabel.setVisible(True)
                 return valid
             def onFocus(self, sender):
                 pass
             def onLostFocus(self, sender):
                 valid = self.runCheck(sender)
                 if not valid:
-                    element.addKeyboardListener(self) 
+                    checkElement.addKeyboardListener(self) 
                 return valid
             def onKeyUp(self, sender, keyCode, modifiers):
                 valid = self.runCheck(sender)
@@ -97,27 +104,43 @@ class Checkable(HorizontalPanel):
                 pass
             def onKeyPress(self, sender, keyCode, modifiers):
                 pass
-        element.addFocusListener(CheckableListener())
 
-        self.add(element)
-        self.add(check_label)
+        self.checkListener = CheckableListener()
+
+    def onModuleLoad(self): 
+        self.checkLabel.setVisible(False)
+        self.checkElement.addFocusListener(self.checkListener)
+
+        self.add(self.checkElement)
+        self.add(self.checkLabel)
+
+
 
 class CheckableTextArea(Checkable):
     def __init__(self, Name, Check, Msg, **kwargs):
-        super(CheckableTextArea, self).__init__(Name, Check, Msg, TextArea, **kwargs)
+        super(CheckableTextArea, self).__init__(Name=Name, Check=Check, Msg=Msg, Element=TextArea, **kwargs)
 
 class CheckableTextBox(Checkable):
     def __init__(self, Name, Check, Msg, **kwargs):
-        super(CheckableTextBox, self).__init__(Name, Check, Msg, TextBox, **kwargs)
+        super(CheckableTextBox, self).__init__(Name=Name, Check=Check, Msg=Msg, Element=TextBox, **kwargs)
 
 class Email(CheckableTextBox):
     def __init__(self, Name, Check=validateEmail, Msg="Not Valid Email", **kwargs):
         super(Email, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs )
+    def onModuleLoad(self):
+        #getattr(Checkable,"onModuleLoad")(self)
         l = Label("Email:")
-        self.insert(l,0)
+        self.add(l)
+        super(Email, self).onModuleLoad()
 
 class Url(CheckableTextBox):
-    def __init__(self, Name, Check=validateUrl, Msg="Not Valid URL", **kwargs):
-        super(Url, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs )
+    def __init__(self, Name, Check=validateUrl, Msg="Not Valid URL", Text="http://", **kwargs):
+        super(Url, self).__init__(Name=Name, Check=Check, Msg=Msg, Text=Text, **kwargs )
+    def onModuleLoad(self):
+        #getattr(Checkable,"onModuleLoad")(self)
         l = Label("URL:")
-        self.insert(l,0)
+        self.add(l)
+        super(Url, self).onModuleLoad()
+
+
+
