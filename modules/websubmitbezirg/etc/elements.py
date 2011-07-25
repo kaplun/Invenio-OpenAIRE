@@ -4,6 +4,7 @@ if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.HorizontalPanel import HorizontalPanel
     from pyjamas.ui.TextArea import TextArea
     from pyjamas.ui.TextBox import TextBox
+    from pyjamas.ui.PasswordTextBox import PasswordTextBox
     from pyjamas.ui.Label import Label
     from pyjamas.ui.FileUpload import FileUpload
     from pyjamas.ui.ListBox import ListBox
@@ -18,7 +19,7 @@ else:
                 self.__name = None
         def getName(self):
             return self.__name
-    VerticalPanel=HorizontalPanel=TextArea=TextBox=Label=FileUpload=ListBox=Button=DateField=NullClass
+    VerticalPanel=HorizontalPanel=TextArea=TextBox=PasswordTextBox=Label=FileUpload=ListBox=Button=DateField=NullClass
 
 from checks import *
 
@@ -43,14 +44,6 @@ class Abstract(HorizontalPanel):
         self.add(l)
         self.add(t)
 
-class NoPages(VerticalPanel):
-    def onModuleLoad(self):
-        l = Label("NoPages:")
-        t = TextBox()
-        self.add(l)
-        self.add(t)
-        
-    
 class Language(VerticalPanel):
     def onModuleLoad(self):
         l = Label("Language:")
@@ -69,15 +62,21 @@ class Published(HorizontalPanel):
         self.add(l)
         self.add(df)
 
-
 class Checkable(HorizontalPanel):
-    def __init__(self, Name, Check, Msg, Element=None, **kwargs):
+    def __init__(self, Name, Check, Msg, Element=None, Required=False, **kwargs):
         if sys.version_info[3] == 'pyjamas':
             super(Checkable, self).__init__()
         else:
             super(Checkable, self).__init__(Name=Name, **kwargs)
-        self.checkFunction = checkFunction = Check
-        self.checkLabel = checkLabel = Label(Msg)
+
+        self.required = Required
+        if self.required:
+            # wrap required and check
+            self.checkFunction = checkFunction = lambda input: Check(input) and input.strip() # wraps and input must be not an empty string
+        else:
+            # wrap optional and check
+            self.checkFunction = checkFunction = lambda input: Check(input) or not input.strip() # wraps and input can be an empty string
+        self.checkLabel = checkLabel = Label(Msg, StyleName="emph")
         self.checkElement = checkElement = Element(Name=Name, **kwargs)
 
         class CheckableListener:
@@ -113,8 +112,9 @@ class Checkable(HorizontalPanel):
 
         self.add(self.checkElement)
         self.add(self.checkLabel)
-
-
+        if self.required:
+            l = Label("*", StyleName="emph")
+            self.insert(l,0)
 
 class CheckableTextArea(Checkable):
     def __init__(self, Name, Check, Msg, **kwargs):
@@ -124,23 +124,40 @@ class CheckableTextBox(Checkable):
     def __init__(self, Name, Check, Msg, **kwargs):
         super(CheckableTextBox, self).__init__(Name=Name, Check=Check, Msg=Msg, Element=TextBox, **kwargs)
 
+class CheckablePasswordTextBox(Checkable):
+    def __init__(self, Name, Check, Msg, **kwargs):
+        super(CheckablePasswordTextBox, self).__init__(Name=Name, Check=Check, Msg=Msg, Element=PasswordTextBox, **kwargs)
+
+class NoPages(CheckableTextBox):
+    def __init__(self, Name, Check=validateNoPages, Msg="Must be digits", **kwargs):
+        super(NoPages, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs)
+    def onModuleLoad(self):
+        l = Label("NoPages:")
+        self.add(l)
+        super(NoPages,self).onModuleLoad()
+
 class Email(CheckableTextBox):
     def __init__(self, Name, Check=validateEmail, Msg="Not Valid Email", **kwargs):
-        super(Email, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs )
+        super(Email, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs)
     def onModuleLoad(self):
-        #getattr(Checkable,"onModuleLoad")(self)
         l = Label("Email:")
         self.add(l)
         super(Email, self).onModuleLoad()
 
 class Url(CheckableTextBox):
     def __init__(self, Name, Check=validateUrl, Msg="Not Valid URL", Text="http://", **kwargs):
-        super(Url, self).__init__(Name=Name, Check=Check, Msg=Msg, Text=Text, **kwargs )
+        super(Url, self).__init__(Name=Name, Check=Check, Msg=Msg, Text=Text, **kwargs)
     def onModuleLoad(self):
-        #getattr(Checkable,"onModuleLoad")(self)
         l = Label("URL:")
         self.add(l)
         super(Url, self).onModuleLoad()
 
 
 
+class Password(CheckablePasswordTextBox):
+    def __init__(self, Name, Check=validatePassword, Msg = "Not Valid Password", **kwargs):
+        super(Password, self).__init__(Name=Name, Check=Check, Msg=Msg, **kwargs)
+    def onModuleLoad(self):
+        l = Label("Password:")
+        self.add(l)
+        super(Password, self).onModuleLoad()

@@ -10,10 +10,11 @@ Interface(
     Author(),
     Abstract(),
     Published(),
-    NoPages(),
+    NoPages(Name="pages1"),
     Language(),
-    Email(Name="email1"),
-    Url(Name="url1")
+    Email(Name="email1", Required=True),
+    Url(Name="url1"),
+    Password(Name="p1", Required=True)
 )
 
 

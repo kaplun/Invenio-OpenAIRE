@@ -4,7 +4,7 @@ from pyjamas.ui.FormPanel import FormPanel
 from pyjamas.ui.Button import Button
 from pyjamas.ui.Hidden import Hidden
 from pyjamas import Window
-
+from pyjamas.JSONParser import JSONParser
 
 from elements import *
 
@@ -28,6 +28,8 @@ class Interface(object):
 
         # Create a panel to hold all of the form widgets.
         self.panel = VerticalPanel()
+        self.panel.setID("form-panel")
+        self.panel.setSpacing(10)
         self.form.setWidget(self.panel)
 
         self.root.add(self.form)
@@ -42,16 +44,11 @@ class Interface(object):
         self.panel.add(self.action)
         
         self.submitButton = Button("Submit", self)
-        self.submitLabel = Label("The form contains errors (client-side)")
+        self.submitLabel = Label("The form contains errors", StyleName="emph")
         self.submitLabel.setVisible(False)
-
-        self.validationServerLabel = Label("The form contains errors (server-side)")
-        self.validationServerLabel.setVisible(False)
 
         self.panel.add(self.submitButton)
         self.panel.add(self.submitLabel)
-        self.panel.add(self.validationServerLabel)
-
 
     def onClick(self, sender):
         for element in self.elements:
@@ -77,8 +74,13 @@ class Interface(object):
         # fired. Assuming the service returned a response of type text/plain,
         # we can get the result text here (see the FormPanel documentation for
         # further explanation).
-        self.validationServerLabel.setVisible(True)
-        self.validationServerLabel.setText(event.getResults())
+        res_json = event.getResults()[5:-6]
+        res_py = JSONParser().decodeAsObject(res_json)
+        if res_py['valid']:
+            self.submitLabel.setVisible(False)
+        else:
+            self.submitLabel.setVisible(True)
+
 
     def onSubmit(self, event):
         pass

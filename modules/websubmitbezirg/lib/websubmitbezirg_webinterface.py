@@ -5,8 +5,10 @@ from invenio.config import CFG_ETCDIR, CFG_WEBDIR, CFG_SITE_URL
 
 import os
 import os.path
+import json
 import sys
 import re
+
 from uuid import uuid4
 
 
@@ -124,9 +126,10 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
             try:
                 execfile(os.path.join(action_etc_dir,"bootstrap.py"))
             except ValidationError:
-                return "The form contains errors (server-side)"
+                #req.content_type = "text/plain"
+                return json.dumps({'valid': False})
             else:
-                return "The form is valid"
+                return json.dumps({'valid': True})
 
 
         def dispatcher(req, form):
