@@ -10,6 +10,7 @@ if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.ListBox import ListBox
     from pyjamas.ui.Button import Button
     from pyjamas.ui.Calendar import DateField, Calendar, CalendarPopup
+    from pyjamas.ui.RootPanel import get
 else:
     class NullClass(object):
         def __init__(self, *args, **kwargs):
@@ -82,6 +83,7 @@ class Checkable(HorizontalPanel):
         class CheckableListener:
             def runCheck(self, sender):
                 valid = checkFunction(checkElement.getText())
+                get("submit-label").setVisible(False)
                 if valid:
                     checkElement.setID("valid")
                     checkLabel.setVisible(False)

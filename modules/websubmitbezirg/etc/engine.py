@@ -43,12 +43,16 @@ class Interface(object):
         self.panel.add(self.doctype)
         self.panel.add(self.action)
         
+        self.submitPanel = HorizontalPanel()
         self.submitButton = Button("Submit", self)
         self.submitLabel = Label("The form contains errors", StyleName="emph")
+        self.submitLabel.setID("submit-label")
         self.submitLabel.setVisible(False)
 
-        self.panel.add(self.submitButton)
-        self.panel.add(self.submitLabel)
+        self.submitPanel.add(self.submitButton)
+        self.submitPanel.add(self.submitLabel)
+
+        self.panel.add(self.submitPanel)
 
     def onClick(self, sender):
         for element in self.elements:
