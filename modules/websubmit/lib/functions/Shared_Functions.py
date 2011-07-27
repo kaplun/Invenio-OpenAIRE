@@ -266,3 +266,11 @@ def retrieve_field_values(curdir, field_name, separator=None, system_number_file
             else:
                 return [record_get_field_value(record, tag[:3], tag[3], tag[4], tag[5])]
     return []
+
+def push_to_arxiv_response_element(curdir, submission_prefix, ln):
+    from invenio.bibsword_client import get_remote_server_by_name
+    serverid = get_remote_server_by_name('arXiv')['id']
+    collections = list_collections_from_server(serverid)
+    text = """\
+<input type="hidden" name="%(prefix)s_SERVERID" value="%(serverid)s" />
+

@@ -467,7 +467,7 @@ def task_submit_check_options():
        not task_get_option('tasks') and \
        not task_get_option('check-tables') and \
        not task_get_option('optimise-tables'):
-        task_set_option('sessions', True)
+        task_set_option('guests', True)
     return True
 
 def task_submit_elaborate_specific_parameter(key, value, opts, args):

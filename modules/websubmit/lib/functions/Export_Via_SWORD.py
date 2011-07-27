@@ -128,7 +128,7 @@ def Export_Via_SWORD(parameters, curdir, form, user_info=None):
 
     metadata['categories'] = []
 
-    #Path of file containing primary category url
+    #Path of file containing secondary category url
     if os.path.exists("%s/%s" % (curdir, parameters['secondary'])):
         tmp_file = open("%s/%s" % (curdir, parameters['secondary']), "r")
         sc_from_param = tmp_file.read()

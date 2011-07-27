@@ -120,7 +120,7 @@ def get_last_update(id_remoteserver):
     return qres[0][0]
 
 
-def get_all_remote_server(id_server):
+def get_all_remote_server(id_server=None):
     '''
         This function select the name of all remote service implementing the
         SWORD protocol. It returns a list of dictionnary containing three fields:
@@ -131,7 +131,7 @@ def get_all_remote_server(id_server):
 
     remote_servers = []
 
-    if id_server == '':
+    if id_server:
         qstr = '''SELECT id, name, host FROM swrREMOTESERVER'''
         qres = run_sql(qstr)
     else :

@@ -67,10 +67,23 @@ from invenio.config import CFG_TMPDIR, CFG_SITE_ADMIN_EMAIL
 # Implementation of the BibSword API
 #-------------------------------------------------------------------------------
 
-def list_remote_servers(id_server=''):
+def get_remote_server_by_name(name):
+    """
+    Return a dictionary (id - name - host) of the matched remote server. None
+    othewise.
+    """
+
+    servers = [row for row in get_all_remote_server(1) if row['name'] == name]
+    if servers:
+        return servers[0]
+    else:
+        None
+
+def list_remote_servers(id_server=None):
     '''
-        Get the list of remote servers implemented by the Invenio SWORD API.
-        @return: list of tuples [ { 'id', 'name' } ]
+        Get the mapping of remote servers implemented by the Invenio SWORD API.
+        @return:(remote_server) list of dictionary (id - name - host) of each
+                  remote server
     '''
 
     return get_all_remote_server(id_server)
@@ -542,7 +555,7 @@ def perform_submission_process(server_id, collection, recid, user_info,
         record twice in the same remote server
         @param server_id: remote server id on the swrREMOTESERVER table
         @param user_info: invenio user infos of the submitter
-        @param metadata: dictionnary containing some informations
+        @param metadata: dictionary containing some informations
         @param collection: url of the place where to deposit the record
         @param marcxml: place where to find important information to the record
         @param recid: id of the record that can be found if no marcxml
@@ -555,7 +568,7 @@ def perform_submission_process(server_id, collection, recid, user_info,
     if medias == None:
         medias = []
 
-    # dictionnary containing 2 steps response and possible errors
+    # dictionary containing 2 steps response and possible errors
     response = {'error':'',
                 'message':'',
                 'deposit_media':'',
