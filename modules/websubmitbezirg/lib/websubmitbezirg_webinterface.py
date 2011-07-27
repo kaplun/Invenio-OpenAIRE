@@ -36,12 +36,18 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
             title = "Choose Doctype"
             html = ""
 
-            for doctype in filter(lambda d: os.path.isdir(os.path.join(APP_WEB_DIR,d)), os.listdir(APP_WEB_DIR)):
-                doctype_url = APP_URL + '/submit/'+ doctype
-                html += '<a href="%s">%s</a><br>' % (doctype_url, doctype)        
-            if not html:
-                html = "No doctype"
+            config_file = open(os.path.join(APP_ETC_DIR, "config.json"), 'r')
+            config = json.load(config_file)
 
+            for category_ in config:
+                category = category_.encode('ascii')
+                html += '<h2>%s</h2><ul>' % (category)
+                for doctype_, enabled in config[category].items():
+                    doctype = doctype_.encode('ascii')
+                    if enabled:
+                        doctype_url = APP_URL + '/submit/'+ doctype
+                        html += '<li><a href="%s">%s</a></li>' % (doctype_url, doctype)
+                html += "</ul>"
             return page(title, html)
         
 
@@ -52,7 +58,8 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
             doctype = path[0]
 
             doctype_dir = os.path.join(APP_ETC_DIR, doctype)
-            if os.path.exists(doctype_dir):
+            doctype_file = os.path.join(doctype_dir, doctype+".py")
+            if os.path.exists(doctype_file):
                 for action in filter(lambda d: os.path.isdir(os.path.join(doctype_dir, d)), os.listdir(doctype_dir)):
                     action_url = req.uri.rstrip('/') + '/' + action
                     html += '<a href="%s">%s</a><br>' % (action_url, action)
