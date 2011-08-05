@@ -1104,6 +1104,8 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
         raise StandardError('FFT tag specified but bibupload executed in --delete mode')
 
     tuple_list = extract_tag_from_record(record, 'FFT')
+
+
     if tuple_list: # FFT Tags analysis
         write_message("FFTs: "+str(tuple_list), verbose=9)
         docs = {} # docnames and their data

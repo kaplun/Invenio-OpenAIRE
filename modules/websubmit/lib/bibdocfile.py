@@ -142,6 +142,8 @@ CFG_BIBDOCFILE_AVAILABLE_FLAGS = (
     'OCRED'
 )
 
+DBG_LOG_QUERIES = False
+
 #: constant used if FFT correct with the obvious meaning.
 KEEP_OLD_VALUE = 'KEEP-OLD-VALUE'
 
@@ -524,7 +526,7 @@ def propose_next_docname(docname):
         docname += '_1'
     return docname
 
-class BibRecDocs:
+class BibRecDocs(object):
     """
     This class represents all the files attached to one record.
 
@@ -1171,7 +1173,7 @@ class BibRecDocs:
         self.build_bibdoc_list()
 
         for bibdoc in self.bibdocs:
-            if not run_sql('SELECT more_info FROM bibdoc WHERE id=%s', (bibdoc.id,)):
+            if not run_sql('SELECT data_value FROM bibdoc_moreinfo WHERE bibdocid=%s', (bibdoc.id,)):
                 ## Import from MARC only if the bibdoc has never had
                 ## its more_info initialized.
                 try:
@@ -1310,7 +1312,7 @@ class BibRecDocs:
                 self.merge_bibdocs(docname, new_docname)
             docnames.add(docname)
 
-class BibDoc:
+class BibDoc(object):
     """
     This class represents one document (i.e. a set of files with different
     formats and with versioning information that consitutes a piece of
@@ -1357,7 +1359,6 @@ class BibDoc:
             self.docname = initial_data["docname"]
             self.id = initial_data["id"]
             self.status = initial_data["status"]
-            self.more_info = initial_data["more_info"]
             self.basedir = initial_data["basedir"]
             self.doctype = initial_data["doctype"]
         # else it is a new document
@@ -1450,7 +1451,7 @@ class BibDoc:
                 #this bibdoc isn't associated with the corresponding bibrec.
                 raise InvenioWebSubmitFileError, "Docid %s is not associated with the recid %s" % (docid, recid)
         # gather the other information
-        res = run_sql("SELECT id,status,docname,creation_date,modification_date,text_extraction_date,more_info FROM bibdoc WHERE id=%s LIMIT 1", (docid,), 1)
+        res = run_sql("SELECT id, status, docname, creation_date, modification_date, text_extraction_date FROM bibdoc WHERE id=%s LIMIT 1", (docid,), 1)
         container = {}
         if res:
             container["cd"] = res[0][3]
@@ -1460,7 +1461,6 @@ class BibDoc:
             container["docname"] = res[0][2]
             container["id"] = docid
             container["status"] = res[0][1]
-            container["more_info"] = BibDocMoreInfo(docid, blob_to_string(res[0][6]))
             container["basedir"] = _make_base_dir(container["id"])
             container["doctype"] = doctype
         else:
@@ -1743,6 +1743,7 @@ class BibDoc:
         result might be unpredicted.
         """
         del self.md5s
+        self.more_info.delete()
         del self.more_info
         os.system('rm -rf %s' % escape_shell_arg(self.basedir))
         run_sql('DELETE FROM bibrec_bibdoc WHERE id_bibdoc=%s', (self.id, ))
@@ -2318,12 +2319,13 @@ class BibDoc:
         if context != 'init':
             previous_file_list = list(self.docfiles)
         res = run_sql("SELECT status,docname,creation_date,"
-            "modification_date,more_info FROM bibdoc WHERE id=%s", (self.id,))
+            "modification_date FROM bibdoc WHERE id=%s", (self.id,))
         self.cd = res[0][2]
         self.md = res[0][3]
         self.docname = res[0][1]
         self.status = res[0][0]
-        self.more_info = BibDocMoreInfo(self.id, blob_to_string(res[0][4]))
+        self.more_info = BibDocMoreInfo(self.id)
+
         self.docfiles = []
         if os.path.exists(self.basedir):
             self.md5s = Md5Folder(self.basedir)
@@ -2366,9 +2368,9 @@ class BibDoc:
         @deprecated: use subformats instead.
         """
         self.related_files = {}
-        res = run_sql("SELECT ln.id_bibdoc2,ln.type,bibdoc.status FROM "
-            "bibdoc_bibdoc AS ln,bibdoc WHERE id=ln.id_bibdoc2 AND "
-            "ln.id_bibdoc1=%s", (self.id,))
+        res = run_sql("SELECT ln.id_bibdoc2,ln.rel_type,bibdoc.status FROM "
+            "bibdoc_bibdoc AS ln,bibdoc WHERE bibdoc.id=ln.id_bibdoc2 AND "
+            "ln.id_bibdoc1=%s", (str(self.id),))
         for row in res:
             docid = row[0]
             doctype = row[1]
@@ -2437,6 +2439,41 @@ class BibDoc:
             (self.recid, self.id, version, format,
             userid, ip_address,))
 
+    def get_incoming_relations(self, rel_type=None):
+        """Return all relations in which this BibDoc appears on target position
+        @param rel_type: Type of the relation, to which we want to limit our search. None = any type
+        @type rel_type: string
+
+        @return: List of BibRelation instances
+        @rtype: list
+        """
+        return BibRelation.get_relations(rel_type = rel_type,
+                                         bibdoc2_id = self.id)
+
+
+    def get_outgoing_relations(self, rel_type=None):
+        """Return all relations in which this BibDoc appears on target position
+        @param rel_type: Type of the relation, to which we want to limit our search. None = any type
+        @type rel_type: string
+
+        @return: List of BibRelation instances
+        @rtype: list
+        """
+        return BibRelation.get_relations(rel_type = rel_type,
+                                         bibdoc1_id = self.id)
+    def create_outgoing_relation(self, bibdoc2, rel_type):
+        """
+        Create an outgoing relation between current BibDoc and a different one
+        """
+        return BibRelation.create(bibdoc1_id = self.id, bibdoc2_id = bibdoc2.id, rel_type = rel_type)
+
+    def create_incoming_relation(self, bibdoc1, rel_type):
+        """
+        Create an outgoing relation between a particular version of
+        current BibDoc and a particular version of a different BibDoc
+        """
+        return BibRelation.create(bibdoc1_id = bibdoc1.id, bibdoc2_id = self.id, rel_type = rel_type)
+
 def generic_path2bidocfile(fullpath):
     """
     Returns a BibDocFile objects that wraps the given fullpath.
@@ -2465,7 +2502,7 @@ def generic_path2bidocfile(fullpath):
         checksum=checksum,
         more_info=None)
 
-class BibDocFile:
+class BibDocFile(object):
     """This class represents a physical file in the Invenio filesystem.
     It should never be instantiated directly"""
 
@@ -2994,7 +3031,7 @@ def _make_base_dir(docid):
     group = "g" + str(int(int(docid) / CFG_WEBSUBMIT_FILESYSTEM_BIBDOC_GROUP_LIMIT))
     return os.path.join(CFG_WEBSUBMIT_FILEDIR, group, str(docid))
 
-class Md5Folder:
+class Md5Folder(object):
     """Manage all the Md5 checksum about a folder"""
     def __init__(self, folder):
         """Initialize the class from the md5 checksum of a given path"""
@@ -3331,7 +3368,148 @@ def download_url(url, format=None, sleep=2):
     finally:
         os.close(tmpfd)
 
-class BibDocMoreInfo:
+class MoreInfo(object):
+    """This class represents a genering MoreInfo dictionary.
+       MoreInfo object can be attached to bibdoc, bibversion, format or BibRelation.
+       The entity where a particular MoreInfo object is attached has to be specified using the
+       constructor parametes.
+
+       This class is a thin wrapper around the database table.
+       """
+
+    def __init__(self, docid = None, version = None, format = None, relation = None):
+        self.docid = docid
+        self.version = version
+        self.format = format
+        self.relation = relation
+
+    def _val_or_null(self, val, eq_name = None, q_str = None, q_args = None):
+        res = ""
+        if eq_name != None:
+            res += eq_name
+        if val == None:
+            if eq_name != None:
+                res += " is "
+            res += "NULL"
+            if q_str != None:
+                q_str.append(res)
+            return res
+        else:
+            if eq_name != None:
+                res += "="
+            res += "%s"
+            if q_str != None:
+                q_str.append(res)
+            if q_args != None:
+                q_args.append(str(val))
+            return res
+
+    def _generate_where_query_args(self, namespace = None, data_key = None):
+        """Private method generating WHERE clause of SQL statements"""
+        q_str = []
+        q_args = []
+
+        q_str.append(self._val_or_null(self.docid, eq_name = "id_bibdoc", q_args = q_args))
+        q_str.append(self._val_or_null(self.version, eq_name = "ver_bibdoc", q_args = q_args))
+        q_str.append(self._val_or_null(self.format, eq_name = "fmt_bibdoc", q_args = q_args))
+        q_str.append(self._val_or_null(self.relation, eq_name = "id_rel", q_args = q_args))
+        if namespace != None:
+            q_str.append("namespace=%s")
+            q_args.append(str(namespace))
+        if data_key != None:
+            q_str.append("data_key=%s")
+            q_args.append(str(data_key))
+        if DBG_LOG_QUERIES:
+            from invenio.bibtask import write_message
+            write_message(" WHERE STATEMENT: %s ARGS: %s" % (" AND ".join(q_str), repr(q_args)))
+
+        return (" AND ".join(q_str), q_args)
+
+    def set_data(self, namespace, key, value):
+        """setting data directly in the database dictionary"""
+        #TODO: this should happen within one transaction
+        serialised_val = cPickle.dumps(value)
+        # on duplicate key will not work here as miltiple null values are permitted by the index
+        if not self.contains_key(namespace, key):
+            #insert new value
+            query_parts = []
+            query_args = []
+
+            self._val_or_null(self.docid, q_str = query_parts, q_args = query_args)
+            self._val_or_null(self.version, q_str = query_parts, q_args = query_args)
+            self._val_or_null(self.format, q_str = query_parts, q_args = query_args)
+            self._val_or_null(self.relation, q_str = query_parts, q_args = query_args)
+
+            query = "INSERT INTO bibdoc_moreinfo (id_bibdoc, ver_bibdoc, fmt_bibdoc, id_rel, namespace, data_key, data_value) VALUES (" + ", ".join(query_parts) + ", %s, %s, %s)"
+
+            query_args += [str(namespace), str(key), str(serialised_val)]
+            if DBG_LOG_QUERIES:
+                from invenio.bibtask import write_message
+                write_message("Executing query: " + query + " ARGS: " + repr(query_args))
+                print "Executing query: " + query + " ARGS: " + repr(query_args)
+
+            run_sql(query, query_args)
+        else:
+            #Update existing value
+            where_str, where_args = self._generate_where_query_args()
+            query_str = "UPDATE bibdoc_moreinfo SET data_value=%s WHERE" + where_str
+            run_sql(query_str, [self.str(serialised_val)] + where_args )
+
+    def get_data(self, namespace, key):
+        """retrieving data from the database"""
+        where_str, where_args = self._generate_where_query_args(namespace = namespace, data_key = key)
+        query_str = "SELECT data_value FROM bibdoc_moreinfo WHERE " + where_str
+        if DBG_LOG_QUERIES:
+            from invenio.bibtask import write_message
+            write_message("Executing query: " + query_str  + "  ARGS: " + repr(where_args))
+            print "Executing query: " + query_str + "  ARGS: " + repr(where_args)
+
+        res = run_sql(query_str, where_args)
+
+        if res and res[0][0]:
+            try:
+                return cPickle.loads(res[0][0])
+            except:
+                raise Exception("Error when deserialising value for %s key=%s retrieved value=%s" % (repr(self), str(key), str(res[0][0])))
+        return None
+
+    def del_key(self, namespace, key):
+        """retrieving data from the database"""
+
+        where_str, where_args = self._generate_where_query_args(namespace = namespace, data_key = key)
+        query = "DELETE FROM bibdoc_moreinfo WHERE " + where_str
+        if DBG_LOG_QUERIES:
+            from invenio.bibtask import write_message
+            write_message("Executing query: " + query_str + "   ARGS: " + repr(where_args))
+            print "Executing query: " + query_str + "   ARGS: " + repr(where_args)
+        res = run_sql(query_str, where_args)
+
+        return None
+
+    def contains_key(self, namespace, key):
+        return self.get_data(namespace, key) != None
+
+    # the dictionary interface -> updating the default namespace
+    def __setitem__(self, key, value):
+        self.set_data("", key, value) #the default value
+
+    def __getitem__(self, key):
+        return self.get_data("", key)
+
+    def __delitem__(self, key):
+        self.del_key("", key)
+
+    def __contains__(self, key):
+        return self.contains_key("", key)
+
+    def __repr__(self):
+        return "MoreInfo(docid=%s, version=%s, format=%s, relation=%s)" % (self.docid, self.version, self.format, self.relation)
+
+    def delete(self):
+        """Remove all entries associated with this MoreInfo"""
+        run_sql("DELETE FROM bibdoc_bibdoc WHERE id_bibdoc=%s AND ver_bibdoc=%s AND fmt_bibdoc=%s AND id_rel=%s", (self.docid, self.version, self.format, self.relation))
+
+class BibDocMoreInfo(MoreInfo):
     """
     This class wraps contextual information of the documents, such as the
         - comments
@@ -3357,37 +3535,28 @@ class BibDocMoreInfo:
     @note: this class will be extended in the future to hold all the new auxiliary
     information about a document.
     """
-    def __init__(self, docid, more_info=None):
+    def __init__(self, docid):
         if not (type(docid) in (long, int) and docid > 0):
             raise ValueError("docid is not a positive integer, but %s." % docid)
-        self.docid = docid
-        if more_info is None:
-            res = run_sql('SELECT more_info FROM bibdoc WHERE id=%s', (docid, ))
-            if res and res[0][0]:
-                self.more_info = cPickle.loads(blob_to_string(res[0][0]))
-            else:
-                self.more_info = {}
-        else:
-            self.more_info = cPickle.loads(more_info)
-        if 'descriptions' not in self.more_info:
-            self.more_info['descriptions'] = {}
-        if 'comments' not in self.more_info:
-            self.more_info['comments'] = {}
-        if 'flags' not in self.more_info:
-            self.more_info['flags'] = {}
+        MoreInfo.__init__(self, docid)
+
+        if 'descriptions' not in self:
+            self['descriptions'] = {}
+        if 'comments' not in self:
+            self['comments'] = {}
+        if 'flags' not in self:
+            self['flags'] = {}
+        if DBG_LOG_QUERIES:
+            from invenio.bibtask import write_message
+            write_message("Createing BibdocMoreInfo :" + repr(self["comments"]))
+            print "Createing BibdocMoreInfo :" + repr(self["comments"])
 
     def __repr__(self):
         """
         @return: the canonical string representation of the C{BibDocMoreInfo}.
         @rtype: string
         """
-        return 'BibDocMoreInfo(%i, %s)' % (self.docid, repr(cPickle.dumps(self.more_info)))
-
-    def flush(self):
-        """
-        Flush this object to the database.
-        """
-        run_sql('UPDATE bibdoc SET more_info=%s WHERE id=%s', (cPickle.dumps(self.more_info), self.docid))
+        return 'BibDocMoreInfo(%i, %s)' % (self.docid, repr(cPickle.dumps(self)))
 
     def set_flag(self, flagname, format, version):
         """
@@ -3404,14 +3573,15 @@ class BibDocMoreInfo:
             L{CFG_BIBDOCFILE_AVAILABLE_FLAGS}
         """
         if flagname in CFG_BIBDOCFILE_AVAILABLE_FLAGS:
-            if not flagname in self.more_info['flags']:
-                self.more_info['flags'][flagname] = {}
+            flags = self['flags']
+            if not flagname in flags:
+                flags[flagname] = {}
             if not version in self.more_info['flags'][flagname]:
-                self.more_info['flags'][flagname][version] = {}
-            if not format in self.more_info['flags'][flagname][version]:
-                self.more_info['flags'][flagname][version][format] = {}
-            self.more_info['flags'][flagname][version][format] = True
-            self.flush()
+                flags[flagname][version] = {}
+            if not format in self['flags'][flagname][version]:
+                flags[flagname][version][format] = {}
+            flags[flagname][version][format] = True
+            self['flags'] = flags
         else:
             raise ValueError, "%s is not in %s" % (flagname, CFG_BIBDOCFILE_AVAILABLE_FLAGS)
 
@@ -3431,7 +3601,8 @@ class BibDocMoreInfo:
         try:
             assert(type(version) is int)
             format = normalize_format(format)
-            return self.more_info['comments'].get(version, {}).get(format)
+            #TODO ERROR POINT !
+            return self['comments'].get(version, {}).get(format)
         except:
             register_exception()
             raise
@@ -3452,7 +3623,7 @@ class BibDocMoreInfo:
         try:
             assert(type(version) is int)
             format = normalize_format(format)
-            return self.more_info['descriptions'].get(version, {}).get(format)
+            return self['descriptions'].get(version, {}).get(format)
         except:
             register_exception()
             raise
@@ -3474,7 +3645,7 @@ class BibDocMoreInfo:
             L{CFG_BIBDOCFILE_AVAILABLE_FLAGS}
         """
         if flagname in CFG_BIBDOCFILE_AVAILABLE_FLAGS:
-            return self.more_info['flags'].get(flagname, {}).get(version, {}).get(format, False)
+            return self['flags'].get(flagname, {}).get(version, {}).get(format, False)
         else:
             raise ValueError, "%s is not in %s" % (flagname, CFG_BIBDOCFILE_AVAILABLE_FLAGS)
 
@@ -3490,7 +3661,7 @@ class BibDocMoreInfo:
             L{CFG_BIBDOCFILE_AVAILABLE_FLAGS}).
         @rtype: list of string
         """
-        return [flag for flag in self.more_info['flags'] if format in self.more_info['flags'][flag].get(version, {})]
+        return [flag for flag in self['flags'] if format in self['flags'][flag].get(version, {})]
 
     def set_comment(self, comment, format, version):
         """
@@ -3510,12 +3681,14 @@ class BibDocMoreInfo:
                 comment = self.get_comment(format, version) or self.get_comment(format, version - 1)
             if not comment:
                 self.unset_comment(format, version)
-                self.flush()
                 return
-            if not version in self.more_info['comments']:
-                self.more_info['comments'][version] = {}
-            self.more_info['comments'][version][format] = comment
-            self.flush()
+            if not version in self['comments']:
+                comments = self['comments']
+                comments[version] = {}
+                self['comments'] = comments
+            comments = self['comments']
+            comments[version][format] = comment
+            self['comments'] = comments
         except:
             register_exception()
             raise
@@ -3538,12 +3711,14 @@ class BibDocMoreInfo:
                 description = self.get_description(format, version) or self.get_description(format, version - 1)
             if not description:
                 self.unset_description(format, version)
-                self.flush()
                 return
-            if not version in self.more_info['descriptions']:
-                self.more_info['descriptions'][version] = {}
-            self.more_info['descriptions'][version][format] = description
-            self.flush()
+            if not version in self['descriptions']:
+                descriptions = self['descriptions']
+                descriptions[version] = {}
+                self['descriptions'] = descriptions
+            descriptions = self['descriptions']
+            descriptions[version][format] = description
+            self['descriptions'] = descriptions
         except:
             register_exception()
             raise
@@ -3559,8 +3734,9 @@ class BibDocMoreInfo:
         """
         try:
             assert(type(version) is int and version > 0)
-            del self.more_info['comments'][version][format]
-            self.flush()
+            comments = self['comments']
+            del comments[version][format]
+            self['comments'] = comments
         except KeyError:
             pass
         except:
@@ -3578,8 +3754,9 @@ class BibDocMoreInfo:
         """
         try:
             assert(type(version) is int and version > 0)
-            del self.more_info['descriptions'][version][format]
-            self.flush()
+            descriptions = self['descriptions']
+            del descriptions[version][format]
+            self['descriptions'] = descriptions
         except KeyError:
             pass
         except:
@@ -3602,19 +3779,222 @@ class BibDocMoreInfo:
         """
         if flagname in CFG_BIBDOCFILE_AVAILABLE_FLAGS:
             try:
-                del self.more_info['flags'][flagname][version][format]
-                self.flush()
+                flags = self['flags']
+                del flags[flagname][version][format]
+                self['flags'] = flags
             except KeyError:
                 pass
         else:
             raise ValueError, "%s is not in %s" % (flagname, CFG_BIBDOCFILE_AVAILABLE_FLAGS)
 
-    def serialize(self):
+class BibRelation(object):
+    """
+    A representation of a relation between documents or their particular versions
+    """
+    def __init__(self, rel_type = "NULL",
+                 bibdoc1_id = "NULL", bibdoc2_id = "NULL",
+                 bibdoc1_ver = "NULL", bibdoc2_ver = "NULL",
+                 bibdoc1_fmt = "NULL", bibdoc2_fmt = "NULL",
+                 rel_id = None):
         """
-        @return: the serialized version of this object.
-        @rtype: string
+        The constructor of the class representing a relation between two
+        documents.
+
+        If the more_info parameter is specified, no data is retrieved from
+        the database and the internal dictionary is initialised with
+        the passed value. If the more_info is not provided, the value is
+        read from the database. In the case of non-existing record, an
+        empty dictionary is assigned.
+
+        If a version of whichever record is not specified, the resulting
+        object desctibes a relation of all version of a given BibDoc.
+
+        @param bibdoc1
+        @type bibdoc1 BibDoc
+        @param bibdoc1_ver
+        @type version1_ver int
+        @param bibdoc2
+        @type bibdoc2 BibDco
+        @param bibdoc2_ver
+        @type bibdoc2_ver int
+
+        @param bibdoc1_fmt format of the first document
+        @type bibdoc1_fmt string
+        @param bibdoc2_fmt format of the second document
+        @type bibdoc2_fmt string
+
+        @param rel_type
+        @type rel_type string
+        @param more_info The serialised representation of the more_info
+        @type more_info string
+
+        @param rel_id allows to specify the identifier of the newly created relation
+        @type rel_ide unsigned int
+
         """
-        return cPickle.dumps(self.more_info)
+
+        self.id = rel_id
+        self.bibdoc1_id = bibdoc1_id
+        self.bibdoc2_id = bibdoc2_id
+        self.bibdoc1_ver = bibdoc1_ver
+        self.bibdoc2_ver = bibdoc2_ver
+        self.bibdoc1_fmt = bibdoc1_fmt
+        self.bibdoc2_fmt = bibdoc2_fmt
+        self.rel_type = rel_type
+
+        if rel_id == None:
+            self._fill_id_from_data()
+        else:
+            self._fill_data_from_id()
+
+        self.more_info = MoreInfo(relation = self.id)
+
+    def _fill_data_from_id(self):
+        """Fill all the relation data from the relation identifier
+        """
+        query = "SELECT id_bibdoc1, ver_bibdoc1, fmt_bibdoc1, id_bibdoc2, ver_bibdoc2, fmt_bibdoc2, rel_type FROM bibdoc_bibdoc WHERE id=%s"
+        res = run_sql(query, (str(id), ))
+        if res != None and res[0] != None:
+            self.bibdoc1_id = res[0][0]
+            self.bibdoc1_ver = res[0][1]
+            self.bibdoc1_fmt = res[0][2]
+            self.bibdoc2_id = res[0][3]
+            self.bibdoc2_ver = res[0][4]
+            self.bibdoc2_fmt = res[0][5]
+            self.rel_type = res[0][6]
+
+    def _fill_id_from_data(self):
+        """Fill the relation identifier based on the data provided"""
+        where_str, where_args = self._get_where_clauses()
+        query = "SELECT id FROM bibdoc_bibdoc WHERE %s" % (where_str, )
+        res = run_sql(query, where_args)
+        if res and res[0][0]:
+            self.id = int(res[0][0])
+
+    def _get_rel_where_clauses(self):
+        """Private function returning part of the SQL statement identifying
+          current relation
+
+        @return
+        @rtype tuple
+        """
+        q_where = []
+        q_args = []
+
+        q_where.append("id_bibdoc1=%s")
+        q_args.append(self.bibdoc1_id)
+
+        q_where.append("id_bibdoc2=%s")
+        q_args.append(self.bibdoc2_id)
+
+        q_where.append("rel_type=%s")
+        q_args.append(self.rel_type)
+
+        q_where.append("ver_bibdoc1=%s")
+        q_args.append(self.bibdoc1_ver)
+
+        q_where.append("ver_bibdoc2=%s")
+        q_args.append(self.bibdoc2_ver)
+
+        q_where.append("fmt_bibdoc1=%s")
+        q_args.append(self.bibdoc1_fmt)
+
+        q_where.append("fmt_bibdoc2=%s")
+        q_args.append(self.bibdoc2_fmt)
+
+        return (" AND ".join(q_where), q_args)
+
+    @staticmethod
+    def create(self, bibdoc1_id = "NULL", bibdoc1_ver = "NULL",
+               bibdoc1_fmt = "NULL", bibdoc2_id = "NULL",
+               bibdoc2_ver = "NULL", bibdoc2_fmt = "NULL",
+               rel_type = ""):
+        """
+        Create a relation and return instance
+        """
+        rel_id = run_sql("INSERT INTO bibdoc_bibdoc (id_bibdoc1, ver_bibdoc1, fmt_bibdoc1, id_bibdoc2, ver_bibdoc2, fmt_bibdoc2, rel_type) VALUES (%s, %s, %s, %s, %s, %s, %s)", (bibdoc1_id, bibdoc1_ver, bibdoc1_fmt, bibdoc2_id, bibdoc2_ver, bibdoc2_fmt, rel_type))
+
+        return BibRelation(rel_id = rel_id)
+
+    def delete(self):
+        """ Removes a relation between objects from the database.
+            executing the flush function on the same object will restore
+            the relation
+        """
+        where_str, where_args = self._get_rel_where_clauses()
+        run_sql("DELETE FROM bibdoc_bibdoc WHERE %s" % (where_str,), where_args)
+        # removing associated MoreInfo
+        self.more_info.delete()
+
+#    def flush(self):
+#        run_sql("INSERT INTO bibdoc_bibdoc (id_bibdoc1, ver_bibdoc1, fmt_bibdoc1, id_bibdoc2, ver_bibdoc2, fmt_bibdoc2, rel_type, more_info) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE more_info=%s", (self.bibdoc1.id, self.bibdoc1_ver, self.bibdoc1_fmt, self.bibdoc2.id, self.bibdoc2_ver, self.bibdoc2_fmt, self.rel_type, more_info_str, more_info_str))
+
+    @staticmethod
+    def get_relations(rel_type=None, bibdoc1_id = None, bibdoc2_id = None,
+                 bibdoc1_ver = None, bibdoc2_ver = None,
+                 bibdoc1_fmt = None, bibdoc2_fmt = None):
+        """Get all relations satisfying criteria
+           Returns list of relation objects"""
+        where_str = []
+        where_args = []
+
+        if rel_type != None:
+            where_str.append("rel_type=%s")
+            where_args.append(rel_type)
+
+        if bibdoc1_id != None:
+            where_str.append("id_bibdoc1=%s")
+            where_args.append(bibdoc1_id)
+
+        if bibdoc1_ver != None:
+            where_str.append("ver_bibdoc1=%s")
+            where_args.append(bibdoc1_ver)
+
+        if bibdoc1_fmt != None:
+            where_str.append("fmt_bibdoc1=%s")
+            where_args.append(bibdoc1_fmt)
+
+        if bibdoc2_id != None:
+            where_str.append("id_bibdoc2=%s")
+            where_args.append(bibdoc2_id)
+
+        if bibdoc2_ver != None:
+            where_str.append("ver_bibdoc2=%s")
+            where_args.append(bibdoc2_ver)
+
+        if bibdoc2_fmt != None:
+            where_str.append("fmt_bibdoc2=%s")
+            where_args.append(bibdoc2_fmt)
+        query_str = "SELECT id FROM bibdoc_bibdoc WHERE %s" % (" AND ".join(where_str),)
+        res = run_sql(query_str, where_args)
+        results = []
+        if res != None:
+            for res_row in res:
+                results.append(BibRelation(rel_id=res_row[0]))
+        return results
+
+    # Access to MoreInfo
+    def set_data(self, category, key, value):
+        """assign additional information to this relation"""
+        self.more_info.set_data(category, key, value)
+
+    def get_data(self, category, key):
+        """read additional information assigned to this relation"""
+        return self.more_info.get_data(category, key)
+
+
+
+    #the dictionary interface allowing to set data bypassing the namespaces
+
+    def __setitem__(self, key, value):
+        self.more_info[key] = value
+
+    def __getitem__(self, key):
+        return self.more_info[key]
+
+    def __contains__(self, key):
+        return self.more_info.__contains__(key)
+
 
 def readfile(filename):
     """

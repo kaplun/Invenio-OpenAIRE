@@ -2868,11 +2868,31 @@ CREATE TABLE IF NOT EXISTS bibrec_bibdoc (
 ) ENGINE=MyISAM;
 
 CREATE TABLE IF NOT EXISTS bibdoc_bibdoc (
-  id_bibdoc1 mediumint(9) unsigned NOT NULL,
-  id_bibdoc2 mediumint(9) unsigned NOT NULL,
-  type varchar(255),
+  id mediumint(9) unsigned NOT NULL auto_increment,
+  id_bibdoc1 mediumint(9) unsigned,
+  ver_bibdoc1 mediumint(9) unsigned, -- NULL means all versions
+  fmt_bibdoc1 varchar(255),
+  id_bibdoc2 mediumint(9) unsigned,
+  ver_bibdoc2 mediumint(9) unsigned, -- NULL means all versions
+  fmt_bibdoc2 varchar(255),
+
+  rel_type varchar(255),
   KEY  (id_bibdoc1),
-  KEY  (id_bibdoc2)
+  KEY  (id_bibdoc2),
+  KEY  (id)
+) ENGINE=MyISAM;
+
+-- Storage of moreInfo fields
+CREATE TABLE IF NOT EXISTS bibdoc_moreinfo (
+  id_bibdoc mediumint(9) unsigned DEFAULT NULL,
+  ver_bibdoc mediumint(9) unsigned DEFAULT NULL, -- NULL means all versions
+  fmt_bibdoc VARCHAR(25) DEFAULT NULL,
+  id_rel mediumint(9) unsigned DEFAULT NULL,
+
+  namespace VARCHAR(25) DEFAULT NULL, -- namespace in the moreinfo dictionary
+  data_key VARCHAR(25), -- key in the moreinfo dictionary
+  data_value MEDIUMBLOB,
+  KEY (id_bibdoc, ver_bibdoc, fmt_bibdoc, id_rel, namespace, data_key)
 ) ENGINE=MyISAM;
 
 -- tables for publication requests:
