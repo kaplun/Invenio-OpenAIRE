@@ -15,9 +15,15 @@
 ## along with Invenio; if not, write to the Free Software Foundation, Inc.,
 ## 59 Temple Place, Suite 330, Boston, MA 02111-1307, USA.
 
+SUBDIRS = websubmitbezirg_elements websubmitbezirg_checks websubmitbezirg_processes
+
 pylibdir = $(libdir)/python/invenio
 
-pylib_DATA = websubmitbezirg_webinterface.py
+pylib_DATA = websubmitbezirg_webinterface.py \
+			 websubmitbezirg_engine.py \
+             websubmitbezirg_config.py \
+	         workflow_engine.py
+
 
 EXTRA_DIST = $(pylib_DATA)
 

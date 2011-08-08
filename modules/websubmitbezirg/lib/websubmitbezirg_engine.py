@@ -1,0 +1,234 @@
+import sys
+if sys.version_info[3] == 'pyjamas':
+    from pyjamas.ui.RootPanel import RootPanel
+    from pyjamas.ui.Label import Label
+    from pyjamas.ui.FormPanel import FormPanel
+    from pyjamas.ui.VerticalPanel import VerticalPanel
+    from pyjamas.ui.Button import Button
+    from pyjamas.ui.Hidden import Hidden
+
+    from invenio.websubmitbezirg_elements.ProcessingPanel import ProcessingPanel as ProcessingPage
+    from invenio.websubmitbezirg_elements.Submit import Submit
+    from invenio.websubmitbezirg_elements.Checkable import Checkable
+
+    import urllib
+    from pyjamas.HTTPRequest import HTTPRequest
+    from pyjamas.Window import getLocation
+    from pyjamas.JSONParser import JSONParser
+
+    from pyjamas.ui.CheckBox import CheckBox
+    from pyjamas.ui.TextBoxBase import TextBoxBase
+
+    from pyjamas.ui.HTML import HTML
+
+
+
+    from pyjamas import DOM
+
+    def ajax(method, params, handler):
+        # this method parameter is different
+        # than the http request method.
+        # the http request method is POST (async)
+        
+        # the ajax request is of the form {'method': STR, 'params': JSON}
+
+        # the params are python expressions
+        # convert them to json
+        jsonParams = JSONParser().toJSONString(params) 
+
+        data = urllib.urlencode({'method': method, 'params': jsonParams})
+        header = {"Content-Type": "application/x-www-form-urlencoded"}
+        
+        currentURL = getLocation().getPageHref()
+        HTTPRequest().asyncPost(currentURL, data, handler=handler, headers=header)
+
+    class Page(VerticalPanel):
+        def __init__(self, name, *args, **kwargs):
+            # The Main Panel
+            super(Page,self).__init__(StyleName="main-panel", **kwargs)
+            self.setSpacing(10)
+
+            self.elements = args
+
+            self.name = name
+
+            # Some extra elements
+            self.submitLabel = Label("The form contains errors", StyleName="emph", ID="submit-label")
+            self.submitLabel.setVisible(False)
+
+            self.method = Hidden(Name="method", Value="submit_form")
+            self.params = Hidden(Name="params", Value="{}")
+
+            self.load()
+
+        def load(self):
+            for element in self.elements:
+                element.load()
+                self.add(element)
+
+
+            self.add(self.submitLabel)
+            self.add(self.method)
+            self.add(self.params)
+            #self.add(self.doctype)
+            #self.add(self.action)
+
+        def fill(self, form):
+            for element in self.elements:
+                if isinstance(element, CheckBox): 
+                    # radio buttons and checkboxes
+                    if element.getName() in form:
+                        element.setChecked(form[element.getName()])
+                elif isinstance(element, TextBoxBase) or isinstance(element,Checkable):
+                    if element.getName() in form:
+                        element.setText(form[element.getName()])
+
+
+else:
+    class Page(object):                                      
+        def __init__(self, name, *args, **kwargs):
+            self.name = name
+
+
+
+class Interface(object):
+    def __init__(self, *args):
+        self.pages = args
+
+        # 
+        #self.doctype = Hidden(Name="doctype", Value="") # hidden elements 
+        #self.action = Hidden(Name="action", Value="")   # for passing the doctype&action to the form 
+
+        self.root = RootPanel("bootstrap")
+
+        self.location = getLocation().getPageHref()
+        
+        # The Form
+        #
+        self.form = FormPanel(Encoding = FormPanel.ENCODING_MULTIPART, Method=FormPanel.METHOD_POST)
+        self.form.setAction(self.location) # should be set to the document.URL
+        self.form.addFormHandler(self) # sets the form listener
+        # added to the rootpanel
+        self.root.add(self.form)
+
+        for page in self.pages:
+            for element in page.elements:
+                if isinstance(element, Submit):
+                    element.addClickListener(self)
+
+        # show the processing page
+        self.processingPage = ProcessingPage()
+        self.setCurrentPage(self.processingPage)
+
+        # Ask for the current page
+        ajax("current_page", params={}, handler=self)
+
+
+    def setCurrentPage(self, page):
+        self._current_page = page
+        self.form.setWidget(page)
+
+
+    def getCurrentPage(self):
+        return self._current_page
+
+    # The Form Listener
+    #
+    def onClick(self, sender):
+        if True:           # validation suceeded
+            # hide that the form contains errors
+            self.getCurrentPage().submitLabel.setVisible(False)
+
+            # make the button a <input type="submit" />
+            self.form.submit()
+
+            # show the processing page
+            self.processingPage = ProcessingPage()
+            self.setCurrentPage(self.processingPage)
+        else:                   # validation failed
+            # show that the form contains errors
+            self.getCurrentPage().submitLabel.setVisible(True)
+
+    def onSubmitComplete(self, event):
+        # the rsp is retrieved
+        # pass it to the next page
+
+        # Ask for the current page
+
+        rsp = event.getResults()#[5:-6]
+        rsp_html = HTML(rsp)
+        rsp_json = rsp_html.getText()
+        rsp_py = JSONParser().decodeAsObject(rsp_json)
+
+        # rsp_py = JSONParser().decode(rsp_json)
+
+        method = rsp_py['method']
+        result = rsp_py['result']
+
+        if result == "ok": 
+            # that means the forms was submitted
+            # we have to check the processing
+            ajax("current_page", params={}, handler=self)
+
+
+    def onSubmit(self, event):
+        pass
+    
+
+
+    # The AJAX handler
+    #
+    def onCompletion(self, text):
+        # responses are of the form {'method': STR, 'result': JSON}
+        
+        pyText = JSONParser().decodeAsObject(text)
+        method = pyText['method']
+        result = pyText['result']
+        if method == 'current_page':
+            # the nextpage's name is returned inside the response
+            next_page_name = result['current_page_name']
+            next_page = [p for p in self.pages if p.name==next_page_name][0]
+
+            # the data to fill in the next page
+            output_form = result['output_form']
+
+            if output_form:
+                next_page.fill(output_form)
+
+            self.setCurrentPage(next_page)
+
+
+
+
+
+
+
+    def onError(self, text, code):
+        pass
+    def onTimeOut(self, text):
+        # self.submitLabel.setText = "mpli"
+        # self.submitLabel.setVisibile(true)
+        pass
+
+class Workflow(object):
+    def __init__(self, action, *args):
+        self.action = action
+        self.processes = list(args)
+
+        def end_process(obj, engine):
+            engine.setVar("result", "finished")
+            engine.setVar("__finished", True)
+
+        self.processes.append(end_process)
+
+
+        self.pages = [process.__page__ for process in self.processes if getattr(process,'__page__', False)]
+
+    def build_interface(self):
+        if sys.version_info[3] == 'pyjamas':
+            Interface(*self.pages)
+            #RootPanel().add(Label("mplo"))
+
+
+
+

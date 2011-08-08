@@ -1,0 +1,11 @@
+{
+"Category1": {
+             "Book": true,
+             "Paper": false
+             }
+,
+"Category2": {
+             "Journal": true,
+             "Article": true
+             }
+}
