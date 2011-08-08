@@ -22,7 +22,11 @@ div.calendar-top-panel a:hover { background: #5b80b2; color:white; }
 .calendar-module { margin:0; padding:2px 5px 3px 5px; font-size:11px; text-align:left; font-weight:bold; background:#bcd; color:#fff; }
 .calendar td.calendar-header { margin: 0; background:#ccffee; font-weight: bold; font-size:12px; text-align:center; border-top:1px solid #ddd; border-bottom:1px solid #ddd }
 
-#bootstrap { width: 100%; text-align: center}
-.main-panel { background-color: #EEEEEE; width: 400px}
+#bootstrap { width: 100%;}
+
+.main-panel { 
+    background-color: #EEEEEE;
+    width: 400px;
+}
 
 .emph { color: #AE0000; font-size: 14px; font-style: italic}

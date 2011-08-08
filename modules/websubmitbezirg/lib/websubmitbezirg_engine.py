@@ -3,7 +3,9 @@ if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.RootPanel import RootPanel
     from pyjamas.ui.Label import Label
     from pyjamas.ui.FormPanel import FormPanel
+    from pyjamas.ui.Panel import Panel
     from pyjamas.ui.VerticalPanel import VerticalPanel
+    from pyjamas.ui.HorizontalPanel import HorizontalPanel
     from pyjamas.ui.Button import Button
     from pyjamas.ui.Hidden import Hidden
 
@@ -63,9 +65,26 @@ if sys.version_info[3] == 'pyjamas':
 
         def load(self):
             for element in self.elements:
-                element.load()
-                self.add(element)
-
+                if isinstance(element, Panel):
+                    # panels
+                    # or basic elements
+                    if hasattr(element, 'load'):
+                        element.load()
+                    self.add(element)
+                else:
+                    wrapper_element = HorizontalPanel()
+                    if isinstance(element, tuple) or isinstance(element, list):
+                        # a list of elements
+                        # wrap them inside a horizontal panel
+                        for element_ in element:
+                            if hasattr(element_, 'load'):
+                                e.load()
+                            wrapper_element.add(element_)
+                    else:
+                        # single "simple" element
+                        # wrap it inside a horizontal panel
+                        wrapper_element.add(element)
+                    self.add(wrapper_element)
 
             self.add(self.submitLabel)
             self.add(self.method)
@@ -135,17 +154,20 @@ class Interface(object):
     # The Form Listener
     #
     def onClick(self, sender):
-        if True:           # validation suceeded
+        
+        client_side_validation = server_side_validation = True
+        
+        if client_side_validation and server_side_validation: # short-circuit so it won't hit the server if client-side fails
             # hide that the form contains errors
             self.getCurrentPage().submitLabel.setVisible(False)
 
-            # make the button a <input type="submit" />
+            # make the button a <input type="submit" />, submit the form
             self.form.submit()
 
             # show the processing page
             self.processingPage = ProcessingPage()
             self.setCurrentPage(self.processingPage)
-        else:                   # validation failed
+        else:
             # show that the form contains errors
             self.getCurrentPage().submitLabel.setVisible(True)
 
@@ -155,18 +177,16 @@ class Interface(object):
 
         # Ask for the current page
 
-        rsp = event.getResults()#[5:-6]
+        rsp = event.getResults()
         rsp_html = HTML(rsp)
         rsp_json = rsp_html.getText()
         rsp_py = JSONParser().decodeAsObject(rsp_json)
-
-        # rsp_py = JSONParser().decode(rsp_json)
 
         method = rsp_py['method']
         result = rsp_py['result']
 
         if result == "ok": 
-            # that means the forms was submitted
+            # that means the form was submitted
             # we have to check the processing
             ajax("current_page", params={}, handler=self)
 
@@ -227,7 +247,6 @@ class Workflow(object):
     def build_interface(self):
         if sys.version_info[3] == 'pyjamas':
             Interface(*self.pages)
-            #RootPanel().add(Label("mplo"))
 
 
 
