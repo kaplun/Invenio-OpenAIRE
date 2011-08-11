@@ -19,11 +19,10 @@ if sys.version_info[3] == 'pyjamas':
     from pyjamas.JSONParser import JSONParser
 
     from pyjamas.ui.CheckBox import CheckBox
+    from pyjamas.ui.ListBox import ListBox
     from pyjamas.ui.TextBoxBase import TextBoxBase
 
     from pyjamas.ui.HTML import HTML
-
-
 
     from pyjamas import DOM
 
@@ -95,12 +94,27 @@ if sys.version_info[3] == 'pyjamas':
         def fill(self, form):
             for element in self.elements:
                 if isinstance(element, CheckBox): 
-                    # radio buttons and checkboxes
                     if element.getName() in form:
                         element.setChecked(form[element.getName()])
+                elif isinstance(element, ListBox):
+                    if element.getName() in form:
+                        element.selectValue(form[element.getName()])
                 elif isinstance(element, TextBoxBase) or isinstance(element,Checkable):
                     if element.getName() in form:
                         element.setText(form[element.getName()])
+                elif isinstance(element, Panel):
+                    for element_ in element:
+                        if isinstance(element_, CheckBox): 
+                            if element_.getName() in form:
+                                element_.setChecked(form[element_.getName()])
+                        elif isinstance(element_, ListBox):
+                            if element_.getName() in form:
+                                element_.selectValue(form[element_.getName()])
+                        elif isinstance(element_, TextBoxBase) or isinstance(element_,Checkable):
+                            if element_.getName() in form:
+                                element_.setText(form[element_.getName()])
+                        
+                    
 
 
 else:
@@ -120,7 +134,7 @@ class Interface(object):
 
         self.root = RootPanel("bootstrap")
 
-        self.location = getLocation().getPageHref()
+        self.location = getLocation().getHref()
         
         # The Form
         #
@@ -167,6 +181,7 @@ class Interface(object):
             # show the processing page
             self.processingPage = ProcessingPage()
             self.setCurrentPage(self.processingPage)
+            self.processingPage.label.setHTML("Processing form...")
         else:
             # show that the form contains errors
             self.getCurrentPage().submitLabel.setVisible(True)
@@ -186,15 +201,12 @@ class Interface(object):
         result = rsp_py['result']
 
         if result == "ok": 
-            # that means the form was submitted
-            # we have to check the processing
             ajax("current_page", params={}, handler=self)
 
 
     def onSubmit(self, event):
         pass
     
-
 
     # The AJAX handler
     #
@@ -216,8 +228,6 @@ class Interface(object):
                 next_page.fill(output_form)
 
             self.setCurrentPage(next_page)
-
-
 
 
 
