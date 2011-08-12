@@ -166,19 +166,18 @@ class Interface(object):
     #
     def onClick(self, sender):
         
-        client_side_validation = server_side_validation = True
-        
-        if client_side_validation and server_side_validation: # short-circuit so it won't hit the server if client-side fails
+        #client_side_validation = False if get("invalid") else True  # has a bug, it removes the listeners of each element that is invalid
+        client_side_validation = False if DOM.getElementById("invalid") else True
+
+
+        if client_side_validation: 
             # hide that the form contains errors
             self.getCurrentPage().submitLabel.setVisible(False)
 
-            # make the button a <input type="submit" />, submit the form
+            # server-side-validation
+            self.getCurrentPage().method.setValue("validate_all")
             self.form.submit()
 
-            # show the processing page
-            self.processingPage = ProcessingPage()
-            self.setCurrentPage(self.processingPage)
-            self.processingPage.label.setHTML("Processing form...")
         else:
             # show that the form contains errors
             self.getCurrentPage().submitLabel.setVisible(True)
@@ -197,8 +196,26 @@ class Interface(object):
         method = rsp_py['method']
         result = rsp_py['result']
 
-        if result == "ok": 
-            ajax("current_page", params={}, handler=self)
+        if method == "submit_form":
+            if result == "ok": 
+                ajax("current_page", params={}, handler=self)
+        elif method == "validate_all":
+            if result == True:
+                # hide that the form contains errors
+                self.getCurrentPage().submitLabel.setVisible(False)
+
+                # make the button a <input type="submit" />, submit the form
+                self.getCurrentPage().method.setValue("submit_form")
+                self.form.submit()
+
+                # show the processing page
+                self.processingPage = ProcessingPage()
+                self.setCurrentPage(self.processingPage)
+                self.processingPage.label.setHTML("Processing form...")
+            else:
+                # show that the form contains errors
+                self.getCurrentPage().submitLabel.setVisible(True)
+
 
 
     def onSubmit(self, event):
@@ -225,6 +242,7 @@ class Interface(object):
                 next_page.fill(output_form)
 
             self.setCurrentPage(next_page)
+
 
     def onError(self, text, code):
         pass

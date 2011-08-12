@@ -271,9 +271,24 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                     finally:
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
                         pickled_engine_file.close()
-                    
-
-
+                elif method == 'validate_all':
+                    pickled_engine_file = open(pickled_engine_path, 'r+')
+                    try:
+                        # the response is blocking. it returns when the engine halts
+                        fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_EX)
+                        wfe = cPickle.load(pickled_engine_file)
+                        current_page_name = wfe.getVar('current_page_name')
+                    except:
+                        result = "error"
+                    else:
+                        current_page = [p for p in workflow.pages if p.name==current_page_name][0]
+                        elements = current_page.elements
+                        for k,v in form.items():
+                            for element in elements:
+                                if hasattr(element, 'checkFunction') and hasattr(element, 'getName') and element.getName() == k:
+                                    if not element.checkFunction(v):
+                                        return json.dumps({'method': method, 'result': False}) # server-side validation failed, exit
+                        result = True # server-side validation suceeded for all elements
                 # the response is of the form {'method': STR, 'result': JSON}
                 return json.dumps({'method': method, 'result': result})
 
