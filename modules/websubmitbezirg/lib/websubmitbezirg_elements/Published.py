@@ -1,10 +1,5 @@
-from pyjamas.ui.HorizontalPanel import HorizontalPanel
-from pyjamas.ui.Label import Label
-from invenio.websubmitbezirg_elements.DateField import DateField
+from invenio.websubmitbezirg_elements.Checkable import CheckableDateField
 
-class Published(HorizontalPanel):
-    def load(self):
-        l = Label("Published:")
-        df = DateField()
-        self.add(l)
-        self.add(df)
+class Published(CheckableDateField):
+    def __init__(self, Name, Title="Published:", **kwargs):
+        super(Published,self).__init__(Name=Name, Title=Title, **kwargs)

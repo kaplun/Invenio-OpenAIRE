@@ -193,7 +193,6 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                 params = json.loads(form['params'])
 
                 if method == 'current_page':
-                    doctype_module = load_source(doctype, doctype_file)
                     pickled_engine_file = open(pickled_engine_path, 'r+')
                     try:
                         # the response is blocking. it returns when the engine halts
@@ -211,19 +210,13 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
 
 
                 elif method == 'submit_form':
-                    doctype_module = load_source(doctype, doctype_file)
                     pickled_engine_file = open(pickled_engine_path, 'r+')
                     try:
                         # the response is non-blocking. if the engine runs when the form is submitted return error
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                         wfe = cPickle.load(pickled_engine_file)
 
-                        # set the workflow, because it is not serialized (functions cannot be serialized)
-                        workflows = {}
-                        for var,val in vars(doctype_module).items():
-                            if isinstance(val, Workflow):
-                                workflows[val.action] = val
-                        wfe.setWorkflow(workflows[action].processes)
+                        wfe.setWorkflow(workflow.processes)
 
                         # convert form from FieldStorage to dict
                         # FieldStorage contains cStringIO instances, that are not pickle-serializable 
@@ -259,11 +252,32 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
                         pickled_engine_file.close()
 
+                elif method == 'validate':
+                    element_name = params['element_name']
+                    element_input = params['element_input']
+
+                    pickled_engine_file = open(pickled_engine_path, 'r+')
+                    try:
+                        # the response is blocking. it returns when the engine halts
+                        fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_EX)
+                        wfe = cPickle.load(pickled_engine_file)
+                        current_page_name = wfe.getVar('current_page_name')
+                    except:
+                        result = "error"
+                    else:
+                        current_page = [p for p in workflow.pages if p.name==current_page_name][0]
+                        element = [e for e in current_page.elements if hasattr(e,'getName') and e.getName() == element_name][0]
+                        result = element.checkFunction(element_input)
+                    finally:
+                        fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
+                        pickled_engine_file.close()
+                    
+
 
                 # the response is of the form {'method': STR, 'result': JSON}
                 return json.dumps({'method': method, 'result': result})
 
-
+            
 
 
 

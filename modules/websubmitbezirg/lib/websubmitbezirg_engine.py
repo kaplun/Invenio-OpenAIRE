@@ -11,7 +11,8 @@ if sys.version_info[3] == 'pyjamas':
 
     from invenio.websubmitbezirg_elements.ProcessingPanel import ProcessingPanel as ProcessingPage
     from invenio.websubmitbezirg_elements.Submit import Submit
-    from invenio.websubmitbezirg_elements.Checkable import Checkable
+    from invenio.websubmitbezirg_elements.Checkable import Checkable, CheckableDateField
+
 
     import urllib
     from pyjamas.HTTPRequest import HTTPRequest
@@ -43,15 +44,22 @@ if sys.version_info[3] == 'pyjamas':
         currentURL = getLocation().getPageHref()
         HTTPRequest().asyncPost(currentURL, data, handler=handler, headers=header)
 
-    class Page(VerticalPanel):
-        def __init__(self, name, *args, **kwargs):
-            # The Main Panel
-            super(Page,self).__init__(StyleName="main-panel", **kwargs)
+else:
+    class NullClass(object):
+        def __init__(self, *args, **kwargs):
+            pass
+    VerticalPanel = NullClass
+
+class Page(VerticalPanel):
+    def __init__(self, name, *args, **kwargs):
+        # The Main Panel
+        super(Page,self).__init__(StyleName="main-panel", **kwargs)
+
+        self.elements = args
+        self.name = name
+
+        if sys.version_info[3] == 'pyjamas':
             self.setSpacing(10)
-
-            self.elements = args
-
-            self.name = name
 
             # Some extra elements
             self.submitLabel = Label("The form contains errors", StyleName="emph", ID="submit-label")
@@ -62,66 +70,55 @@ if sys.version_info[3] == 'pyjamas':
 
             self.load()
 
-        def load(self):
-            for element in self.elements:
-                if isinstance(element, Panel):
-                    # panels
-                    # or basic elements
-                    if hasattr(element, 'load'):
-                        element.load()
-                    self.add(element)
-                else:
-                    wrapper_element = HorizontalPanel()
-                    if isinstance(element, tuple) or isinstance(element, list):
-                        # a list of elements
-                        # wrap them inside a horizontal panel
-                        for element_ in element:
-                            if hasattr(element_, 'load'):
-                                e.load()
-                            wrapper_element.add(element_)
-                    else:
-                        # single "simple" element
-                        # wrap it inside a horizontal panel
-                        wrapper_element.add(element)
-                    self.add(wrapper_element)
-
-            self.add(self.submitLabel)
-            self.add(self.method)
-            self.add(self.params)
-            #self.add(self.doctype)
-            #self.add(self.action)
-
-        def fill(self, form):
-            for element in self.elements:
-                if isinstance(element, CheckBox): 
-                    if element.getName() in form:
-                        element.setChecked(form[element.getName()])
-                elif isinstance(element, ListBox):
-                    if element.getName() in form:
-                        element.selectValue(form[element.getName()])
-                elif isinstance(element, TextBoxBase) or isinstance(element,Checkable):
-                    if element.getName() in form:
-                        element.setText(form[element.getName()])
-                elif isinstance(element, Panel):
+    def load(self):
+        for element in self.elements:
+            if isinstance(element, Panel):
+                # panels
+                # or basic elements
+                if hasattr(element, 'load'):
+                    element.load()
+                self.add(element)
+            else:
+                wrapper_element = HorizontalPanel()
+                if isinstance(element, tuple) or isinstance(element, list):
+                    # a list of elements
+                    # wrap them inside a horizontal panel
                     for element_ in element:
-                        if isinstance(element_, CheckBox): 
-                            if element_.getName() in form:
-                                element_.setChecked(form[element_.getName()])
-                        elif isinstance(element_, ListBox):
-                            if element_.getName() in form:
-                                element_.selectValue(form[element_.getName()])
-                        elif isinstance(element_, TextBoxBase) or isinstance(element_,Checkable):
-                            if element_.getName() in form:
-                                element_.setText(form[element_.getName()])
-                        
-                    
+                        if hasattr(element_, 'load'):
+                            e.load()
+                        wrapper_element.add(element_)
+                else:
+                    # single "simple" element
+                    # wrap it inside a horizontal panel
+                    wrapper_element.add(element)
+                self.add(wrapper_element)
 
+        self.add(self.submitLabel)
+        self.add(self.method)
+        self.add(self.params)
 
-else:
-    class Page(object):                                      
-        def __init__(self, name, *args, **kwargs):
-            self.name = name
-
+    def fill(self, form):
+        for element in self.elements:
+            if isinstance(element, CheckBox): 
+                if element.getName() in form:
+                    element.setChecked(form[element.getName()])
+            elif isinstance(element, ListBox):
+                if element.getName() in form:
+                    element.selectValue(form[element.getName()])
+            elif isinstance(element, TextBoxBase) or isinstance(element,Checkable) or isinstance(element, CheckableDateField):
+                if element.getName() in form:
+                    element.setText(form[element.getName()])
+            elif isinstance(element, Panel):
+                for element_ in element:
+                    if isinstance(element_, CheckBox): 
+                        if element_.getName() in form:
+                            element_.setChecked(form[element_.getName()])
+                    elif isinstance(element_, ListBox):
+                        if element_.getName() in form:
+                            element_.selectValue(form[element_.getName()])
+                    elif isinstance(element_, TextBoxBase) or isinstance(element_,Checkable):
+                        if element_.getName() in form:
+                            element_.setText(form[element_.getName()])
 
 
 class Interface(object):
@@ -228,10 +225,6 @@ class Interface(object):
                 next_page.fill(output_form)
 
             self.setCurrentPage(next_page)
-
-
-
-
 
     def onError(self, text, code):
         pass

@@ -1,5 +1,14 @@
-from pyjamas.ui.VerticalPanel import VerticalPanel
-from pyjamas.ui.HTML import HTML
+import sys
+if sys.version_info[3] == 'pyjamas':
+    from pyjamas.ui.VerticalPanel import VerticalPanel
+    from pyjamas.ui.HTML import HTML
+else:
+    class NullClass(object):
+        def __init__(self, *args, **kwargs):
+            pass
+    VerticalPanel = HTML = NullClass
+
+
 from invenio.websubmitbezirg_elements.Loader import Loader
 #from invenio.messages import gettext_set_language
 
