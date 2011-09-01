@@ -192,12 +192,12 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         # the response is blocking. it returns when the engine halts
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_EX)
                         wfe = cPickle.load(pickled_engine_file)
-                        current_page_name = wfe.getVar('current_page_name')
+                        __current_page_name = wfe.getVar('__current_page_name')
                         output_form = wfe.getVar('output_form')
                     except:
                         result = "error"
                     else:
-                        result = {'current_page_name': current_page_name, 'output_form': output_form}
+                        result = {'__current_page_name': __current_page_name, 'output_form': output_form}
                     finally:
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
                         pickled_engine_file.close()
@@ -256,11 +256,11 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         # the response is blocking. it returns when the engine halts
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_EX)
                         wfe = cPickle.load(pickled_engine_file)
-                        current_page_name = wfe.getVar('current_page_name')
+                        __current_page_name = wfe.getVar('__current_page_name')
                     except:
                         result = "error"
                     else:
-                        current_page = [p for p in workflow.pages if p.name==current_page_name][0]
+                        current_page = [p for p in workflow.pages if p.name==__current_page_name][0]
                         element = [e for e in current_page.elements if hasattr(e,'getName') and e.getName() == element_name][0]
                         result = element.checkFunction(element_input)
                     finally:
@@ -272,11 +272,11 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         # the response is blocking. it returns when the engine halts
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_EX)
                         wfe = cPickle.load(pickled_engine_file)
-                        current_page_name = wfe.getVar('current_page_name')
+                        __current_page_name = wfe.getVar('__current_page_name')
                     except:
                         result = "error"
                     else:
-                        current_page = [p for p in workflow.pages if p.name==current_page_name][0]
+                        current_page = [p for p in workflow.pages if p.name==__current_page_name][0]
                         elements = current_page.elements
                         for k,v in form.items():
                             for element in elements:

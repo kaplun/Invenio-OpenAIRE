@@ -232,7 +232,7 @@ class Interface(object):
         result = pyText['result']
         if method == 'current_page':
             # the nextpage's name is returned inside the response
-            next_page_name = result['current_page_name']
+            next_page_name = result['__current_page_name']
             next_page = [p for p in self.pages if p.name==next_page_name][0]
 
             # the data to fill in the next page
