@@ -1,3 +1,16 @@
+"""
+The WebController (the C part of the MVC) for the WebSubmission module.
+
+An overview of the URL scheme and the dispatching:
+
+GET       /websubmitbezirg/                     -------> list_doctypes()
+GET       /websubmitbezirg/DOCTYPE              -------> list_actions()
+GET       /websubmitbezirg/DOCTYPE/ACTION       -------> init_submission()
+GET,POST  /websubmitbezirg/DOCTYPE/ACTION/UUID  -------> resume_submission()
+
+"""
+
+
 from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
 from invenio.webpage import page, pageheaderonly, pagefooteronly
 from invenio.urlutils import redirect_to_url
@@ -19,13 +32,23 @@ from imp import load_source
 
 from uuid import uuid4, UUID
 
-from shutil import copyfileobj
-from bz2 import BZ2File
+# The bzip2 compression of the pickled files is commented out
+# from shutil import copyfileobj
+# from bz2 import BZ2File
 
 class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
     _exports = ['']
 
     def list_doctypes(self, req, form):
+        """
+        The main page of the module.
+
+        Dispatched from http://INVENIO_ROOT/websubmitbezirg
+
+        Reads the configuration file (config.json)
+        and returns all enabled DOCTYPEs.
+        """
+
         title = "Choose Doctype"
         html = ""
 
@@ -34,31 +57,46 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
 
         for category_ in config:
             category = category_.encode('ascii')
-            html += '<h2>%s</h2><ul>' % (category)
+            html += '<h2>%s</h2><ul>' % (category) # hardcoded html; a template would be nicer
             for doctype_, enabled in config[category].items():
                 doctype = doctype_.encode('ascii')
                 if enabled:
                     doctype_url = APP_URL + '/' + doctype
-                    html += '<li><a href="%s">%s</a></li>' % (doctype_url, doctype)
+                    html += '<li><a href="%s">%s</a></li>' % (doctype_url, doctype) # hardcoded html
             html += "</ul>"
         return page(title, html)
 
     def _lookup(self, component, path):
 
+        # ugly hack to the broken _lookup method
+        # treats trailing slashes to the path as supposed to
         while path and path[-1] == '':
             path = path[:-1]
 
 
         def list_actions(req, form, component, path):
+            """
+            The page of a specified DOCTYPE.
+
+            Dispatched from http://INVENIO_ROOT/websubmitbezirg/DOCTYPE
+
+            Returns a list with all the ACTIONs of the DOCTYPE.
+
+            """
+
             title = "Choose Action"
             html = ""
 
+            
             doctype = component
             doctype_file = os.path.join(APP_ETC_DIR, doctype+".py")
            
             if os.path.exists(doctype_file):
 
-                doctype_module = load_source(doctype, doctype_file)
+                doctype_module = load_source(doctype, doctype_file) # dynamically load the DOCTYPE.py specification to extract the actions
+
+                # each Workflow inside the DOCTYPE.py has each own name.
+                # An action corresponds to a specific Workflow. So the name of the action is the name of the Workflow
                 actions = [val.action for var, val in vars(doctype_module).items() if isinstance(val,Workflow)]
 
                 for action in actions:
@@ -73,6 +111,17 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
    
 
         def init_submission(req, form, component, path):
+            """
+            Initialize the submission page.
+
+            Dispatched from http://INVENIO_ROOT/websubmitbezirg/DOCTYPE/ACTION
+
+            1. Creates a new UUID.
+            2. Starts the workflow engine and maybe execute some initial processes that come before the 1st page in the workflow.
+            3. Halts the engine, pickles it and dumps it.
+            4. Redirects the user to http://INVENIO_ROOT/websubmitbezirg/DOCTYPE/ACTION/UUID, which is a new unique session for the user.
+            """
+
             doctype = component
             doctype_file = os.path.join(APP_ETC_DIR, doctype+".py")
             action = path[0]
@@ -124,6 +173,17 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
 
 
         def resume_submission(req, form, component, path):
+            """
+            The actual submission page that corresponds to a unique session.
+
+            Dispatched from http://INVENIO_ROOT/websubmitbezirg/DOCTYPE/ACTION/UUID
+
+            GET requests: Show the current page to the user
+            POST requests: Deal with input by the user
+
+            1. Resume the engine marked with the UUID
+            2. Do stuff to the engine and dump it.
+            """
             
             doctype = component
             doctype_file = os.path.join(APP_ETC_DIR, doctype+".py")
@@ -163,11 +223,11 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
 
 
             if req_method == 'GET':
-
-
-                # Wrap the 
-                # pyjamas bootstrap.js
-                # and return it
+                ##### GET
+                # A user asks for the submission page
+                # A somewhat "static" html file is returned
+                # The html file wraps the corresponding bootstrap.js and puts the invenio header and footer
+                
                 title = "Submission Form"
                 html = ""
                 
@@ -182,10 +242,22 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                 return page(title, html, metaheaderadd= metaheaderadd)
 
             elif req_method == 'POST':
-                # the request is a form {'method': STR, 'params': JSON}
+                # the POST response is JSON encoded
+                # Similar interface to a JSON-RPC call:  {'method': STR, 'params': JSON}
+                # extract the keys
                 method = form['method']
                 params = json.loads(form['params'])
 
+
+                ##### POST
+                # 4 different "JSON-RPC" calls by the user
+                # A 'submit_form' that contaitns the filled form by the user
+                # A 'validate' AJAX call by the user to validate a specific element of a Submission Page
+                # A 'validate_all' AJAX call by the user to validate all elements of a Submission Page
+                # A 'current_page' AJAX call by the user asking for the next page to show
+
+
+                ##### 'current_page' call
                 if method == 'current_page':
                     pickled_engine_file = open(pickled_engine_path, 'r+')
                     try:
@@ -203,6 +275,8 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         pickled_engine_file.close()
 
 
+
+                ##### 'submit_form' call
                 elif method == 'submit_form':
                     pickled_engine_file = open(pickled_engine_path, 'r+')
                     try:
@@ -247,6 +321,9 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
                         pickled_engine_file.close()
 
+
+
+                ##### 'validate' call
                 elif method == 'validate':
                     element_name = params['element_name']
                     element_input = params['element_input']
@@ -266,6 +343,11 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                     finally:
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
                         pickled_engine_file.close()
+                        
+
+
+
+                ##### 'validate_all' call                        
                 elif method == 'validate_all':
                     pickled_engine_file = open(pickled_engine_path, 'r+')
                     try:
@@ -287,50 +369,21 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                 # the response is of the form {'method': STR, 'result': JSON}
                 return json.dumps({'method': method, 'result': result})
 
-            
-
-
-
-
-        def validate_submission(req, form, component, path):
-            doctype = form['doctype']
-            action = form['action']
-            action_etc_dir = os.path.join(APP_ETC_DIR, doctype, action)
-
-            class ValidationError(Exception):
-                pass
-
-            class Interface(object):
-                def __init__(self, *args):
-                    self.elements = args
-                    for inputName, inputValue in form.items():
-                        for element in self.elements:
-                            if inputName == element.getName() and isinstance(element, Checkable):
-                                if not element.checkFunction(inputValue):
-                                    raise ValidationError # validation failed
-
-            class Workflow(object):
-                pass
-
-            try:
-                execfile(os.path.join(action_etc_dir,"bootstrap.py"))
-            except ValidationError:
-                #req.content_type = "text/plain"
-                return json.dumps({'valid': False})
-            else:
-                return json.dumps({'valid': True})
-
 
         def dispatcher(req, form):
-            # incrementing the path
-            dispatch_table = [list_actions,          # GET /websubmitbezirg/DOCTYPE
-                              init_submission,       # GET /websubmitbezirg/DOCTYPE/ACTION
-                              resume_submission,     # GET /websubmitbezirg/DOCTYPE/ACTION/UUID
+            """
+            The request dispatcher.
+            It is not a regexp dispatcher. It is based on incremental path levels.
+            """
+
+            dispatch_table = [list_actions,          # GET       /websubmitbezirg/DOCTYPE
+                              init_submission,       # GET       /websubmitbezirg/DOCTYPE/ACTION
+                              resume_submission,     # GET,POST  /websubmitbezirg/DOCTYPE/ACTION/UUID
                               ]
             return dispatch_table[len(path)](req, form, component, path)
 
         return dispatcher, []
 
-    __call__ = index = list_doctypes
+    __call__ = index = list_doctypes # the main page of the module
 
 
