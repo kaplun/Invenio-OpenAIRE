@@ -1,5 +1,16 @@
+"""
+This module includes the basic widgets: Interface, Page and Workflow.
+
+A thing to mention is that this module is is being processed both:
+1. statically by the pyjamas, to create the client-side interface, its core logic and a basic display formatting.
+2. dynamically by the invenio instance, to create the server-side logic of the interface (extracting processes, checks that belong to a DOCTYPE spec).
+
+"""
+
+
 import sys
 if sys.version_info[3] == 'pyjamas':
+    # modules to load if this module is being processed by the Pyjamas Compiler
     from pyjamas.ui.RootPanel import RootPanel
     from pyjamas.ui.Label import Label
     from pyjamas.ui.FormPanel import FormPanel
@@ -28,6 +39,10 @@ if sys.version_info[3] == 'pyjamas':
     from pyjamas import DOM
 
     def ajax(method, params, handler):
+        """
+        Make an AJAX JSON-RPC-like call
+        """
+
         # this method parameter is different
         # than the http request method.
         # the http request method is POST (async)
@@ -35,7 +50,7 @@ if sys.version_info[3] == 'pyjamas':
         # the ajax request is of the form {'method': STR, 'params': JSON}
 
         # the params are python expressions
-        # convert them to json
+        # converts them to json
         jsonParams = JSONParser().toJSONString(params) 
 
         data = urllib.urlencode({'method': method, 'params': jsonParams})
@@ -45,6 +60,7 @@ if sys.version_info[3] == 'pyjamas':
         HTTPRequest().asyncPost(currentURL, data, handler=handler, headers=header)
 
 else:
+    # code to create if this module is being processed by Invenio 
     class NullClass(object):
         def __init__(self, *args, **kwargs):
             pass
@@ -71,25 +87,32 @@ class Page(VerticalPanel):
             self.load()
 
     def load(self):
+        """
+        Addes each element of the Page and formats it according to some rules.
+
+        The page is a VerticalPanel
+        Most of the elements are Horizontal Panels
+        Each element is added vertically-wise, essentially forming a Grid.
+        3 rules apply to the formatting
+        """
+
         for element in self.elements:
+            
             if isinstance(element, Panel):
-                # panels
-                # or basic elements
+                # Rule 1: panels or builtin elements
                 if hasattr(element, 'load'):
                     element.load()
                 self.add(element)
             else:
                 wrapper_element = HorizontalPanel()
                 if isinstance(element, tuple) or isinstance(element, list):
-                    # a list of elements
-                    # wrap them inside a horizontal panel
+                    # Rule 2: a list of elements wrap them inside a horizontal panel
                     for element_ in element:
                         if hasattr(element_, 'load'):
                             e.load()
                         wrapper_element.add(element_)
                 else:
-                    # single "simple" element
-                    # wrap it inside a horizontal panel
+                    # Rule 3: a single "simple" element, wrap it inside a horizontal panel
                     wrapper_element.add(element)
                 self.add(wrapper_element)
 
@@ -98,6 +121,15 @@ class Page(VerticalPanel):
         self.add(self.params)
 
     def fill(self, form):
+        """
+        The form contains data to fill the elements.
+        The method to fill them is different for each element type.
+        The fill function dispatches element-wise:
+        TextBoxBase().setText()
+        CheckBox().setChecked()
+        ListBox().selectValue()
+        """
+
         for element in self.elements:
             if isinstance(element, CheckBox): 
                 if element.getName() in form:
@@ -122,25 +154,34 @@ class Page(VerticalPanel):
 
 
 class Interface(object):
-    def __init__(self, *args):
-        self.pages = args
+    """
+    The Interface can be thought as the Page Manager.
 
-        # 
-        #self.doctype = Hidden(Name="doctype", Value="") # hidden elements 
-        #self.action = Hidden(Name="action", Value="")   # for passing the doctype&action to the form 
+    It makes the actual AJAX calls to the server and listens for Form events.
+    
+    According to this feedback and data received, it makes the transition between pages.
+
+    The interface contains also the Main Form and submits it on completion.
+
+    """
+    def __init__(self, *args):
+
+        self.pages = args
 
         self.root = RootPanel("bootstrap")
 
         self.location = getLocation().getHref()
         
-        # The Form
-        #
+        # Create The Main Form
         self.form = FormPanel(Encoding = FormPanel.ENCODING_MULTIPART, Method=FormPanel.METHOD_POST)
         self.form.setAction(self.location) # should be set to the document.URL
         self.form.addFormHandler(self) # sets the form listener
-        # added to the rootpanel
+
+        # adds the form to the rootpanel
         self.root.add(self.form)
 
+
+        # adds ClickListeners to all the Submit buttons of the Pages
         for page in self.pages:
             for element in page.elements:
                 if isinstance(element, Submit):
@@ -150,7 +191,7 @@ class Interface(object):
         self.processingPage = ProcessingPage()
         self.setCurrentPage(self.processingPage)
 
-        # Ask for the current page
+        # Ask for the current page to show
         ajax("current_page", params={}, handler=self)
 
 
@@ -166,11 +207,16 @@ class Interface(object):
     #
     def onClick(self, sender):
         
-        #client_side_validation = False if get("invalid") else True  # has a bug, it removes the listeners of each element that is invalid
-        client_side_validation = False if DOM.getElementById("invalid") else True
-
+        # if an element is marked as invalid then the whole client-side validation is False
+        if DOM.getElementById("invalid"):
+            client_side_validation = False  
+        else: 
+            client_side_validation = True
 
         if client_side_validation: 
+            # the client-side validation succeeded
+            # transition to server-side validation
+
             # hide that the form contains errors
             self.getCurrentPage().submitLabel.setVisible(False)
 
@@ -252,8 +298,16 @@ class Interface(object):
         pass
 
 class Workflow(object):
-    def __init__(self, action, *args):
-        self.action = action
+    def __init__(self, action_name, *args):
+        """
+        The workflow takes an action_name
+        and a list of processes to run.
+
+        A workflow also contains a list of pages that it should sequentially display,
+        according to calls to the special process "show_page".
+        """
+
+        self.action = action_name
         self.processes = list(args)
 
         def end_process(obj, engine):
@@ -266,9 +320,8 @@ class Workflow(object):
         self.pages = [process.__page__ for process in self.processes if getattr(process,'__page__', False)]
 
     def build_interface(self):
+        """
+        A function that is called by the build.py script to construct the Interface, based on the pages of the Workflow.
+        """
         if sys.version_info[3] == 'pyjamas':
             Interface(*self.pages)
-
-
-
-
