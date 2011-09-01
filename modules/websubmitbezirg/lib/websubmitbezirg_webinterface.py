@@ -86,18 +86,12 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                     if isinstance(val, Workflow):
                         workflows[val.action] = val
 
-
-
-
-
-
-
-
                 if action in workflows:
                     # create a new UUID
                     uuid = uuid4()
 
-                    pickled_engine_path = os.path.join(APP_DATA_DIR, str(uuid) + ".pickled")
+                    pickled_engine_path = os.path.join(APP_DATA_DIR, str(uuid), str(uuid) + ".pickled") # the pickled filename
+                    os.mkdir(os.path.join(APP_DATA_DIR, str(uuid))) # the directory containing the pickled file
 
                     # spawn a new workflow engine instance
                     wfe = GenericWorkflowEngine()
@@ -142,7 +136,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
             except:
                 return "Invalid uuid"
 
-            pickled_engine_path = os.path.join(APP_DATA_DIR, str(uuid) + ".pickled")
+            pickled_engine_path = os.path.join(APP_DATA_DIR, str(uuid), str(uuid) + ".pickled")
 
             if os.path.exists(pickled_engine_path):
                 doctype_module = load_source(doctype, doctype_file)
@@ -234,10 +228,11 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                             # the engine/processing  is done
                             cPickle.dump(wfe, pickled_engine_file)
                             # BZIP2 Compression of the engine
-                            pickled_engine_compressed_file = BZ2File(pickled_engine_path+".bz2", 'w')
-                            copyfileobj(pickled_engine_file, pickled_engine_compressed_file)
-                            pickled_engine_compressed_file.close()
-                            os.remove(pickled_engine_path)
+                            # commented out
+                            # pickled_engine_compressed_file = BZ2File(pickled_engine_path+".bz2", 'w')
+                            # copyfileobj(pickled_engine_file, pickled_engine_compressed_file)
+                            # pickled_engine_compressed_file.close()
+                            # os.remove(pickled_engine_path)
                             result = "ok"
                     except IOError:
                         # the engine is running
