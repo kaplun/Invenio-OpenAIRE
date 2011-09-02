@@ -15,10 +15,10 @@ else:
 
 
 class Language(VerticalPanel):
-    def __init__(self, **kwargs):
+    def __init__(self, Name, **kwargs):
         super(Language, self).__init__()
         self.l = Label("Language:")
-        self.c = ListBox(**kwargs)
+        self.c = ListBox(Name=Name, **kwargs)
         
     def load(self):
         # Add Languages here

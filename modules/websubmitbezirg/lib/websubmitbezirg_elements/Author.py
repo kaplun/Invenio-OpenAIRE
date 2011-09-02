@@ -4,11 +4,18 @@ if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.Label import Label
     from pyjamas.ui.TextArea import TextArea
 else:
-    HorizontalPanel = object
+    class NullClass(object):
+        def __init__(self, *args, **kwargs):
+            pass
+
+    HorizontalPanel = Label = TextArea = NullClass
 
 class Author(HorizontalPanel):
+    def __init__(self, Name, **kwargs):
+        super(Author,self).__init__()
+        self.l = Label("Author:")
+        self.t = TextArea(Name, **kwargs)
+
     def load(self):
-        l = Label("Author:")
-        t = TextArea()
-        self.add(l)
-        self.add(t)
+        self.add(self.l)
+        self.add(self.t)
