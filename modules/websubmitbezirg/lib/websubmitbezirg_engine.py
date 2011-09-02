@@ -2,8 +2,11 @@
 This module includes the basic widgets: Interface, Page and Workflow.
 
 A thing to mention is that this module is is being processed both:
-1. statically by the pyjamas, to create the client-side interface, its core logic and a basic display formatting.
-2. dynamically by the invenio instance, to create the server-side logic of the interface (extracting processes, checks that belong to a DOCTYPE spec).
+    1. statically by the pyjamas, to create the client-side interface,
+    its core logic and a basic display formatting.
+    2. dynamically by the invenio instance, to create
+    the server-side logic of the interface
+    (extracting processes, checks that belong to a DOCTYPE spec).
 
 """
 
@@ -17,7 +20,6 @@ if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.Panel import Panel
     from pyjamas.ui.VerticalPanel import VerticalPanel
     from pyjamas.ui.HorizontalPanel import HorizontalPanel
-    from pyjamas.ui.Button import Button
     from pyjamas.ui.Hidden import Hidden
 
     from invenio.websubmitbezirg_elements.ProcessingPanel import ProcessingPanel as ProcessingPage
@@ -46,30 +48,33 @@ if sys.version_info[3] == 'pyjamas':
         # this method parameter is different
         # than the http request method.
         # the http request method is POST (async)
-        
+
         # the ajax request is of the form {'method': STR, 'params': JSON}
 
         # the params are python expressions
         # converts them to json
-        jsonParams = JSONParser().toJSONString(params) 
+        jsonParams = JSONParser().toJSONString(params)
 
         data = urllib.urlencode({'method': method, 'params': jsonParams})
         header = {"Content-Type": "application/x-www-form-urlencoded"}
-        
+
         currentURL = getLocation().getPageHref()
         HTTPRequest().asyncPost(currentURL, data, handler=handler, headers=header)
 
 else:
-    # code to create if this module is being processed by Invenio 
+    # code to create if this module is being processed by Invenio
     class NullClass(object):
+
         def __init__(self, *args, **kwargs):
             pass
     VerticalPanel = NullClass
 
+
 class Page(VerticalPanel):
+
     def __init__(self, name, *args, **kwargs):
         # The Main Panel
-        super(Page,self).__init__(StyleName="main-panel", **kwargs)
+        super(Page, self).__init__(StyleName="main-panel", **kwargs)
 
         self.elements = args
         self.name = name
@@ -97,7 +102,7 @@ class Page(VerticalPanel):
         """
 
         for element in self.elements:
-            
+
             if isinstance(element, Panel):
                 # Rule 1: panels or builtin elements
                 if hasattr(element, 'load'):
@@ -109,7 +114,7 @@ class Page(VerticalPanel):
                     # Rule 2: a list of elements wrap them inside a horizontal panel
                     for element_ in element:
                         if hasattr(element_, 'load'):
-                            e.load()
+                            element_.load()
                         wrapper_element.add(element_)
                 else:
                     # Rule 3: a single "simple" element, wrap it inside a horizontal panel
@@ -131,24 +136,24 @@ class Page(VerticalPanel):
         """
 
         for element in self.elements:
-            if isinstance(element, CheckBox): 
+            if isinstance(element, CheckBox):
                 if element.getName() in form:
                     element.setChecked(form[element.getName()])
             elif isinstance(element, ListBox):
                 if element.getName() in form:
                     element.selectValue(form[element.getName()])
-            elif isinstance(element, TextBoxBase) or isinstance(element,Checkable) or isinstance(element, CheckableDateField):
+            elif isinstance(element, TextBoxBase) or isinstance(element, Checkable) or isinstance(element, CheckableDateField):
                 if element.getName() in form:
                     element.setText(form[element.getName()])
             elif isinstance(element, Panel):
                 for element_ in element:
-                    if isinstance(element_, CheckBox): 
+                    if isinstance(element_, CheckBox):
                         if element_.getName() in form:
                             element_.setChecked(form[element_.getName()])
                     elif isinstance(element_, ListBox):
                         if element_.getName() in form:
                             element_.selectValue(form[element_.getName()])
-                    elif isinstance(element_, TextBoxBase) or isinstance(element_,Checkable):
+                    elif isinstance(element_, TextBoxBase) or isinstance(element_, Checkable):
                         if element_.getName() in form:
                             element_.setText(form[element_.getName()])
 
@@ -158,12 +163,13 @@ class Interface(object):
     The Interface can be thought as the Page Manager.
 
     It makes the actual AJAX calls to the server and listens for Form events.
-    
+
     According to this feedback and data received, it makes the transition between pages.
 
     The interface contains also the Main Form and submits it on completion.
 
     """
+
     def __init__(self, *args):
 
         self.pages = args
@@ -171,7 +177,7 @@ class Interface(object):
         self.root = RootPanel("bootstrap")
 
         self.location = getLocation().getHref()
-        
+
         # Create The Main Form
         self.form = FormPanel(Encoding = FormPanel.ENCODING_MULTIPART, Method=FormPanel.METHOD_POST)
         self.form.setAction(self.location) # should be set to the document.URL
@@ -194,11 +200,9 @@ class Interface(object):
         # Ask for the current page to show
         ajax("current_page", params={}, handler=self)
 
-
     def setCurrentPage(self, page):
         self._current_page = page
         self.form.setWidget(page)
-
 
     def getCurrentPage(self):
         return self._current_page
@@ -206,14 +210,14 @@ class Interface(object):
     # The Form Listener
     #
     def onClick(self, sender):
-        
+
         # if an element is marked as invalid then the whole client-side validation is False
         if DOM.getElementById("invalid"):
-            client_side_validation = False  
-        else: 
+            client_side_validation = False
+        else:
             client_side_validation = True
 
-        if client_side_validation: 
+        if client_side_validation:
             # the client-side validation succeeded
             # transition to server-side validation
 
@@ -243,7 +247,7 @@ class Interface(object):
         result = rsp_py['result']
 
         if method == "submit_form":
-            if result == "ok": 
+            if result == "ok":
                 ajax("current_page", params={}, handler=self)
         elif method == "validate_all":
             if result == True:
@@ -262,17 +266,15 @@ class Interface(object):
                 # show that the form contains errors
                 self.getCurrentPage().submitLabel.setVisible(True)
 
-
-
     def onSubmit(self, event):
         pass
-    
+
 
     # The AJAX handler
     #
     def onCompletion(self, text):
         # responses are of the form {'method': STR, 'result': JSON}
-        
+
         pyText = JSONParser().decodeAsObject(text)
         method = pyText['method']
         result = pyText['result']
@@ -289,15 +291,17 @@ class Interface(object):
 
             self.setCurrentPage(next_page)
 
-
     def onError(self, text, code):
         pass
+
     def onTimeOut(self, text):
         # self.submitLabel.setText = "mpli"
         # self.submitLabel.setVisibile(true)
         pass
 
+
 class Workflow(object):
+
     def __init__(self, action_name, *args):
         """
         The workflow takes an action_name
@@ -310,14 +314,14 @@ class Workflow(object):
         self.action = action_name
         self.processes = list(args)
 
-        def end_process(obj, engine):
+        def end_process(_obj, engine):
             engine.setVar("result", "finished")
             engine.setVar("__finished", True)
 
         self.processes.append(end_process)
 
 
-        self.pages = [process.__page__ for process in self.processes if getattr(process,'__page__', False)]
+        self.pages = [process.__page__ for process in self.processes if getattr(process, '__page__', False)]
 
     def build_interface(self):
         """

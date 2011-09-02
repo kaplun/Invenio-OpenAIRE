@@ -11,22 +11,19 @@ GET,POST  /websubmitbezirg/DOCTYPE/ACTION/UUID  -------> resume_submission()
 """
 
 
-from invenio.webinterface_handler import wash_urlargd, WebInterfaceDirectory
-from invenio.webpage import page, pageheaderonly, pagefooteronly
+from invenio.webinterface_handler import WebInterfaceDirectory
 from invenio.urlutils import redirect_to_url
 from invenio.workflow_engine import GenericWorkflowEngine, HaltProcessing
+from invenio.webpage import page
 
 import os
 import os.path
 import json
-import sys
-import re
 import fcntl
 import cPickle
-import cStringIO
 
-from invenio.websubmitbezirg_engine import Interface, Workflow
-from invenio.websubmitbezirg_config import APP_NAME, APP_URL, APP_ETC_DIR, APP_WEB_DIR, APP_DATA_DIR
+from invenio.websubmitbezirg_engine import Workflow
+from invenio.websubmitbezirg_config import APP_NAME, APP_URL, APP_ETC_DIR, APP_DATA_DIR
 
 from imp import load_source
 
@@ -39,7 +36,7 @@ from uuid import uuid4, UUID
 class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
     _exports = ['']
 
-    def list_doctypes(self, req, form):
+    def list_doctypes(self, _req, _form):
         """
         The main page of the module.
 
@@ -73,8 +70,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
         while path and path[-1] == '':
             path = path[:-1]
 
-
-        def list_actions(req, form, component, path):
+        def list_actions(req, _form, component, _path):
             """
             The page of a specified DOCTYPE.
 
@@ -87,17 +83,16 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
             title = "Choose Action"
             html = ""
 
-            
             doctype = component
             doctype_file = os.path.join(APP_ETC_DIR, doctype+".py")
-           
+
             if os.path.exists(doctype_file):
 
                 doctype_module = load_source(doctype, doctype_file) # dynamically load the DOCTYPE.py specification to extract the actions
 
                 # each Workflow inside the DOCTYPE.py has each own name.
                 # An action corresponds to a specific Workflow. So the name of the action is the name of the Workflow
-                actions = [val.action for var, val in vars(doctype_module).items() if isinstance(val,Workflow)]
+                actions = [val.action for _var, val in vars(doctype_module).items() if isinstance(val, Workflow)]
 
                 for action in actions:
                     action_url = req.uri.rstrip('/') + '/' + action
@@ -108,9 +103,8 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                 html = "No such doctype"
 
             return page(title, html)
-   
 
-        def init_submission(req, form, component, path):
+        def init_submission(req, _form, component, path):
             """
             Initialize the submission page.
 
@@ -126,12 +120,15 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
             doctype_file = os.path.join(APP_ETC_DIR, doctype+".py")
             action = path[0]
 
+            title = ""
+            html = ""
+
             if os.path.exists(doctype_file):
 
                 # workflows indexed by action name
                 doctype_module = load_source(doctype, doctype_file)
                 workflows = {}
-                for var,val in vars(doctype_module).items():
+                for _var, val in vars(doctype_module).items():
                     if isinstance(val, Workflow):
                         workflows[val.action] = val
 
@@ -148,7 +145,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                     wfe.setWorkflow(workflows[action].processes)
                     wfe.setVar('uuid', uuid)
                     wfe.setVar('status', 'Running')
-                    
+
                     try:
                         # Run the initial processes before the 1st page
                         pickled_engine_file = open(pickled_engine_path, 'w')
@@ -171,7 +168,6 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
 
             return page(title, html)
 
-
         def resume_submission(req, form, component, path):
             """
             The actual submission page that corresponds to a unique session.
@@ -184,7 +180,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
             1. Resume the engine marked with the UUID
             2. Do stuff to the engine and dump it.
             """
-            
+
             doctype = component
             doctype_file = os.path.join(APP_ETC_DIR, doctype+".py")
             action = path[0]
@@ -202,12 +198,12 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                 doctype_module = load_source(doctype, doctype_file)
             else:
                 return "Session/engine does not exist"
-            
+
             ## Workflow from the submit file
 
             # workflows indexed by action name
             workflows = {}
-            for var,val in vars(doctype_module).items():
+            for _var, val in vars(doctype_module).items():
                 if isinstance(val, Workflow):
                     workflows[val.action] = val
 
@@ -227,14 +223,14 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                 # A user asks for the submission page
                 # A somewhat "static" html file is returned
                 # The html file wraps the corresponding bootstrap.js and puts the invenio header and footer
-                
+
                 title = "Submission Form"
                 html = ""
-                
+
                 app_static_url = "/%s-static" % (APP_NAME)
-                
+
                 submission_static_url = "/%s-static/%s/%s" % (APP_NAME, doctype, action)
-                    
+
                 metaheaderadd = '<link rel="stylesheet" href="%(app_static_url)s/bootstrap.css" type="text/css" /> <meta name="pygwt:module" content="%(url)s/bootstrap">' % {"app_static_url": app_static_url, "url": submission_static_url}
 
                 html += '<script language="javascript" src="%s/bootstrap.js"></script> <div id="bootstrap"></div>' % (submission_static_url)
@@ -287,17 +283,15 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         wfe.setWorkflow(workflow.processes)
 
                         # convert form from FieldStorage to dict
-                        # FieldStorage contains cStringIO instances, that are not pickle-serializable 
+                        # FieldStorage contains cStringIO instances, that are not pickle-serializable
                         form_dict = {}
-                        for k,v in form.items():
+                        for k, v in form.items():
                             form_dict[k] = v.value
-
 
                         wfe.setVar("input_form", form_dict)
 
                         wfe.resume()
 
-                        
                         if wfe.hasVar("__finished"):
                             # the engine/processing  is done
                             cPickle.dump(wfe, pickled_engine_file)
@@ -314,14 +308,12 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                     except HaltProcessing:
                         # dump
                         pickled_engine_file.close()
-                        pickled_engine_file = open(pickled_engine_path, 'r+')                        
+                        pickled_engine_file = open(pickled_engine_path, 'r+')
                         cPickle.dump(wfe, pickled_engine_file)
                         result = "ok"
                     finally:
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
                         pickled_engine_file.close()
-
-
 
                 ##### 'validate' call
                 elif method == 'validate':
@@ -338,16 +330,13 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         result = "error"
                     else:
                         current_page = [p for p in workflow.pages if p.name==__current_page_name][0]
-                        element = [e for e in current_page.elements if hasattr(e,'getName') and e.getName() == element_name][0]
+                        element = [e for e in current_page.elements if hasattr(e, 'getName') and e.getName() == element_name][0]
                         result = element.checkFunction(element_input)
                     finally:
                         fcntl.lockf(pickled_engine_file.fileno(), fcntl.LOCK_UN)
                         pickled_engine_file.close()
-                        
 
-
-
-                ##### 'validate_all' call                        
+                ##### 'validate_all' call
                 elif method == 'validate_all':
                     pickled_engine_file = open(pickled_engine_path, 'r+')
                     try:
@@ -360,7 +349,7 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                     else:
                         current_page = [p for p in workflow.pages if p.name==__current_page_name][0]
                         elements = current_page.elements
-                        for k,v in form.items():
+                        for k, v in form.items():
                             for element in elements:
                                 if hasattr(element, 'checkFunction') and hasattr(element, 'getName') and element.getName() == k:
                                     if not element.checkFunction(v):
@@ -368,7 +357,6 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
                         result = True # server-side validation suceeded for all elements
                 # the response is of the form {'method': STR, 'result': JSON}
                 return json.dumps({'method': method, 'result': result})
-
 
         def dispatcher(req, form):
             """
@@ -385,5 +373,3 @@ class WebInterfaceBezirgSubmitPages(WebInterfaceDirectory):
         return dispatcher, []
 
     __call__ = index = list_doctypes # the main page of the module
-
-
