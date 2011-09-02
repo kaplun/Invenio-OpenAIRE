@@ -1,3 +1,7 @@
+"""
+The Loading icon
+"""
+
 import sys
 if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.Image import Image

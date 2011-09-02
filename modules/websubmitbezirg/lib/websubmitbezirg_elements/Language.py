@@ -1,3 +1,7 @@
+"""
+The choose-language ListBox
+"""
+
 import sys
 if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.VerticalPanel import VerticalPanel
@@ -17,6 +21,7 @@ class Language(VerticalPanel):
         self.c = ListBox(**kwargs)
         
     def load(self):
+        # Add Languages here
         self.c.addItem("English", "en")
         self.c.addItem("French", "fr")
         self.add(self.l)

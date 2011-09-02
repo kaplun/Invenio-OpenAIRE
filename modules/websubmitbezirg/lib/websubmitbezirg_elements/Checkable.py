@@ -1,3 +1,11 @@
+"""
+This module provides the base classes that can be checked.
+
+To create Checkable elements just inherit from them.
+"""
+
+
+
 import sys
 if sys.version_info[3] == 'pyjamas':
     from pyjamas.ui.HorizontalPanel import HorizontalPanel
@@ -31,13 +39,23 @@ from invenio.websubmitbezirg_elements.DateField import DateField
 from invenio.websubmitbezirg_checks.validateDate import validateDate
 
 class Checkable(HorizontalPanel):
-    def __init__(self, Name, CheckFunction, Msg, Element=None, Check=True, Required=False, CheckOnClient=True, **kwargs):
+    def __init__(self, Name, CheckFunction, Msg, Element=None, Check=True, CheckOnClient=True, Required=False, **kwargs):
+        """
+        Keyword Arguments:
+
+        Name          : the name inside the form
+        CheckFunction : function that takes a str() and returns true or false, String -> Bool
+        Msg           : The message to display if the element does not pass the check
+        Check         : bool() turn on/off the checking
+        CheckOnClient : bool() turn on/off only the client-side checking
+        Required      : if True the element is required, it cannot be blank
+        """
+
         super(Checkable, self).__init__() 
 
         self.name = Name
         self.Check = Check
         self.CheckOnClient = CheckOnClient
-
 
         # Required
         self.required = Required
@@ -58,10 +76,6 @@ class Checkable(HorizontalPanel):
         self.checkElement.setText(txt)
     def getText(self):
         return self.checkElement.getText()
-
-    # self.getName = self.checkElement.getName
-    # self.setText = self.checkElement.setText
-    # self.getText = self.checkElement.getText
 
     def load(self): 
         self.checkLabel.setVisible(False)
@@ -141,6 +155,10 @@ class CheckablePasswordTextBox(Checkable):
 
 class CheckableDateField(HorizontalPanel):
     def __init__(self, Name, Title, Msg="Not Valid Date", CheckOnClient=True, Required=False, **kwargs):
+        """
+        Similar to the Checkable class, whith the difference it's not for Text elements, but for Calendars
+        """
+
         super(CheckableDateField, self).__init__()
         self.CheckOnClient=CheckOnClient
         self.l = Label(Title)
