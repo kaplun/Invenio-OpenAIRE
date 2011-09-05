@@ -70,7 +70,7 @@ try:
     CFG_HAS_MAGIC = True
 except ImportError:
     CFG_HAS_MAGIC = False
-
+from invenio.bibtask import write_message #TODO: Remove this line
 ## The above flag controls whether HTTP range requests are supported or not
 ## when serving static files via Python. This is disabled by default as
 ## it currently breaks support for opening PDF files on Windows platforms
@@ -202,6 +202,55 @@ class InvenioWebSubmitFileError(Exception):
     Exception raised in case of errors related to fulltext files.
     """
     pass
+
+def _val_or_null(val, eq_name = None, q_str = None, q_args = None):
+    """
+    Auxiliary function helpful while building WHERE clauses of SQL queries
+    that should contain field=val or field is val
+
+    If optional parameters q_str and q_args are provided, lists are updated
+    if val == None, a statement of the form "eq_name is Null" is returned
+    otherwise, otherwise the function returns a parametrised comparison
+    "eq_name=%s" with val as an argument added to the query args list.
+
+    Using parametrised queries diminishes the likelihood of having
+    SQL injection.
+
+    @param val Value to compare with
+    @type val
+    @param eq_name The name of the database column
+    @type eq_name string
+    @param q_str Query string builder - list of clauses
+                 that should be connected by AND operator
+    @type q_str list
+
+    @param q_args Query arguments list. This list will be applied as
+                  a second argument of run_sql command
+    @type q_args list
+
+    @result string of a single part of WHERE clause
+    @rtype string
+
+    """
+    res = ""
+    if eq_name != None:
+        res += eq_name
+    if val == None:
+        if eq_name != None:
+            res += " is "
+        res += "NULL"
+        if q_str != None:
+            q_str.append(res)
+        return res
+    else:
+        if eq_name != None:
+            res += "="
+        res += "%s"
+        if q_str != None:
+            q_str.append(res)
+        if q_args != None:
+            q_args.append(str(val))
+        return res
 
 def file_strip_ext(afile, skip_version=False, only_known_extensions=False, allow_subformat=True):
     """
@@ -1311,6 +1360,11 @@ class BibRecDocs(object):
                 bibdoc.change_name(new_docname)
                 self.merge_bibdocs(docname, new_docname)
             docnames.add(docname)
+
+
+class BibVersion(object):
+    """This class represents a particular version of a document"""
+    pass
 
 class BibDoc(object):
     """
@@ -3383,45 +3437,21 @@ class MoreInfo(object):
         self.format = format
         self.relation = relation
 
-    def _val_or_null(self, val, eq_name = None, q_str = None, q_args = None):
-        res = ""
-        if eq_name != None:
-            res += eq_name
-        if val == None:
-            if eq_name != None:
-                res += " is "
-            res += "NULL"
-            if q_str != None:
-                q_str.append(res)
-            return res
-        else:
-            if eq_name != None:
-                res += "="
-            res += "%s"
-            if q_str != None:
-                q_str.append(res)
-            if q_args != None:
-                q_args.append(str(val))
-            return res
-
     def _generate_where_query_args(self, namespace = None, data_key = None):
         """Private method generating WHERE clause of SQL statements"""
         q_str = []
         q_args = []
 
-        q_str.append(self._val_or_null(self.docid, eq_name = "id_bibdoc", q_args = q_args))
-        q_str.append(self._val_or_null(self.version, eq_name = "ver_bibdoc", q_args = q_args))
-        q_str.append(self._val_or_null(self.format, eq_name = "fmt_bibdoc", q_args = q_args))
-        q_str.append(self._val_or_null(self.relation, eq_name = "id_rel", q_args = q_args))
+        q_str.append(_val_or_null(self.docid, eq_name = "id_bibdoc", q_args = q_args))
+        q_str.append(_val_or_null(self.version, eq_name = "ver_bibdoc", q_args = q_args))
+        q_str.append(_val_or_null(self.format, eq_name = "fmt_bibdoc", q_args = q_args))
+        q_str.append(_val_or_null(self.relation, eq_name = "id_rel", q_args = q_args))
         if namespace != None:
             q_str.append("namespace=%s")
             q_args.append(str(namespace))
         if data_key != None:
             q_str.append("data_key=%s")
             q_args.append(str(data_key))
-        if DBG_LOG_QUERIES:
-            from invenio.bibtask import write_message
-            write_message(" WHERE STATEMENT: %s ARGS: %s" % (" AND ".join(q_str), repr(q_args)))
 
         return (" AND ".join(q_str), q_args)
 
@@ -3435,10 +3465,10 @@ class MoreInfo(object):
             query_parts = []
             query_args = []
 
-            self._val_or_null(self.docid, q_str = query_parts, q_args = query_args)
-            self._val_or_null(self.version, q_str = query_parts, q_args = query_args)
-            self._val_or_null(self.format, q_str = query_parts, q_args = query_args)
-            self._val_or_null(self.relation, q_str = query_parts, q_args = query_args)
+            _val_or_null(self.docid, q_str = query_parts, q_args = query_args)
+            _val_or_null(self.version, q_str = query_parts, q_args = query_args)
+            _val_or_null(self.format, q_str = query_parts, q_args = query_args)
+            _val_or_null(self.relation, q_str = query_parts, q_args = query_args)
 
             query = "INSERT INTO bibdoc_moreinfo (id_bibdoc, ver_bibdoc, fmt_bibdoc, id_rel, namespace, data_key, data_value) VALUES (" + ", ".join(query_parts) + ", %s, %s, %s)"
 
@@ -3451,20 +3481,31 @@ class MoreInfo(object):
             run_sql(query, query_args)
         else:
             #Update existing value
-            where_str, where_args = self._generate_where_query_args()
-            query_str = "UPDATE bibdoc_moreinfo SET data_value=%s WHERE" + where_str
-            run_sql(query_str, [self.str(serialised_val)] + where_args )
+            where_str, where_args = self._generate_where_query_args(namespace, key)
+            query_str = "UPDATE bibdoc_moreinfo SET data_value=%s WHERE " + where_str
+            query_args =  [str(serialised_val)] + where_args
+
+            if DBG_LOG_QUERIES:
+                from invenio.bibtask import write_message
+                write_message("Executing query: " + query_str + " ARGS: " + repr(query_args))
+                print "Executing query: " + query_str + " ARGS: " + repr(query_args)
+
+            run_sql(query_str, query_args )
 
     def get_data(self, namespace, key):
         """retrieving data from the database"""
         where_str, where_args = self._generate_where_query_args(namespace = namespace, data_key = key)
         query_str = "SELECT data_value FROM bibdoc_moreinfo WHERE " + where_str
-        if DBG_LOG_QUERIES:
-            from invenio.bibtask import write_message
-            write_message("Executing query: " + query_str  + "  ARGS: " + repr(where_args))
-            print "Executing query: " + query_str + "  ARGS: " + repr(where_args)
 
         res = run_sql(query_str, where_args)
+
+        if DBG_LOG_QUERIES:
+            from invenio.bibtask import write_message
+            write_message("Executing query: " + query_str  + "  ARGS: " + repr(where_args) + "WITH THE RESULT: " + str(res))
+            s_ = ""
+            if res:
+                s_ = cPickle.loads(res[0][0])
+            print "Executing query: " + query_str + "  ARGS: " + repr(where_args) + " WITH THE RESULT: " + str(s_)
 
         if res and res[0][0]:
             try:
@@ -3507,7 +3548,29 @@ class MoreInfo(object):
 
     def delete(self):
         """Remove all entries associated with this MoreInfo"""
-        run_sql("DELETE FROM bibdoc_bibdoc WHERE id_bibdoc=%s AND ver_bibdoc=%s AND fmt_bibdoc=%s AND id_rel=%s", (self.docid, self.version, self.format, self.relation))
+        #TODO : this query looks suspicious ! should consider "is NULL" for null values
+        where_str, query_args = self._generate_where_query_args()
+        query_str = "DELETE FROM bibdoc_moreinfo WHERE %s" % (where_str, )
+
+        if DBG_LOG_QUERIES:
+            from invenio.bibtask import write_message
+            write_message("Executing query: " + query_str + "   ARGS: " + repr(query_args))
+            print "Executing query: " + query_str + "   ARGS: " + repr(query_args)
+        run_sql(query_str, query_args)
+
+    def enrich_from_hash(self, serialised_data):
+        """
+        Enriches current MoreInfo structure with data provided as the second argument.
+        The data has a structure of a dictionary:
+            {namespace : { key1: value, key2: value2}, namespace2 {...},...}
+        This structure is cPickle serialised and later Base64 encoded to be transferrable
+        inside text based data formats
+
+        """
+        data = base64.b64decode(serialised_data)
+        for namespace in data:
+            for key in data[namespace]:
+                self.set_data(namespace, key, data[namespace][key])
 
 class BibDocMoreInfo(MoreInfo):
     """
@@ -3574,11 +3637,12 @@ class BibDocMoreInfo(MoreInfo):
         """
         if flagname in CFG_BIBDOCFILE_AVAILABLE_FLAGS:
             flags = self['flags']
+
             if not flagname in flags:
                 flags[flagname] = {}
-            if not version in self.more_info['flags'][flagname]:
+            if not version in flags[flagname]:
                 flags[flagname][version] = {}
-            if not format in self['flags'][flagname][version]:
+            if not format in flags[flagname][version]:
                 flags[flagname][version][format] = {}
             flags[flagname][version][format] = True
             self['flags'] = flags
@@ -3712,13 +3776,13 @@ class BibDocMoreInfo(MoreInfo):
             if not description:
                 self.unset_description(format, version)
                 return
-            if not version in self['descriptions']:
-                descriptions = self['descriptions']
-                descriptions[version] = {}
-                self['descriptions'] = descriptions
+
             descriptions = self['descriptions']
+            if not version in descriptions:
+                descriptions[version] = {}
+
             descriptions[version][format] = description
-            self['descriptions'] = descriptions
+            self.set_data("", 'descriptions', descriptions)
         except:
             register_exception()
             raise
@@ -3787,14 +3851,16 @@ class BibDocMoreInfo(MoreInfo):
         else:
             raise ValueError, "%s is not in %s" % (flagname, CFG_BIBDOCFILE_AVAILABLE_FLAGS)
 
+
+_bib_relation__any_value = -1
 class BibRelation(object):
     """
     A representation of a relation between documents or their particular versions
     """
-    def __init__(self, rel_type = "NULL",
-                 bibdoc1_id = "NULL", bibdoc2_id = "NULL",
-                 bibdoc1_ver = "NULL", bibdoc2_ver = "NULL",
-                 bibdoc1_fmt = "NULL", bibdoc2_fmt = "NULL",
+    def __init__(self, rel_type = None,
+                 bibdoc1_id = None, bibdoc2_id = None,
+                 bibdoc1_ver = None, bibdoc2_ver = None,
+                 bibdoc1_fmt = None, bibdoc2_fmt = None,
                  rel_id = None):
         """
         The constructor of the class representing a relation between two
@@ -3842,6 +3908,7 @@ class BibRelation(object):
         self.bibdoc2_fmt = bibdoc2_fmt
         self.rel_type = rel_type
 
+
         if rel_id == None:
             self._fill_id_from_data()
         else:
@@ -3853,7 +3920,7 @@ class BibRelation(object):
         """Fill all the relation data from the relation identifier
         """
         query = "SELECT id_bibdoc1, ver_bibdoc1, fmt_bibdoc1, id_bibdoc2, ver_bibdoc2, fmt_bibdoc2, rel_type FROM bibdoc_bibdoc WHERE id=%s"
-        res = run_sql(query, (str(id), ))
+        res = run_sql(query, (str(self.id), ))
         if res != None and res[0] != None:
             self.bibdoc1_id = res[0][0]
             self.bibdoc1_ver = res[0][1]
@@ -3867,11 +3934,27 @@ class BibRelation(object):
         """Fill the relation identifier based on the data provided"""
         where_str, where_args = self._get_where_clauses()
         query = "SELECT id FROM bibdoc_bibdoc WHERE %s" % (where_str, )
+
+#        write_message("%s <--- %s" % (query, str(where_args)))
+#        print " EXECUTING QUERY: %s <--- %s" % (query, str(where_args))
+
         res = run_sql(query, where_args)
         if res and res[0][0]:
             self.id = int(res[0][0])
 
-    def _get_rel_where_clauses(self):
+    def _get_value_column_mapping(self):
+        """
+        Returns a list of tuples each tuple consists of a value and a name
+        of a database column where this value should fit
+        """
+        return [(self.rel_type, "rel_type"), (self.bibdoc1_id, "id_bibdoc1"),
+               (self.bibdoc1_ver, "ver_bibdoc1"),
+                (self.bibdoc1_fmt, "fmt_bibdoc1"),
+               (self.bibdoc2_id, "id_bibdoc2"),
+                (self.bibdoc2_ver, "ver_bibdoc2"),
+               (self.bibdoc2_fmt, "fmt_bibdoc2")]
+
+    def _get_where_clauses(self):
         """Private function returning part of the SQL statement identifying
           current relation
 
@@ -3880,40 +3963,53 @@ class BibRelation(object):
         """
         q_where = []
         q_args = []
-
-        q_where.append("id_bibdoc1=%s")
-        q_args.append(self.bibdoc1_id)
-
-        q_where.append("id_bibdoc2=%s")
-        q_args.append(self.bibdoc2_id)
-
-        q_where.append("rel_type=%s")
-        q_args.append(self.rel_type)
-
-        q_where.append("ver_bibdoc1=%s")
-        q_args.append(self.bibdoc1_ver)
-
-        q_where.append("ver_bibdoc2=%s")
-        q_args.append(self.bibdoc2_ver)
-
-        q_where.append("fmt_bibdoc1=%s")
-        q_args.append(self.bibdoc1_fmt)
-
-        q_where.append("fmt_bibdoc2=%s")
-        q_args.append(self.bibdoc2_fmt)
-
+        prc = self._get_value_column_mapping()
+        for entry in prc:
+            q_where.append(_val_or_null(entry[0], eq_name = entry[1],
+                                          q_args = q_args))
         return (" AND ".join(q_where), q_args)
 
     @staticmethod
-    def create(self, bibdoc1_id = "NULL", bibdoc1_ver = "NULL",
-               bibdoc1_fmt = "NULL", bibdoc2_id = "NULL",
-               bibdoc2_ver = "NULL", bibdoc2_fmt = "NULL",
+    def create(bibdoc1_id = None, bibdoc1_ver = None,
+               bibdoc1_fmt = None, bibdoc2_id = None,
+               bibdoc2_ver = None, bibdoc2_fmt = None,
                rel_type = ""):
         """
-        Create a relation and return instance
+        Create a relation and return instance.
+        Ommiting an argument means that a particular relation concerns any value of the parameter
         """
-        rel_id = run_sql("INSERT INTO bibdoc_bibdoc (id_bibdoc1, ver_bibdoc1, fmt_bibdoc1, id_bibdoc2, ver_bibdoc2, fmt_bibdoc2, rel_type) VALUES (%s, %s, %s, %s, %s, %s, %s)", (bibdoc1_id, bibdoc1_ver, bibdoc1_fmt, bibdoc2_id, bibdoc2_ver, bibdoc2_fmt, rel_type))
+        # check if there is already entry corresponding to parameters
+        existing = BibRelation.get_relations(rel_type = rel_type,
+                                  bibdoc1_id = bibdoc1_id,
+                                  bibdoc2_id = bibdoc2_id,
+                                  bibdoc1_ver = bibdoc1_ver,
+                                  bibdoc2_ver = bibdoc2_ver,
+                                  bibdoc1_fmt = bibdoc1_fmt,
+                                  bibdoc2_fmt = bibdoc2_fmt)
+        if len(existing) > 0:
+            return existing[0]
 
+        # build the insert query and execute it
+        to_process = [(rel_type, "rel_type"), (bibdoc1_id, "id_bibdoc1"),
+                      (bibdoc1_ver, "ver_bibdoc1"), (bibdoc1_fmt, "fmt_bibdoc1"),
+                      (bibdoc2_id, "id_bibdoc2"), (bibdoc2_ver, "ver_bibdoc2"),
+                      (bibdoc2_fmt, "fmt_bibdoc2")]
+
+        values_list = []
+        args_list = []
+        columns_list = []
+
+        for entry in to_process:
+            columns_list.append(entry[1])
+            if entry[0] == None:
+                values_list.append("NULL")
+            else:
+                values_list.append("%s")
+                args_list.append(entry[0])
+
+        query = "INSERT INTO bibdoc_bibdoc (%s) VALUES (%s)" % (", ".join(columns_list), ", ".join(values_list))
+#        print "Query: %s Args: %s" % (query, str(args_list))
+        rel_id = run_sql(query, args_list)
         return BibRelation(rel_id = rel_id)
 
     def delete(self):
@@ -3921,50 +4017,36 @@ class BibRelation(object):
             executing the flush function on the same object will restore
             the relation
         """
-        where_str, where_args = self._get_rel_where_clauses()
+        where_str, where_args = self._get_where_clauses()
         run_sql("DELETE FROM bibdoc_bibdoc WHERE %s" % (where_str,), where_args)
         # removing associated MoreInfo
         self.more_info.delete()
 
-#    def flush(self):
-#        run_sql("INSERT INTO bibdoc_bibdoc (id_bibdoc1, ver_bibdoc1, fmt_bibdoc1, id_bibdoc2, ver_bibdoc2, fmt_bibdoc2, rel_type, more_info) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE more_info=%s", (self.bibdoc1.id, self.bibdoc1_ver, self.bibdoc1_fmt, self.bibdoc2.id, self.bibdoc2_ver, self.bibdoc2_fmt, self.rel_type, more_info_str, more_info_str))
-
     @staticmethod
-    def get_relations(rel_type=None, bibdoc1_id = None, bibdoc2_id = None,
-                 bibdoc1_ver = None, bibdoc2_ver = None,
-                 bibdoc1_fmt = None, bibdoc2_fmt = None):
-        """Get all relations satisfying criteria
-           Returns list of relation objects"""
+    def get_relations(rel_type = _bib_relation__any_value,
+                       bibdoc1_id = _bib_relation__any_value,
+                       bibdoc2_id = _bib_relation__any_value,
+                       bibdoc1_ver = _bib_relation__any_value,
+                       bibdoc2_ver = _bib_relation__any_value,
+                       bibdoc1_fmt = _bib_relation__any_value,
+                       bibdoc2_fmt = _bib_relation__any_value):
+
+        """Retrieves list of relations satisfying condtions.
+          If a parameter is specified, its value has to match exactly.
+          If a parameter is ommited, any of its values will be accepted"""
+
         where_str = []
         where_args = []
 
-        if rel_type != None:
-            where_str.append("rel_type=%s")
-            where_args.append(rel_type)
+        to_process = [(rel_type, "rel_type"), (bibdoc1_id, "id_bibdoc1"),
+                      (bibdoc1_ver, "ver_bibdoc1"), (bibdoc1_fmt, "fmt_bibdoc1"),
+                      (bibdoc2_id, "id_bibdoc2"), (bibdoc2_ver, "ver_bibdoc2"),
+                      (bibdoc2_fmt, "fmt_bibdoc2")]
 
-        if bibdoc1_id != None:
-            where_str.append("id_bibdoc1=%s")
-            where_args.append(bibdoc1_id)
+        for entry in to_process:
+            if entry[0] != _bib_relation__any_value:
+                where_str.append(_val_or_null(entry[0], eq_name = entry[1], q_args = where_args))
 
-        if bibdoc1_ver != None:
-            where_str.append("ver_bibdoc1=%s")
-            where_args.append(bibdoc1_ver)
-
-        if bibdoc1_fmt != None:
-            where_str.append("fmt_bibdoc1=%s")
-            where_args.append(bibdoc1_fmt)
-
-        if bibdoc2_id != None:
-            where_str.append("id_bibdoc2=%s")
-            where_args.append(bibdoc2_id)
-
-        if bibdoc2_ver != None:
-            where_str.append("ver_bibdoc2=%s")
-            where_args.append(bibdoc2_ver)
-
-        if bibdoc2_fmt != None:
-            where_str.append("fmt_bibdoc2=%s")
-            where_args.append(bibdoc2_fmt)
         query_str = "SELECT id FROM bibdoc_bibdoc WHERE %s" % (" AND ".join(where_str),)
         res = run_sql(query_str, where_args)
         results = []
@@ -4012,3 +4094,6 @@ def readfile(filename):
         return open(filename).read()
     except Exception:
         return ''
+
+
+
