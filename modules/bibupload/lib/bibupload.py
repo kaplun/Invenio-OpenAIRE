@@ -340,15 +340,15 @@ def bibupload(record, opt_tag=None, opt_mode=None,
 
         # Have a look at FFR tags - relations between objects
         write_message("Stage 2C: Start (Upload FFR tags.)", verbose=2)
-        write_message("Processing FFR")
-        write_message(str(extract_tag_from_record(record, 'FFR')))
-        write_message("Full record : %s" %(str(record),))
+#        write_message("Processing FFR")
+#        write_message(str(extract_tag_from_record(record, 'FFR')))
+#        write_message("Full record : %s" %(str(record),))
         record_had_FFR = False
         if opt_stage_to_start_from <= 2 and \
             extract_tag_from_record(record, 'FFR') is not None:
-            write_message("found FFR tags")
+ #           write_message("found FFR tags")
             record_had_FFR = True
-            write_message("Record : %s" %(str(record),))
+ #           write_message("Record : %s" %(str(record),))
             try:
                 record = elaborate_ffr_tags(record, rec_id, opt_mode, pretend=pretend)
             except Exception, e:
@@ -356,7 +356,7 @@ def bibupload(record, opt_tag=None, opt_mode=None,
                 write_message("   Stage 2C failed: Error while elaborating FFR tags: %s" % e,
                     verbose=1, stream=sys.stderr)
                 return (1, int(rec_id))
-            write_message("Record : %s" %(str(record),))
+#            write_message("Record : %s" %(str(record),))
             if record is None:
                 write_message("   Stage 2C failed: Error while elaborating FFR tags",
                             verbose=1, stream=sys.stderr)
@@ -364,7 +364,7 @@ def bibupload(record, opt_tag=None, opt_mode=None,
             write_message("   -Stage COMPLETED", verbose=2)
         else:
             write_message("   -Stage NOT NEEDED", verbose=2)
-        write_message("finished processing FFR")
+#        write_message("finished processing FFR")
 
 
 
@@ -1061,12 +1061,12 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
     """
     Process FFR tags describing relations between existing objects
     """
-    def _get_subfield_value_or_null(field, subfield_code):
+    def _get_subfield_value(field, subfield_code):
         res = field_get_subfield_values(field, subfield_code)
         if res:
             return res[0]
         else:
-            return "NULL"
+            return None
 
     tuple_list = extract_tag_from_record(record, 'FFR')
 
@@ -1077,9 +1077,8 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
 
     if tuple_list:
         for ffr in record_get_field_instances(record, 'FFR', ' ', ' '):
-            relation_id = field_get_subfield_values(ffr, "r")
-            if relation_id:
-                relation_id = relation_id[0]
+
+            relation_id = _get_subfield_value(ffr, "r")
 
             bibdoc1_id = None
             bibdoc1_name = None
@@ -1091,11 +1090,11 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
             bibdoc2_fmt = None
 
             if not relation_id:
-                bibdoc1_id = _get_subfield_value_or_null(ffr, "i")
-                bibdoc1_name = _get_subfield_value_or_null(ffr, "n")
+                bibdoc1_id = _get_subfield_value(ffr, "i")
+                bibdoc1_name = _get_subfield_value(ffr, "n")
 
-                if bibdoc1_id == "NULL":
-                    if bibdoc1_name == "NULL":
+                if bibdoc1_id == None:
+                    if bibdoc1_name == None:
                         raise StandardError("Incorrect relation. Neither name nor identifier of the first obejct has been specified")
                     else:
                         # retrieving the ID based on the document name (inside current record)
@@ -1105,17 +1104,17 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                         except:
                             raise StandardError("BibDoc of a name %s does not exist within a record" % (bibdoc1_name, ))
                 else:
-                    if bibdoc1_name != "NULL":
-                        write_message("Warning: both name and id of the first document of a relation has been specified. Ignoring the name")
+                    if bibdoc1_name != None:
+                        write_message("Warning: both name and id of the first document of a relation have been specified. Ignoring the name")
 
-                bibdoc1_ver = _get_subfield_value_or_null(ffr, "v")
-                bibdoc1_fmt = _get_subfield_value_or_null(ffr, "f")
+                bibdoc1_ver = _get_subfield_value(ffr, "v")
+                bibdoc1_fmt = _get_subfield_value(ffr, "f")
 
-                bibdoc2_id = _get_subfield_value_or_null(ffr, "j")
-                bibdoc2_name = _get_subfield_value_or_null(ffr, "o")
+                bibdoc2_id = _get_subfield_value(ffr, "j")
+                bibdoc2_name = _get_subfield_value(ffr, "o")
 
-                if bibdoc2_id == "NULL":
-                    if bibdoc2_name == "NULL":
+                if bibdoc2_id == None:
+                    if bibdoc2_name == None:
                         raise StandardError("Incorrect relation. Neither name nor identifier of the second obejct has been specified")
                     else:
                         # retrieving the ID based on the document name (inside current record)
@@ -1125,20 +1124,17 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                         except:
                             raise StandardError("BibDoc of a name %s does not exist within a record" % (bibdoc2_name, ))
                 else:
-                    if bibdoc2_name != "NULL":
-                        write_message("Warning: both name and id of the first document of a relation has been specified. Ignoring the name")
+                    if bibdoc2_name != None:
+                        write_message("Warning: both name and id of the first document of a relation have been specified. Ignoring the name")
 
-                bibdoc2_ver = _get_subfield_value_or_null(ffr, "w")
-                bibdoc2_fmt = _get_subfield_value_or_null(ffr, "g")
+                bibdoc2_ver = _get_subfield_value(ffr, "w")
+                bibdoc2_fmt = _get_subfield_value(ffr, "g")
 
-            relation_type = field_get_subfield_values(ffr, "t")
+            relation_type = _get_subfield_value(ffr, "t")
             if not relation_type:
                 raise StandardError("The relation type must be specified")
-            relation_type = relation_type[0]
 
-            more_info = field_get_subfield_values(ffr, "m")
-            if more_info:
-                more_info = more_info[0]
+            more_info = _get_subfield_value(ffr, "m")
 
             # the relation id might be specified in the case of updating
             # MoreInfo table instead of other fields
@@ -1147,7 +1143,7 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
             if not relation_id:
                 #try to read the relation_id from other parameters.
                 #Failing means that there is no such relation
-                write_message("retrieving relations")
+#                write_message("retrieving relations")
                 rels = BibRelation.get_relations(rel_type = relation_type,
                                                  bibdoc1_id = bibdoc1_id,
                                                  bibdoc2_id = bibdoc2_id,
@@ -1155,7 +1151,7 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                                                  bibdoc2_ver = bibdoc2_ver,
                                                  bibdoc1_fmt = bibdoc1_fmt,
                                                  bibdoc2_fmt = bibdoc2_fmt)
-                write_message("DONE")
+ #               write_message("DONE")
                 if len(rels) > 0:
                     rel_obj = rels[0]
                     relation_id = rel_obj.id
@@ -1167,19 +1163,19 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                                  bibdoc2_fmt, relation_type, more_info,
                                  rel_obj))
 
-    write_message("Encountered FFR fields : %s %s" % (str(relations_to_create), str(tuple_list)))
+#    write_message("Encountered FFR fields : %s %s" % (str(relations_to_create), str(tuple_list)))
     record_delete_field(record, 'FFR', ' ', ' ')
 
-    if mode in ("insert", "replace_or_insert"):
+    if mode in ("insert", "replace_or_insert", "append"):
         # now creating relations between objects based on the data
 
         if not pretend:
             for (relation_id, bibdoc1_id, bibdoc1_ver, bibdoc1_fmt,
                  bibdoc2_id,  bibdoc2_ver, bibdoc2_fmt, rel_type,
                  more_info, rel_obj) in relations_to_create:
-                if (mode == "replace_or_insert" and rel_obj == None) or mode == "insert":
+                if (mode == "replace_or_insert" and rel_obj == None) or mode == "insert" or mode == "append":
                     try:
-                        write_message("creating relation")
+ #                       write_message("creating relation")
                         rel_obj = BibRelation.create(bibdoc1_id = bibdoc1_id,
                                                       bibdoc1_ver = bibdoc1_ver,
                                                       bibdoc1_fmt = bibdoc1_fmt,
@@ -1187,7 +1183,7 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                                                       bibdoc2_ver = bibdoc2_ver,
                                                       bibdoc2_fmt = bibdoc2_fmt,
                                                       rel_type = rel_type)
-                        write_message("DONE")
+#                      write_message("DONE")
                     except Exception, e:
                         write_message("Error creating a relation between objects")
                         raise

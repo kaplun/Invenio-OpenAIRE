@@ -3431,36 +3431,74 @@ class MoreInfo(object):
        This class is a thin wrapper around the database table.
        """
 
-    def __init__(self, docid = None, version = None, format = None, relation = None):
+    def __init__(self, docid = None, version = None, format = None,
+                 relation = None, cache_only = False, cache_reads = True, initial_data = None):
+        """
+        @param cache_only Determines if MoreInfo object should be created in
+                          memory only or reflected in the database
+        @type cache_only boolean
+
+        @param cache_reads Determines if reads should be executed on the
+                           in-memory cache or should be redirected to the
+                           database. If this is true, cache can be entirely
+                           regenerated from the database only upon an explicit
+                           request. If the value is not present in the cache,
+                           the database is queried
+        @type cache_reads boolean
+
+        @param initial_data Allows to specify initial content of the cache.
+                             This parameter is useful when we create an in-memory
+                             instance from serialised value
+        @type initial_data string
+
+        """
         self.docid = docid
         self.version = version
         self.format = format
         self.relation = relation
+        self.cache_only = cache_only
 
-    def _generate_where_query_args(self, namespace = None, data_key = None):
-        """Private method generating WHERE clause of SQL statements"""
-        q_str = []
-        q_args = []
+        if initial_data != None:
+            self.cache = initial_data
+            self.dirty = initial_data
+            if not self.cache_only:
+                self._flush_cache() #inserts new entries !
+        else:
+            self.cache = {}
+            self.dirty = {}
 
-        q_str.append(_val_or_null(self.docid, eq_name = "id_bibdoc", q_args = q_args))
-        q_str.append(_val_or_null(self.version, eq_name = "ver_bibdoc", q_args = q_args))
-        q_str.append(_val_or_null(self.format, eq_name = "fmt_bibdoc", q_args = q_args))
-        q_str.append(_val_or_null(self.relation, eq_name = "id_rel", q_args = q_args))
-        if namespace != None:
-            q_str.append("namespace=%s")
-            q_args.append(str(namespace))
-        if data_key != None:
-            q_str.append("data_key=%s")
-            q_args.append(str(data_key))
+        self.cache_reads = cache_reads
+        if not self.cache_only:
+            self._populate_cache()
 
-        return (" AND ".join(q_str), q_args)
+    def _populate_cache(self):
+        """Retrieves all values of MoreInfo and places them in the cache"""
+        where_str, where_args = self._generate_where_query_args()
+        query_str = "SELECT namespace, data_key, data_value FROM bibdoc_moreinfo WHERE %s" % (where_str, )
+        res = run_sql(query_str, where_args)
+        if res:
+            for row in res:
+                namespace, data_key, data_value_ser = row
+                data_value = cPickle.loads(data_value_ser)
+                if not namespace in self.cache:
+                    self.cache[namespace] = {}
+                self.cache[namespace][data_key] = data_value
 
-    def set_data(self, namespace, key, value):
-        """setting data directly in the database dictionary"""
+    def _mark_dirty(self, namespace, data_key):
+        """Marks a data key dirty - that should be saved into the database"""
+        if not namespace in self.dirty:
+            self.dirty[namespace] = {}
+        self.dirty[namespace][data_key] = True
+
+    def _database_contains_key(self, namespace, key):
+        return self._database_read_value(namespace, key) != None
+
+    def _database_save_value(self, namespace, key, value):
+        """Write changes into the database"""
         #TODO: this should happen within one transaction
         serialised_val = cPickle.dumps(value)
         # on duplicate key will not work here as miltiple null values are permitted by the index
-        if not self.contains_key(namespace, key):
+        if not self._database_contains_key(namespace, key):
             #insert new value
             query_parts = []
             query_args = []
@@ -3492,8 +3530,11 @@ class MoreInfo(object):
 
             run_sql(query_str, query_args )
 
-    def get_data(self, namespace, key):
-        """retrieving data from the database"""
+    def _database_read_value(self, namespace, key):
+        """Reads a value directly from the database
+        @param namespace - namespace of the data to be read
+        @param key - key of the data to be read
+        """
         where_str, where_args = self._generate_where_query_args(namespace = namespace, data_key = key)
         query_str = "SELECT data_value FROM bibdoc_moreinfo WHERE " + where_str
 
@@ -3514,11 +3555,10 @@ class MoreInfo(object):
                 raise Exception("Error when deserialising value for %s key=%s retrieved value=%s" % (repr(self), str(key), str(res[0][0])))
         return None
 
-    def del_key(self, namespace, key):
-        """retrieving data from the database"""
-
+    def _database_remove_value(self, namespace, key):
+        """Removes an entry directly in the database"""
         where_str, where_args = self._generate_where_query_args(namespace = namespace, data_key = key)
-        query = "DELETE FROM bibdoc_moreinfo WHERE " + where_str
+        query_str = "DELETE FROM bibdoc_moreinfo WHERE " + where_str
         if DBG_LOG_QUERIES:
             from invenio.bibtask import write_message
             write_message("Executing query: " + query_str + "   ARGS: " + repr(where_args))
@@ -3526,6 +3566,68 @@ class MoreInfo(object):
         res = run_sql(query_str, where_args)
 
         return None
+
+    def _flush_cache(self):
+        """Writes all the dirty cache entries into the database"""
+        for namespace in self.dirty:
+            for data_key in self.dirty[namespace]:
+                if namespace in self.cache and data_key in self.cache[namespace]:
+                    self._database_save_value(namespace, data_key, self.cache[namespace][data_key])
+                else:
+                    # This might happen if a value has been removed from the cache
+                    self._database_remove_value(namespace, data_key)
+        self.dirty = {}
+
+    def _generate_where_query_args(self, namespace = None, data_key = None):
+        """Private method generating WHERE clause of SQL statements"""
+        q_str = []
+        q_args = []
+
+        q_str.append(_val_or_null(self.docid, eq_name = "id_bibdoc", q_args = q_args))
+        q_str.append(_val_or_null(self.version, eq_name = "ver_bibdoc", q_args = q_args))
+        q_str.append(_val_or_null(self.format, eq_name = "fmt_bibdoc", q_args = q_args))
+        q_str.append(_val_or_null(self.relation, eq_name = "id_rel", q_args = q_args))
+        if namespace != None:
+            q_str.append("namespace=%s")
+            q_args.append(str(namespace))
+        if data_key != None:
+            q_str.append("data_key=%s")
+            q_args.append(str(data_key))
+
+        return (" AND ".join(q_str), q_args)
+
+    def set_data(self, namespace, key, value):
+        """setting data directly in the database dictionary"""
+        if not namespace in self.cache:
+            self.cache[namespace] = {}
+        self.cache[namespace][key] = value
+        self._mark_dirty(namespace, key)
+        if not self.cache_only:
+            self._flush_cache()
+
+    def get_data(self, namespace, key):
+        """retrieving data from the database"""
+        if self.cache_reads or self.cache_only:
+            if namespace in self.cache and key in self.cache[namespace]:
+                return self.cache[namespace][key]
+        if not self.cache_only:
+            # we have a permission to read from the database
+            value = self._database_read_value(namespace, key)
+            if value:
+                if not namespace in self.cache:
+                    self.cache[namespace] = {}
+                self.cache[namespace] = value
+            return value
+        return None
+
+    def del_key(self, namespace, key):
+        """retrieving data from the database"""
+        if not namespace in self.cache:
+            return None
+        del self.cache[namespace][key]
+        self._mark_dirty(namespace, key)
+        if not self.cache_only:
+            self._flush_cache()
 
     def contains_key(self, namespace, key):
         return self.get_data(namespace, key) != None
@@ -3548,29 +3650,23 @@ class MoreInfo(object):
 
     def delete(self):
         """Remove all entries associated with this MoreInfo"""
-        #TODO : this query looks suspicious ! should consider "is NULL" for null values
-        where_str, query_args = self._generate_where_query_args()
-        query_str = "DELETE FROM bibdoc_moreinfo WHERE %s" % (where_str, )
+        self.cache = {}
+        if not self.cache_only:
+            where_str, query_args = self._generate_where_query_args()
+            query_str = "DELETE FROM bibdoc_moreinfo WHERE %s" % (where_str, )
 
-        if DBG_LOG_QUERIES:
-            from invenio.bibtask import write_message
-            write_message("Executing query: " + query_str + "   ARGS: " + repr(query_args))
-            print "Executing query: " + query_str + "   ARGS: " + repr(query_args)
-        run_sql(query_str, query_args)
+            if DBG_LOG_QUERIES:
+                from invenio.bibtask import write_message
+                write_message("Executing query: " + query_str + "   ARGS: " + repr(query_args))
+                print "Executing query: " + query_str + "   ARGS: " + repr(query_args)
+            run_sql(query_str, query_args)
 
-    def enrich_from_hash(self, serialised_data):
+    def get_cache(self):
+        """Returns the content of the cache
+        @return The content of the MoreInfo cache
+        @rtype dictionary {namespace: {key1: value1, ... }, namespace2: {}}
         """
-        Enriches current MoreInfo structure with data provided as the second argument.
-        The data has a structure of a dictionary:
-            {namespace : { key1: value, key2: value2}, namespace2 {...},...}
-        This structure is cPickle serialised and later Base64 encoded to be transferrable
-        inside text based data formats
-
-        """
-        data = base64.b64decode(serialised_data)
-        for namespace in data:
-            for key in data[namespace]:
-                self.set_data(namespace, key, data[namespace][key])
+        return self.cache
 
 class BibDocMoreInfo(MoreInfo):
     """

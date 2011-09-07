@@ -243,6 +243,8 @@ class BibRelationTest(unittest.TestCase):
         self.assertEqual("key1" in newer_rel1, False)
         self.assertEqual("key1" in newer_rel2, False)
 
+        newer_rel1.delete()
+        newer_rel2.delete()
 
 class BibDocFilesTest(unittest.TestCase):
     """regression tests about BibDocFiles"""
@@ -320,6 +322,33 @@ class CheckBibDocAuthorization(unittest.TestCase):
 class MoreInfoTest(unittest.TestCase):
     """regression tests about BibDocFiles"""
 
+    def test_initialData(self):
+        """Testing if passing the initial data really enriches the existing structure"""
+        more_info = MoreInfo(docid = 134)
+        more_info.set_data("ns1", "k1", "vsrjklfh23478956@#%@#@#%")
+        more_info2 = MoreInfo(docid = 134, initial_data = {"ns1" : { "k2" : "weucb2324@#%@#$%@"}})
+        self.assertEqual(more_info.get_data("ns1", "k2"), "weucb2324@#%@#$%@")
+        self.assertEqual(more_info.get_data("ns1", "k1"), "vsrjklfh23478956@#%@#@#%")
+        self.assertEqual(more_info2.get_data("ns1", "k2"), "weucb2324@#%@#$%@")
+        self.assertEqual(more_info2.get_data("ns1", "k1"), "vsrjklfh23478956@#%@#@#%")
+        more_info3 = MoreInfo(docid = 134)
+        self.assertEqual(more_info3.get_data("ns1", "k2"), "weucb2324@#%@#$%@")
+        self.assertEqual(more_info3.get_data("ns1", "k1"), "vsrjklfh23478956@#%@#@#%")
+
+
+
+
+    def test_createSeparateRead(self):
+        """MoreInfo - testing if information saved using one instance is accessible via
+        a new one"""
+        more_info = MoreInfo(docid = 13)
+        more_info.set_data("some_namespace", "some_key", "vsrjklfh23478956@#%@#@#%")
+
+        more_info2 = MoreInfo(docid = 13)
+        self.assertEqual(more_info.get_data("some_namespace", "some_key"), "vsrjklfh23478956@#%@#@#%")
+        self.assertEqual(more_info2.get_data("some_namespace", "some_key"), "vsrjklfh23478956@#%@#@#%")
+        more_info2.del_key("some_namespace", "some_key")
+
     def test_DictionaryBehaviour(self):
         """moreinfo - tests assignments of data, both using the general interface and using
            namespaces"""
@@ -331,95 +360,31 @@ class MoreInfoTest(unittest.TestCase):
         self.assertEqual(more_info.get_data("namespace1", "key2"), "val2")
         self.assertEqual(more_info.get_data("namespace2", "key1"), "val3")
 
+    def test_inMemoryMoreInfo(self):
+        """test that MoreInfo is really stored only in memory (no database accesses)"""
+        m1 = MoreInfo(docid = 101, version = 12, cache_only = True)
+        m2 = MoreInfo(docid = 101, version = 12, cache_reads = False) # The most direct DB access
+        m1.set_data("n1", "k1", "v1")
+        self.assertEqual(m2.get_data("n1","k1"), None)
+        self.assertEqual(m1.get_data("n1","k1"), "v1")
 
-class BibDocRelationTest(unittest.TestCase):
-    def test_rel(self):
-        """bibdoc_relation"""
-        doc1 = BibDoc(docid = 10)
-        doc2 = BibDoc(docid = 12)
-        # creating a relation without passing more_info object -> the database will be accessed
-        rel1 = BibDocRelation(doc1, doc2, "some_rel", 1, 1)
-        rel2 = BibDocRelation(doc1, doc2, "some_rel", 1, 2)
+    def test_readCacheMoreInfo(self):
+        """we verify that if value is not present in the cache, read will happen from the database"""
+        m1 = MoreInfo(docid = 102, version = 12)
+        m2 = MoreInfo(docid = 102, version = 12) # The most direct DB access
+        self.assertEqual(m2.get_data("n11","k11"), None)
+        self.assertEqual(m1.get_data("n11","k11"), None)
 
-        rel1["key1"] = "value1"
-        rel1["key2"] = "value2"
-        rel2["key1"] = "value3"
+        m1.set_data("n11", "k11", "some value")
+        self.assertEqual(m1.get_data("n11","k11"), "some value")
+        self.assertEqual(m2.get_data("n11","k11"), "some value") # read from a different instance
 
-        rel1.flush()
-        rel2.flush()
-
-        # now testing the retrieval of data
-        new_rel1 = BibDocRelation(doc1, doc2, "some_rel", 1, 1)
-        new_rel2 = BibDocRelation(doc1, doc2, "some_rel", 1, 2)
-
-        self.assertEqual(new_rel1["key1"], "value1")
-        self.assertEqual(new_rel1["key2"], "value2")
-        self.assertEqual(new_rel2["key1"], "value3")
-
-        new_rel1.flush()
-        new_rel2.flush()
-
-        # now testing the deletion of relations
-        new_rel1.delete()
-        new_rel2.delete()
-
-        newer_rel1 = BibDocRelation(doc1, doc2, "some_rel", 1, 1)
-        newer_rel2 = BibDocRelation(doc1, doc2, "some_rel", 3, 2)
-        self.assertEqual("key1" in newer_rel1, False)
-        self.assertEqual("key1" in newer_rel2, False)
-
-    def test_retrieve_rel(self):
-        """bibdoc_relation_retrieval"""
-        doc1 = BibDoc(docid = 3)
-        doc2 = BibDoc(docid = 7)
-        rel = BibDocRelation(doc1, doc2, "is_extracted_from", 1, 1)
-        rel["key"] = "value"
-        rel.flush()
-
-        rel2 = BibDocRelation(doc1, doc2, "is_extracted_from", 3, 2)
-        rel2["key2"] = "value2"
-        rel2.flush()
-
-        rels = doc2.get_incoming_relations()
-        # retreived all incoming relations regardless the version
-        #  - should return 2 results
-        self.assertEqual(len(rels), 2)
-
-        rels = doc2.get_incoming_relations(version = 2) # only rels of version 2
-        self.assertEqual(len(rels), 1)
-        self.assertEqual(rels[0]["key2"], "value2")
-
-        rels = doc2.get_incoming_relations(version = 1) # only relations of ver 1
-        self.assertEqual(len(rels), 1)
-        self.assertEqual(rels[0]["key"], "value")
-
-        rels = doc2.get_outgoing_relations() # there should be no outgoing relations
-        self.assertEqual(len(rels), 0)
-
-        #now retrieving outgoing relations
-
-        rels = doc1.get_outgoing_relations()
-        # retreived all incoming relations regardless the version
-        #  - should return 2 results
-        self.assertEqual(len(rels), 2)
-
-        rels = doc1.get_outgoing_relations(version = 1) # only rels of version 1
-        self.assertEqual(len(rels), 1)
-        self.assertEqual(rels[0]["key"], "value")
-
-        rels = doc1.get_outgoing_relations(version = 3) # only relations of ver 3
-        self.assertEqual(len(rels), 1)
-        self.assertEqual(rels[0]["key2"], "value2")
-
-        rels = doc1.get_incoming_relations() # there should be no outgoing relations
-        self.assertEqual(len(rels), 0)
+        m1.delete()
+        m2.delete()
 
 
-        rel.delete()
-        rel2.delete()
 
-
-#TEST_SUITE = make_test_suite(BibDocsTest)
+#TEST_SUITE = make_test_suite(MoreInfoTest)
 
 TEST_SUITE = make_test_suite(BibRecDocsTest, \
                              BibDocsTest, \
