@@ -110,7 +110,7 @@ from invenio.bibdocfile import BibRecDocs, file_strip_ext, normalize_format, \
     get_docname_from_url, check_valid_url, download_url, \
     KEEP_OLD_VALUE, decompose_bibdocfile_url, InvenioWebSubmitFileError, \
     bibdocfile_url_p, CFG_BIBDOCFILE_AVAILABLE_FLAGS, guess_format_from_url, \
-    BibRelation
+    BibRelation, MoreInfo
 
 from invenio.search_engine import search_pattern
 
@@ -338,33 +338,48 @@ def bibupload(record, opt_tag=None, opt_mode=None,
             write_message("   -Stage NOT NEEDED", verbose=2)
 
 
-        # Have a look at FFR tags - relations between objects
-        write_message("Stage 2C: Start (Upload FFR tags.)", verbose=2)
-#        write_message("Processing FFR")
-#        write_message(str(extract_tag_from_record(record, 'FFR')))
-#        write_message("Full record : %s" %(str(record),))
-        record_had_FFR = False
+        # Have a look at BRT tags - relations between objects
+        write_message("Stage 2C: Start (Upload BRT tags.)", verbose=2)
+        record_had_BRT = False
         if opt_stage_to_start_from <= 2 and \
-            extract_tag_from_record(record, 'FFR') is not None:
- #           write_message("found FFR tags")
-            record_had_FFR = True
- #           write_message("Record : %s" %(str(record),))
+            extract_tag_from_record(record, 'BRT') is not None:
+            record_had_BRT = True
             try:
-                record = elaborate_ffr_tags(record, rec_id, opt_mode, pretend=pretend)
+                record = elaborate_brt_tags(record, rec_id, opt_mode, pretend=pretend)
             except Exception, e:
                 register_exception()
-                write_message("   Stage 2C failed: Error while elaborating FFR tags: %s" % e,
+                write_message("   Stage 2C failed: Error while elaborating BRT tags: %s" % e,
                     verbose=1, stream=sys.stderr)
                 return (1, int(rec_id))
 #            write_message("Record : %s" %(str(record),))
             if record is None:
-                write_message("   Stage 2C failed: Error while elaborating FFR tags",
+                write_message("   Stage 2C failed: Error while elaborating BRT tags",
                             verbose=1, stream=sys.stderr)
                 return (1, int(rec_id))
             write_message("   -Stage COMPLETED", verbose=2)
         else:
             write_message("   -Stage NOT NEEDED", verbose=2)
-#        write_message("finished processing FFR")
+
+        # Have a look at MIT tags -> MoreInfo Transfer
+        write_message("Stage 2D: Start (Upload MIT tags.)", verbose=2)
+        record_had_BRT = False
+        if opt_stage_to_start_from <= 2 and \
+            extract_tag_from_record(record, 'MIT') is not None:
+            record_had_BRT = True
+            try:
+                record = elaborate_mit_tags(record, rec_id, opt_mode, pretend=pretend)
+            except Exception, e:
+                register_exception()
+                write_message("   Stage 2D failed: Error while elaborating MIT tags: %s" % e,
+                    verbose=1, stream=sys.stderr)
+                return (1, int(rec_id))
+            if record is None:
+                write_message("   Stage 2D failed: Error while elaborating MIT tags",
+                            verbose=1, stream=sys.stderr)
+                return (1, int(rec_id))
+            write_message("   -Stage COMPLETED", verbose=2)
+        else:
+            write_message("   -Stage NOT NEEDED", verbose=2)
 
 
 
@@ -1057,28 +1072,74 @@ def synchronize_8564(rec_id, record, record_had_FFT, pretend=False):
     write_message('Final record: %s' % record, verbose=9)
     return record
 
-def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
-    """
-    Process FFR tags describing relations between existing objects
-    """
-    def _get_subfield_value(field, subfield_code):
-        res = field_get_subfield_values(field, subfield_code)
-        if res:
-            return res[0]
-        else:
-            return None
+def _get_subfield_value(field, subfield_code, default=None):
+    res = field_get_subfield_values(field, subfield_code)
+    if res != [] and res != None:
+        return res[0]
+    else:
+        return default
 
-    tuple_list = extract_tag_from_record(record, 'FFR')
+def elaborate_mit_tags(record, rec_id, mode, pretend=False):
+    """
+    Uploading MoreInfo -> MIT tags
+    """
+    tuple_list = extract_tag_from_record(record, 'MIT')
 
-    # Now gathering information from FFR tags - to be processed later
+    # Now gathering information from BRT tags - to be processed later
     relations_to_create = []
-    write_message("Processing FFR entries of the record ")
+    write_message("Processing MIT entries of the record ")
+    recordDocs = BibRecDocs(rec_id)
+
+    if tuple_list:
+        for mit in record_get_field_instances(record, 'MIT', ' ', ' '):
+            relation_id = _get_subfield_value(mit, "r")
+            bibdoc_id = _get_subfield_value(mit, "i")
+            bibdoc_name = _get_subfield_value(mit, "n")
+            bibdoc_ver = _get_subfield_value(mit, "v")
+            bibdoc_fmt = _get_subfield_value(mit, "f")
+            moreinfo_str = _get_subfield_value(mit, "m")
+
+            if bibdoc_id == None:
+                if bibdoc_name == None:
+                    raise StandardError("Incorrect relation. Neither name nor identifier of the first obejct has been specified")
+                else:
+                    # retrieving the ID based on the document name (inside current record)
+                    # The document is attached to current record.
+                    try:
+                        bibdoc_id = recordDocs.get_docid(bibdoc1_name)
+                    except:
+                        raise StandardError("BibDoc of a name %s does not exist within a record" % (bibdoc1_name, ))
+            else:
+                if bibdoc_name != None:
+                    write_message("Warning: both name and id of the first document of a relation have been specified. Ignoring the name")
+            if (moreinfo_str is None or mode in ("replace", "correct")) and (not pretend):
+
+                MoreInfo(docid=bibdoc_id , version = bibdoc_ver,
+                         format = bibdoc_fmt, relation = relation_id).delete()
+
+#            import rpdb2; rpdb2.start_embedded_debugger('password', fAllowRemote=True)
+            if (not moreinfo_str is None) and (not pretend):
+                mi = MoreInfo.create_from_serialised(moreinfo_str,
+                                                     docid=bibdoc_id,
+                                                     version = bibdoc_ver,
+                                                     format = bibdoc_fmt,
+                                                     relation = relation_id)
+
+def elaborate_brt_tags(record, rec_id, mode, pretend=False):
+    """
+    Process BRT tags describing relations between existing objects
+    """
+    tuple_list = extract_tag_from_record(record, 'BRT')
+
+    # Now gathering information from BRT tags - to be processed later
+    relations_to_create = []
+    write_message("Processing BRT entries of the record ")
     recordDocs = BibRecDocs(rec_id) #TODO: check what happens if there is no record yet ! Will the class represent an empty set?
 
     if tuple_list:
-        for ffr in record_get_field_instances(record, 'FFR', ' ', ' '):
+        for brt in record_get_field_instances(record, 'BRT', ' ', ' '):
 
-            relation_id = _get_subfield_value(ffr, "r")
+            relation_id = _get_subfield_value(brt, "r")
 
             bibdoc1_id = None
             bibdoc1_name = None
@@ -1090,8 +1151,8 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
             bibdoc2_fmt = None
 
             if not relation_id:
-                bibdoc1_id = _get_subfield_value(ffr, "i")
-                bibdoc1_name = _get_subfield_value(ffr, "n")
+                bibdoc1_id = _get_subfield_value(brt, "i")
+                bibdoc1_name = _get_subfield_value(brt, "n")
 
                 if bibdoc1_id == None:
                     if bibdoc1_name == None:
@@ -1107,11 +1168,11 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                     if bibdoc1_name != None:
                         write_message("Warning: both name and id of the first document of a relation have been specified. Ignoring the name")
 
-                bibdoc1_ver = _get_subfield_value(ffr, "v")
-                bibdoc1_fmt = _get_subfield_value(ffr, "f")
+                bibdoc1_ver = _get_subfield_value(brt, "v")
+                bibdoc1_fmt = _get_subfield_value(brt, "f")
 
-                bibdoc2_id = _get_subfield_value(ffr, "j")
-                bibdoc2_name = _get_subfield_value(ffr, "o")
+                bibdoc2_id = _get_subfield_value(brt, "j")
+                bibdoc2_name = _get_subfield_value(brt, "o")
 
                 if bibdoc2_id == None:
                     if bibdoc2_name == None:
@@ -1127,14 +1188,15 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                     if bibdoc2_name != None:
                         write_message("Warning: both name and id of the first document of a relation have been specified. Ignoring the name")
 
-                bibdoc2_ver = _get_subfield_value(ffr, "w")
-                bibdoc2_fmt = _get_subfield_value(ffr, "g")
+                bibdoc2_ver = _get_subfield_value(brt, "w")
+                bibdoc2_fmt = _get_subfield_value(brt, "g")
 
-            relation_type = _get_subfield_value(ffr, "t")
+            control_command = _get_subfield_value(brt, "d")
+            relation_type = _get_subfield_value(brt, "t")
             if not relation_type:
                 raise StandardError("The relation type must be specified")
 
-            more_info = _get_subfield_value(ffr, "m")
+            more_info = _get_subfield_value(brt, "m")
 
             # the relation id might be specified in the case of updating
             # MoreInfo table instead of other fields
@@ -1161,21 +1223,18 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
             relations_to_create.append((relation_id, bibdoc1_id, bibdoc1_ver,
                                  bibdoc1_fmt, bibdoc2_id, bibdoc2_ver,
                                  bibdoc2_fmt, relation_type, more_info,
-                                 rel_obj))
+                                 rel_obj, control_command))
 
-#    write_message("Encountered FFR fields : %s %s" % (str(relations_to_create), str(tuple_list)))
-    record_delete_field(record, 'FFR', ' ', ' ')
+    record_delete_field(record, 'BRT', ' ', ' ')
 
-    if mode in ("insert", "replace_or_insert", "append"):
+    if mode in ("insert", "replace_or_insert", "append", "correct", "replace"):
         # now creating relations between objects based on the data
-
         if not pretend:
             for (relation_id, bibdoc1_id, bibdoc1_ver, bibdoc1_fmt,
                  bibdoc2_id,  bibdoc2_ver, bibdoc2_fmt, rel_type,
-                 more_info, rel_obj) in relations_to_create:
-                if (mode == "replace_or_insert" and rel_obj == None) or mode == "insert" or mode == "append":
+                 more_info, rel_obj, control_command) in relations_to_create:
+                if rel_obj == None:
                     try:
- #                       write_message("creating relation")
                         rel_obj = BibRelation.create(bibdoc1_id = bibdoc1_id,
                                                       bibdoc1_ver = bibdoc1_ver,
                                                       bibdoc1_fmt = bibdoc1_fmt,
@@ -1183,25 +1242,24 @@ def elaborate_ffr_tags(record, rec_id, mode, pretend=False):
                                                       bibdoc2_ver = bibdoc2_ver,
                                                       bibdoc2_fmt = bibdoc2_fmt,
                                                       rel_type = rel_type)
-#                      write_message("DONE")
+                        relation_id = rel_obj.id
                     except Exception, e:
                         write_message("Error creating a relation between objects")
                         raise
-#                rel_obj.more_info.delete() # this will do nothing if this is an empty MoreInfo
-                #TODO: Upload MoreInfo entries
 
-    if mode == "replace" :
-        # In the replace mode, we competely replace existing MoreInfo table
-        raise StandardError("TODO: Implement this functionality ... what exactly should be done in this case... it is rather non-obvious")
+                if mode in ("correct", "replace"):
+                    # Clearing existing MoreInfo content
+                    rel_obj.get_more_info().delete()
 
-    if mode == "correct" :
-        # In the correct specified entried in the MoreInfo table
-        raise StandardError("TODO: Implement this functionality")
+                if more_info:
+                    print "Creating for relation_id = %s" %(str(relation_id), )
+                    MoreInfo.create_from_serialised(more_info, relation = relation_id)
 
-    if mode == "delete":
-        # removing the relation
-        raise StandardError("TODO: Implement this functionality")
+                if control_command == "DELETE":
+                    rel_obj.delete()
 
+    else:
+        write_message("BRT tag is not processed in the %s mode" % (mode, ))
     return record
 
 def elaborate_fft_tags(record, rec_id, mode, pretend=False):
@@ -1279,6 +1337,51 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
             raise
         return True
 
+    def _process_document_moreinfos(more_infos, docname, version, format, mode):
+        if not mode in ('correct', 'append', 'replace_or_insert', 'replace', 'correct', 'insert'):
+            print "exited because the mode is incorrect"
+            return
+
+        brd = BibRecDocs(rec_id)
+
+        docid = None
+        try:
+            docid = brd.get_docid(docname)
+        except:
+            raise StandardError("MoreInfo: No document of a given name associated with the record")
+
+        if not version:
+            # We have to retrieve the most recent version ...
+            version = brd.get_bibdoc(docname).get_latest_version()
+
+        doc_moreinfo_s, version_moreinfo_s, version_format_moreinfo_s, format_moreinfo_s = more_infos
+
+        doc_moreinfo = MoreInfo(docid = docid)
+        version_moreinfo = MoreInfo(docid = docid, version = version)
+        version_format_moreinfo = MoreInfo(docid = docid, version = version, format = format)
+        format_moreinfo = MoreInfo(docid = docid, format = format)
+
+        if mode in ("replace", "replace_or_insert"):
+            if doc_moreinfo_s: #only if specified, otherwise do not touch
+                MoreInfo(docid = docid).delete()
+
+            if format_moreinfo_s: #only if specified... otherwise do not touch
+                MoreInfo(docid = docid, format = format).delete()
+
+        if not doc_moreinfo_s is None:
+            MoreInfo.create_from_serialised(ser_str = doc_moreinfo_s, docid = docid)
+
+        if not version_moreinfo_s is None:
+            MoreInfo.create_from_serialised(ser_str = version_moreinfo_s,
+                                            docid = docid, version = version)
+        if not version_format_moreinfo_s is None:
+            MoreInfo.create_from_serialised(ser_str = version_format_moreinfo_s,
+                                            docid = docid, version = version,
+                                            format = format)
+        if not format_moreinfo_s is None:
+            MoreInfo.create_from_serialised(ser_str = format_moreinfo_s,
+                                            docid = docid, format = format)
+
     if mode == 'delete':
         raise StandardError('FFT tag specified but bibupload executed in --delete mode')
 
@@ -1293,11 +1396,7 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
             # Let's discover the type of the document
             # This is a legacy field and will not be enforced any particular
             # check on it.
-            doctype = field_get_subfield_values(fft, 't')
-            if doctype:
-                doctype = doctype[0]
-            else: # Default is Main
-                doctype = 'Main'
+            doctype = _get_subfield_value(fft, 't', 'Main') #Default is Main
 
             # Let's discover the url.
             url = field_get_subfield_values(fft, 'a')
@@ -1310,18 +1409,25 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
             else:
                 url = ''
 
+#TODO: a lot of code can be compactified using similar syntax ... should be more readable on the longer scale
+#      maybe right side expressions look a bit cryptic, but the elaborate_fft function would be much clearer
+
+            description =  _get_subfield_value(
+                fft, 'd', '' if (mode == 'correct' and doctype != 'FIX-MARC')
+                else KEEP_OLD_VALUE)
+
             # Let's discover the description
-            description = field_get_subfield_values(fft, 'd')
-            if description != []:
-                description = description[0]
-            else:
-                if mode == 'correct' and doctype != 'FIX-MARC':
+#            description = field_get_subfield_values(fft, 'd')
+#            if description != []:
+#                description = description[0]
+#            else:
+#                if mode == 'correct' and doctype != 'FIX-MARC':
                     ## If the user require to correct, and do not specify
                     ## a description this means she really want to
                     ## modify the description.
-                    description = ''
-                else:
-                    description = KEEP_OLD_VALUE
+#                    description = ''
+#                else:
+#                    description = KEEP_OLD_VALUE
 
             # Let's discover the desired docname to be created/altered
             name = field_get_subfield_values(fft, 'n')
@@ -1389,11 +1495,12 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                 else:
                     restriction = KEEP_OLD_VALUE
 
-            version = field_get_subfield_values(fft, 'v')
-            if version:
-                version = version[0]
-            else:
-                version = ''
+            version = _get_subfield_value(fft, 'v', '')
+
+            document_moreinfo = _get_subfield_value(fft, 'w')
+            version_moreinfo = _get_subfield_value(fft, 'p')
+            version_format_moreinfo = _get_subfield_value(fft, 's')
+            format_moreinfo = _get_subfield_value(fft, 'u')
 
             flags = field_get_subfield_values(fft, 'o')
             for flag in flags:
@@ -1419,13 +1526,13 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                     urls.append((icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags))
             else:
                 if url or format:
-                    docs[name] = (doctype, newname, restriction, version, [(url, format, description, comment, flags)])
+                    docs[name] = (doctype, newname, restriction, version, [(url, format, description, comment, flags)], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo])
                     if icon:
                         docs[name][4].append((icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags))
                 elif icon:
-                    docs[name] = (doctype, newname, restriction, version, [(icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags)])
+                    docs[name] = (doctype, newname, restriction, version, [(icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags)], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo])
                 else:
-                    docs[name] = (doctype, newname, restriction, version, [])
+                    docs[name] = (doctype, newname, restriction, version, [], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo])
 
         write_message('Result of FFT analysis:\n\tDocs: %s' % (docs,), verbose=9)
 
@@ -1441,7 +1548,7 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                     bibdoc.delete()
                 bibrecdocs.build_bibdoc_list()
 
-        for docname, (doctype, newname, restriction, version, urls) in docs.iteritems():
+        for docname, (doctype, newname, restriction, version, urls, more_infos) in docs.iteritems():
             write_message("Elaborating olddocname: '%s', newdocname: '%s', doctype: '%s', restriction: '%s', urls: '%s', mode: '%s'" % (docname, newname, doctype, restriction, urls, mode), verbose=9)
             if mode in ('insert', 'replace'): # new bibdocs, new docnames, new marc
                 if newname in bibrecdocs.get_bibdoc_names():
@@ -1607,6 +1714,9 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                 except:
                     register_exception()
                     raise
+            if not pretend:
+                _process_document_moreinfos(more_infos, docname, version, urls[0][1], mode)
+
     return record
 
 def insert_fmt_tags(record, rec_id, opt_mode, pretend=False):

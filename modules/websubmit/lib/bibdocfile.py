@@ -252,6 +252,22 @@ def _val_or_null(val, eq_name = None, q_str = None, q_args = None):
             q_args.append(str(val))
         return res
 
+def _sql_generate_conjunctive_where(to_process):
+    """Generating WHERE clause of a SQL statement, consisting of conjunction
+       of declared terms. Terms are defined by the to_process argument.
+       the method creates appropriate entries different in the case, value
+       should be NULL (None in the list) and in the case of not-none arguments.
+       In the second case, parametrised query is generated decreasing the
+       chance of an SQL-injection.
+
+       @param to_process List of tuples (value, database_column)
+       @type to_process list"""
+    q_str = []
+    q_args = []
+    for entry in to_process:
+        q_str.append(_val_or_null(entry[0], eq_name = entry[1], q_args = q_args))
+    return (" AND ".join(q_str), q_args)
+
 def file_strip_ext(afile, skip_version=False, only_known_extensions=False, allow_subformat=True):
     """
     Strip in the best way the extension from a filename.
@@ -717,7 +733,9 @@ class BibRecDocs(object):
                          bibdoc ON id=id_bibdoc WHERE id_bibrec=%s AND
                          status<>'DELETED' ORDER BY docname ASC""", (self.id,))
         for row in res:
-            cur_doc = BibDoc.create_instance(docid=row[0], recid=self.id, doctype=row[1], human_readable=self.human_readable)
+            cur_doc = BibDoc.create_instance(docid=row[0], recid=self.id,
+                                             doctype=row[1],
+                                             human_readable=self.human_readable)
             self.bibdocs.append(cur_doc)
 
     def list_bibdocs(self, doctype=''):
@@ -774,7 +792,8 @@ class BibRecDocs(object):
             potential = [afile for afile in potential if afile.get_checksum() == checksum]
 
             if potential:
-                potential = [afile for afile in potential if filecmp.cmp(afile.get_full_path(), path)]
+                potential = [afile for afile in potential if \
+                                 filecmp.cmp(afile.get_full_path(), path)]
 
                 if potential:
                     return True
@@ -838,7 +857,9 @@ class BibRecDocs(object):
             format = bibdocfile.get_format()
             comment = bibdocfile.get_comment()
             description = bibdocfile.get_description()
-            bibdoc1.add_file_new_format(bibdocfile.get_full_path(), description=description, comment=comment, format=format)
+            bibdoc1.add_file_new_format(bibdocfile.get_full_path(),
+                                        description=description,
+                                        comment=comment, format=format)
 
         ## Finally deleting old bibdoc2
         bibdoc2.delete()
@@ -933,16 +954,21 @@ class BibRecDocs(object):
             if never_fail:
                 docname = self.propose_unique_docname(docname)
             if docname in self.get_bibdoc_names():
-                raise InvenioWebSubmitFileError, "%s has already a bibdoc with docname %s" % (self.id, docname)
+                raise InvenioWebSubmitFileError, \
+                    "%s has already a bibdoc with docname %s" % (self.id, docname)
             else:
-                bibdoc = BibDoc.create_instance(recid=self.id, doctype=doctype, docname=docname, human_readable=self.human_readable)
+                bibdoc = BibDoc.create_instance(recid=self.id, doctype=doctype,
+                                                docname=docname,
+                                                human_readable=self.human_readable)
                 self.build_bibdoc_list()
                 return bibdoc
         except Exception, e:
             register_exception()
             raise InvenioWebSubmitFileError(str(e))
 
-    def add_new_file(self, fullpath, doctype="Main", docname=None, never_fail=False, description=None, comment=None, format=None, flags=None):
+    def add_new_file(self, fullpath, doctype="Main", docname=None,
+                     never_fail=False, description=None, comment=None,
+                     format=None, flags=None):
         """
         Directly add a new file to this record.
 
@@ -3458,20 +3484,36 @@ class MoreInfo(object):
         self.relation = relation
         self.cache_only = cache_only
 
+
         if initial_data != None:
             self.cache = initial_data
             self.dirty = initial_data
             if not self.cache_only:
-                self._flush_cache() #inserts new entries !
+                self._flush_cache() #inserts new entries
         else:
             self.cache = {}
             self.dirty = {}
 
         self.cache_reads = cache_reads
-        if not self.cache_only:
-            self._populate_cache()
 
-    def _populate_cache(self):
+        if not self.cache_only:
+            self.populate_from_database()
+
+    @staticmethod
+    def create_from_serialised(ser_str, docid = None, version = None, format = None,
+                 relation = None, cache_only = False, cache_reads = True, initial_data = None):
+        """Creates an instance of MoreInfo
+           using serialised data as the cache content"""
+        data = cPickle.loads(base64.b64decode(ser_str))
+        return MoreInfo(docid = docid, version = version, format = format,
+                        relation = relation, cache_only = cache_only,
+                        cache_reads = cache_reads, initial_data = data);
+
+    def serialise_cache(self):
+        """Returns a serialised representation of the cache"""
+        return base64.b64encode(cPickle.dumps(self.get_cache()))
+
+    def populate_from_database(self):
         """Retrieves all values of MoreInfo and places them in the cache"""
         where_str, where_args = self._generate_where_query_args()
         query_str = "SELECT namespace, data_key, data_value FROM bibdoc_moreinfo WHERE %s" % (where_str, )
@@ -3490,6 +3532,31 @@ class MoreInfo(object):
             self.dirty[namespace] = {}
         self.dirty[namespace][data_key] = True
 
+    def _database_get_distinct_string_list(self, column, namespace = None):
+        """A private method reading an unique list of strings from the
+        moreinfo database table"""
+        where_str, where_args = self._generate_where_query_args(
+            namespace = namespace)
+        query_str = "SELECT DISTINCT %s FROM bibdoc_moreinfo WHERE %s" % \
+            ( column, where_str, )
+
+        if DBG_LOG_QUERIES:
+            from invenio.bibtask import write_message
+            write_message("Executing query: " + query_str + "   ARGS: " + repr(where_args))
+            print "Executing query: " + query_str + "   ARGS: " + repr(where_args)
+
+        res = run_sql(query_str, where_args)
+
+        return [x[0] for x in res] if res else []
+
+    def _database_get_namespaces(self):
+        """Read the database to discover namespaces declared in a given MoreInfo"""
+        return self._database_get_distinct_string_list("namespace")
+
+    def _database_get_keys(self, namespace):
+        """Returns all keys assigned in a given namespace of a MoreInfo instance"""
+        return self._database_get_distinct_string_list("data_key", namespace=namespace)
+
     def _database_contains_key(self, namespace, key):
         return self._database_read_value(namespace, key) != None
 
@@ -3503,20 +3570,26 @@ class MoreInfo(object):
             query_parts = []
             query_args = []
 
-            _val_or_null(self.docid, q_str = query_parts, q_args = query_args)
-            _val_or_null(self.version, q_str = query_parts, q_args = query_args)
-            _val_or_null(self.format, q_str = query_parts, q_args = query_args)
-            _val_or_null(self.relation, q_str = query_parts, q_args = query_args)
+            to_process = [(self.docid, "id_bibdoc"), (self.version, "ver_bibdoc"),
+                          (self.format, "fmt_bibdoc"), (self.relation, "id_rel"),
+                          (str(namespace), "namespace"), (str(key), "data_key"),
+                          (str(serialised_val), "data_value")]
 
-            query = "INSERT INTO bibdoc_moreinfo (id_bibdoc, ver_bibdoc, fmt_bibdoc, id_rel, namespace, data_key, data_value) VALUES (" + ", ".join(query_parts) + ", %s, %s, %s)"
+            for entry in to_process:
+                _val_or_null(entry[0], q_str = query_parts, q_args = query_args)
 
-            query_args += [str(namespace), str(key), str(serialised_val)]
+            columns_str = ", ".join(map(lambda x: x[1], to_process))
+            values_str = ", ".join(query_parts)
+
+            query_str = "INSERT INTO bibdoc_moreinfo (%s) VALUES(%s)" % \
+                          (columns_str, values_str)
+
             if DBG_LOG_QUERIES:
                 from invenio.bibtask import write_message
-                write_message("Executing query: " + query + " ARGS: " + repr(query_args))
-                print "Executing query: " + query + " ARGS: " + repr(query_args)
+                write_message("Executing query: " + query_str + " ARGS: " + repr(query_args))
+                print "Executing query: " + query_str + " ARGS: " + repr(query_args)
 
-            run_sql(query, query_args)
+            run_sql(query_str, query_args)
         else:
             #Update existing value
             where_str, where_args = self._generate_where_query_args(namespace, key)
@@ -3571,7 +3644,8 @@ class MoreInfo(object):
         """Writes all the dirty cache entries into the database"""
         for namespace in self.dirty:
             for data_key in self.dirty[namespace]:
-                if namespace in self.cache and data_key in self.cache[namespace]:
+                if namespace in self.cache and data_key in self.cache[namespace]\
+                        and not self.cache[namespace][data_key] is None:
                     self._database_save_value(namespace, data_key, self.cache[namespace][data_key])
                 else:
                     # This might happen if a value has been removed from the cache
@@ -3580,21 +3654,12 @@ class MoreInfo(object):
 
     def _generate_where_query_args(self, namespace = None, data_key = None):
         """Private method generating WHERE clause of SQL statements"""
-        q_str = []
-        q_args = []
+        to_process = [(self.docid, "id_bibdoc"), (self.version, "ver_bibdoc"),
+                      (self.format, "fmt_bibdoc"), (self.relation, "id_rel")] +\
+                      ([(namespace, "namespace")] if namespace != None else []) +\
+                      ([(data_key, "data_key")] if data_key != None else [])
 
-        q_str.append(_val_or_null(self.docid, eq_name = "id_bibdoc", q_args = q_args))
-        q_str.append(_val_or_null(self.version, eq_name = "ver_bibdoc", q_args = q_args))
-        q_str.append(_val_or_null(self.format, eq_name = "fmt_bibdoc", q_args = q_args))
-        q_str.append(_val_or_null(self.relation, eq_name = "id_rel", q_args = q_args))
-        if namespace != None:
-            q_str.append("namespace=%s")
-            q_args.append(str(namespace))
-        if data_key != None:
-            q_str.append("data_key=%s")
-            q_args.append(str(data_key))
-
-        return (" AND ".join(q_str), q_args)
+        return _sql_generate_conjunctive_where(to_process)
 
     def set_data(self, namespace, key, value):
         """setting data directly in the database dictionary"""
@@ -3646,7 +3711,8 @@ class MoreInfo(object):
         return self.contains_key("", key)
 
     def __repr__(self):
-        return "MoreInfo(docid=%s, version=%s, format=%s, relation=%s)" % (self.docid, self.version, self.format, self.relation)
+        return "MoreInfo(docid=%s, version=%s, format=%s, relation=%s)" % \
+            (self.docid, self.version, self.format, self.relation)
 
     def delete(self):
         """Remove all entries associated with this MoreInfo"""
@@ -3667,6 +3733,27 @@ class MoreInfo(object):
         @rtype dictionary {namespace: {key1: value1, ... }, namespace2: {}}
         """
         return self.cache
+
+    def get_namespaces(self):
+        """Returns a list of namespaces present in the MoreInfo structure.
+           If the object is permitted access to the database, the data should
+           be always read from there. Unlike when reading a particular value,
+           we can not check if value is missing in the cache
+        """
+        if self.cache_only and self.cache_reads:
+            return self.cache_reads.keys()
+        return self._database_get_namespaces()
+
+    def get_keys(self, namespace):
+        """Returns a list of keys present in a given namespace"""
+        if self.cache_only and self.cache_reads:
+            return self.cache[namespace].keys() if namespace in self.cache else []
+        else:
+            return self._database_get_keys(namespace)
+
+    def flush(self):
+        """Flush the content into the database"""
+        self._flush_cache()
 
 class BibDocMoreInfo(MoreInfo):
     """
@@ -3707,8 +3794,8 @@ class BibDocMoreInfo(MoreInfo):
             self['flags'] = {}
         if DBG_LOG_QUERIES:
             from invenio.bibtask import write_message
-            write_message("Createing BibdocMoreInfo :" + repr(self["comments"]))
-            print "Createing BibdocMoreInfo :" + repr(self["comments"])
+            write_message("Creating BibDocMoreInfo :" + repr(self["comments"]))
+            print "Creating BibdocMoreInfo :" + repr(self["comments"])
 
     def __repr__(self):
         """
@@ -3743,7 +3830,8 @@ class BibDocMoreInfo(MoreInfo):
             flags[flagname][version][format] = True
             self['flags'] = flags
         else:
-            raise ValueError, "%s is not in %s" % (flagname, CFG_BIBDOCFILE_AVAILABLE_FLAGS)
+            raise ValueError, "%s is not in %s" % \
+                (flagname, CFG_BIBDOCFILE_AVAILABLE_FLAGS)
 
     def get_comment(self, format, version):
         """
@@ -3761,7 +3849,6 @@ class BibDocMoreInfo(MoreInfo):
         try:
             assert(type(version) is int)
             format = normalize_format(format)
-            #TODO ERROR POINT !
             return self['comments'].get(version, {}).get(format)
         except:
             register_exception()
@@ -4031,9 +4118,6 @@ class BibRelation(object):
         where_str, where_args = self._get_where_clauses()
         query = "SELECT id FROM bibdoc_bibdoc WHERE %s" % (where_str, )
 
-#        write_message("%s <--- %s" % (query, str(where_args)))
-#        print " EXECUTING QUERY: %s <--- %s" % (query, str(where_args))
-
         res = run_sql(query, where_args)
         if res and res[0][0]:
             self.id = int(res[0][0])
@@ -4057,13 +4141,7 @@ class BibRelation(object):
         @return
         @rtype tuple
         """
-        q_where = []
-        q_args = []
-        prc = self._get_value_column_mapping()
-        for entry in prc:
-            q_where.append(_val_or_null(entry[0], eq_name = entry[1],
-                                          q_args = q_args))
-        return (" AND ".join(q_where), q_args)
+        return _sql_generate_conjunctive_where(self._get_value_column_mapping())
 
     @staticmethod
     def create(bibdoc1_id = None, bibdoc1_ver = None,
@@ -4118,6 +4196,9 @@ class BibRelation(object):
         # removing associated MoreInfo
         self.more_info.delete()
 
+    def get_more_info(self):
+        return self.more_info
+
     @staticmethod
     def get_relations(rel_type = _bib_relation__any_value,
                        bibdoc1_id = _bib_relation__any_value,
@@ -4131,20 +4212,24 @@ class BibRelation(object):
           If a parameter is specified, its value has to match exactly.
           If a parameter is ommited, any of its values will be accepted"""
 
-        where_str = []
-        where_args = []
-
         to_process = [(rel_type, "rel_type"), (bibdoc1_id, "id_bibdoc1"),
                       (bibdoc1_ver, "ver_bibdoc1"), (bibdoc1_fmt, "fmt_bibdoc1"),
                       (bibdoc2_id, "id_bibdoc2"), (bibdoc2_ver, "ver_bibdoc2"),
                       (bibdoc2_fmt, "fmt_bibdoc2")]
 
-        for entry in to_process:
-            if entry[0] != _bib_relation__any_value:
-                where_str.append(_val_or_null(entry[0], eq_name = entry[1], q_args = where_args))
+        where_str, where_args = _sql_generate_conjunctive_where(
+            filter(lambda x: x[0] != _bib_relation__any_value, to_process))
 
-        query_str = "SELECT id FROM bibdoc_bibdoc WHERE %s" % (" AND ".join(where_str),)
-        res = run_sql(query_str, where_args)
+        if where_str:
+            where_str = "WHERE " + where_str # in case of nonempty where, we need a where clause
+
+        query_str = "SELECT id FROM bibdoc_bibdoc %s" % (where_str, )
+        #     print "running query : %s with arguments %s on the object %s" % (query_str, str(where_args), repr(self))
+        try:
+            res = run_sql(query_str, where_args)
+        except:
+            raise Exception(query_str + " " + str(where_args))
+
         results = []
         if res != None:
             for res_row in res:
@@ -4173,6 +4258,11 @@ class BibRelation(object):
     def __contains__(self, key):
         return self.more_info.__contains__(key)
 
+    def __repr__(self):
+        return "BibRelation(id_bibdoc1 = %s, ver_bibdoc1 = %s, fmt_bibdoc1 = %s, id_bibdoc2 = %s, ver_bibdoc2 = %s, fmt_bibdoc2 = %s, rel_type = %s)" % \
+            (self.bibdoc1_id, self.bibdoc1_ver, self.bibdoc1_fmt,
+             self.bibdoc2_id, self.bibdoc2_ver, self.bibdoc2_fmt,
+             self.rel_type)
 
 def readfile(filename):
     """

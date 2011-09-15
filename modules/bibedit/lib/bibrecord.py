@@ -288,7 +288,7 @@ def record_add_field(rec, tag, ind1=' ', ind2=' ', controlfield_value='',
                 else:
                     field_position_global = 1
         else:
-            if tag in ('FMT', 'FFT', 'FFR'):
+            if tag in ('FMT', 'FFT', 'BRT', 'MIT'):
                 # Add the new tag to the end of the record.
                 if tag_field_positions_global:
                     field_position_global = max(tag_field_positions_global) + 1
@@ -301,7 +301,7 @@ def record_add_field(rec, tag, ind1=' ', ind2=' ', controlfield_value='',
                 # right global field position.
                 immediate_lower_tag = '000'
                 for rec_tag in rec:
-                    if (tag not in ('FMT', 'FFT', 'FFR') and
+                    if (tag not in ('FMT', 'FFT', 'BRT', 'MIT') and
                         immediate_lower_tag < rec_tag < tag):
                         immediate_lower_tag = rec_tag
 
@@ -1460,7 +1460,7 @@ def _correct_record(record):
                 str([f[4] for f in record[tag]]) + ')'))
             record['000'] = record.pop(tag)
             tag = '000'
-        elif not ('001' <= tag <= upper_bound or tag in ('FMT', 'FFT', 'FFR')):
+        elif not ('001' <= tag <= upper_bound or tag in ('FMT', 'FFT', 'BRT', 'MIT')):
             errors.append(2)
             record['000'] = record.pop(tag)
             tag = '000'

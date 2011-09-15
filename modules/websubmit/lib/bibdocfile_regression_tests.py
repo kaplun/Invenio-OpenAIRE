@@ -334,9 +334,8 @@ class MoreInfoTest(unittest.TestCase):
         more_info3 = MoreInfo(docid = 134)
         self.assertEqual(more_info3.get_data("ns1", "k2"), "weucb2324@#%@#$%@")
         self.assertEqual(more_info3.get_data("ns1", "k1"), "vsrjklfh23478956@#%@#@#%")
-
-
-
+        more_info.del_key("ns1", "k1")
+        more_info.del_key("ns1", "k2")
 
     def test_createSeparateRead(self):
         """MoreInfo - testing if information saved using one instance is accessible via

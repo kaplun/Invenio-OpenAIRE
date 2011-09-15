@@ -48,8 +48,10 @@ from invenio.search_engine import print_record
 from invenio.dbquery import run_sql, get_table_status_info
 from invenio.dateutils import convert_datestruct_to_datetext
 from invenio.testutils import make_test_suite, run_test_suite, test_web_page_content
-from invenio.bibdocfile import BibRecDocs
+from invenio.bibdocfile import BibRecDocs, BibRelation, MoreInfo
 from invenio.bibtask import task_set_task_param, setup_loggers
+import base64
+import cPickle
 
 # helper functions:
 
@@ -182,6 +184,260 @@ class GenericBibUploadTest(unittest.TestCase):
     def tearDown(self):
         for recid in run_sql("SELECT id FROM bibrec WHERE id>%s", (self.last_recid,)):
             wipe_out_record_from_all_tables(recid[0])
+
+class BibUploadBibRelationsTest(GenericBibUploadTest):
+    def setUp(self):
+        GenericBibUploadTest.setUp(self)
+
+    def test_upload_by_name(self):
+        pass
+
+    def test_modify_by_number(self):
+        """modify relation entry by the docname inside the currently modified record"""
+        pass
+
+    def test_modify_by_name(self):
+        """modifying relation by providing bibdoc names rather than elation numbers"""
+        pass
+
+
+class BibUploadMoreInfoTest(GenericBibUploadTest):
+    """ Testing upload of different types of MoreInfo """
+
+    def _dict_checker(self, dic, more_info, equal = True):
+        """ Check the more_info for being conform with the dictionary
+        @param equal - The mode of conformity. True means that the dictionary
+               has to be equal with the MoreInfo. False means that dictionary
+               has to be contained in the MoreInfo
+        """
+#        import rpdb2; rpdb2.start_embedded_debugger('password', fAllowRemote=True)
+
+        for namespace in dic:
+            for key in dic[namespace]:
+                self.assertEqual(cPickle.dumps(dic[namespace][key]),
+                                 cPickle.dumps(more_info.get_data(namespace, key)),
+                                 "Different values for the value of key %s in the namespace %s inside of the MoreInfo object" % \
+                                     (namespace, key))
+
+        if equal:
+            for namespace in more_info.get_namespaces():
+                for key in more_info.get_keys(namespace):
+                    print "checking namespace %s and key %s in dic" % (namespace, key)
+                    self.assertTrue(namespace in dic,
+                                    "namespace %s present in the MoreInfo, but not present int the dictionary" % \
+                                        (namespace, ))
+                    self.assertTrue(key in dic[namespace],
+                                    "key %s present in the namespace %s of the MoreInfo but not present in the dictionary" % \
+                                        (namespace, key))
+                    self.assertEqual(cPickle.dumps(more_info.get_data(namespace, key)),
+                                     cPickle.dumps(dic[namespace][key]),
+                                     "Value for namespace '%s' and key '%s' varies between MoreInfo and the dictionary. moreinfo value: '%s' dictionary value: '%s'" % \
+                                         (namespace, key, repr(more_info.get_data(namespace, key)), repr(dic[namespace][key])))
+    def setUp(self):
+        GenericBibUploadTest.setUp(self)
+
+    def tearDown(self):
+        GenericBibUploadTest.tearDown(self)
+
+    def test_relation_moreinfo_insert(self):
+        """ Testing the upload of BibRelation and corresponding MoreInfo field"""
+        # Cleaning existing data
+        rels = BibRelation.get_relations(bibdoc1_id = 70, bibdoc2_id = 71, rel_type = "is_extracted_from")
+        for rel in rels:
+            rel.delete()
+
+        # Uploading
+        relation_upload_template = """
+        <record>
+           <datafield tag="BRT" ind1=" " ind2=" ">
+              <subfield code="i">70</subfield>
+              <subfield code="j">71</subfield>
+              <subfield code="t">is_extracted_from</subfield>
+              <subfield code="m">%s</subfield>
+           </datafield>
+           <datafield tag="100" ind1=" " ind2=" ">
+              <subfield code="a">Some author</subfield>
+           </datafield>
+        </record>"""
+        data_to_insert = {"first namespace": {"k1" : "val1", "k2" : "val2"},
+                          "second" : {"k1" : "#@$#$@###!!!", "k123": {1:2, 9: (6,2,7)}}}
+        serialised = base64.b64encode(cPickle.dumps(data_to_insert))
+
+        recs = bibupload.xml_marc_to_records(relation_upload_template % (serialised, ))
+        err, recid = bibupload.bibupload(recs[0], opt_mode='insert')
+
+        # Verifying the correctness of the uploaded data
+        rels = BibRelation.get_relations(bibdoc1_id = 70, bibdoc2_id = 71, rel_type = "is_extracted_from")
+        self.assertEqual(len(rels), 1)
+        rel = rels[0]
+
+        self.assertEqual(rel.bibdoc1_id, 70)
+        self.assertEqual(rel.bibdoc2_id, 71)
+        self.assertEqual(rel.get_data("first namespace", "k1"), "val1")
+        self.assertEqual(rel.get_data("first namespace", "k2"), "val2")
+        self.assertEqual(rel.get_data("second", "k1"), "#@$#$@###!!!")
+        self.assertEqual(rel.get_data("second", "k123")[1], 2)
+        self.assertEqual(rel.get_data("second", "k123")[9], (6,2,7))
+
+        self._dict_checker(data_to_insert, rel.more_info)
+        retrieve_rec = print_record(recid, "xm")
+
+        # Cleaning after the upload ... just in case we have selected more
+        for rel in rels:
+            rel.delete()
+
+    def _serialise_data(self, data):
+        return base64.b64encode(cPickle.dumps(data))
+
+    # Subfield tags used to upload particular types of MoreInfo
+    _mi_bibdoc = "w"
+    _mi_bibdoc_version = "p"
+    _mi_bibdoc_version_format = "s"
+    _mi_bibdoc_format = "u"
+
+    def _generate_moreinfo_tag(self, mi_type, data):
+        """
+        """
+        serialised = self._serialise_data(data)
+        return """<subfield code="%s">%s</subfield>""" % (mi_type, serialised)
+
+    def test_document_moreinfo_insert(self):
+        """ Inserting new MoreInfo to the document
+        1) Inserting new MoreInfo to new document
+        2) Inserting new MoreInfo keys existing document version
+        3) Removing keys from MoreInfo
+        4) Removing document and asserting, MoreInfo gets removed as well
+        5) Overriding MoreInfo keys
+        """
+
+        moreinfo_upload_template = """
+        <record>
+            <datafield tag="FFT" ind1=" " ind2=" ">
+               <subfield code="a">http://invenio-software.org/download/invenio-demo-site-files/0106015_01.jpg</subfield>
+               <subfield code="r">restricted_picture</subfield>
+               %(additional_content)s
+           </datafield>
+           <datafield tag="100" ind1=" " ind2=" ">
+              <subfield code="a">Some author</subfield>
+           </datafield>
+        </record>"""
+
+        data_to_insert = {"first namespace": {"k1" : "val1", "k2" : "val2"},
+                          "second" : {"k1" : "#@$#$@###!!!", "k123": {1:2, 9: (6,2,7)}}}
+
+        sfs = []
+        sfs.append(self._generate_moreinfo_tag(BibUploadMoreInfoTest._mi_bibdoc,
+                                               {"first namespace" :
+                                                {"type": "document moreinfo"}}))
+        sfs.append(self._generate_moreinfo_tag(BibUploadMoreInfoTest._mi_bibdoc_version,
+                                               {"first namespace" :
+                                                {"type": "Bibdoc - version moreinfo"}}))
+        sfs.append(self._generate_moreinfo_tag(BibUploadMoreInfoTest._mi_bibdoc_version_format,
+                                               {"first namespace" :
+                                                {"type": "Bibdoc - version, format moreinfo"}}))
+        sfs.append(self._generate_moreinfo_tag(BibUploadMoreInfoTest._mi_bibdoc_format,
+                                               {"first namespace" :
+                                                {"type": "Bibdoc - format moreinfo"}}))
+        print "\n".join(sfs)
+        marcxml_1 = moreinfo_upload_template % {"additional_content" : "\n".join(sfs)}
+        print "MARC TO INSERT: " + marcxml_1
+        recs = bibupload.xml_marc_to_records(marcxml_1)
+        err, recid = bibupload.bibupload(recs[0], opt_mode='insert')
+
+        # now checking if all the data has been uploaded correctly
+
+        bdr = BibRecDocs(recid)
+        doc = bdr.list_bibdocs()[0]
+        docid = doc.get_id()
+        mi_doc = MoreInfo(docid = docid)
+        mi_doc_ver = MoreInfo(docid = docid, version = 1)
+        mi_doc_ver_fmt = MoreInfo(docid = docid, version = 1, format=".jpg")
+        mi_doc_fmt = MoreInfo(docid = docid, format=".jpg")
+        self._dict_checker({"first namespace" : {"type": "document moreinfo"}},
+                           mi_doc, equal=False) # in case of the document only inclusive check
+        self._dict_checker({"first namespace" : {"type": "Bibdoc - version moreinfo"}},
+                           mi_doc_ver)
+        self._dict_checker({"first namespace" : {
+                    "type": "Bibdoc - version, format moreinfo"}},
+                           mi_doc_ver_fmt)
+        self._dict_checker({"first namespace" : {"type": "Bibdoc - format moreinfo"}},
+                           mi_doc_fmt)
+        #now appending to a particular version of MoreInfo
+        # uplad new key to an existing dictionary of a version
+        def _get_mit_template(recid, bibdocid=None, bibdocname=None,
+                              version=None, format=None, relation=None, data=None):
+            ser = base64.b64encode(cPickle.dumps(data)) if not data is None else None
+            subfields = []
+            for s_code, val in (("r", relation), ("i", bibdocid),
+                                ("n", bibdocname), ("v", version),
+                                ("f", format) , ("m", ser)):
+                if not val is None:
+                    subfields.append("""<subfield code="%s">%s</subfield>""" % \
+                                         (s_code, val))
+
+            return """<record>
+              <controlfield tag="001">%s</controlfield>
+              <datafield tag="MIT" ind1=" " ind2=" ">
+                 %s
+              </datafield>
+              </record>""" % (str(recid), ("\n".join(subfields)))
+
+        marcxml_2 = _get_mit_template(recid, version = 1, bibdocid = docid,
+                                       data= {"first namespace" :
+                                              {"new key": {1:2, 987:678}}})
+        recs = bibupload.xml_marc_to_records(marcxml_2)
+        bibupload.bibupload(recs[0], opt_mode='append')
+        mi = MoreInfo(docid = docid, version = 1)
+
+        self._dict_checker({
+                "first namespace" : {"type": "Bibdoc - version moreinfo",
+                                     "new key": {1:2, 987:678}
+                                     }
+                }, mi)
+
+        #removing the entire old content of the MoreInfo and uploading new
+        data = {"ns1" : {"nk1": 12, "mk1": "this is new content"},
+                "namespace two" : {"ddd" : "bbb"}}
+        marcxml_3 = _get_mit_template(recid, version = 1, bibdocid = docid,
+                                       data= data)
+        recs = bibupload.xml_marc_to_records(marcxml_3)
+        bibupload.bibupload(recs[0], opt_mode='correct')
+        mi = MoreInfo(docid = docid, version = 1)
+        self._dict_checker(data, mi)
+
+        # removing a particular key
+
+        marcxml_4 = _get_mit_template(recid, version = 1, bibdocid = docid,
+                                       data= {"ns1": {"nk1" : None}})
+        recs = bibupload.xml_marc_to_records(marcxml_4)
+        bibupload.bibupload(recs[0], opt_mode='append')
+        mi = MoreInfo(docid = docid, version = 1)
+        self._dict_checker( {"ns1" : { "mk1": "this is new content"},
+                "namespace two" : {"ddd" : "bbb"}}, mi)
+
+        # adding new key
+        marcxml_5 = _get_mit_template(recid, version = 1, bibdocid = docid,
+                                       data= {"ns1": {"newkey" : "newvalue"}})
+        recs = bibupload.xml_marc_to_records(marcxml_5)
+        bibupload.bibupload(recs[0], opt_mode='append')
+        mi = MoreInfo(docid = docid, version = 1)
+        self._dict_checker( {"ns1" : { "mk1": "this is new content", "newkey" : "newvalue"},
+                "namespace two" : {"ddd" : "bbb"}}, mi)
+
+class BibUploadTemporaryIdentifiersTest(GenericBibUploadTest):
+    """ Testing the usage of temporary identifiers... """
+
+    def setUp(self):
+        GenericBibUploadTest.setUp(self)
+
+
+    def test_upload(self):
+        """ 1) Uploading two new documents together with a relation between them
+            2) Creating new versions of both uploaded earlier documents and
+               creating relation between them.
+        """
+        pass
+
 
 class BibUploadInsertModeTest(GenericBibUploadTest):
     """Testing insert mode."""
@@ -3850,6 +4106,7 @@ allow any</subfield>
         self.assertEqual(test_web_page_content(testrec_expected_url, 'hyde', 'h123yde', expected_text='Authorization failure'), [])
         self.assertEqual(test_web_page_content(testrec_expected_url, 'jekyll', 'j123ekyll', expected_text=expected_content_version), [])
 
+#TEST_SUITE = make_test_suite(BibUploadMoreInfoTest)
 
 TEST_SUITE = make_test_suite(BibUploadHoldingPenTest,
                              BibUploadInsertModeTest,
@@ -3868,6 +4125,9 @@ TEST_SUITE = make_test_suite(BibUploadHoldingPenTest,
                              BibUploadStrongTagsTest,
                              BibUploadFFTModeTest,
                              BibUploadPretendTest,
+                             BibUploadMoreInfoTest,
+                             BibUploadTemporaryIdentifiersTest,
+                             BibUploadBibRelationsTest
                              )
 
 if __name__ == "__main__":
