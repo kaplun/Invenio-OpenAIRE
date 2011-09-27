@@ -128,6 +128,28 @@ _WRITING_RIGHTS = None
 ## Let's set a reasonable timeout for URL request (e.g. FFT)
 socket.setdefaulttimeout(40)
 
+def parse_identifier(identifier):
+    """Parse the identifier and determine if it is temporary or fixed"""
+    id_str = str(identifier)
+    if not id_str.startswith("TMP:"):
+        return (False, identifier)
+    else:
+        (True, id_str[4:])
+
+def resolve_identifier(tmps, identifier):
+    """Resolves an identifier. If the identifier is not temporary, this
+    function is an identity on the second argument. Otherwise, a resolved
+    value is returned or an exception raised"""
+
+    is_tmp, tmp_id = parse_identifier(identifier)
+    if bibdoc_tmpid:
+        if identifier in tmps:
+            write_message("WARNING: the temporary identifier %s has been declared more than once. Ignoring the second occurance" % (bibdoc_tmpid, ))
+        else:
+            tmp_ids[bibdoc_tmpid] = brd.get_docid(docname)
+
+
+
 _re_find_001 = re.compile('<controlfield\\s+tag=("001"|\'001\')\\s*>\\s*(\\d*)\\s*</controlfield>', re.S)
 def bibupload_pending_recids():
     """This function embed a bit of A.I. and is more a hack than an elegant
@@ -161,7 +183,8 @@ def bibupload_pending_recids():
 
 ### bibupload engine functions:
 def bibupload(record, opt_tag=None, opt_mode=None,
-        opt_stage_to_start_from=1, opt_notimechange=0, oai_rec_id = "", pretend=False):
+        opt_stage_to_start_from=1, opt_notimechange=0, oai_rec_id = "", pretend=False,
+        tmp_ids = {}, tmp_vers = {}):
     """Main function: process a record and fit it in the tables
     bibfmt, bibrec, bibrec_bibxxx, bibxxx with proper record
     metadata.
@@ -304,7 +327,9 @@ def bibupload(record, opt_tag=None, opt_mode=None,
                 task_update_status("ERROR")
                 sys.exit(1)
             try:
-                record = elaborate_fft_tags(record, rec_id, opt_mode, pretend=pretend)
+                record = elaborate_fft_tags(record, rec_id, opt_mode,
+                                            pretend=pretend, tmp_ids = tmp_ids,
+                                            tmp_versions = tmp_versions)
             except Exception, e:
                 register_exception()
                 write_message("   Stage 2 failed: Error while elaborating FFT tags: %s" % e,
@@ -336,51 +361,6 @@ def bibupload(record, opt_tag=None, opt_mode=None,
             write_message("   -Stage COMPLETED", verbose=2)
         else:
             write_message("   -Stage NOT NEEDED", verbose=2)
-
-
-        # Have a look at BRT tags - relations between objects
-        write_message("Stage 2C: Start (Upload BRT tags.)", verbose=2)
-        record_had_BRT = False
-        if opt_stage_to_start_from <= 2 and \
-            extract_tag_from_record(record, 'BRT') is not None:
-            record_had_BRT = True
-            try:
-                record = elaborate_brt_tags(record, rec_id, opt_mode, pretend=pretend)
-            except Exception, e:
-                register_exception()
-                write_message("   Stage 2C failed: Error while elaborating BRT tags: %s" % e,
-                    verbose=1, stream=sys.stderr)
-                return (1, int(rec_id))
-#            write_message("Record : %s" %(str(record),))
-            if record is None:
-                write_message("   Stage 2C failed: Error while elaborating BRT tags",
-                            verbose=1, stream=sys.stderr)
-                return (1, int(rec_id))
-            write_message("   -Stage COMPLETED", verbose=2)
-        else:
-            write_message("   -Stage NOT NEEDED", verbose=2)
-
-        # Have a look at MIT tags -> MoreInfo Transfer
-        write_message("Stage 2D: Start (Upload MIT tags.)", verbose=2)
-        record_had_BRT = False
-        if opt_stage_to_start_from <= 2 and \
-            extract_tag_from_record(record, 'MIT') is not None:
-            record_had_BRT = True
-            try:
-                record = elaborate_mit_tags(record, rec_id, opt_mode, pretend=pretend)
-            except Exception, e:
-                register_exception()
-                write_message("   Stage 2D failed: Error while elaborating MIT tags: %s" % e,
-                    verbose=1, stream=sys.stderr)
-                return (1, int(rec_id))
-            if record is None:
-                write_message("   Stage 2D failed: Error while elaborating MIT tags",
-                            verbose=1, stream=sys.stderr)
-                return (1, int(rec_id))
-            write_message("   -Stage COMPLETED", verbose=2)
-        else:
-            write_message("   -Stage NOT NEEDED", verbose=2)
-
 
 
         # Update of the BibFmt
@@ -482,6 +462,39 @@ def find_record_ids_by_oai_id(oaiId):
         return recids
     else:
         return intbitset()
+
+def bibupload_post_phase(record, mode = None, rec_id = "", pretend = False,
+                         tmp_ids = {}, tmp_vers = {}):
+
+    def _elaborate_tag(tag, fun):
+        if extract_tag_from_record(record, tag) is not None:
+            try:
+                record = fun()
+            except Exception, e:
+                register_exception()
+                write_message("   Stage failed: Error while elaborating %s tags: %s" % (tag, e),
+                              verbose=1, stream=sys.stderr)
+                return (1, int(rec_id))
+            if record is None:
+                write_message("   Stage failed: Error while elaborating %s tags" % (tag, ),
+                              verbose=1, stream=sys.stderr)
+                return (1, int(rec_id))
+            write_message("   -Stage COMPLETED", verbose=2)
+        else:
+            write_message("   -Stage NOT NEEDED", verbose=2)
+
+    _elaborate_tag("BRT", lambda: elaborate_brt_tags(record, rec_id = rec_id,
+                                                     mode = opt_mode,
+                                                     pretend = pretend,
+                                                     tmp_ids = tmp_ids,
+                                                     tmp_vers = tmp_vers))
+
+
+    _elaborate_tag("MIT", lambda: elaborate_mit_tags(record, rec_id = rec_id,
+                                                     mode = mode,
+                                                     pretend = pretend,
+                                                     tmp_ids = tmp_ids,
+                                                     tmp_vers = tmp_vers))
 
 def insert_record_into_holding_pen(record, oai_id, pretend=False):
     query = "INSERT INTO bibHOLDINGPEN (oai_id, changeset_date, changeset_xml, id_bibrec) VALUES (%s, NOW(), %s, %s)"
@@ -1079,7 +1092,8 @@ def _get_subfield_value(field, subfield_code, default=None):
     else:
         return default
 
-def elaborate_mit_tags(record, rec_id, mode, pretend=False):
+def elaborate_mit_tags(record, rec_id, mode, pretend = False, tmp_ids = {},
+                       tmp_vers = {}):
     """
     Uploading MoreInfo -> MIT tags
     """
@@ -1094,8 +1108,25 @@ def elaborate_mit_tags(record, rec_id, mode, pretend=False):
         for mit in record_get_field_instances(record, 'MIT', ' ', ' '):
             relation_id = _get_subfield_value(mit, "r")
             bibdoc_id = _get_subfield_value(mit, "i")
-            bibdoc_name = _get_subfield_value(mit, "n")
+            # checking for a possibly temporary ID
+            is_temporary, bibdoc_tmpid = parse_identifier(bibdoc_id)
+            if is_temporary:
+                if not bibdoc_tmpid in tmp_ids:
+                    raise StandardError("Temporary identifier %s not present in the dictionary" % (bibdoc_tmpid, ))
+                else:
+                    bibdoc_id = tmp_ids[bibdoc_tmpid]
+
             bibdoc_ver = _get_subfield_value(mit, "v")
+
+            # resolving possibly temporary version
+            is_temporary, bibdoc_tmpver = parse_identifier(bibdoc_ver)
+            if is_temporary:
+                if not bibdoc_tmpver in tmp_vers:
+                    raise StandardError("Temporary version %s not present in the dictionary" % (bibdoc_tmpver, ))
+                else:
+                    bibdoc_ver = tmp_vers[bibdoc_tmpver]
+
+            bibdoc_name = _get_subfield_value(mit, "n")
             bibdoc_fmt = _get_subfield_value(mit, "f")
             moreinfo_str = _get_subfield_value(mit, "m")
 
@@ -1124,8 +1155,9 @@ def elaborate_mit_tags(record, rec_id, mode, pretend=False):
                                                      version = bibdoc_ver,
                                                      format = bibdoc_fmt,
                                                      relation = relation_id)
+    return record
 
-def elaborate_brt_tags(record, rec_id, mode, pretend=False):
+def elaborate_brt_tags(record, rec_id, mode, pretend=False, tmp_ids = {}, tmp_vers = {}):
     """
     Process BRT tags describing relations between existing objects
     """
@@ -1262,7 +1294,8 @@ def elaborate_brt_tags(record, rec_id, mode, pretend=False):
         write_message("BRT tag is not processed in the %s mode" % (mode, ))
     return record
 
-def elaborate_fft_tags(record, rec_id, mode, pretend=False):
+def elaborate_fft_tags(record, rec_id, mode, pretend=False,
+                       tmp_ids = {}, tmp_vers = {}):
     """
     Process FFT tags that should contain $a with file pathes or URLs
     to get the fulltext from.  This function enriches record with
@@ -1496,13 +1529,25 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                     restriction = KEEP_OLD_VALUE
 
             version = _get_subfield_value(fft, 'v', '')
-
+            # checking if version is temporary... if so, filling a different varaible
+            is_tmp_ver, bibdoc_tmpver = parse_identifier(version)
+            if is_tmp_ver:
+                version = None
+            else:
+                bibdoc_tmpver = None
             document_moreinfo = _get_subfield_value(fft, 'w')
             version_moreinfo = _get_subfield_value(fft, 'p')
             version_format_moreinfo = _get_subfield_value(fft, 's')
             format_moreinfo = _get_subfield_value(fft, 'u')
 
+            bibdoc_tmpid = field_get_subfield_values(fft, 'i')
+            bibdoc_tmpid = bibdoc_tmpid[0] if bibdoc_tmpid else None
+            is_tmp_id, bibdoc_tmpid = parse_identifier(bibdoc_tmpid)
+            if not is_tmp_id:
+                bibdoc_tmpid = None
+
             flags = field_get_subfield_values(fft, 'o')
+
             for flag in flags:
                 if flag not in CFG_BIBDOCFILE_AVAILABLE_FLAGS:
                     raise StandardError, "fft '%s' specifies a non available flag: %s" % (fft, flag)
@@ -1526,13 +1571,13 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                     urls.append((icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags))
             else:
                 if url or format:
-                    docs[name] = (doctype, newname, restriction, version, [(url, format, description, comment, flags)], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo])
+                    docs[name] = (doctype, newname, restriction, version, [(url, format, description, comment, flags)], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo], bibdoc_tmpid, bibdoc_tmpver)
                     if icon:
                         docs[name][4].append((icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags))
                 elif icon:
-                    docs[name] = (doctype, newname, restriction, version, [(icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags)], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo])
+                    docs[name] = (doctype, newname, restriction, version, [(icon, icon[len(file_strip_ext(icon)):] + ';icon', description, comment, flags)], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo], bibdoc_tmpid, bibdoc_tmpver)
                 else:
-                    docs[name] = (doctype, newname, restriction, version, [], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo])
+                    docs[name] = (doctype, newname, restriction, version, [], [document_moreinfo, version_moreinfo, version_format_moreinfo, format_moreinfo], bibdoc_tmpid, bibdoc_tmpver)
 
         write_message('Result of FFT analysis:\n\tDocs: %s' % (docs,), verbose=9)
 
@@ -1548,7 +1593,7 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                     bibdoc.delete()
                 bibrecdocs.build_bibdoc_list()
 
-        for docname, (doctype, newname, restriction, version, urls, more_infos) in docs.iteritems():
+        for docname, (doctype, newname, restriction, version, urls, more_infos, bibdoc_tmpid, bibdoc_tmpver) in docs.iteritems():
             write_message("Elaborating olddocname: '%s', newdocname: '%s', doctype: '%s', restriction: '%s', urls: '%s', mode: '%s'" % (docname, newname, doctype, restriction, urls, mode), verbose=9)
             if mode in ('insert', 'replace'): # new bibdocs, new docnames, new marc
                 if newname in bibrecdocs.get_bibdoc_names():
@@ -1716,6 +1761,24 @@ def elaborate_fft_tags(record, rec_id, mode, pretend=False):
                     raise
             if not pretend:
                 _process_document_moreinfos(more_infos, docname, version, urls[0][1], mode)
+
+            # resolving temporary version and identifier
+            brd = BibRecDocs(rec_id)
+            if bibdoc_tmpid:
+                if bibdoc_tmpid in tmp_ids:
+                    write_message("WARNING: the temporary identifier %s has been declared more than once. Ignoring the second occurance" % (bibdoc_tmpid, ))
+                else:
+                    tmp_ids[bibdoc_tmpid] = brd.get_docid(docname)
+
+            if bibdoc_tmpver:
+                if bibdoc_tmpver in tmp_vers:
+                    write_message("WARNING: the temporary version identifier %s has been declared more than once. Ignoring the second occurance" % (bibdoc_verid, ))
+                else:
+                    if version == None:
+                        tmp_vers[bibdoc_tmpver] = version if version else \
+                            brd.get_bibdoc(docname).get_latest_version()
+                    else:
+                        tmp_vers[bibdoc_tmpver] = version
 
     return record
 
@@ -2250,6 +2313,81 @@ def writing_rights_p():
         return False
     return True
 
+
+def bibupload_records(records, opt_mode = None, opt_tag = None,
+                      opt_stage_to_start_from = 1, opt_notimechange = 0,
+                      pretend = False):
+    """perform the task of uploading a set of records"""
+
+    #Dictionaries maintaining temporary identifiers
+    # Structure: identifier -> number
+
+    tmp_ids = {}
+    tmp_vers = {}
+
+    # The first phase -> assigning meaning to temporary identifiers
+
+    for record in records:
+        record_id = record_extract_oai_id(record)
+        task_sleep_now_if_required(can_stop_too=True)
+        if opt_mode == "holdingpen":
+                    #inserting into the holding pen
+            write_message("Inserting into holding pen", verbose=3)
+            insert_record_into_holding_pen(record, record_id)
+        else:
+            write_message("Inserting into main database", verbose=3)
+            error = bibupload(
+                record,
+                opt_tag = opt_tag,
+                opt_mode = opt_mode,
+                opt_stage_to_start_from = opt_stage_to_start_from,
+                opt_notimechange = opt_notimechange,
+                oai_rec_id = record_id,
+                pretend = pretend,
+                tmp_ids = tmp_ids,
+                tmp_vers = tmp_vers)
+
+            if error[0] == 1:
+                if record:
+                    write_message(record_xml_output(record),
+                                  stream=sys.stderr)
+                else:
+                    write_message("Record could not have been parsed",
+                                  stream=sys.stderr)
+                    stat['nb_errors'] += 1
+            elif error[0] == 2:
+                if record:
+                    write_message(record_xml_output(record),
+                                  stream=sys.stderr)
+                else:
+                    write_message("Record could not have been parsed",
+                                  stream=sys.stderr)
+
+            # stat us a global variable
+            task_update_progress("Done %d out of %d." % \
+                                     (stat['nb_records_inserted'] + \
+                                          stat['nb_records_updated'],
+                                      stat['nb_records_to_upload']))
+
+    # Second phase -> Now we can process all entries where temporary identifiers might appear (BRT, MIT, BDA)
+
+    write_message("Uploading BRT, MIT and BDA fields")
+    if opt_mode != "holdingpen":
+        for record in recs:
+            record_id = record_extract_oai_id(record)
+            bibupload_post_phase(record,
+                                 opt_tag = opt_tag,
+                                 opt_mode = opt_mode,
+
+
+                                 oai_rec_id = record_id,
+                                 pretend = pretend,
+                                 tmp_ids = tmp_ids,
+                                 tmp_vers = tmp_vers)
+
+
+
+
 def task_run_core():
     """ Reimplement to add the body of the task."""
     error = 0
@@ -2265,45 +2403,14 @@ def task_run_core():
         write_message("   -Open XML marc: DONE", verbose=2)
         task_sleep_now_if_required(can_stop_too=True)
         write_message("Entering records loop", verbose=3)
+
         if recs is not None:
             # We proceed each record by record
-            for record in recs:
-                record_id = record_extract_oai_id(record)
-                task_sleep_now_if_required(can_stop_too=True)
-                if task_get_option("mode") == "holdingpen":
-                    #inserting into the holding pen
-                    write_message("Inserting into holding pen", verbose=3)
-                    insert_record_into_holding_pen(record, record_id)
-                else:
-                    write_message("Inserting into main database", verbose=3)
-                    error = bibupload(
-                        record,
-                        opt_tag=task_get_option('tag'),
-                        opt_mode=task_get_option('mode'),
-                        opt_stage_to_start_from=task_get_option('stage_to_start_from'),
-                        opt_notimechange=task_get_option('notimechange'),
-                        oai_rec_id=record_id,
-                        pretend=task_get_option('pretend'))
-                    if error[0] == 1:
-                        if record:
-                            write_message(record_xml_output(record),
-                                          stream=sys.stderr)
-                        else:
-                            write_message("Record could not have been parsed",
-                                          stream=sys.stderr)
-                        stat['nb_errors'] += 1
-                    elif error[0] == 2:
-                        if record:
-                            write_message(record_xml_output(record),
-                                          stream=sys.stderr)
-                        else:
-                            write_message("Record could not have been parsed",
-                                          stream=sys.stderr)
-
-                task_update_progress("Done %d out of %d." % \
-                    (stat['nb_records_inserted'] + \
-                    stat['nb_records_updated'],
-                    stat['nb_records_to_upload']))
+            bibupload_records(records = recs, opt_mode = task_get_option('mode'),
+                              opt_tag=task_get_option('tag'),
+                              opt_stage_to_start_from=task_get_option('stage_to_start_from'),
+                              opt_notimechange=task_get_option('notimechange'),
+                              pretend=task_get_option('pretend'))
         else:
             write_message("   Error bibupload failed: No record found",
                         verbose=1, stream=sys.stderr)
@@ -2324,5 +2431,6 @@ def log_record_uploading(oai_rec_id, task_id, bibrec_id, insertion_db, pretend=F
         except Error, error:
             write_message("   Error during the log_record_uploading function : %s "
                           % error, verbose=1, stream=sys.stderr)
+
 if __name__ == "__main__":
     main()
