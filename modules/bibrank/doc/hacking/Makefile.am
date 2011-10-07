@@ -27,7 +27,6 @@ webdoclib_DATA = \
 	bibrank-pagerank-c.webdoc \
 	bibrank-pagerank-t.webdoc
 
-
 EXTRA_DIST = $(webdoclib_DATA)
 
 CLEANFILES = *~ *.tmp
