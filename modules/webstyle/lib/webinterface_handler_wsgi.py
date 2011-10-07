@@ -324,6 +324,9 @@ class SimulatedModPythonRequest(object):
     def get_referer(self):
         return self.headers_in.get('referer')
 
+    def get_user_agent(self):
+        return self.headers_in.get('User-Agent', '')
+
     def get_what_was_written(self):
         return self.__what_was_written
 
@@ -371,6 +374,7 @@ class SimulatedModPythonRequest(object):
     remote_host = property(get_remote_host)
     referer = property(get_referer)
     what_was_written = property(get_what_was_written)
+    user_agent = property(get_user_agent)
 
 def alert_admin_for_server_status_p(status, referer):
     """

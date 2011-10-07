@@ -2583,7 +2583,7 @@ class BibDoc:
         """Return the total number of files."""
         return len(self.docfiles)
 
-    def register_download(self, ip_address, download_referer, version, format, userid=0):
+    def register_download(self, ip_address, download_referer, version, format, userid=0, url, session_key):
         """Register the information about a download of a particular file."""
         format = normalize_format(format)
         if format[:1] == '.':
@@ -2591,10 +2591,10 @@ class BibDoc:
         format = format.upper()
         return run_sql("INSERT INTO rnkDOWNLOADS "
             "(id_bibrec,id_bibdoc, referer, file_version,file_format,"
-            "id_user,client_host,download_time) VALUES "
-            "(%s,%s,%s,%s,%s,%s,INET_ATON(%s),NOW())",
+            "id_user,client_host,download_time,url,session_key) VALUES "
+            "(%s,%s,%s,%s,%s,%s,INET_ATON(%s),NOW(),%s)",
             (self.recid, self.id, download_referer, version, format,
-            userid, ip_address))
+            userid, ip_address, url, session_key))
 
 def generic_path2bidocfile(fullpath):
     """

@@ -569,5 +569,11 @@ update-v1.0.0-rc0-tables: # from v1.0.0-rc0 to next release
 	echo "ALTER TABLE schTASK CHANGE proc proc varchar(255) NOT NULL;" | ${prefix}/bin/dbexec
 	echo "ALTER TABLE oaiREPOSITORY CHANGE setSpec setSpec varchar(255) NOT NULL default 'GLOBAL_SET';" | ${prefix}/bin/dbexec
 	echo "UPDATE oaiREPOSITORY SET setSpec='GLOBAL_SET' WHERE setSpec='';" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE rnkDOWNLOADS ADD COLUMN url text DEFAULT NULL;" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE rnkPAGEVIEWS ADD COLUMN url text DEFAULT NULL;" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE rnkDOWNLOADS ADD COLUMN session_key varchar(32) NOT NULL DEFAULT '';" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE rnkPAGEVIEWS ADD COLUMN session_key varchar(32) NOT NULL DEFAULT '';" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE rnkDOWNLOADS ADD COLUMN user_agent varchar(255) NOT NULL DEFAULT '';" | ${prefix}/bin/dbexec
+	echo "ALTER TABLE rnkPAGEVIEWS ADD COLUMN user_agent varchar(255) NOT NULL DEFAULT '';" | ${prefix}/bin/dbexec
 
 CLEANFILES = *~ *.pyc *.tmp

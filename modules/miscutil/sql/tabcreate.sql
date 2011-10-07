@@ -2596,6 +2596,9 @@ CREATE TABLE IF NOT EXISTS rnkPAGEVIEWS (
   display_position mediumint(8) unsigned default '0',
   view_delay time default NULL,
   id_query int(15) unsigned NOT NULL default '0',
+  url text default NULL,
+  session_key varchar(32) NOT NULL default '',
+  user_agent varchar(255) NOT NULL default '',
   KEY view_time (view_time),
   KEY id_bibrec (id_bibrec)
 ) ENGINE=MyISAM;
@@ -2612,6 +2615,9 @@ CREATE TABLE IF NOT EXISTS rnkDOWNLOADS (
   display_position mediumint(8) unsigned default '0',
   download_delay time default NULL,
   id_query int(15) unsigned NOT NULL default '0',
+  url text default NULL,
+  session_key varchar(32) NOT NULL default '',
+  user_agent varchar(255) NOT NULL default '',
   KEY download_time (download_time),
   KEY id_bibrec (id_bibrec)
 ) TYPE=MyISAM;

@@ -46,7 +46,7 @@ def record_exists(recID):
 
 ### INTERFACE
 
-def register_page_view_event(recid, uid, client_ip_address, view_referer):
+def register_page_view_event(recid, uid, client_ip_address, view_referer, url, session_key):
     """Register Detailed record page view event for record RECID
        consulted by user UID from machine CLIENT_HOST_IP.
        To be called by the search engine.
@@ -56,9 +56,9 @@ def register_page_view_event(recid, uid, client_ip_address, view_referer):
         # site mode:
         return []
     return run_sql("INSERT INTO rnkPAGEVIEWS " \
-                   " (id_bibrec,id_user,client_host,view_time, referer) " \
-                   " VALUES (%s,%s,INET_ATON(%s),NOW(), %s)", \
-                   (recid, uid, client_ip_address, view_referer))
+                   " (id_bibrec,id_user,client_host,view_time, referer, url, session_key) " \
+                   " VALUES (%s,%s,INET_ATON(%s),NOW(), %s, %s, %s)", \
+                   (recid, uid, client_ip_address, view_referer, url, session_key))
 
 def calculate_reading_similarity_list(recid, type="pageviews"):
     """Calculate reading similarity data to use in reading similarity

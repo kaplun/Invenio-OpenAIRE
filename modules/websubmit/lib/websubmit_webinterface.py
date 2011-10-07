@@ -211,7 +211,7 @@ class WebInterfaceFilesPages(WebInterfaceDirectory):
                                 if not readonly and not CFG_WEBSUBMIT_ICON_SUBFORMAT_RE.match(get_subformat_from_format(format)):
                                     download_referer = req.headers_in.get('Referer')
                                     ip = str(req.remote_ip)
-                                    res = doc.register_download(ip, download_referer, version, format, uid)
+                                    res = doc.register_download(ip, download_referer, version, format, uid, docfile.get_url(), get_session(req).sid())
                                 try:
                                     return docfile.stream(req, download=is_download)
                                 except InvenioWebSubmitFileError, msg:

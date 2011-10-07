@@ -99,6 +99,7 @@ from invenio.errorlib import register_exception
 from invenio.textutils import encode_for_xml, wash_for_utf8
 from invenio.htmlutils import get_mathjax_header
 from invenio.htmlutils import nmtoken_from_string
+from invenio.session import get_session
 
 import invenio.template
 webstyle_templates = invenio.template.load('webstyle')
@@ -4695,7 +4696,7 @@ def perform_request_search(req=None, cc=CFG_SITE_NAME, c=None, p="", f="", rg=CF
                 client_ip_address = str(req.remote_ip)
                 #view_referer = str(cgi.parse_qs(req.headers_in.get('Referer')))
                 view_referer = req.headers_in.get('Referer')
-                register_page_view_event(recid, uid, client_ip_address, view_referer)
+                register_page_view_event(recid, uid, client_ip_address, view_referer, CFG_SITE_URL + CFG_SITE_RECORD + recid, get_session(req).sid())
         else: # record does not exist
             if of == "id":
                 return []
