@@ -1347,6 +1347,16 @@ class Template:
             i += 1
         out += "</tbody></table>"
 
+        out += """\
+<script type="text/javascript">
+$(document).ready(function(){
+    $("input:checkbox[name='c']").each(function(){
+        if (permitted_restricted_collections.indexOf(this.value) > -1)
+            this.checked = true;
+    });
+});
+</script>
+"""
         return out
 
     def tmpl_searchalso(self, ln, engines_list, collection_id):

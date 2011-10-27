@@ -1127,7 +1127,7 @@ class Template:
                     'x_url_close': '</a>'}
         return out
 
-    def tmpl_create_userinfobox(self, ln, url_referer, guest, username, submitter, referee, admin, usebaskets, usemessages, usealerts, usegroups, useloans, usestats):
+    def tmpl_create_userinfobox(self, ln, url_referer, guest, username, submitter, referee, admin, usebaskets, usemessages, usealerts, usegroups, useloans, usestats, permitted_restricted_collections):
         """
         Displays the user block
 
@@ -1158,6 +1158,9 @@ class Template:
           - 'useloans' *boolean* - If loans are enabled for the user
 
           - 'usestats' *boolean* - If stats are enabled for the user
+
+          - 'permitted_restricted_collections' *list of strings* - the list
+             of strings that are considered as authorized for the authenticated user
 
         @note: with the update of CSS classes (cds.cds ->
             invenio.css), the variables useloans etc are not used in
@@ -1191,6 +1194,11 @@ class Template:
                     'ln' : ln,
                     'logout' : _("logout"),
                 }
+        permitted_restricted_collections_js = "permitted_restricted_collections = [%s];" % ', '.join(['"%s"' % coll.replace('"', r'\"') for coll in  permitted_restricted_collections])
+
+        ## Let's include as a global JS var the list of permitted restricted collections
+        ## so that this can then by served to a javascript script in webcoll.
+        out += """<script type="text/javascript">%s</script>""" % permitted_restricted_collections_js
         return out
 
     def tmpl_create_useractivities_menu(self, ln, selected, url_referer, guest, username, submitter, referee, admin, usebaskets, usemessages, usealerts, usegroups, useloans, usestats):

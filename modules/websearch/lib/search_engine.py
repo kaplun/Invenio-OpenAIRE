@@ -1782,6 +1782,27 @@ def get_coll_real_descendants(coll, type='_', get_hosted_colls=True):
             coll_sons.extend(get_coll_real_descendants(name))
     return coll_sons
 
+def get_coll_descendants(coll, type='_', get_hosted_colls=True, coll_sons=None):
+    """Return a list of all descendants of collection 'coll'.
+    """
+    if coll_sons is None:
+        coll_sons = []
+    res = run_sql("""SELECT c.name,c.dbquery FROM collection AS c
+                     LEFT JOIN collection_collection AS cc ON c.id=cc.id_son
+                     LEFT JOIN collection AS ccc ON ccc.id=cc.id_dad
+                     WHERE ccc.name=%s AND cc.type LIKE %s ORDER BY cc.score DESC""",
+                  (coll, type,))
+    for name, dbquery in res:
+        if name in coll_sons:
+            continue
+        if get_hosted_colls:
+            coll_sons.append(name)
+        else:
+            if not dbquery or not dbquery.startswith("hostedcollection:"):
+                coll_sons.append(name)
+        get_coll_descendants(name, type=type, get_hosted_colls=get_hosted_colls, coll_sons=coll_sons)
+    return coll_sons
+
 def browse_pattern(req, colls, p, f, rg, ln=CFG_SITE_LANG):
     """Browse either biliographic phrases or words indexes, and display it."""
 

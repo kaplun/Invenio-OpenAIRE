@@ -113,7 +113,9 @@ from invenio.search_engine import check_user_can_view_record, \
      perform_request_log, \
      perform_request_search, \
      restricted_collection_cache, \
-     get_coll_normalised_name
+     get_coll_normalised_name, \
+     get_coll_sons, \
+     get_coll_descendants
 from invenio.search_engine_utils import get_fieldvalues
 from invenio.access_control_engine import acc_authorize_action
 from invenio.access_control_config import VIEWRESTRCOLL
@@ -1174,7 +1176,15 @@ class WebInterfaceSearchResultsPages(WebInterfaceDirectory):
                 try:
                     restricted_collections = user_info['precached_permitted_restricted_collections']
                     argd_collections = set(argd['c'])
-                    argd_collections.update(restricted_collections)
+                    current_collection = argd['cc']
+                    current_collection_sons = get_coll_sons(current_collection, public_only=0)
+                    current_collection_descendants = get_coll_descendants(current_collection, type='_', get_hosted_colls=False)
+                    for restricted_collection in restricted_collections:
+                        if restricted_collection in current_collection_descendants and restricted_collection not in current_collection_sons:
+                            ## We add only those restricted collections descendent of the current collection
+                            ## and that they couldn't have been selected directly because they were not
+                            ## direct son.
+                            argd_collections.add(restricted_collection)
                     argd['c'] = list(argd_collections)
                 except KeyError:
                     pass

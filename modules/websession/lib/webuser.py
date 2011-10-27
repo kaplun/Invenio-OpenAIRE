@@ -803,7 +803,8 @@ def create_userinfobox_body(req, uid, language="en"):
                                             usealerts=user_info['precached_usealerts'],
                                             usegroups=user_info['precached_usegroups'],
                                             useloans=user_info['precached_useloans'],
-                                            usestats=user_info['precached_usestats']
+                                            usestats=user_info['precached_usestats'],
+                                            permitted_restricted_collections=user_info['precached_permitted_restricted_collections'],
                                             )
     except OperationalError:
         return ""
