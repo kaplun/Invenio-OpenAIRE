@@ -23,9 +23,12 @@ running from configure.ac.
 """
 
 ## minimally recommended/required versions:
-cfg_min_python_version = "2.4"
-cfg_max_python_version = "2.9.9999"
-cfg_min_mysqldb_version = "1.2.1_p2"
+CFG_MIN_PYTHON_VERSION = "2.4"
+CFG_MAX_PYTHON_VERSION = "2.9.9999"
+CFG_MIN_MYSQLDB_VERSION = "1.2.1_p2"
+CFG_MIN_FLASK_VERSION = "0.8"
+CFG_MIN_WERKZEUG_VERSION = "0.8.1"
+CFG_MIN_JINJA2_VERSION = "2.6"
 
 ## 0) import modules needed for this testing:
 import string
@@ -36,6 +39,16 @@ import re
 
 error_messages = []
 warning_messages = []
+
+def version_cmp(v1, v2):
+    """
+    Returns -1 if v1 < v2
+    Returns 0 if v1 == v2
+    Returns 1 if v1 > v2
+    """
+    def numerify(text):
+        return tuple((token.isdigit() and [int(token)] or [token])[0] for token in re.split('[\._-]', text))
+    return cmp(numerify(v1), numerify(v2))
 
 def wait_for_user(msg):
     """Print MSG and prompt user for confirmation."""
@@ -49,7 +62,7 @@ def wait_for_user(msg):
         return
 
 ## 1) check Python version:
-if sys.version < cfg_min_python_version:
+if version_cmp(sys.version, CFG_MIN_PYTHON_VERSION) == -1:
     error_messages.append(
     """
     *******************************************************
@@ -65,10 +78,10 @@ if sys.version < cfg_min_python_version:
     **                                                   **
     ** Please upgrade your Python before continuing.     **
     *******************************************************
-    """ % (string.replace(sys.version, "\n", ""), cfg_min_python_version)
+    """ % (string.replace(sys.version, "\n", ""), CFG_MIN_PYTHON_VERSION)
     )
 
-if sys.version > cfg_max_python_version:
+if version_cmp(sys.version, CFG_MAX_PYTHON_VERSION) == 1:
     error_messages.append(
     """
     *******************************************************
@@ -85,7 +98,7 @@ if sys.version > cfg_max_python_version:
     **                                                   **
     ** Installation aborted.                             **
     *******************************************************
-    """ % (string.replace(sys.version, "\n", ""), cfg_max_python_version)
+    """ % (string.replace(sys.version, "\n", ""), CFG_MAX_PYTHON_VERSION)
     )
 
 ## 2) check for required modules:
@@ -113,6 +126,9 @@ try:
     import urllib
     import zlib
     import wsgiref
+    import flask
+    import werkzeug
+    import jinja2
 except ImportError, msg:
     error_messages.append("""
     *************************************************
@@ -348,7 +364,7 @@ except ImportError, msg:
 
 
 ## 4) check for versions of some important modules:
-if MySQLdb.__version__ < cfg_min_mysqldb_version:
+if version_cmp(MySQLdb.__version__, CFG_MIN_MYSQLDB_VERSION) == -1:
     error_messages.append(
     """
     *****************************************************
@@ -359,7 +375,7 @@ if MySQLdb.__version__ < cfg_min_mysqldb_version:
     ** before continuing.  Please see the INSTALL file **
     ** for more details.                               **
     *****************************************************
-    """ % (MySQLdb.__version__, cfg_min_mysqldb_version)
+    """ % (MySQLdb.__version__, CFG_MIN_MYSQLDB_VERSION)
     )
 
 try:
@@ -405,6 +421,52 @@ except StandardError, msg:
     *****************************************************
     """ % (msg)
     )
+
+## 6) check for Flask
+if version_cmp(flask.__version__, CFG_MIN_FLASK_VERSION) == -1:
+    error_messages.append(
+    """
+    *****************************************************
+    ** ERROR: PYTHON MODULE FLASK %s DETECTED
+    *****************************************************
+    ** You have to upgrade your Flask to at least      **
+    ** version %s.  You must fix this problem         **
+    ** before continuing.  Please see the INSTALL file **
+    ** for more details.                               **
+    *****************************************************
+    """ % (flask.__version__, CFG_MIN_FLASK_VERSION)
+    )
+
+## 7) check for Werkzeug
+if version_cmp(werkzeug.__version__, CFG_MIN_WERKZEUG_VERSION) == -1:
+    error_messages.append(
+    """
+    *****************************************************
+    ** ERROR: PYTHON MODULE WERKZEUG %s DETECTED
+    *****************************************************
+    ** You have to upgrade your Werkzeug to at least   **
+    ** version %s.  You must fix this problem       **
+    ** before continuing.  Please see the INSTALL file **
+    ** for more details.                               **
+    *****************************************************
+    """ % (werkzeug.__version__, CFG_MIN_WERKZEUG_VERSION)
+    )
+
+## 7) check for Jinja2
+if version_cmp(jinja2.__version__, CFG_MIN_JINJA2_VERSION) == -1:
+    error_messages.append(
+    """
+    *****************************************************
+    ** ERROR: PYTHON MODULE JINJA2 %s DETECTED
+    *****************************************************
+    ** You have to upgrade your Jinja2 to at least     **
+    ** version %s.  You must fix this problem         **
+    ** before continuing.  Please see the INSTALL file **
+    ** for more details.                               **
+    *****************************************************
+    """ % (jinja2.__version__, CFG_MIN_JINJA2_VERSION)
+    )
+
 
 ## Check if ffmpeg is installed and if so, with the minimum configuration for bibencode
 try:

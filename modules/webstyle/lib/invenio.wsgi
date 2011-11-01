@@ -20,10 +20,24 @@
 mod_wsgi Invenio application loader.
 """
 
+from flask import Flask
+
 try:
     from invenio import remote_debugger
     remote_debugger.start_file_changes_monitor()
 except:
     pass
 
-from invenio.webinterface_handler_wsgi import application
+from invenio.webinterface_handler_wsgi import application as legacy_invenio
+from invenio.webinterface_handler_wsgi import SimulatedModPythonRequest
+
+class LegacyInvenioFixer(object):
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        req = SimulatedModPythonRequest(environ, start_response)
+
+
+application = Flask(__name__)
+    application.wsgi_app()

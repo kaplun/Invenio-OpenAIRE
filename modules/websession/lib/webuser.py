@@ -1059,7 +1059,7 @@ def get_preferred_user_language(req):
 
     return new_lang
 
-def collect_user_info(req, login_time=False, refresh=False):
+def collect_user_info(req=None, login_time=False, refresh=False):
     """Given the mod_python request object rec or a uid it returns a dictionary
     containing at least the keys uid, nickname, email, groups, plus any external keys in
     the user preferences (collected at login time and built by the different
@@ -1069,6 +1069,7 @@ def collect_user_info(req, login_time=False, refresh=False):
     is saved into req._user_info (for caching purpouses)
     setApacheUser & setUid will properly reset it.
     """
+    from flask import request
     from invenio.search_engine import get_permitted_restricted_collections
     user_info = {
         'remote_ip' : '',
@@ -1099,6 +1100,7 @@ def collect_user_info(req, login_time=False, refresh=False):
 
     try:
         is_req = False
+        is_flask = bool(request)
         if not req:
             uid = -1
         elif type(req) in (type(1), type(1L)):

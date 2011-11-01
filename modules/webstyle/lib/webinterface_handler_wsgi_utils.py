@@ -54,6 +54,7 @@ import os
 import cgi
 import cStringIO
 import tempfile
+import flask
 from types import TypeType, ClassType, BuiltinFunctionType, MethodType, ListType
 from invenio.config import CFG_TMPDIR, CFG_TMPSHAREDDIR
 from invenio.webinterface_handler_config import \
@@ -63,6 +64,7 @@ from invenio.webinterface_handler_config import \
     InvenioWebInterfaceWSGIContentLenghtError, \
     InvenioWebInterfaceWSGIContentTypeError, \
     InvenioWebInterfaceWSGIContentMD5Error
+
 
 # Cache for values of PythonPath that have been seen already.
 _path_cache = {}
@@ -265,9 +267,12 @@ def get_cookies(req, Class=Cookie, **kw):
     return Class.parse(cookies, **kw)
 
 def get_cookie(req, name, Class=Cookie, **kw):
-    cookies = get_cookies(req, Class, names=[name], **kw)
-    if cookies.has_key(name):
-        return cookies[name]
+    if isinstance(req, flask.Request):
+        return req.cookies.get(name)
+    else:
+        cookies = get_cookies(req, Class, names=[name], **kw)
+        if cookies.has_key(name):
+            return cookies[name]
 
 
 parse_qs = cgi.parse_qs

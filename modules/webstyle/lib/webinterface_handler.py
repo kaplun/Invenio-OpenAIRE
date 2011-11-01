@@ -111,7 +111,10 @@ def _check_result(req, result):
         # to guess it
         if not req.content_type_set_p:
             # make an attempt to guess content-type
-            if result[:100].strip()[:6].lower() == '<html>' \
+            chunk = result[:100].strip()
+            if chunk.startswith("{"):
+                req.content_type = 'application/json'
+            elif chunk[:6].lower() == '<html>' \
                or result.find('</') > 0:
                 req.content_type = 'text/html'
             else:

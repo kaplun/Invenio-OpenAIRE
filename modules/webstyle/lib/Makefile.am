@@ -34,7 +34,7 @@ pylib_DATA = webdoc.py \
              webinterface_handler_config.py \
              httptest_webinterface.py
 
-wsgiweb_DATA = invenio.wsgi
+wsgiweb_DATA = invenio.wsgi invenio-flask.wsgi
 
 EXTRA_DIST = $(pylib_DATA) $(wsgiweb_DATA)
 

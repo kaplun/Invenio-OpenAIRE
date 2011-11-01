@@ -925,7 +925,10 @@ WSGIRestrictStdout Off
         Alias /robots.txt %(webdir)s/robots.txt
         Alias /favicon.ico %(webdir)s/favicon.ico
         WSGIDaemonProcess invenio processes=5 threads=1 display-name=%%{GROUP} inactivity-timeout=3600 maximum-requests=10000
+        WSGIDaemonProcess invenio-flask processes=5 threads=1 display-name=%%{GROUP} inactivity-timeout=3600 maximum-requests=10000
         WSGIImportScript %(wsgidir)s/invenio.wsgi process-group=invenio application-group=%%{GLOBAL}
+        WSGIImportScript %(wsgidir)s/invenio-flask.wsgi process-group=invenio application-group=%%{GLOBAL}
+        WSGIScriptAliasMatch ^/yourmessages.* %(wsgidir)s/invenio-flask.wsgi
         WSGIScriptAlias / %(wsgidir)s/invenio.wsgi
         WSGIPassAuthorization On
         %(xsendfile_directive)s
@@ -1000,6 +1003,7 @@ WSGIRestrictStdout Off
         Alias /robots.txt %(webdir)s/robots.txt
         Alias /favicon.ico %(webdir)s/favicon.ico
         RedirectMatch /sslredirect/(.*) http://$1
+        WSGIScriptAliasMatch ^/yourmessages.* %(wsgidir)s/invenio-flask.wsgi
         WSGIScriptAlias / %(wsgidir)s/invenio.wsgi
         WSGIPassAuthorization On
         %(xsendfile_directive)s

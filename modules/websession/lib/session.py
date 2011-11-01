@@ -27,11 +27,13 @@ interface, which will let you store permanent information).
 from invenio.webinterface_handler_wsgi_utils import add_cookies, Cookie, get_cookie
 
 import cPickle
-import time
+import datetime
 import random
 import re
 import sys
 import os
+import flask
+import uuid
 if sys.hexversion < 0x2060000:
     from md5 import md5
 else:
@@ -45,6 +47,81 @@ from invenio.websession_config import CFG_WEBSESSION_COOKIE_NAME, \
     CFG_WEBSESSION_ENABLE_LOCKING
 
 CFG_FULL_HTTPS = CFG_SITE_URL.lower().startswith("https://")
+
+from flask.sessions import SessionInterface, SessionMixin
+
+class InvenioSession(dict, SessionMixin):
+    def _get_uid(self):
+        return self.get("_uid", -1)
+
+    def _set_uid(self, uid):
+        self["_uid"] = uid
+        self.modified = True
+
+    uid = property(_get_uid, _set_uid)
+    del _get_uid, _set_uid
+
+class InvenioFlaskSessionInterfaceBrige(SessionInterface):
+    def open_session(self, app, request):
+        sid = request.cookies.get(CFG_WEBSESSION_COOKIE_NAME)
+        remote_ip = request.environ['REMOTE_ADDR']
+        if not sid:
+            sid = request.args['session_id']
+        if sid:
+            invalid = False
+            session_dict = None
+            res = run_sql("SELECT session_object FROM session "
+                            "WHERE session_key=%s WHERE session_expiry > UTC_TIMESTAMP()", (self._sid, ))
+            if res:
+                try:
+                    session = cPickle.loads(zlib.uncompress(res[0][0]))
+                    if request.scheme == 'https':
+                        if getattr(session, 'https_ip', remote_ip) != remote_ip:
+                            invalid = True
+                        else:
+                            session.https_ip = remote_ip
+                    else:
+                        if getattr(session, 'http_ip', remote_ip) != remote_ip:
+                            invalid = True
+                        else:
+                            session.http_ip = remote_ip
+                except:
+                    invalid = True
+
+            if session is not None and not invalid:
+                session.new = False
+                return session
+        session = InvenioSession()
+        session.sid = uuid4()
+        if request.scheme == 'https':
+            session.https_ip = remote_ip
+        else:
+            session.http_ip = remote_ip
+        return session
+
+    def save_session(self, app, session, response):
+        if session.permanent:
+            session_expiry = datetime.datetime.utcnow() + app.permanent_session_lifetime
+        elif:
+            session_expiry = datetime.datetime.utcnow() + datetime.timedelta(CFG_SESSION_SHORTTIMEOUT)
+
+        session_key = session.sid
+        session_object = zlib.compress(cPickle.dumps(session, -1)
+        uid = session.uid
+        if session.modified:
+            run_sql("INSERT INTO session(session_key, session_expiry, session_object, uid) VALUES(%s, %s, %s, %s) ON DUPLICATE KEY UPDATE session_expiry=%s, session_object=%s, uid=%s WHERE session_key=%s", (session_key, session_expiry, session_object, uid, session_expiry, session_object, uid, session_key))
+        if session.new:
+            if session.uid > -1 and CFG_FULL_HTTPS:
+                from flask import request
+                if request.scheme == 'https':
+                    if session.permanent:
+                        max_age = app.permanent_session_lifetime
+                    else:
+                        max_age = None
+                    expires = session_expiry
+                    response.set_cookie(CFG_WEBSESSION_COOKIE_NAME, value=sid, secure=True, httponly=True, mag_age=max_age, expires=expires)
+
+
 
 def get_session(req, sid=None):
     """
@@ -69,7 +146,7 @@ def get_session(req, sid=None):
         req._session = InvenioSession(req, sid)
     return req._session
 
-class InvenioSession(dict):
+class InvenioSession(dict, SessionMixin):
     """
     This class implements a Session handling based on MySQL.
 
@@ -89,9 +166,9 @@ class InvenioSession(dict):
         session.
     """
 
-    def __init__(self, req, sid=None):
+    def __init__(self, request, sid=None):
         self._remember_me = False
-        self._req, self._sid, self._secret = req, sid, None
+        self._req, self._sid = request, sid
         self._lock = CFG_WEBSESSION_ENABLE_LOCKING
         self._new = 1
         self._created = 0
@@ -137,7 +214,7 @@ class InvenioSession(dict):
             # make a new session
             if self._sid:
                 self.unlock() # unlock old sid
-            self._sid = _new_sid(self._req)
+            self._sid = _new_sid(self._req.remote_ip)
             self.lock()                 # lock new sid
             remote_ip = self._req.remote_ip
             if self._req.is_https():
@@ -163,6 +240,7 @@ class InvenioSession(dict):
         @type remember_me: bool
         """
         self._remember_me = remember_me
+        self['_permanent'] = bool(remember_me)
         if remember_me:
             self.set_timeout(CFG_WEBSESSION_EXPIRY_LIMIT_REMEMBER *
                 CFG_WEBSESSION_ONE_DAY)
@@ -411,6 +489,23 @@ class InvenioSession(dict):
     ## resources.
     need_https = property(get_need_https)
 
+    def _get_new(self):
+        return bool(self._new)
+
+    def _set_new(self, new):
+        self._new = new
+
+    new = property(_get_new, _set_new)
+    del _get_new, _set_new
+
+    def _get_permanent(self):
+        return self._remember_me
+
+    def _set_permanent(self, value):
+        self.set_remember_me(value)
+    permanent = property(_get_permanent, _set_permanent)
+    del _get_permanent, _set_permanent
+
 def _unlock_session_cleanup(session):
     """
     Auxliary function to unlock a session.
@@ -480,7 +575,7 @@ def _check_sid(sid):
     """
     return not not _RE_VALIDATE_SID.match(sid)
 
-def _new_sid(req):
+def _new_sid(remote_ip):
     """
     Make a number based on current time, pid, remote ip
     and two random ints, then hash with md5. This should
@@ -508,7 +603,6 @@ def _new_sid(req):
     random_generator = _get_generator()
     rnd1 = random_generator.randint(0, 999999999)
     rnd2 = random_generator.randint(0, 999999999)
-    remote_ip = req.remote_ip
 
     return md5("%d%d%d%d%s" % (
         the_time,
