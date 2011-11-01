@@ -40,4 +40,4 @@ class LegacyInvenioFixer(object):
 
 
 application = Flask(__name__)
-    application.wsgi_app()
+application.wsgi_app = legacy_invenio(application.wsgi_app)
