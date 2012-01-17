@@ -884,7 +884,7 @@ def parse_reference_line(ref_line, kbs, bad_titles_count):
                                     identified_urls)
 
     # Transformations on elements
-    #citation_elements = format_volume(citation_elements)
+    citation_elements = format_volume(citation_elements)
     citation_elements = handle_special_journals(citation_elements, kbs)
     citation_elements = format_report_number(citation_elements)
     citation_elements = format_author_ed(citation_elements)

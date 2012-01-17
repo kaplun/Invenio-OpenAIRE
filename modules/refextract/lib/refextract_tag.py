@@ -1009,7 +1009,7 @@ def tag_numeration(line):
         and possibly recognized/marked-up.
     """
     patterns = (
-        re_strip_series_and_volume_labels,
+        #re_strip_series_and_volume_labels,
 
         # vol,page,year
         re_numeration_vol_page_yr,

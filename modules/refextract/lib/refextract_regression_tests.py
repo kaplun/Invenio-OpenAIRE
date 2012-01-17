@@ -1864,6 +1864,17 @@ Rev. D 80 034030 1-25"""
    </datafield>
 </record>""")
 
+    def test_journal_phys_rev_d(self):
+        ref_line = u"""[6] Sivers D. W., Phys. Rev.D, 41 (1990) 83"""
+        reference_test(self, ref_line, u"""<record>
+   <controlfield tag="001">1</controlfield>
+   <datafield tag="999" ind1="C" ind2="5">
+      <subfield code="o">6</subfield>
+      <subfield code="h">Sivers D. W.</subfield>
+      <subfield code="s">Phys.Rev.D,41,83</subfield>
+   </datafield>
+</record>""")
+
 
 if __name__ == '__main__':
     test_suite = make_test_suite(RefextractTest)
