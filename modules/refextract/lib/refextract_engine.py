@@ -1491,6 +1491,7 @@ def extract_one(config, kbs, num, pdf_path):
         # don't search for citations in the document body:
         # treat it as a reference section:
         reflines = docbody
+        how_found_start = 1
     else:
         # launch search for the reference section in the document body:
         (reflines, extract_error, how_found_start) = \
