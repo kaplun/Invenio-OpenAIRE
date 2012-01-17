@@ -501,7 +501,7 @@ def build_authors_knowledge_base(fpath):
 
 def build_journals_re_knowledge_base(fpath):
     """Load journals regexps knowledge base
-    
+
     @see build_journals_knowledge_base
     """
     def make_tuple(match):
@@ -740,7 +740,7 @@ def remove_reference_line_marker(line):
 
 def roman2arabic(num):
     """Convert numbers from roman to arabic
-    
+
     This function expects a string like XXII
     and outputs an integer
     """
@@ -1044,7 +1044,7 @@ def parse_tagged_reference_line(line_marker,
                     # 1. To get the series char from the title, if no series was found with the numeration
                     # 2. To always remove any series character from the title match text
                     # series_from_title = re_series_from_title.search(title_text)
-                    # 
+                    #
                     if numeration_match.group('series'):
                         reference_volume = numeration_match.group('series') + reference_volume
 
@@ -1543,7 +1543,7 @@ def begin_extraction(config):
     """
     global RUNNING_INDEPENDENTLY
     RUNNING_INDEPENDENTLY = True
- 
+
     # What journal title format are we using?
     if config.inspire:
         write_message("Using inspire journal title form", verbose=2)
@@ -1595,7 +1595,7 @@ def begin_extraction(config):
 
 def write_references(config, xml_references):
     """Write marcxml to file
-    
+
     * Output xml header
     * Output collection opening tag
     * Output xml for each record
@@ -1627,7 +1627,7 @@ def write_references(config, xml_references):
 
 def display_lines_count(text):
     """Display lines count
-    
+
     Give a text, it counts the number of lines in it and displays it
     """
     lines_count = sum([1 for c in text if c == '\n'])
@@ -1636,7 +1636,7 @@ def display_lines_count(text):
 
 def write_raw_references(num, reflines):
     """Write raw references to a file
-    
+
     If you want to save the raw references to a file
     They will be save in the current directory named by their position
     1st file will be named 1.rawrefs
@@ -1658,7 +1658,7 @@ def write_raw_references(num, reflines):
 
 def write_titles_statistics(all_found_titles_count, destination_file):
     """Write title statistics to file
-    
+
     Write statistics from the extraction to a file
     Output file will look like
         3:JHEP
@@ -1719,7 +1719,7 @@ def load_kbs(kb_journals=None, kb_reports=None, kb_authors=None,
 
 def build_xml_references(citations, inspire):
     """Build marc xml from a references list
-    
+
     Transform the reference elements into marc xml
     """
     xml_references = []
@@ -1745,7 +1745,7 @@ def parse_references(reference_lines, recid=1, inspire=False,
         kb_journals=None, kb_reports=None, kb_authors=None,
         kb_books=None, kb_conferences=None, kb_journals_re=None):
     """Parse a list of references
-    
+
     Given a list of raw reference lines (list of strings),
     output the MARC-XML content extracted version
     """
