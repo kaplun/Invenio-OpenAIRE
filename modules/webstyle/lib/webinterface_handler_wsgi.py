@@ -195,6 +195,14 @@ class SimulatedModPythonRequest(object):
             self.__buffer = ''
 
     def set_content_type(self, content_type):
+        if content_type.startswith('text/html') and "application/xhtml+xml" in self.__headers_in.get('Accept', ''):
+            ## The W3C recommends that:
+            ## <http://www.w3.org/TR/xhtml-media-types/#media-types>
+            ## If the Accept header explicitly contains application/xhtml+xml
+            ## (with either no "q" parameter or a positive "q" value)
+            ## deliver the document using that media type.
+            content_type = content_type.replace('text/html', "application/xhtml+xml")
+
         self.__headers['content-type'] = content_type
         if self.__is_https:
             if content_type.startswith("text/html") or content_type.startswith("application/rss+xml"):
